@@ -52,6 +52,10 @@ impl TempCredentials {
     pub fn upgrade(self, certificate: Certificate) -> Result<PermCredentials> {
         PermCredentials::new(self.raw, certificate)
     }
+
+    pub fn public_key (&self) -> &[u8] {
+       self.keypair.public_key().as_ref()
+    }
 }
 
 impl CanSign for TempCredentials {

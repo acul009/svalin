@@ -5,6 +5,7 @@ mod hash;
 mod perm_credentials;
 mod signed_message;
 mod temp_credentials;
+mod public_key;
 
 use anyhow::Result;
 pub use certificate::Certificate;

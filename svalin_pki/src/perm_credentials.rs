@@ -1,11 +1,10 @@
 use anyhow::{anyhow, Context, Result};
+use rcgen::CertificateParams;
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    encrypt::EncryptedData,
-    signed_message::{CanSign, CanVerify},
-    Certificate,
+    encrypt::EncryptedData, public_key::PublicKey, signed_message::{CanSign, CanVerify}, Certificate
 };
 
 pub struct PermCredentials {
@@ -71,6 +70,13 @@ impl PermCredentials {
 
     pub fn get_certificate(&self) -> &Certificate {
         &self.certificate
+    }
+
+    pub fn create_certificate(&self, public_key: PublicKey) -> Result<Certificate> {
+        let rc_keypair = rcgen::KeyPair::from_der(&self.raw_keypair)?;
+       let params = CertificateParams::from_ca_cert_der(self.certificate.to_der(), rc_keypair)?;
+
+       todo!()
     }
 }
 

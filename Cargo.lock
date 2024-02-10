@@ -961,6 +961,7 @@ dependencies = [
  "pem",
  "ring 0.17.7",
  "time",
+ "x509-parser",
  "yasna",
 ]
 
@@ -1260,10 +1261,12 @@ name = "svalin"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "clap",
  "marmelade",
  "serde",
  "serde_json",
+ "svalin_pki",
  "svalin_rpc",
  "tokio",
 ]

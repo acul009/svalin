@@ -6,7 +6,8 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use command::HandlerCollection;
+pub use command::{HandlerCollection, CommandHandler};
+pub use session::{Session, SessionOpen};
 use rustls::PrivateKey;
 use tokio::task::JoinSet;
 
@@ -16,7 +17,7 @@ mod ping;
 mod session;
 mod skip_verify;
 
-use session::{Session, SessionCreated};
+use session::SessionCreated;
 
 use crate::ping::PingHandler;
 
