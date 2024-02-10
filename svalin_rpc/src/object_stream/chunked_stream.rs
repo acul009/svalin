@@ -4,11 +4,11 @@ use anyhow::{Ok, Result};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub(super) struct ChunkWriter {
-    binary_writer: Box<dyn AsyncWrite + Unpin>,
+    binary_writer: Box<dyn AsyncWrite + Send + Unpin>,
 }
 
 impl ChunkWriter {
-    pub(super) fn new(binary_writer: Box<dyn AsyncWrite + Unpin>) -> Self {
+    pub(super) fn new(binary_writer: Box<dyn AsyncWrite + Send + Unpin>) -> Self {
         Self { binary_writer }
     }
 
@@ -33,11 +33,11 @@ impl ChunkWriter {
 }
 
 pub(super) struct ChunkReader {
-    binary_reader: Box<dyn AsyncRead + Unpin>,
+    binary_reader: Box<dyn AsyncRead + Send + Unpin>,
 }
 
 impl ChunkReader {
-    pub(super) fn new(binary_reader: Box<dyn AsyncRead + Unpin>) -> Self {
+    pub(super) fn new(binary_reader: Box<dyn AsyncRead + Send + Unpin>) -> Self {
         Self { binary_reader }
     }
 

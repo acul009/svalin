@@ -9,6 +9,7 @@ mod temp_credentials;
 use anyhow::Result;
 pub use certificate::Certificate;
 pub use error::Error;
+pub use hash::ArgonParams;
 pub use perm_credentials::PermCredentials;
 pub use temp_credentials::TempCredentials;
 

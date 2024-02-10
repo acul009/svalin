@@ -142,7 +142,7 @@ impl Connection {
 
                 core::result::Result::Ok((send, recv)) => {
                     println!("data stream incoming!");
-                    let session = Session::new(recv, send);
+                    let session = Session::new(Box::new(recv), Box::new(send));
                     let fut = Server::handle_stream(stream);
                     self.open_streams.spawn(async move {
                         if let Err(e) = fut.await {

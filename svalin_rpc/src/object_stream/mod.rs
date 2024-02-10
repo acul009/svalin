@@ -11,7 +11,7 @@ pub(crate) struct ObjectWriter {
 }
 
 impl ObjectWriter {
-    pub(super) fn new(binary_writer: Box<dyn AsyncWrite + Unpin>) -> Self {
+    pub(super) fn new(binary_writer: Box<dyn AsyncWrite + Send + Unpin>) -> Self {
         let chunk_writer = chunked_stream::ChunkWriter::new(binary_writer);
         Self { chunk_writer }
     }
@@ -29,7 +29,7 @@ pub(crate) struct ObjectReader {
 }
 
 impl ObjectReader {
-    pub(super) fn new(binary_reader: Box<dyn AsyncRead + Unpin>) -> Self {
+    pub(super) fn new(binary_reader: Box<dyn AsyncRead + Send + Unpin>) -> Self {
         let chunk_reader = chunked_stream::ChunkReader::new(binary_reader);
         Self { chunk_reader }
     }

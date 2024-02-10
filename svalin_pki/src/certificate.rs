@@ -1,4 +1,5 @@
 use anyhow::Result;
+use serde::{de, Deserialize, Serialize};
 use x509_parser::nom::AsBytes;
 use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
 
@@ -35,12 +36,32 @@ impl CanVerify for Certificate {
     }
 }
 
+impl Serialize for Certificate {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.to_der())
+    }
+}
+
+impl<'de> Deserialize<'de> for Certificate {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let der = Vec::<u8>::deserialize(deserializer)?;
+        Certificate::from_der(der).map_err(|err| de::Error::custom(err.to_string()))
+    }
+}
+
+#[cfg(test)]
 mod test {
     use ring::rand::{SecureRandom, SystemRandom};
 
     use crate::{
         signed_message::{Sign, Verify},
-        TempCredentials,
+        Certificate, TempCredentials,
     };
 
     #[test]
@@ -57,5 +78,28 @@ mod test {
         let msg2 = cert.verify(&signed).unwrap();
 
         assert_eq!(msg, msg2.as_ref());
+    }
+
+    #[test]
+    pub fn serialization() {
+        let credentials = TempCredentials::generate().unwrap();
+        let perm_creds = credentials.to_self_signed_cert().unwrap();
+        let cert = perm_creds.get_certificate();
+
+        let seriaized = cert.to_der().to_owned();
+        let cert2 = Certificate::from_der(seriaized).unwrap();
+        assert_eq!(cert, &cert2)
+    }
+
+    #[test]
+    pub fn serde_serialization() {
+        let credentials = TempCredentials::generate().unwrap();
+        let perm_creds = credentials.to_self_signed_cert().unwrap();
+        let cert = perm_creds.get_certificate();
+
+        let serialized = postcard::to_extend(cert, Vec::new()).unwrap();
+
+        let cert2: Certificate = postcard::from_bytes(&serialized).unwrap();
+        assert_eq!(cert, &cert2)
     }
 }

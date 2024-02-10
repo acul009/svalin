@@ -1,4 +1,4 @@
-use std::fmt::{write, Display};
+use std::fmt::Display;
 
 #[derive(Debug)]
 pub enum Error {

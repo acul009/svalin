@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, Params,

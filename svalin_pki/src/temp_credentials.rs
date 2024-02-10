@@ -66,6 +66,7 @@ impl CanVerify for TempCredentials {
     }
 }
 
+#[cfg(test)]
 mod test {
 
     use ring::rand::{SecureRandom, SystemRandom};

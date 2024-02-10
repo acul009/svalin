@@ -56,7 +56,7 @@ static DEFAULT_ALG: EncryptionAlgorythm = EncryptionAlgorythm::Chacha20Poly1305;
 
 impl EncryptedData {
     pub fn encrypt_with_password(data: &[u8], password: &[u8]) -> Result<Vec<u8>> {
-        EncryptedData::encrypt_with_alg(data, password, EncryptionAlgorythm::Chacha20Poly1305)
+        EncryptedData::encrypt_with_alg(data, password, DEFAULT_ALG)
     }
 
     fn encrypt_with_alg(data: &[u8], password: &[u8], alg: EncryptionAlgorythm) -> Result<Vec<u8>> {
@@ -109,6 +109,7 @@ impl EncryptedData {
     }
 }
 
+#[cfg(test)]
 mod test {
     use ring::rand::{SecureRandom, SystemRandom};
 

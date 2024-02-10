@@ -46,8 +46,8 @@ struct SessionDeclinedHeader {
 
 impl Session<_> {
     pub(crate) fn new(
-        recv: Box<dyn AsyncRead + Unpin>,
-        send: Box<dyn AsyncWrite + Unpin>,
+        recv: Box<dyn AsyncRead + Send + Unpin>,
+        send: Box<dyn AsyncWrite + Send + Unpin>,
     ) -> Session<SessionCreated> {
         Session {
             state: PhantomData,

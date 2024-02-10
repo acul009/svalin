@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.79"
-argon2 = { version = "0.5.3", features = ["simple"] }
+argon2 = { version = "0.5.3", features = ["simple", "std"] }
 postcard = "1.0.8"
 rcgen = "0.12.1"
 ring = "0.17.7"

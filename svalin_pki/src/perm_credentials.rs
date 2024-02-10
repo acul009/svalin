@@ -68,6 +68,10 @@ impl PermCredentials {
 
         return Self::new(decrypted_keypair, certificate);
     }
+
+    pub fn get_certificate(&self) -> &Certificate {
+        &self.certificate
+    }
 }
 
 impl CanSign for PermCredentials {
@@ -82,6 +86,7 @@ impl CanVerify for PermCredentials {
     }
 }
 
+#[cfg(test)]
 mod test {
     use ring::rand::{SecureRandom, SystemRandom};
 
