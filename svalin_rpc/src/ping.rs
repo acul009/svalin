@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::{command::CommandHandler, session};
 
-pub(crate) struct PingHandler {}
+pub(crate) struct PingHandler;
 
 #[async_trait]
 impl CommandHandler for PingHandler {
@@ -11,14 +11,13 @@ impl CommandHandler for PingHandler {
     }
 
     async fn handle(
-        &mut self,
+        &self,
         mut session: session::Session<session::SessionOpen>,
     ) -> anyhow::Result<()> {
         loop {
             let ping: u64 = session.read_object().await?;
             session.write_object(&ping).await?;
         }
-        Ok(())
     }
 }
 

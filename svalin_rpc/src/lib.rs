@@ -4,9 +4,8 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::{anyhow, Ok, Result};
-use futures::stream::FuturesUnordered;
-use quinn::{AcceptBi, RecvStream, SendStream};
+use anyhow::{anyhow, Result};
+use command::HandlerCollection;
 use rustls::PrivateKey;
 use tokio::task::JoinSet;
 
@@ -16,7 +15,9 @@ mod ping;
 mod session;
 mod skip_verify;
 
-use session::Session;
+use session::{Session, SessionCreated};
+
+use crate::ping::PingHandler;
 
 pub struct Server {
     endpoint: quinn::Endpoint,
@@ -100,59 +101,51 @@ impl Server {
         println!("connection established");
 
         let conn = Connection::new(conn);
-        conn.handle().await?;
+
+        let commands = HandlerCollection::new();
+        commands.add(PingHandler).await;
+
+        conn.serve(commands).await?;
 
         Ok(())
-    }
-
-    async fn handle_stream(stream: (SendStream, RecvStream)) -> Result<()> {
-        println!("echoing data stream");
-        let (mut send, mut recv) = stream;
-        let mut buffer = [0u8; 1024];
-        loop {
-            let byte_count = recv.read(&mut buffer).await?;
-            if let Some(count) = byte_count {
-                send.write_all(&buffer[0..count]).await?;
-            }
-        }
     }
 }
 
 pub struct Connection {
     conn: quinn::Connection,
-    open_streams: JoinSet<()>,
 }
 
 impl Connection {
     fn new(conn: quinn::Connection) -> Self {
-        Connection {
-            conn,
-            open_streams: JoinSet::new(),
-        }
+        Connection { conn }
     }
 
-    async fn handle(mut self) -> Result<()> {
+    async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()> {
         println!("waiting for incoming data stream");
-        loop {
-            match self.conn.accept_bi().await {
-                Err(e) => {
-                    while let Some(res) = self.open_streams.join_next().await {}
-                    Err(e)
-                }
+        let mut open_sessions = JoinSet::<()>::new();
 
-                core::result::Result::Ok((send, recv)) => {
-                    println!("data stream incoming!");
-                    let session = Session::new(Box::new(recv), Box::new(send));
-                    let fut = Server::handle_stream(stream);
-                    self.open_streams.spawn(async move {
-                        if let Err(e) = fut.await {
+        loop {
+            match self.accept_session().await {
+                Ok(session) => {
+                    let commands2 = commands.clone();
+                    open_sessions.spawn(async move {
+                        let res = session.handle(commands2).await;
+                        if let Err(e) = res {
                             print!("Error: {}", e);
                         }
                     });
-                    core::result::Result::Ok(())
                 }
-            }?;
+                Err(err) => while let Some(_) = open_sessions.join_next().await {},
+            }
         }
+    }
+
+    async fn accept_session(&self) -> Result<Session<SessionCreated>> {
+        let (send, recv) = self.conn.accept_bi().await.map_err(|err| anyhow!(err))?;
+
+        let session = Session::new(Box::new(recv), Box::new(send));
+
+        Ok(session)
     }
 }
 
@@ -181,10 +174,7 @@ impl Client {
     }
 
     pub async fn ping(&mut self) -> Result<()> {
-        let conn = self
-            .endpoint
-            .connect("127.0.0.1:1234".parse()?, "localhost")?
-            .await?;
+        let conn = self.endpoint.connect(self.addr, "localhost")?.await?;
 
         println!("Connection established, creating data stream");
 

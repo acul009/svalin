@@ -1,5 +1,5 @@
 use anyhow::{Context, Ok, Result};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use self::chunked_stream::{ChunkReader, ChunkWriter};

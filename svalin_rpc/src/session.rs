@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,6 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use crate::{
     command::HandlerCollection,
     object_stream::{ObjectReader, ObjectWriter},
-    session,
 };
 
 pub struct SessionCreated {}
@@ -44,7 +43,7 @@ struct SessionDeclinedHeader {
     message: String,
 }
 
-impl Session<_> {
+impl Session<()> {
     pub(crate) fn new(
         recv: Box<dyn AsyncRead + Send + Unpin>,
         send: Box<dyn AsyncWrite + Send + Unpin>,
@@ -74,10 +73,10 @@ impl Session<SessionCreated> {
         Ok((session, header))
     }
 
-    pub(crate) async fn handle(self, commands: &HandlerCollection) -> Result<()> {
+    pub(crate) async fn handle(self, commands: Arc<HandlerCollection>) -> Result<()> {
         let (mut session, header) = self.receive_header().await?;
 
-        if let Some(mut command) = commands.get(&header.command_key) {
+        if let Some(command) = commands.get(&header.command_key).await {
             let response = SessionResponseHeader::Accept(SessionAcceptedHeader {});
             session.write_object(&response).await?;
 

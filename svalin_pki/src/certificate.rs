@@ -51,7 +51,7 @@ impl<'de> Deserialize<'de> for Certificate {
         D: serde::Deserializer<'de>,
     {
         let der = Vec::<u8>::deserialize(deserializer)?;
-        Certificate::from_der(der).map_err(|err| de::Error::custom(err.to_string()))
+        Certificate::from_der(der).map_err(de::Error::custom)
     }
 }
 
