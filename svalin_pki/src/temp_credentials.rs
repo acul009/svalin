@@ -23,13 +23,13 @@ impl TempCredentials {
         let keypair = ring::signature::Ed25519KeyPair::from_pkcs8(keypair_pkcs8.as_ref()).unwrap();
 
         Ok(TempCredentials {
-            keypair: keypair,
-            raw: raw,
+            keypair,
+            raw,
         })
     }
 
     pub fn to_self_signed_cert(self) -> Result<PermCredentials> {
-        let rc_keypair = rcgen::KeyPair::from_der(&self.raw.as_ref())?;
+        let rc_keypair = rcgen::KeyPair::from_der(self.raw.as_ref())?;
         let mut params = rcgen::CertificateParams::new(vec![]);
         params.key_pair = Some(rc_keypair);
         params.alg = &rcgen::PKCS_ED25519;
@@ -106,8 +106,8 @@ mod test {
 
         let msg2 = credentials.verify(&signed);
         match msg2 {
-            Err(_) => assert!(true),
-            Ok(_) => assert!(false, "message should not be readable after tampering"),
+            Err(_) => (),
+            Ok(_) => panic!("message should not be readable after tampering"),
         }
     }
 

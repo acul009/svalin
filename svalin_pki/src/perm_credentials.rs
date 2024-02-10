@@ -66,7 +66,7 @@ impl PermCredentials {
             EncryptedData::decrypt_with_password(&on_disk.encrypted_keypair, password)
                 .context("failed to decrypt keypair")?;
 
-        return Self::new(decrypted_keypair, certificate);
+         Self::new(decrypted_keypair, certificate)
     }
 
     pub fn get_certificate(&self) -> &Certificate {

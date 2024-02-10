@@ -1,7 +1,8 @@
-use core::net::SocketAddr;
+
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
+    net::SocketAddr
 };
 
 use anyhow::{anyhow, Result};
@@ -135,7 +136,7 @@ impl Connection {
                         }
                     });
                 }
-                Err(err) => while let Some(_) = open_sessions.join_next().await {},
+                Err(_err) => while open_sessions.join_next().await.is_some() {},
             }
         }
     }
@@ -168,8 +169,8 @@ impl Client {
         endpoint.set_default_client_config(client_config);
 
         Ok(Client {
-            endpoint: endpoint,
-            addr: addr,
+            endpoint,
+            addr,
         })
     }
 

@@ -14,11 +14,11 @@ enum EncryptionAlgorythm {
     Aes256Gcm,
 }
 
-impl Into<&ring::aead::Algorithm> for EncryptionAlgorythm {
-    fn into(self) -> &'static ring::aead::Algorithm {
-        match self {
-            EncryptionAlgorythm::Aes256Gcm => &AES_256_GCM,
+impl From<EncryptionAlgorythm> for &'static ring::aead::Algorithm {
+    fn from(value: EncryptionAlgorythm) -> Self {
+        match value {
             EncryptionAlgorythm::Chacha20Poly1305 => &CHACHA20_POLY1305,
+            EncryptionAlgorythm::Aes256Gcm => &AES_256_GCM,
         }
     }
 }
@@ -76,15 +76,15 @@ impl EncryptedData {
             .context("failed ring sealing in place")?;
 
         let encrypted_data = EncryptedData {
-            alg: alg,
-            parameters: parameters,
+            alg,
+            parameters,
             ciphertext: encrypted,
         };
 
         let packed = Vec::new();
-        Ok(postcard::to_extend(&encrypted_data, packed)
+        postcard::to_extend(&encrypted_data, packed)
             .map_err(|err| anyhow!(err))
-            .context("failed postcard encoding")?)
+            .context("failed postcard encoding")
     }
 
     pub fn decrypt_with_password(cipherdata: &[u8], password: &[u8]) -> Result<Vec<u8>> {

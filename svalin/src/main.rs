@@ -1,4 +1,4 @@
-use std::{net::ToSocketAddrs, os::unix::net::SocketAddr};
+use std::net::ToSocketAddrs;
 
 use svalin_rpc::*;
 

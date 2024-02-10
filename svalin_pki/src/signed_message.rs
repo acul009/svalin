@@ -66,7 +66,7 @@ impl SignedMessage<'_> {
     fn encode(message: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
         let signed = SignedMessage {
             message,
-            signature: signature.as_ref(),
+            signature,
         };
 
         let vec = postcard::to_extend(&signed, Vec::<u8>::new())?;
