@@ -9,8 +9,8 @@ pub(crate) struct InitHandler {}
 impl CommandHandler for InitHandler {
     async fn handle(&self, mut session: Session<SessionOpen>) -> anyhow::Result<()> {
         let keypair = Keypair::generate()?;
-        let public_key = keypair.public_key();
-        session.write_object(public_key).await?;
+        let request = keypair.generate_request()?;
+        session.write_object(&request).await?;
 
         todo!()
     }

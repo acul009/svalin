@@ -3,7 +3,7 @@ use crate::{
     Certificate, PermCredentials,
 };
 use anyhow::{anyhow, Result};
-use rcgen::{ExtendedKeyUsagePurpose, KeyUsagePurpose, SignatureAlgorithm};
+use rcgen::{DnType, ExtendedKeyUsagePurpose, KeyUsagePurpose, SignatureAlgorithm};
 use ring::{
     rand::SystemRandom,
     signature::{Ed25519KeyPair, KeyPair},
@@ -43,6 +43,12 @@ impl Keypair {
             .push(ExtendedKeyUsagePurpose::ServerAuth);
         params.use_authority_key_identifier_extension = true;
 
+        let mut uuid = vec![0u8; 128];
+        uuid::Uuid::new_v4().as_hyphenated().encode_lower(&mut uuid);
+        params
+            .distinguished_name
+            .push(DnType::CommonName, String::from_utf8(uuid)?);
+
         let ca_cert = rcgen::Certificate::from_params(params)?;
         let ca_der = ca_cert.serialize_der()?;
 
@@ -56,6 +62,12 @@ impl Keypair {
         let mut params = rcgen::CertificateParams::new(vec![]);
         params.key_pair = Some(rc_keypair);
         params.alg = self.alg;
+
+        let mut uuid = vec![0u8; 128];
+        uuid::Uuid::new_v4().as_hyphenated().encode_lower(&mut uuid);
+        params
+            .distinguished_name
+            .push(DnType::CommonName, String::from_utf8(uuid)?);
 
         let temp_cert = rcgen::Certificate::from_params(params)?;
         Ok(temp_cert.serialize_request_pem()?)
