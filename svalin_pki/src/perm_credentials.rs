@@ -4,7 +4,10 @@ use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    encrypt::EncryptedData, public_key::PublicKey, signed_message::{CanSign, CanVerify}, Certificate
+    encrypt::EncryptedData,
+    public_key::PublicKey,
+    signed_message::{CanSign, CanVerify},
+    Certificate,
 };
 
 pub struct PermCredentials {
@@ -65,7 +68,7 @@ impl PermCredentials {
             EncryptedData::decrypt_with_password(&on_disk.encrypted_keypair, password)
                 .context("failed to decrypt keypair")?;
 
-         Self::new(decrypted_keypair, certificate)
+        Self::new(decrypted_keypair, certificate)
     }
 
     pub fn get_certificate(&self) -> &Certificate {
@@ -74,9 +77,9 @@ impl PermCredentials {
 
     pub fn create_certificate(&self, public_key: PublicKey) -> Result<Certificate> {
         let rc_keypair = rcgen::KeyPair::from_der(&self.raw_keypair)?;
-       let params = CertificateParams::from_ca_cert_der(self.certificate.to_der(), rc_keypair)?;
+        let params = CertificateParams::from_ca_cert_der(self.certificate.to_der(), rc_keypair)?;
 
-       todo!()
+        todo!()
     }
 }
 
@@ -96,14 +99,11 @@ impl CanVerify for PermCredentials {
 mod test {
     use ring::rand::{SecureRandom, SystemRandom};
 
-    use crate::{PermCredentials, TempCredentials};
+    use crate::{Keypair, PermCredentials};
 
     #[test]
     fn test_on_disk_storage() {
-        let original = TempCredentials::generate()
-            .unwrap()
-            .to_self_signed_cert()
-            .unwrap();
+        let original = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
 
         let rand = SystemRandom::new();
 

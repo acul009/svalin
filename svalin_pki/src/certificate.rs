@@ -61,12 +61,12 @@ mod test {
 
     use crate::{
         signed_message::{Sign, Verify},
-        Certificate, TempCredentials,
+        Certificate, Keypair,
     };
 
     #[test]
     pub fn cert_verify_message() {
-        let credentials = TempCredentials::generate().unwrap();
+        let credentials = Keypair::generate().unwrap();
         let rand = SystemRandom::new();
 
         let mut msg = [0u8; 1024];
@@ -82,7 +82,7 @@ mod test {
 
     #[test]
     pub fn serialization() {
-        let credentials = TempCredentials::generate().unwrap();
+        let credentials = Keypair::generate().unwrap();
         let perm_creds = credentials.to_self_signed_cert().unwrap();
         let cert = perm_creds.get_certificate();
 
@@ -93,7 +93,7 @@ mod test {
 
     #[test]
     pub fn serde_serialization() {
-        let credentials = TempCredentials::generate().unwrap();
+        let credentials = Keypair::generate().unwrap();
         let perm_creds = credentials.to_self_signed_cert().unwrap();
         let cert = perm_creds.get_certificate();
 

@@ -2,17 +2,17 @@ mod certificate;
 mod encrypt;
 mod error;
 mod hash;
+mod keypair;
 mod perm_credentials;
-mod signed_message;
-mod temp_credentials;
 mod public_key;
+mod signed_message;
 
 use anyhow::Result;
 pub use certificate::Certificate;
 pub use error::Error;
 pub use hash::ArgonParams;
+pub use keypair::Keypair;
 pub use perm_credentials::PermCredentials;
-pub use temp_credentials::TempCredentials;
 
 trait Credentials {
     fn sign(&self, data: &[u8]) -> Result<&[u8]>;
