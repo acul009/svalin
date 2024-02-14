@@ -1,14 +1,13 @@
-
 use std::{
+    net::SocketAddr,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
-    net::SocketAddr
 };
 
 use anyhow::{anyhow, Result};
-pub use command::{HandlerCollection, CommandHandler};
-pub use session::{Session, SessionOpen};
+pub use command::{CommandHandler, HandlerCollection};
 use rustls::PrivateKey;
+pub use session::{Session, SessionOpen};
 use tokio::task::JoinSet;
 
 mod command;
@@ -149,6 +148,16 @@ impl Connection {
 
         Ok(session)
     }
+
+    pub async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>> {
+        let (send, recv) = self.conn.open_bi().await.map_err(|err| anyhow!(err))?;
+
+        let session = Session::new(Box::new(recv), Box::new(send));
+
+        let session = session.request_session(command_key).await?;
+
+        Ok(session)
+    }
 }
 
 pub struct Client {
@@ -169,10 +178,7 @@ impl Client {
 
         endpoint.set_default_client_config(client_config);
 
-        Ok(Client {
-            endpoint,
-            addr,
-        })
+        Ok(Client { endpoint, addr })
     }
 
     pub async fn ping(&mut self) -> Result<()> {

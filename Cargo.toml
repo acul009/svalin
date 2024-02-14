@@ -3,5 +3,5 @@
 resolver = "2"
 
 members = [
-    "marmelade", "svalin", "svalin_pki", "svalin_rpc",
+    "marmelade", "svalin", "svalin_macros", "svalin_pki", "svalin_rpc",
 ]

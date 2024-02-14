@@ -1272,6 +1272,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "svalin_macros"
+version = "0.1.0"
+dependencies = [
+ "syn 2.0.48",
+]
+
+[[package]]
 name = "svalin_pki"
 version = "0.1.0"
 dependencies = [

@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -71,6 +71,21 @@ impl Session<SessionCreated> {
         let header: SessionRequestHeader = session.read_object().await?;
 
         Ok((session, header))
+    }
+
+    pub(crate) async fn request_session(self, command_key: String) -> Result<Session<SessionOpen>> {
+        let header = SessionRequestHeader { command_key };
+
+        let mut session = self.open();
+        session.write_object(&header).await?;
+
+        let response: SessionResponseHeader = session.read_object().await?;
+        match response {
+            SessionResponseHeader::Decline(declined) => {
+                Err(anyhow!(format!("{}: {}", declined.code, declined.message)))
+            }
+            SessionResponseHeader::Accept(_accepted) => Ok(session),
+        }
     }
 
     pub(crate) async fn handle(self, commands: Arc<HandlerCollection>) -> Result<()> {

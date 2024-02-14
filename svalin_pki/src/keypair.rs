@@ -36,7 +36,7 @@ impl Keypair {
         params.key_pair = Some(rc_keypair);
         params.alg = self.alg;
         params.not_before = OffsetDateTime::now_utc();
-        params.not_after = OffsetDateTime::now_utc().saturating_add(Duration::days(365));
+        params.not_after = OffsetDateTime::now_utc().saturating_add(Duration::days(365 * 10));
         params.key_usages.push(KeyUsagePurpose::DigitalSignature);
         params
             .extended_key_usages
