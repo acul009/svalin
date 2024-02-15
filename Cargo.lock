@@ -1266,6 +1266,7 @@ dependencies = [
  "marmelade",
  "serde",
  "serde_json",
+ "svalin_macros",
  "svalin_pki",
  "svalin_rpc",
  "tokio",
@@ -1275,6 +1276,8 @@ dependencies = [
 name = "svalin_macros"
 version = "0.1.0"
 dependencies = [
+ "proc-macro2",
+ "quote",
  "syn 2.0.48",
 ]
 
