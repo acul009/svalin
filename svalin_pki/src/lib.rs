@@ -1,4 +1,5 @@
 mod certificate;
+mod certificate_request;
 mod encrypt;
 mod error;
 mod hash;
@@ -9,6 +10,7 @@ mod signed_message;
 
 use anyhow::Result;
 pub use certificate::Certificate;
+pub use certificate_request::CertificateRequest;
 pub use error::Error;
 pub use hash::ArgonParams;
 pub use keypair::Keypair;

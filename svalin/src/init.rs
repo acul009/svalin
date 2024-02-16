@@ -1,6 +1,7 @@
+use anyhow::Result;
 use svalin_macros::rpc_dispatch;
-use svalin_pki::Keypair;
-use svalin_rpc::{CommandHandler, Connection, Session, SessionOpen};
+use svalin_pki::{CertificateRequest, Keypair};
+use svalin_rpc::{CommandHandler, Session, SessionOpen};
 
 use async_trait::async_trait;
 
@@ -22,20 +23,9 @@ impl CommandHandler for InitHandler {
 }
 
 #[rpc_dispatch(init_key)]
-async fn init(session: &Session<SessionOpen>, initname: String) -> Result<String> {
+async fn init(session: &mut Session<SessionOpen>, initname: String) -> Result<String> {
+    let raw_request: String = session.read_object().await?;
+    let request = CertificateRequest::from_string(raw_request);
+
     todo!()
 }
-
-// #[async_trait]
-// trait InitDispatcher {
-//     async fn init<'a>(&'a self, initname: String, moreargs: Foo) -> Result<ReturnType>;
-// }
-
-// #[async_trait]
-// impl InitDispatcher for Connection {
-//     async fn init<'a>(&'a self, initname: String, moreargs: Foo) -> Result<ReturnType> {
-//         let session = self.open_session("init_key".into()).await?;
-
-//         init(session, initname, moreargs).await
-//     }
-// }
