@@ -1,6 +1,6 @@
 use anyhow::Result;
 use svalin_macros::rpc_dispatch;
-use svalin_pki::{CertificateRequest, Keypair};
+use svalin_pki::{Certificate, CertificateRequest, Keypair};
 use svalin_rpc::{CommandHandler, Session, SessionOpen};
 
 use async_trait::async_trait;
@@ -10,6 +10,8 @@ pub(crate) struct InitHandler {}
 #[async_trait]
 impl CommandHandler for InitHandler {
     async fn handle(&self, mut session: Session<SessionOpen>) -> anyhow::Result<()> {
+        let root: Certificate = session.read_object().await?;
+
         let keypair = Keypair::generate()?;
         let request = keypair.generate_request()?;
         session.write_object(&request).await?;

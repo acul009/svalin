@@ -7,7 +7,7 @@ use crate::{
     encrypt::EncryptedData,
     public_key::PublicKey,
     signed_message::{CanSign, CanVerify},
-    Certificate,
+    Certificate, CertificateRequest,
 };
 
 pub struct PermCredentials {
@@ -75,11 +75,18 @@ impl PermCredentials {
         &self.certificate
     }
 
-    pub fn create_certificate(&self, public_key: PublicKey) -> Result<Certificate> {
-        let rc_keypair = rcgen::KeyPair::from_der(&self.raw_keypair)?;
-        let params = CertificateParams::from_ca_cert_der(self.certificate.to_der(), rc_keypair)?;
+    pub fn approve_request(&self, request: CertificateRequest) -> Result<Certificate> {
+        let ca_keypair = rcgen::KeyPair::from_der(&self.raw_keypair)?;
+        let ca_params =
+            rcgen::CertificateParams::from_ca_cert_der(self.certificate.to_der(), ca_keypair)?;
 
-        todo!()
+        let ca = rcgen::Certificate::from_params(ca_params)?;
+
+        let new_cert_der = request.csr.serialize_der_with_signer(&ca)?;
+
+        let new_cert = Certificate::from_der(new_cert_der)?;
+
+        Ok(new_cert)
     }
 }
 

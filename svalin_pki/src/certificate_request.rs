@@ -2,7 +2,7 @@ use anyhow::Result;
 use rcgen::CertificateSigningRequest;
 
 pub struct CertificateRequest {
-    csr: CertificateSigningRequest,
+    pub(crate) csr: CertificateSigningRequest,
     raw: String,
 }
 
