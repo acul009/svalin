@@ -26,8 +26,14 @@ impl CommandHandler for InitHandler {
 
 #[rpc_dispatch(init_key)]
 async fn init(session: &mut Session<SessionOpen>, initname: String) -> Result<String> {
+    let root = Keypair::generate()?.to_self_signed_cert()?;
+    session.write_object(root.get_certificate()).await?;
+
     let raw_request: String = session.read_object().await?;
-    let request = CertificateRequest::from_string(raw_request);
+    let request = CertificateRequest::from_string(raw_request)?;
+    let server_cert = root.approve_request(request)?;
+
+    session.write_object(&server_cert).await?;
 
     todo!()
 }
