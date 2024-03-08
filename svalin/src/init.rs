@@ -16,6 +16,9 @@ impl CommandHandler for InitHandler {
         let request = keypair.generate_request()?;
         session.write_object(&request).await?;
 
+        let my_cert: Certificate = session.read_object().await?;	
+        let my_credentials = keypair.upgrade(my_cert)?;
+
         todo!()
     }
 
