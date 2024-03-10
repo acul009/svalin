@@ -63,11 +63,11 @@ impl Server {
         Ok(Arc::new(cfg))
     }
 
-    pub async fn run(&mut self) -> Result<()> {
+    pub async fn run(&mut self, commands: Arc<HandlerCollection>) -> Result<()> {
         println!("starting server");
         while let Some(conn) = self.endpoint.accept().await {
             println!("connection incoming");
-            let fut = Server::handle_connection(conn);
+            let fut = Server::handle_connection(conn, commands.clone());
             self.open_connections.spawn(async move {
                 println!("spawn successful");
                 if let Err(e) = fut.await {
@@ -80,7 +80,10 @@ impl Server {
         todo!()
     }
 
-    async fn handle_connection(conn: quinn::Connecting) -> Result<()> {
+    async fn handle_connection(
+        conn: quinn::Connecting,
+        commands: Arc<HandlerCollection>,
+    ) -> Result<()> {
         println!("waiting for connection to get ready...");
 
         let conn = conn.await?;
@@ -102,9 +105,6 @@ impl Server {
         println!("connection established");
 
         let conn = Connection::new(conn);
-
-        let commands = HandlerCollection::new();
-        commands.add(PingHandler).await;
 
         conn.serve(commands).await?;
 

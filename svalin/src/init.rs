@@ -1,11 +1,20 @@
-use anyhow::Result;
+use anyhow::{anyhow, Ok, Result};
 use svalin_macros::rpc_dispatch;
-use svalin_pki::{Certificate, CertificateRequest, Keypair};
+use svalin_pki::{Certificate, CertificateRequest, Keypair, PermCredentials};
 use svalin_rpc::{CommandHandler, Session, SessionOpen};
 
 use async_trait::async_trait;
+use tokio::sync::{oneshot, Mutex};
 
-pub(crate) struct InitHandler {}
+pub(crate) struct InitHandler {
+    conf: Mutex<oneshot::Sender<(Certificate, PermCredentials)>>,
+}
+
+impl InitHandler {
+    pub fn new(conf: oneshot::Sender<(Certificate, PermCredentials)>) -> Self {
+        todo!()
+    }
+}
 
 #[async_trait]
 impl CommandHandler for InitHandler {
@@ -16,10 +25,14 @@ impl CommandHandler for InitHandler {
         let request = keypair.generate_request()?;
         session.write_object(&request).await?;
 
-        let my_cert: Certificate = session.read_object().await?;	
+        let my_cert: Certificate = session.read_object().await?;
         let my_credentials = keypair.upgrade(my_cert)?;
 
-        todo!()
+        self.conf
+            .send((root, my_credentials))
+            .map_err(|err| anyhow!("Could not send init config"));
+
+        Ok(())
     }
 
     fn key(&self) -> String {
