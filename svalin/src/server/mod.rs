@@ -1,10 +1,10 @@
 use std::net::SocketAddr;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::HandlerCollection;
-use tokio::sync::oneshot;
+use tokio::sync::mpsc;
 
 use crate::init::InitHandler;
 
@@ -82,17 +82,46 @@ impl Server {
     async fn init_server(addr: SocketAddr) -> Result<(Certificate, PermCredentials)> {
         let mut rpc = svalin_rpc::Server::new(addr)?;
 
-        let (send, receive) = oneshot::channel::<(Certificate, PermCredentials)>();
+        let (send, mut receive) = mpsc::channel::<(Certificate, PermCredentials)>(1);
 
         let commands = HandlerCollection::new();
         commands.add(InitHandler::new(send));
 
         let handle = tokio::spawn(async move { rpc.run(commands).await });
 
-        let result = receive.await?;
+        if let Some(result) = receive.recv().await {
+            receive.close();
+            handle.abort();
+            Ok(result)
+        } else {
+            receive.close();
+            handle.abort();
+            Err(anyhow!("error initializing server"))
+        }
+    }
+}
 
-        handle.abort();
+#[cfg(test)]
+mod test {
+    use std::net::ToSocketAddrs;
 
-        Ok(result)
+    use svalin_rpc::Client;
+
+    use crate::init::initDispatcher;
+    use crate::Server;
+
+    #[tokio::test]
+    async fn test_init() {
+        tokio::spawn(async {
+            let addr = "0.0.0.0:1234".to_socket_addrs().unwrap().next().unwrap();
+            let db = marmelade::DB::open("./server_test.jammdb").expect("failed to open client db");
+            Server::run(addr, db.scope("default".into()).unwrap())
+                .await
+                .unwrap();
+        });
+
+        let addr = "localhost:1234".to_socket_addrs().unwrap().next().unwrap();
+        let client = Client::new(addr).unwrap();
+        client.
     }
 }

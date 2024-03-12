@@ -1,8 +1,8 @@
 use std::net::ToSocketAddrs;
 
-use svalin_rpc::*;
-
 use clap::{Parser, Subcommand};
+use svalin::Server;
+use svalin_rpc::Client;
 
 #[derive(Debug, Parser)]
 #[clap(name = "my-app", version)]
@@ -45,12 +45,8 @@ async fn run() {
         }
         Command::Server { address } => {
             if let Ok(addr) = address.parse() {
-                if let Ok(mut server) = Server::new(addr) {
-                    let res = server.run().await;
-                    if let Err(err) = res {
-                        println!("Err: {}", err)
-                    }
-                }
+                let db = marmelade::DB::open("./server.jammdb").expect("failed to open client db");
+                Server::run(addr, todo!());
             }
         }
     }

@@ -16,13 +16,17 @@ impl CertificateRequest {
     }
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
     fn test_cert_request_creation() {
-        let root = crate::Keypair::generate().unwrap().to_self_signed_cert().unwrap();
-        let keypair =  crate::Keypair::generate().unwrap();
+        let root = crate::Keypair::generate()
+            .unwrap()
+            .to_self_signed_cert()
+            .unwrap();
+        let keypair = crate::Keypair::generate().unwrap();
         let raw_request = keypair.generate_request().unwrap();
         let request = CertificateRequest::from_string(raw_request).unwrap();
         let cert = root.approve_request(request).unwrap();

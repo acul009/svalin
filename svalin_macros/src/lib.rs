@@ -73,7 +73,7 @@ fn to_dispatcher(
             #block
         }
 
-        trait #trait_ident {
+        #vis trait #trait_ident {
             async fn #ident(&mut self, #parameters) #output ;
         }
 

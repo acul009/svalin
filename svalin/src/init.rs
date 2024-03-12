@@ -4,14 +4,14 @@ use svalin_pki::{Certificate, CertificateRequest, Keypair, PermCredentials};
 use svalin_rpc::{CommandHandler, Session, SessionOpen};
 
 use async_trait::async_trait;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{mpsc, oneshot, Mutex};
 
 pub(crate) struct InitHandler {
-    conf: Mutex<oneshot::Sender<(Certificate, PermCredentials)>>,
+    channel: mpsc::Sender<(Certificate, PermCredentials)>,
 }
 
 impl InitHandler {
-    pub fn new(conf: oneshot::Sender<(Certificate, PermCredentials)>) -> Self {
+    pub fn new(conf: mpsc::Sender<(Certificate, PermCredentials)>) -> Self {
         todo!()
     }
 }
@@ -19,6 +19,10 @@ impl InitHandler {
 #[async_trait]
 impl CommandHandler for InitHandler {
     async fn handle(&self, mut session: Session<SessionOpen>) -> anyhow::Result<()> {
+        if self.channel.is_closed() {
+            return Ok(());
+        }
+
         let root: Certificate = session.read_object().await?;
 
         let keypair = Keypair::generate()?;
@@ -28,9 +32,7 @@ impl CommandHandler for InitHandler {
         let my_cert: Certificate = session.read_object().await?;
         let my_credentials = keypair.upgrade(my_cert)?;
 
-        self.conf
-            .send((root, my_credentials))
-            .map_err(|err| anyhow!("Could not send init config"));
+        self.channel.send((root, my_credentials)).await?;
 
         Ok(())
     }
@@ -41,13 +43,13 @@ impl CommandHandler for InitHandler {
 }
 
 #[rpc_dispatch(init_key)]
-async fn init(session: &mut Session<SessionOpen>, initname: String) -> Result<String> {
+pub(crate) async fn init(session: &mut Session<SessionOpen>, initname: String) -> Result<String> {
     let root = Keypair::generate()?.to_self_signed_cert()?;
     session.write_object(root.get_certificate()).await?;
 
     let raw_request: String = session.read_object().await?;
     let request = CertificateRequest::from_string(raw_request)?;
-    let server_cert = root.approve_request(request)?;
+    let server_cert: Certificate = root.approve_request(request)?;
 
     session.write_object(&server_cert).await?;
 
