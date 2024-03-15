@@ -122,6 +122,5 @@ mod test {
 
         let addr = "localhost:1234".to_socket_addrs().unwrap().next().unwrap();
         let client = Client::new(addr).unwrap();
-        client.
     }
 }

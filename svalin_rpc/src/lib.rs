@@ -4,161 +4,23 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 pub use command::{CommandHandler, HandlerCollection};
-use rustls::PrivateKey;
+
 pub use session::{Session, SessionOpen};
-use tokio::task::JoinSet;
+pub use connection::{Connection, DirectConnection};
+pub use server::Server;
 
 mod command;
 mod object_stream;
 mod ping;
 mod session;
 mod skip_verify;
+mod server;
+mod connection;
 
-use session::SessionCreated;
-
-use crate::ping::PingHandler;
-
-pub struct Server {
-    endpoint: quinn::Endpoint,
-    open_connections: JoinSet<()>,
-}
-
-impl Server {
-    pub fn new(addr: SocketAddr) -> Result<Self> {
-        let endpoint = Server::create_endpoint(addr)?;
-
-        Ok(Server {
-            endpoint,
-            open_connections: JoinSet::new(),
-        })
-    }
-
-    fn create_endpoint(addr: SocketAddr) -> Result<quinn::Endpoint> {
-        let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
-        let cert_der = cert.serialize_der().unwrap();
-        let priv_key = cert.serialize_private_key_der();
-        let priv_key = rustls::PrivateKey(priv_key);
-        let cert_chain = vec![rustls::Certificate(cert_der.clone())];
-
-        let config = quinn::ServerConfig::with_crypto(Server::create_crypto(cert_chain, priv_key)?);
-
-        let endpoint = quinn::Endpoint::server(config, addr)?;
-
-        Ok(endpoint)
-    }
-
-    fn create_crypto(
-        cert_chain: Vec<rustls::Certificate>,
-        priv_key: PrivateKey,
-    ) -> Result<Arc<rustls::ServerConfig>> {
-        let mut cfg = rustls::ServerConfig::builder()
-            .with_safe_default_cipher_suites()
-            .with_safe_default_kx_groups()
-            .with_protocol_versions(&[&rustls::version::TLS13])?
-            .with_no_client_auth()
-            .with_single_cert(cert_chain, priv_key)?;
-        cfg.max_early_data_size = u32::MAX;
-        Ok(Arc::new(cfg))
-    }
-
-    pub async fn run(&mut self, commands: Arc<HandlerCollection>) -> Result<()> {
-        println!("starting server");
-        while let Some(conn) = self.endpoint.accept().await {
-            println!("connection incoming");
-            let fut = Server::handle_connection(conn, commands.clone());
-            self.open_connections.spawn(async move {
-                println!("spawn successful");
-                if let Err(e) = fut.await {
-                    print!("Error: {}", e);
-                }
-                println!("connection handled");
-            });
-            println!("Waiting for next connection");
-        }
-        todo!()
-    }
-
-    async fn handle_connection(
-        conn: quinn::Connecting,
-        commands: Arc<HandlerCollection>,
-    ) -> Result<()> {
-        println!("waiting for connection to get ready...");
-
-        let conn = conn.await?;
-
-        let peer_cert = match conn.peer_identity() {
-            None => Ok(None),
-            Some(ident) => match ident.downcast::<rustls::Certificate>() {
-                core::result::Result::Ok(cert) => Ok(Some(cert)),
-                Err(_) => Err(anyhow!("Failed to get legitimate identity")),
-            },
-        }?;
-
-        if let Some(cert) = peer_cert {
-            println!("client cert:\n{:?}", cert.as_ref());
-        } else {
-            println!("client did not provide cert")
-        }
-
-        println!("connection established");
-
-        let conn = Connection::new(conn);
-
-        conn.serve(commands).await?;
-
-        Ok(())
-    }
-}
-
-pub struct Connection {
-    conn: quinn::Connection,
-}
-
-impl Connection {
-    fn new(conn: quinn::Connection) -> Self {
-        Connection { conn }
-    }
-
-    async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()> {
-        println!("waiting for incoming data stream");
-        let mut open_sessions = JoinSet::<()>::new();
-
-        loop {
-            match self.accept_session().await {
-                Ok(session) => {
-                    let commands2 = commands.clone();
-                    open_sessions.spawn(async move {
-                        let res = session.handle(commands2).await;
-                        if let Err(e) = res {
-                            print!("Error: {}", e);
-                        }
-                    });
-                }
-                Err(_err) => while open_sessions.join_next().await.is_some() {},
-            }
-        }
-    }
-
-    async fn accept_session(&self) -> Result<Session<SessionCreated>> {
-        let (send, recv) = self.conn.accept_bi().await.map_err(|err| anyhow!(err))?;
-
-        let session = Session::new(Box::new(recv), Box::new(send));
-
-        Ok(session)
-    }
-
-    pub async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>> {
-        let (send, recv) = self.conn.open_bi().await.map_err(|err| anyhow!(err))?;
-
-        let session = Session::new(Box::new(recv), Box::new(send));
-
-        let session = session.request_session(command_key).await?;
-
-        Ok(session)
-    }
-}
+#[cfg(test)]
+mod test;
 
 pub struct Client {
     endpoint: quinn::Endpoint,
