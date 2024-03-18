@@ -18,6 +18,7 @@ mod session;
 mod skip_verify;
 mod server;
 mod connection;
+mod client;
 
 #[cfg(test)]
 mod test;
