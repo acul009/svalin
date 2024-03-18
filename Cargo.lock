@@ -1310,6 +1310,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "svalin_macros",
  "tokio",
 ]
 

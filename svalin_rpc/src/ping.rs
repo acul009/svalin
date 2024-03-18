@@ -1,6 +1,11 @@
-use async_trait::async_trait;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::{command::CommandHandler, session};
+use crate as svalin_rpc;
+use anyhow::Result;
+use async_trait::async_trait;
+use svalin_macros::rpc_dispatch;
+
+use crate::{command::CommandHandler, session, SessionOpen};
 
 pub(crate) struct PingHandler;
 
@@ -21,4 +26,12 @@ impl CommandHandler for PingHandler {
     }
 }
 
-pub(crate) struct PingDispatcher {}
+#[rpc_dispatch]
+async fn ping(session: &mut crate::Session<SessionOpen>) -> Result<Duration> {
+    let ping = SystemTime::now();
+    session.write_object(&ping).await?;
+
+    let pong: SystemTime = session.read_object().await?;
+
+    Ok(SystemTime::now().duration_since(pong)? )
+}
