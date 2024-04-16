@@ -75,6 +75,10 @@ impl PermCredentials {
         &self.certificate
     }
 
+    pub fn get_key_bytes(&self) -> &[u8] {
+        &self.raw_keypair
+    }
+
     pub fn approve_request(&self, request: CertificateRequest) -> Result<Certificate> {
         let ca_keypair = rcgen::KeyPair::from_der(&self.raw_keypair)?;
         let ca_params =
