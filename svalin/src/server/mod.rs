@@ -120,7 +120,7 @@ mod test {
                 .unwrap();
         });
 
-        let host = "localhost:1234";
+        let host = "localhost:1234".parse().unwrap();
         let client = Client::connect(host, None, SkipServerVerification::new())
             .await
             .unwrap();

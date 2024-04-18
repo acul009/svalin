@@ -11,7 +11,7 @@ pub struct Client;
 
 impl Client {
     pub async fn connect(
-        host: &str,
+        url: url::Url,
         identity: Option<PermCredentials>,
         verifier: Arc<dyn rustls::client::ServerCertVerifier>,
     ) -> Result<Client> {
@@ -35,7 +35,14 @@ impl Client {
 
         endpoint.set_default_client_config(client_config);
 
-        let addr = host
+        let host = url
+            .host_str()
+            .ok_or_else(|| anyhow!("missing host in url"))?;
+
+        // default port
+        let port = url.port().unwrap_or(1234);
+
+        let addr = (host, port)
             .to_socket_addrs()?
             .next()
             .ok_or_else(|| anyhow!("Unable to resolve Hostname"))?;

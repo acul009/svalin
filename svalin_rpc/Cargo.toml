@@ -18,3 +18,4 @@ serde_json = "1.0.111"
 tokio = { version = "1.35.1", features = ["sync"] }
 svalin_macros = { path = "../svalin_macros"}
 svalin_pki = { path = "../svalin_pki"}
+url = { version = "2.5.0", features = ["serde"] }
