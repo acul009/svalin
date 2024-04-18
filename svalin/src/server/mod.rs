@@ -105,7 +105,7 @@ impl Server {
 mod test {
     use std::net::ToSocketAddrs;
 
-    use svalin_rpc::Client;
+    use svalin_rpc::{Client, SkipServerVerification};
 
     use crate::init::initDispatcher;
     use crate::Server;
@@ -120,7 +120,9 @@ mod test {
                 .unwrap();
         });
 
-        let addr = "localhost:1234".to_socket_addrs().unwrap().next().unwrap();
-        let client = Client::new(addr).unwrap();
+        let host = "localhost:1234";
+        let client = Client::connect(host, None, SkipServerVerification::new())
+            .await
+            .unwrap();
     }
 }

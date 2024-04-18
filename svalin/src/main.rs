@@ -31,12 +31,12 @@ async fn run() {
             println!("trying to run client");
             match address.to_socket_addrs() {
                 Ok(mut addr) => {
-                    if let Ok(mut client) = Client::new(addr.next().unwrap()) {
-                        let res = client.ping().await;
-                        if let Err(err) = res {
-                            println!("Err: {}", err)
-                        }
-                    }
+                    // if let Ok(mut client) = Client::new(addr.next().unwrap()) {
+                    //     let res = client.ping().await;
+                    //     if let Err(err) = res {
+                    //         println!("Err: {}", err)
+                    //     }
+                    // }
                 }
                 Err(err) => {
                     println!("Err: {}", err);
