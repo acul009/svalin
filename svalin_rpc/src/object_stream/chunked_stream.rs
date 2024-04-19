@@ -44,7 +44,7 @@ impl ChunkReader {
 
         let len: usize;
 
-        if short_len >= 0b1000_0000 {
+        if short_len < 0b1000_0000 {
             len = short_len.into()
         } else {
             // length is 4 bytes
@@ -53,7 +53,8 @@ impl ChunkReader {
             len = u32::from_be_bytes(size_be) as usize;
         }
 
-        let mut chunk = Vec::with_capacity(len);
+        let mut chunk = vec![0; len];
+
         self.binary_reader.read_exact(&mut chunk).await?;
 
         Ok(chunk)

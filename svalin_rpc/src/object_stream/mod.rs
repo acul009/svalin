@@ -18,6 +18,9 @@ impl ObjectWriter {
 
     pub(super) async fn write_object<U: Serialize>(&mut self, object: &U) -> Result<()> {
         let encoded = postcard::to_extend(&object, Vec::new())?;
+
+        println!("writing chunk: {:?}", encoded);
+        
         self.chunk_writer.write_chunk(&encoded).await?;
 
         Ok(())
