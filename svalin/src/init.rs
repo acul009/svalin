@@ -12,13 +12,15 @@ pub(crate) struct InitHandler {
 
 impl InitHandler {
     pub fn new(conf: mpsc::Sender<(Certificate, PermCredentials)>) -> Self {
-        todo!()
+        Self { channel: conf }
     }
 }
 
 #[async_trait]
 impl CommandHandler for InitHandler {
     async fn handle(&self, mut session: Session<SessionOpen>) -> anyhow::Result<()> {
+        println!("incoming init request");
+
         if self.channel.is_closed() {
             return Ok(());
         }
@@ -44,6 +46,7 @@ impl CommandHandler for InitHandler {
 
 #[rpc_dispatch(init_key)]
 pub(crate) async fn init(session: &mut Session<SessionOpen>, initname: String) -> Result<String> {
+    println!("sending init request");
     let root = Keypair::generate()?.to_self_signed_cert()?;
     session.write_object(root.get_certificate()).await?;
 

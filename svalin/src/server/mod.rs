@@ -85,15 +85,21 @@ impl Server {
         let (send, mut receive) = mpsc::channel::<(Certificate, PermCredentials)>(1);
 
         let commands = HandlerCollection::new();
-        commands.add(InitHandler::new(send));
+        commands.add(InitHandler::new(send)).await;
+
+        println!("starting up init server");
 
         let handle = tokio::spawn(async move { rpc.run(commands).await });
 
+        println!("init server running");
+
         if let Some(result) = receive.recv().await {
+            println!("successfully initialized server");
             receive.close();
             handle.abort();
             Ok(result)
         } else {
+            println!("error when trying to initialize server");
             receive.close();
             handle.abort();
             Err(anyhow!("error initializing server"))
