@@ -1293,6 +1293,7 @@ dependencies = [
  "async-trait",
  "clap",
  "marmelade",
+ "rand",
  "serde",
  "serde_json",
  "svalin_macros",

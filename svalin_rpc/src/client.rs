@@ -60,5 +60,9 @@ impl Client {
     pub fn upstream_connection(&self) -> crate::DirectConnection {
         crate::DirectConnection::new(self.connection.clone())
     }
+
+    pub fn close(&self) {
+        self.connection.close(0u32.into(), b"");
+    }
 }
 

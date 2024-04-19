@@ -91,6 +91,8 @@ impl Session<SessionCreated> {
     pub(crate) async fn handle(self, commands: Arc<HandlerCollection>) -> Result<()> {
         let (mut session, header) = self.receive_header().await?;
 
+        println!("requested command: {}", header.command_key);
+
         if let Some(command) = commands.get(&header.command_key).await {
             let response = SessionResponseHeader::Accept(SessionAcceptedHeader {});
             session.write_object(&response).await?;
@@ -104,7 +106,9 @@ impl Session<SessionCreated> {
             session.write_object(&response).await?;
         }
 
-        todo!()
+        // not sure if I need a todo here?
+
+        Ok(())
     }
 }
 

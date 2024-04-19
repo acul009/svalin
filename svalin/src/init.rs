@@ -34,6 +34,8 @@ impl CommandHandler for InitHandler {
         let my_cert: Certificate = session.read_object().await?;
         let my_credentials = keypair.upgrade(my_cert)?;
 
+        println!("init request handled");
+
         self.channel.send((root, my_credentials)).await?;
 
         Ok(())
@@ -44,8 +46,8 @@ impl CommandHandler for InitHandler {
     }
 }
 
-#[rpc_dispatch(init_key)]
-pub(crate) async fn init(session: &mut Session<SessionOpen>, initname: String) -> Result<String> {
+#[rpc_dispatch(init)]
+pub(crate) async fn init(session: &mut Session<SessionOpen>, initname: String) -> Result<()> {
     println!("sending init request");
     let root = Keypair::generate()?.to_self_signed_cert()?;
     session.write_object(root.get_certificate()).await?;
@@ -56,5 +58,7 @@ pub(crate) async fn init(session: &mut Session<SessionOpen>, initname: String) -
 
     session.write_object(&server_cert).await?;
 
-    todo!()
+    println!("init completed");
+
+    Ok(())
 }
