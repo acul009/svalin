@@ -44,8 +44,8 @@ impl Client {
 
         let addr = (host, port)
             .to_socket_addrs()?
-            .next()
-            .ok_or_else(|| anyhow!("Unable to resolve Hostname"))?;
+            .find(|a| a.is_ipv4())
+            .ok_or_else(|| anyhow!("Unable to resolve Hostname, no IPv6 yet"))?;
 
         let connecting = endpoint.connect(addr, host)?.await?;
 

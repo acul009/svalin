@@ -27,7 +27,7 @@ impl Server {
 
         scope.view(|b| {
             if let Some(raw) = b.get_kv("base_config") {
-                base_config = Some(serde_json::from_slice(raw.value())?)
+                base_config = Some(serde_json::from_slice(raw.value())?);
             }
 
             Ok(())
@@ -120,7 +120,7 @@ mod test {
                 .unwrap();
         });
 
-        let host = "localhost:1234".parse().unwrap();
+        let host = "svalin://localhost:1234".parse().unwrap();
         let client = Client::connect(host, None, SkipServerVerification::new())
             .await
             .unwrap();

@@ -28,6 +28,7 @@ impl DB {
             Some(jammdb::Error::BucketMissing) => {
                 let tx = self.jamm.tx(true)?;
                 tx.create_bucket(name.as_bytes())?;
+                tx.commit()?;
                 Ok(())
             }
 
