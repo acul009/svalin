@@ -3,11 +3,13 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Ok, Result};
 use quinn::crypto;
 use svalin_pki::PermCredentials;
 
-pub struct Client;
+pub struct Client {
+    connection: quinn::Connection,
+}
 
 impl Client {
     pub async fn connect(
@@ -49,6 +51,14 @@ impl Client {
 
         let connecting = endpoint.connect(addr, host)?.await?;
 
-        todo!()
+
+        Ok(Self {
+            connection: connecting,
+        })
+    }
+
+    pub fn upstream_connection(&self) -> crate::DirectConnection {
+        crate::DirectConnection::new(self.connection.clone())
     }
 }
+
