@@ -15,12 +15,9 @@ pub struct DirectConnection {
     conn: quinn::Connection,
 }
 
-impl DirectConnection {
-    pub(crate) fn new(conn: quinn::Connection) -> Self {
-        DirectConnection { conn }
-    }
+impl crate::Connection for DirectConnection {
 
-    pub async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()> {
+    async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()> {
         println!("waiting for incoming data stream");
         let mut open_sessions = JoinSet::<()>::new();
 
@@ -39,21 +36,29 @@ impl DirectConnection {
             }
         }
     }
-
-    async fn accept_session(&self) -> Result<Session<SessionCreated>> {
-        let (send, recv) = self.conn.accept_bi().await.map_err(|err| anyhow!(err))?;
-
-        let session = Session::new(Box::new(recv), Box::new(send));
-
-        Ok(session)
-    }
-
-    pub async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>> {
+    
+    async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>> {
         let (send, recv) = self.conn.open_bi().await.map_err(|err| anyhow!(err))?;
 
         let session = Session::new(Box::new(recv), Box::new(send));
 
         let session = session.request_session(command_key).await?;
+
+        Ok(session)
+    }
+
+}
+
+impl DirectConnection {
+    pub(crate) fn new(conn: quinn::Connection) -> Self {
+        DirectConnection { conn }
+    }
+
+
+    async fn accept_session(&self) -> Result<Session<SessionCreated>> {
+        let (send, recv) = self.conn.accept_bi().await.map_err(|err| anyhow!(err))?;
+
+        let session = Session::new(Box::new(recv), Box::new(send));
 
         Ok(session)
     }

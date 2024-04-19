@@ -130,5 +130,10 @@ mod test {
         let client = Client::connect(host, None, SkipServerVerification::new())
             .await
             .unwrap();
+
+        let mut conn = client.upstream_connection();
+        conn.init("testname".to_owned()).await.unwrap();
+
+        todo!()
     }
 }

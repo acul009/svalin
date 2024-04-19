@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use rustls::PrivateKey;
 use tokio::task::JoinSet;
 
-use crate::{connection::DirectConnection, HandlerCollection};
+use crate::{connection::DirectConnection, Connection, HandlerCollection};
 
 
 pub struct Server {
