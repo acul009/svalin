@@ -46,7 +46,7 @@ async fn run() {
         Command::Server { address } => {
             if let Ok(addr) = address.parse() {
                 let db = marmelade::DB::open("./server.jammdb").expect("failed to open client db");
-                Server::run(addr, todo!());
+                Server::prepare(addr, todo!());
             }
         }
     }

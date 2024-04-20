@@ -27,7 +27,7 @@ struct BaseConfig {
 }
 
 impl Server {
-    pub async fn run(addr: SocketAddr, scope: marmelade::Scope) -> Result<Self> {
+    pub async fn prepare(addr: SocketAddr, scope: marmelade::Scope) -> Result<Self> {
         let mut base_config: Option<BaseConfig> = None;
 
         scope.view(|b| {
@@ -155,13 +155,12 @@ mod test {
 
     #[tokio::test]
     async fn test_init() {
-        // delete the test db
-
         let server_handle = tokio::spawn(async {
             let addr = "0.0.0.0:1234".to_socket_addrs().unwrap().next().unwrap();
+            // delete the test db
             std::fs::remove_file("./server_test.jammdb").unwrap_or(());
             let db = marmelade::DB::open("./server_test.jammdb").expect("failed to open client db");
-            Server::run(addr, db.scope("default".into()).unwrap())
+            Server::prepare(addr, db.scope("default".into()).unwrap())
                 .await
                 .unwrap();
         });
