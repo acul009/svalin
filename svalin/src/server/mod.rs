@@ -167,15 +167,18 @@ mod test {
         });
 
         let host = "svalin://localhost:1234".parse().unwrap();
-        let client = Client::connect(host, None, SkipServerVerification::new())
-            .await
-            .unwrap();
 
-        let mut conn = client.upstream_connection();
-        conn.init("testname".to_owned()).await.unwrap();
+        {
+            let client = Client::connect(host, None, SkipServerVerification::new())
+                .await
+                .unwrap();
+
+            let mut conn = client.upstream_connection();
+            conn.init("testname".to_owned()).await.unwrap();
+
+            client.close();
+        }
 
         server_handle.await.unwrap();
-
-        client.close();
     }
 }
