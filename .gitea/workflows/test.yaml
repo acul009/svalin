@@ -10,4 +10,5 @@ jobs:
     steps:
     - name: checkout
       uses: actions/checkout@v3
-    - run: cargo test
+    - name: cargo test
+    run: cargo test
