@@ -3,7 +3,6 @@ use rcgen::CertificateSigningRequest;
 
 pub struct CertificateRequest {
     pub(crate) csr: CertificateSigningRequest,
-    raw: String,
 }
 
 impl CertificateRequest {
@@ -12,7 +11,7 @@ impl CertificateRequest {
 
         // Todo: verify subject format and check if UUID is in use
 
-        Ok(Self { csr, raw: string })
+        Ok(Self { csr })
     }
 }
 
@@ -30,6 +29,6 @@ mod test {
         let raw_request = keypair.generate_request().unwrap();
         let request = CertificateRequest::from_string(raw_request).unwrap();
         let cert = root.approve_request(request).unwrap();
-        let creds = keypair.upgrade(cert).unwrap();
+        let _creds = keypair.upgrade(cert).unwrap();
     }
 }

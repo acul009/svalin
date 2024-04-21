@@ -16,7 +16,6 @@ pub struct DirectConnection {
 }
 
 impl crate::Connection for DirectConnection {
-
     async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()> {
         println!("waiting for incoming data stream");
         let mut open_sessions = JoinSet::<()>::new();
@@ -36,7 +35,7 @@ impl crate::Connection for DirectConnection {
             }
         }
     }
-    
+
     async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>> {
         let (send, recv) = self.conn.open_bi().await.map_err(|err| anyhow!(err))?;
 
@@ -46,14 +45,12 @@ impl crate::Connection for DirectConnection {
 
         Ok(session)
     }
-
 }
 
 impl DirectConnection {
     pub(crate) fn new(conn: quinn::Connection) -> Self {
         DirectConnection { conn }
     }
-
 
     async fn accept_session(&self) -> Result<Session<SessionCreated>> {
         let (send, recv) = self.conn.accept_bi().await.map_err(|err| anyhow!(err))?;

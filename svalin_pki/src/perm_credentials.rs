@@ -1,11 +1,10 @@
 use anyhow::{anyhow, Context, Result};
-use rcgen::CertificateParams;
+
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     encrypt::EncryptedData,
-    public_key::PublicKey,
     signed_message::{CanSign, CanVerify},
     Certificate, CertificateRequest,
 };

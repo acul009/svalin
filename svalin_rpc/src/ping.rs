@@ -1,4 +1,4 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime};
 
 use crate as svalin_rpc;
 use anyhow::Result;
@@ -33,5 +33,5 @@ async fn ping(session: &mut crate::Session<SessionOpen>) -> Result<Duration> {
 
     let pong: SystemTime = session.read_object().await?;
 
-    Ok(SystemTime::now().duration_since(pong)? )
+    Ok(SystemTime::now().duration_since(pong)?)
 }

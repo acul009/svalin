@@ -2,7 +2,7 @@ use crate::{
     signed_message::{CanSign, CanVerify},
     Certificate, PermCredentials,
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use rcgen::{DnType, ExtendedKeyUsagePurpose, KeyUsagePurpose, SignatureAlgorithm};
 use ring::{
     rand::SystemRandom,

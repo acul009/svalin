@@ -1,18 +1,13 @@
 use anyhow::Result;
 use serde::{de, Deserialize, Serialize};
 
-use crate::{Certificate, PermCredentials};
-
-
 pub struct PublicKey {
-    raw: Vec<u8>
+    raw: Vec<u8>,
 }
 
 impl PublicKey {
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<PublicKey> {
-        Ok(PublicKey {
-            raw: bytes
-        })
+        Ok(PublicKey { raw: bytes })
     }
 
     pub(crate) fn to_bytes(&self) -> &[u8] {

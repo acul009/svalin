@@ -1,10 +1,6 @@
-use std::{
-    net::{SocketAddr, ToSocketAddrs},
-    sync::Arc,
-};
+use std::{net::ToSocketAddrs, sync::Arc};
 
 use anyhow::{anyhow, Ok, Result};
-use quinn::crypto;
 use svalin_pki::PermCredentials;
 
 pub struct Client {
@@ -51,7 +47,6 @@ impl Client {
 
         let connecting = endpoint.connect(addr, host)?.await?;
 
-
         Ok(Self {
             connection: connecting,
         })
@@ -65,4 +60,3 @@ impl Client {
         self.connection.close(0u32.into(), b"");
     }
 }
-

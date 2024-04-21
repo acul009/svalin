@@ -4,7 +4,7 @@ use svalin_pki::{Certificate, CertificateRequest, Keypair, PermCredentials};
 use svalin_rpc::{CommandHandler, Session, SessionOpen};
 
 use async_trait::async_trait;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::mpsc;
 
 pub(crate) struct InitHandler {
     channel: mpsc::Sender<(Certificate, PermCredentials)>,
