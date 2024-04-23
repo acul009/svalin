@@ -13,6 +13,7 @@
           glibc
           pkg-config
           gcc
+          dioxus-cli
         ];
 
 
