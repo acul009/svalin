@@ -46,3 +46,24 @@ impl ObjectReader {
         Ok(object)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::time::SystemTime;
+
+    #[test]
+    fn test_postcard_u64() {
+        let number = 98345254575894875u64;
+        let encoded = postcard::to_extend(&number, Vec::new()).unwrap();
+        let copy: u64 = postcard::from_bytes(&encoded).unwrap();
+        assert!(number == copy, "postcard u64 test failed");
+    }
+
+    #[test]
+    fn test_system_time() {
+        let now = SystemTime::now();
+        let encoded = postcard::to_extend(&now, Vec::new()).unwrap();
+        let copy: SystemTime = postcard::from_bytes(&encoded).unwrap();
+        assert!(now == copy, "postcard system time test failed")
+    }
+}
