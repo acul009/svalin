@@ -8,17 +8,40 @@
     in
     {
 
-      devShells.x86_64-linux.default = pkgs.mkShell {
+      devShells.x86_64-linux.default = pkgs.mkShell rec {
+
+
         nativeBuildInputs = with pkgs; [
           glibc
           pkg-config
           gcc
-          dioxus-cli
+
+          # iced
+
+          # gtk-layer-shell
+          # gtk3
+          # libxkbcommon
+          # libGL
+          # wayland
+          # wayland.dev
+          # wayland-protocols
+          # vulkan-loader
+          # libxkbcommon
         ];
 
+        buildInputs = with pkgs; [
+          pkg-config
+          wayland
+          libxkbcommon
+          libGL
+        ];
 
+        LD_LIBRARY_PATH = "${nixpkgs.lib.makeLibraryPath buildInputs}";
 
-        shellHook = "zsh;exit;";
+        shellHook = ''
+          zsh;exit;
+        '';
+
       };
     };
 }
