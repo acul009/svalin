@@ -68,21 +68,26 @@ fn to_dispatcher(
         }
     }
 
-    Ok(syn::parse_quote!(
-        async fn #ident(#inputs) #output {
-            #block
-        }
+    let key_opt = args.first();
 
-        #vis trait #trait_ident {
-            async fn #ident(&mut self, #parameters) #output ;
-        }
-
-        impl<T> #trait_ident for T where T: svalin_rpc::Connection {
-            async fn #ident(&mut self, #parameters) #output {
-                let mut session = self.open_session("init".into()).await?;
-
-                #ident(&mut session, #call_parameters).await
+    match key_opt {
+        Some(key) => Ok(syn::parse_quote!(
+            async fn #ident(#inputs) #output {
+                #block
             }
-        }
-    ))
+
+            #vis trait #trait_ident {
+                async fn #ident(&mut self, #parameters) #output ;
+            }
+
+            impl<T> #trait_ident for T where T: svalin_rpc::Connection {
+                async fn #ident(&mut self, #parameters) #output {
+                    let mut session = self.open_session(#key.to_owned()).await?;
+
+                    #ident(&mut session, #call_parameters).await
+                }
+            }
+        )),
+        None => Ok(parse_quote! {compile_error!("an RPC-Dispatcher needs to have a handler.")}),
+    }
 }

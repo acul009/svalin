@@ -7,12 +7,22 @@ use svalin_macros::rpc_dispatch;
 
 use crate::{command::CommandHandler, session, SessionOpen};
 
-pub(crate) struct PingHandler;
+pub struct PingHandler;
+
+impl PingHandler {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+fn ping_key() -> String {
+    "ping".to_owned()
+}
 
 #[async_trait]
 impl CommandHandler for PingHandler {
     fn key(&self) -> String {
-        "ping".to_owned()
+        ping_key()
     }
 
     async fn handle(
@@ -26,8 +36,8 @@ impl CommandHandler for PingHandler {
     }
 }
 
-#[rpc_dispatch]
-async fn ping(session: &mut crate::Session<SessionOpen>) -> Result<Duration> {
+#[rpc_dispatch(ping_key())]
+pub async fn ping(session: &mut crate::Session<SessionOpen>) -> Result<Duration> {
     let ping = SystemTime::now();
     session.write_object(&ping).await?;
 

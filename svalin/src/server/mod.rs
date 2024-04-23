@@ -1,5 +1,5 @@
 use core::time;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use rand::{
@@ -86,6 +86,10 @@ impl Server {
         })
     }
 
+    pub async fn run(&mut self, commands: Arc<HandlerCollection>) -> Result<()> {
+        self.rpc.run(commands).await
+    }
+
     fn get_encryption_key(scope: &marmelade::Scope) -> Result<Vec<u8>> {
         let mut saved_key: Option<Vec<u8>> = None;
 
@@ -148,33 +152,56 @@ impl Server {
 mod test {
     use std::net::ToSocketAddrs;
 
-    use svalin_rpc::{Client, SkipServerVerification};
+    use svalin_rpc::{
+        ping::{pingDispatcher, PingHandler},
+        Client, HandlerCollection, SkipServerVerification,
+    };
 
-    use crate::init::initDispatcher;
+    use crate::init::{initDispatcher, InitHandler};
     use crate::Server;
 
     #[tokio::test]
     async fn test_init() {
+        let (send_init, recv_init) = tokio::sync::oneshot::channel::<()>();
+
         let server_handle = tokio::spawn(async {
             let addr = "0.0.0.0:1234".to_socket_addrs().unwrap().next().unwrap();
             // delete the test db
             std::fs::remove_file("./server_test.jammdb").unwrap_or(());
             let db = marmelade::DB::open("./server_test.jammdb").expect("failed to open client db");
-            Server::prepare(addr, db.scope("default".into()).unwrap())
+            let mut server = Server::prepare(addr, db.scope("default".into()).unwrap())
                 .await
                 .unwrap();
+
+            send_init.send(()).unwrap();
+
+            let commands = HandlerCollection::new();
+            commands.add(PingHandler::new()).await;
+
+            server.run(commands).await.unwrap();
         });
 
-        let host = "svalin://localhost:1234".parse().unwrap();
+        let host: url::Url = "svalin://localhost:1234".parse().unwrap();
+
+        let init_client = Client::connect(host.clone(), None, SkipServerVerification::new())
+            .await
+            .unwrap();
+
+        let mut conn = init_client.upstream_connection();
+        conn.init("testname".to_owned()).await.unwrap();
+
+        recv_init.await.unwrap();
 
         let client = Client::connect(host, None, SkipServerVerification::new())
             .await
             .unwrap();
 
         let mut conn = client.upstream_connection();
-        conn.init("testname".to_owned()).await.unwrap();
+
+        let duration = conn.ping().await.unwrap();
+        println!("ping duration: {:?}", duration);
 
         server_handle.await.unwrap();
-        client.close();
+        init_client.close();
     }
 }

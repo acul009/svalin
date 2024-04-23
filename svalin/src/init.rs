@@ -16,6 +16,10 @@ impl InitHandler {
     }
 }
 
+fn init_key() -> String {
+    "init".to_owned()
+}
+
 #[async_trait]
 impl CommandHandler for InitHandler {
     async fn handle(&self, mut session: Session<SessionOpen>) -> anyhow::Result<()> {
@@ -42,11 +46,11 @@ impl CommandHandler for InitHandler {
     }
 
     fn key(&self) -> String {
-        "init".into()
+        init_key()
     }
 }
 
-#[rpc_dispatch(init)]
+#[rpc_dispatch(init_key())]
 pub(crate) async fn init(session: &mut Session<SessionOpen>, initname: String) -> Result<()> {
     println!("sending init request");
     let root = Keypair::generate()?.to_self_signed_cert()?;
