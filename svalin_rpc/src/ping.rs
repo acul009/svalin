@@ -1,4 +1,4 @@
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate as svalin_rpc;
 use anyhow::Result;
@@ -38,10 +38,21 @@ impl CommandHandler for PingHandler {
 
 #[rpc_dispatch(ping_key())]
 pub async fn ping(session: &mut crate::Session<SessionOpen>) -> Result<Duration> {
-    let ping = SystemTime::now();
+    let ping = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_nanos();
+
     session.write_object(&ping).await?;
 
-    let pong: SystemTime = session.read_object().await?;
+    let pong: u128 = session.read_object().await?;
 
-    Ok(SystemTime::now().duration_since(pong)?)
+    let now: u128 = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_nanos();
+
+    let diff = Duration::from_nanos((now - pong).try_into()?);
+
+    Ok(diff)
 }

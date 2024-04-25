@@ -201,7 +201,9 @@ mod test {
         let duration = conn.ping().await.unwrap();
         println!("ping duration: {:?}", duration);
 
-        server_handle.await.unwrap();
         init_client.close();
+
+        server_handle.abort();
+        let _ = server_handle.await;
     }
 }
