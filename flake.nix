@@ -39,7 +39,7 @@
         LD_LIBRARY_PATH = "${nixpkgs.lib.makeLibraryPath buildInputs}";
 
         shellHook = ''
-          zsh;exit;
+          PATH=$PATH:~/.cargo/bin;zsh;exit;
         '';
 
       };
