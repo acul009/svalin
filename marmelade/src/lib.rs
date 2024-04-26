@@ -10,7 +10,18 @@ pub struct DB {
 impl DB {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<DB, jammdb::Error> {
         let jamm = jammdb::DB::open(path)?;
-        Ok(DB { jamm: jamm })
+        Ok(DB { jamm })
+    }
+
+    pub fn list_scopes(&self) -> Result<Vec<String>, jammdb::Error> {
+        let tx = self.jamm.tx(false)?;
+
+        let mut scopes = Vec::new();
+        for bucket in tx.buckets() {
+            scopes.push(String::from_utf8_lossy(bucket.0.name()).to_string());
+        }
+
+        Ok(scopes)
     }
 
     pub fn scope(&self, name: String) -> Result<Scope, jammdb::Error> {
