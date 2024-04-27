@@ -1,6 +1,7 @@
 use std::time::{Duration, SystemTime};
 
-use svalin::Client;
+use anyhow::Result;
+use svalin::client::{Client, FirstConnect};
 
 use crate::frb_generated::StreamSink;
 
@@ -30,4 +31,8 @@ pub fn init_app() {
 
 pub fn list_profiles() -> Vec<String> {
     Client::get_profiles().unwrap()
+}
+
+pub async fn first_connect(address: String) -> Result<FirstConnect> {
+    Client::first_connect(address).await
 }

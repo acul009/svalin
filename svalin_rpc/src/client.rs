@@ -45,11 +45,11 @@ impl Client {
             .find(|a| a.is_ipv4())
             .ok_or_else(|| anyhow!("Unable to resolve Hostname, no IPv6 yet"))?;
 
-        let connecting = endpoint.connect(addr, host)?.await?;
+        let connection = endpoint.connect(addr, host)?.await?;
 
-        Ok(Self {
-            connection: connecting,
-        })
+        println!("{:?}", connection.handshake_data().unwrap());
+
+        Ok(Self { connection })
     }
 
     pub fn upstream_connection(&self) -> crate::DirectConnection {

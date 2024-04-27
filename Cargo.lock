@@ -4349,6 +4349,7 @@ dependencies = [
 name = "rust_lib_gui_flutter"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "flutter_rust_bridge",
  "svalin",
  "tokio",

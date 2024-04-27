@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gui_flutter/src/rust/api/simple.dart';
 import 'package:gui_flutter/src/rust/frb_generated.dart';
+import 'package:gui_flutter/src/app/profile/welcome_screen.dart';
 
 Future<void> main() async {
   await RustLib.init();
@@ -13,12 +14,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: const Text('flutter_rust_bridge quickstart')),
-        body: const Center(
-          child: ProfileSelector(),
-        ),
-      ),
+      home: ProfileSelector(),
     );
   }
 }
@@ -57,50 +53,6 @@ class _TimerState extends State<Timer> {
               })
         ],
       )),
-    );
-  }
-}
-
-class ProfileSelector extends StatefulWidget {
-  const ProfileSelector({super.key});
-
-  @override
-  State<ProfileSelector> createState() => _ProfileSelectorState();
-}
-
-class _ProfileSelectorState extends State<ProfileSelector> {
-  List<DropdownMenuEntry<String>> _profiles = [];
-  bool _newProfile = false;
-
-  @override
-  void initState() {
-    super.initState();
-    listProfiles().then((value) => _profiles =
-        value.map((e) => DropdownMenuEntry(value: e, label: e)).toList());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Builder(builder: (context) {
-        if (!_newProfile) {
-          return Center(
-            child: Column(
-              children: [
-                DropdownMenu<String>(
-                  dropdownMenuEntries: _profiles,
-                ),
-                ElevatedButton(
-                  child: const Text("Add profile"),
-                  onPressed: () => setState(() => _newProfile = true),
-                )
-              ],
-            ),
-          );
-        } else {
-          return Text("Add new profile");
-        }
-      }),
     );
   }
 }

@@ -10,3 +10,4 @@ crate-type = ["cdylib", "staticlib"]
 flutter_rust_bridge = "=2.0.0-dev.32"
 tokio = { version = "1.37.0", features = ["time"] }
 svalin = { path = "../svalin" }
+anyhow = "1.0.82"

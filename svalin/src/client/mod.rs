@@ -1,6 +1,11 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+
+mod first_connect;
+
+pub use first_connect::FirstConnect;
+use svalin_rpc::SkipServerVerification;
 
 pub struct Client;
 
@@ -26,12 +31,19 @@ impl Client {
             let appdata = std::env::var("APPDATA")
                 .context("Failed to retrieve APPDATA environment variable")?;
 
-            let path = PathBuf::try_from(appdata).context("Failed to convert APPDATA to path")?;
+            let path = PathBuf::from(appdata);
 
             Ok(path)
         }
 
         #[cfg(target_os = "linux")]
         {}
+    }
+
+    pub async fn first_connect(address: String) -> Result<FirstConnect> {
+        let url = url::Url::parse(&format!("svalin://{address}"))?;
+        let client = svalin_rpc::Client::connect(url, None, SkipServerVerification::new()).await?;
+
+        todo!()
     }
 }
