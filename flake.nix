@@ -1,6 +1,10 @@
 {
   description = "A very basic flake";
 
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+  };
+
   outputs = { self, nixpkgs }:
     let
       system = "x86_64-linux";
@@ -34,12 +38,18 @@
           wayland
           libxkbcommon
           libGL
+
+          flutter
         ];
 
         LD_LIBRARY_PATH = "${nixpkgs.lib.makeLibraryPath buildInputs}";
 
         shellHook = ''
-          PATH=$PATH:~/.cargo/bin;zsh;exit;
+          export PATH=~/.cargo/bin:$PATH
+          export PROJECT_ROOT=$(git rev-parse --show-toplevel)
+          export LD_LIBRARY_PATH="$PROJECT_ROOT/gui_flutter/client/build/linux/x64/debug/bundle/lib:$PROJECT_ROOT/gui_flutter/client/build/linux/x64/release/bundle/lib:$PROJECT_ROOT/gui_flutter/build/linux/x64/debug/bundle/lib"
+          zsh
+          exit;
         '';
 
       };
