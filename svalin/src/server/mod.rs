@@ -188,7 +188,7 @@ mod test {
             .unwrap();
 
         let mut conn = init_client.upstream_connection();
-        conn.init("testname".to_owned()).await.unwrap();
+        conn.init().await.unwrap();
 
         recv_init.await.unwrap();
 

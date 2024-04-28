@@ -51,7 +51,7 @@ impl CommandHandler for InitHandler {
 }
 
 #[rpc_dispatch(init_key())]
-pub(crate) async fn init(session: &mut Session<SessionOpen>, initname: String) -> Result<()> {
+pub(crate) async fn init(session: &mut Session<SessionOpen>) -> Result<PermCredentials> {
     println!("sending init request");
     let root = Keypair::generate()?.to_self_signed_cert()?;
     session.write_object(root.get_certificate()).await?;
@@ -64,5 +64,5 @@ pub(crate) async fn init(session: &mut Session<SessionOpen>, initname: String) -
 
     println!("init completed");
 
-    Ok(())
+    Ok(root)
 }
