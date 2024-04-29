@@ -8,10 +8,6 @@ impl Client {
     pub async fn first_connect(address: String) -> Result<FirstConnect> {}
 }
 
-pub fn test_submodule() {
-    println!("Hello, world!");
-}
-
 #[frb(mirror(FirstConnect))]
 pub enum _FirstConnect {
     Init(Init),
