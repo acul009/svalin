@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 
 mod first_connect;
 
-pub use first_connect::FirstConnect;
+pub use first_connect::*;
 use svalin_rpc::SkipServerVerification;
 
 pub struct Client;

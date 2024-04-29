@@ -8,7 +8,7 @@ pub enum FirstConnect {
     Login(Login),
 }
 
-struct Init {
+pub struct Init {
     rpc: svalin_rpc::Client,
 }
 
@@ -24,7 +24,7 @@ impl Init {
     }
 }
 
-struct Login {
+pub struct Login {
     rpc: svalin_rpc::Client,
 }
 
