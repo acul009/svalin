@@ -5089,7 +5089,6 @@ dependencies = [
  "serde",
  "serde_json",
  "time",
- "uuid",
  "x509-parser",
 ]
 

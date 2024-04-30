@@ -9,6 +9,7 @@ use ring::{
     signature::{Ed25519KeyPair, KeyPair},
 };
 use time::{Duration, OffsetDateTime};
+use x509_parser::nom::HexDisplay;
 
 pub struct Keypair {
     keypair: Ed25519KeyPair,
@@ -43,11 +44,9 @@ impl Keypair {
             .push(ExtendedKeyUsagePurpose::ServerAuth);
         params.use_authority_key_identifier_extension = true;
 
-        let mut uuid = vec![0u8; 128];
-        uuid::Uuid::new_v4().as_hyphenated().encode_lower(&mut uuid);
-        params
-            .distinguished_name
-            .push(DnType::CommonName, String::from_utf8(uuid)?);
+        // let id = self.public_key().to_hex(32);
+
+        // params.distinguished_name.push(DnType::CommonName, id);
 
         let ca_cert = rcgen::Certificate::from_params(params)?;
         let ca_der = ca_cert.serialize_der()?;
@@ -63,11 +62,9 @@ impl Keypair {
         params.key_pair = Some(rc_keypair);
         params.alg = self.alg;
 
-        let mut uuid = vec![0u8; 128];
-        uuid::Uuid::new_v4().as_hyphenated().encode_lower(&mut uuid);
-        params
-            .distinguished_name
-            .push(DnType::CommonName, String::from_utf8(uuid)?);
+        // let id = self.public_key().to_hex(32);
+
+        // params.distinguished_name.push(DnType::CommonName, id);
 
         let temp_cert = rcgen::Certificate::from_params(params)?;
         Ok(temp_cert.serialize_request_pem()?)
