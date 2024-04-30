@@ -4,7 +4,7 @@ use svalin_pki::Certificate;
 
 #[derive(Serialize, Deserialize)]
 struct SavedUser {
-    uuid: uuid::Uuid,
+    certificate: Certificate,
     username: String,
     encrypted_credentials: Vec<u8>,
     password_double_hash: Vec<u8>,
@@ -20,12 +20,12 @@ impl UserStore {
         Self { scope, root }
     }
 
-    fn get_user(&self, uuid: &uuid::Uuid) -> Result<Option<SavedUser>> {
+    fn get_user(&self, public_key: &[u8]) -> Result<Option<SavedUser>> {
         let mut user: Option<SavedUser> = None;
 
         self.scope.view(|b| {
             let b = b.get_bucket("userdata")?;
-            user = b.get_object(uuid)?;
+            user = b.get_object(public_key)?;
 
             Ok(())
         })?;
@@ -39,11 +39,11 @@ impl UserStore {
         self.scope.view(|b| {
             let usernames = b.get_bucket("usernames")?;
 
-            let uuid: Option<uuid::Uuid> = usernames.get_object(username)?;
+            let public_key_user: Option<Vec<u8>> = usernames.get_object(username)?;
 
-            if let Some(uuid) = uuid {
+            if let Some(public_key) = public_key_user {
                 let b = b.get_bucket("userdata")?;
-                user = b.get_object(uuid)?;
+                user = b.get_object(&public_key)?;
             }
 
             Ok(())
@@ -53,7 +53,9 @@ impl UserStore {
     }
 
     fn add_user(&self, user: SavedUser) -> Result<()> {
-        self.scope.update(|b| {
+        self.scope.update(move |b| {
+            let public_key = user.certificate.public_key();
+
             let usernames = b.get_bucket("usernames")?;
 
             if usernames.get_kv(&user.username).is_some() {
@@ -61,13 +63,13 @@ impl UserStore {
             }
 
             let b = b.get_bucket("userdata")?;
-            if b.get_kv(user.uuid).is_some() {
+            if b.get_kv(public_key).is_some() {
                 return Err(anyhow!("User with uuid already exists"));
             }
 
-            b.put_object(user.uuid.to_bytes_le(), &user)?;
+            b.put_object(public_key.to_owned(), &user)?;
 
-            usernames.put_object(user.username.clone(), &user.uuid)?;
+            usernames.put(user.username.clone(), public_key.to_owned())?;
 
             Ok(())
         })

@@ -19,6 +19,10 @@ impl Certificate {
         Ok(Certificate { der, public_key })
     }
 
+    pub fn public_key(&self) -> &[u8] {
+        &self.public_key
+    }
+
     pub fn to_der(&self) -> &[u8] {
         &self.der
     }
