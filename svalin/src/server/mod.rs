@@ -11,7 +11,12 @@ use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::HandlerCollection;
 use tokio::sync::mpsc;
 
-use crate::init::InitHandler;
+use crate::shared::commands::{
+    init::InitHandler,
+    public_server_status::{PublicStatus, PublicStatusHandler},
+};
+
+pub mod users;
 
 pub struct Server {
     rpc: svalin_rpc::Server,
@@ -125,6 +130,9 @@ impl Server {
 
         let commands = HandlerCollection::new();
         commands.add(InitHandler::new(send)).await;
+        commands
+            .add(PublicStatusHandler::new(PublicStatus::WaitingForInit))
+            .await;
 
         let debug = commands.get("init").await.unwrap();
 
@@ -157,7 +165,7 @@ mod test {
         Client, HandlerCollection, SkipServerVerification,
     };
 
-    use crate::init::{initDispatcher, InitHandler};
+    use crate::shared::commands::init::initDispatcher;
     use crate::Server;
 
     #[tokio::test]

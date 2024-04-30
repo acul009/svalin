@@ -1,5 +1,5 @@
 pub mod client;
-mod init;
 pub mod server;
+pub mod shared;
 
 pub use server::Server;

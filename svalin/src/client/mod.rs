@@ -63,11 +63,4 @@ impl Client {
             }
         }
     }
-
-    pub async fn first_connect(address: String) -> Result<FirstConnect> {
-        let url = url::Url::parse(&format!("svalin://{address}"))?;
-        let client = svalin_rpc::Client::connect(url, None, SkipServerVerification::new()).await?;
-
-        todo!()
-    }
 }

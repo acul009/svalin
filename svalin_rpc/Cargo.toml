@@ -11,11 +11,13 @@ async-trait = "0.1.77"
 futures = "0.3.30"
 postcard = "1.0.8"
 quinn = "0.10.2"
-rcgen = "0.12.0"
-rustls = { version = "0.21.0", default-features = false, features = ["quic", "dangerous_configuration"]}
+rustls = { version = "0.21.0", default-features = false, features = [
+    "quic",
+    "dangerous_configuration",
+] }
 serde = "1.0.195"
 serde_json = "1.0.111"
 tokio = { version = "1.35.1", features = ["full"] }
-svalin_macros = { path = "../svalin_macros"}
-svalin_pki = { path = "../svalin_pki"}
+svalin_macros = { path = "../svalin_macros" }
+svalin_pki = { path = "../svalin_pki" }
 url = { version = "2.5.0", features = ["serde"] }
