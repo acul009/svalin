@@ -1,13 +1,16 @@
 use anyhow::{anyhow, Ok, Result};
 use serde::{Deserialize, Serialize};
-use svalin_pki::Certificate;
+use svalin_pki::{ArgonParams, Certificate, PasswordHash};
+use totp_rs::TOTP;
 
 #[derive(Serialize, Deserialize)]
-struct SavedUser {
+pub struct StoredUser {
     certificate: Certificate,
     username: String,
     encrypted_credentials: Vec<u8>,
-    password_double_hash: Vec<u8>,
+    client_hash_options: ArgonParams,
+    password_double_hash: PasswordHash,
+    totp_secret: TOTP,
 }
 
 pub struct UserStore {
@@ -20,8 +23,8 @@ impl UserStore {
         Self { scope, root }
     }
 
-    fn get_user(&self, public_key: &[u8]) -> Result<Option<SavedUser>> {
-        let mut user: Option<SavedUser> = None;
+    fn get_user(&self, public_key: &[u8]) -> Result<Option<StoredUser>> {
+        let mut user: Option<StoredUser> = None;
 
         self.scope.view(|b| {
             let b = b.get_bucket("userdata")?;
@@ -33,8 +36,8 @@ impl UserStore {
         Ok(user)
     }
 
-    fn get_user_by_username(&self, username: &str) -> Result<Option<SavedUser>> {
-        let mut user: Option<SavedUser> = None;
+    fn get_user_by_username(&self, username: &str) -> Result<Option<StoredUser>> {
+        let mut user: Option<StoredUser> = None;
 
         self.scope.view(|b| {
             let usernames = b.get_bucket("usernames")?;
@@ -52,7 +55,24 @@ impl UserStore {
         Ok(user)
     }
 
-    fn add_user(&self, user: SavedUser) -> Result<()> {
+    pub fn add_user(
+        &self,
+        certificate: Certificate,
+        username: String,
+        encrypted_credentials: Vec<u8>,
+        client_hash: Vec<u8>,
+        client_hash_options: ArgonParams,
+        totp_secret: TOTP,
+    ) -> Result<()> {
+        let user = StoredUser {
+            certificate,
+            username,
+            encrypted_credentials,
+            client_hash_options,
+            password_double_hash: ArgonParams::basic().derive_password_hash(&client_hash)?,
+            totp_secret,
+        };
+
         self.scope.update(move |b| {
             let public_key = user.certificate.public_key();
 

@@ -18,5 +18,5 @@ marmelade = { path = "../marmelade", features = ["postcard" ]}
 tokio = { version = "1.35.1", features = ["full"] }
 rand = "0.8.5"
 url = "2.5.0"
-totp-rs = { version = "5.5.1", features = ["qr", "serde"] }
+totp-rs = { version = "5.5.1", features = ["qr", "serde_support"] }
 uuid = { version = "1.8.0", features = ["v4", "serde"] }

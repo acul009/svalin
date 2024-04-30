@@ -5,7 +5,7 @@ use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
 
 use crate::signed_message::CanVerify;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Certificate {
     der: Vec<u8>,
     public_key: Vec<u8>,

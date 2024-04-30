@@ -12,7 +12,7 @@ use anyhow::Result;
 pub use certificate::Certificate;
 pub use certificate_request::CertificateRequest;
 pub use error::Error;
-pub use hash::ArgonParams;
+pub use hash::*;
 pub use keypair::Keypair;
 pub use perm_credentials::PermCredentials;
 

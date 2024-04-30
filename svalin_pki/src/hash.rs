@@ -1,9 +1,10 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Ok, Result};
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, Params,
 };
 use serde::{Deserialize, Serialize};
+use x509_parser::verify;
 
 #[derive(Serialize, Deserialize)]
 pub struct ArgonParams {
@@ -45,7 +46,28 @@ impl ArgonParams {
         Ok(hash)
     }
 
+    pub fn derive_password_hash(self, secret: &[u8]) -> Result<PasswordHash> {
+        let hash = self.derive_key(secret)?;
+        Ok(PasswordHash {
+            params: self,
+            hash: hash,
+        })
+    }
+
     fn get_params(&self) -> Result<Params, argon2::Error> {
         Params::new(self.m_cost, self.t_cost, self.p_cost, None)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PasswordHash {
+    params: ArgonParams,
+    hash: Vec<u8>,
+}
+
+impl PasswordHash {
+    pub fn verify(&self, secret: &[u8]) -> Result<bool> {
+        let hash = self.params.derive_key(secret)?;
+        Ok(self.hash == hash)
     }
 }
