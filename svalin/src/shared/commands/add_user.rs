@@ -1,6 +1,13 @@
+use std::sync::Arc;
+
+use anyhow::Result;
+use async_trait::async_trait;
+use svalin_macros::rpc_dispatch;
 use svalin_rpc::{Session, SessionOpen};
 
 use crate::server::users::UserStore;
+
+use super::public_server_status::PublicStatus;
 
 pub struct AddUserHandler {
     userstore: Arc<UserStore>,

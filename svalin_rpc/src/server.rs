@@ -1,15 +1,11 @@
-
-use std::{
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use rustls::PrivateKey;
+use svalin_pki::PermCredentials;
 use tokio::task::JoinSet;
 
 use crate::{connection::DirectConnection, Connection, HandlerCollection};
-
 
 pub struct Server {
     endpoint: quinn::Endpoint,
@@ -17,8 +13,8 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(addr: SocketAddr) -> Result<Self> {
-        let endpoint = Server::create_endpoint(addr)?;
+    pub fn new(addr: SocketAddr, credentials: &PermCredentials) -> Result<Self> {
+        let endpoint = Server::create_endpoint(addr, &credentials)?;
 
         Ok(Server {
             endpoint,
@@ -26,12 +22,12 @@ impl Server {
         })
     }
 
-    fn create_endpoint(addr: SocketAddr) -> Result<quinn::Endpoint> {
-        let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
-        let cert_der = cert.serialize_der().unwrap();
-        let priv_key = cert.serialize_private_key_der();
-        let priv_key = rustls::PrivateKey(priv_key);
-        let cert_chain = vec![rustls::Certificate(cert_der.clone())];
+    fn create_endpoint(addr: SocketAddr, credentials: &PermCredentials) -> Result<quinn::Endpoint> {
+        let priv_key = rustls::PrivateKey(credentials.get_key_bytes().to_owned());
+
+        let cert_chain = vec![rustls::Certificate(
+            credentials.get_certificate().to_der().to_owned(),
+        )];
 
         let config = quinn::ServerConfig::with_crypto(Server::create_crypto(cert_chain, priv_key)?);
 

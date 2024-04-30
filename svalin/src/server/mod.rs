@@ -7,7 +7,7 @@ use rand::{
     thread_rng, Rng,
 };
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, PermCredentials};
+use svalin_pki::{Certificate, Keypair, PermCredentials};
 use svalin_rpc::HandlerCollection;
 use tokio::sync::mpsc;
 
@@ -81,7 +81,7 @@ impl Server {
             &Server::get_encryption_key(&scope)?,
         )?;
 
-        let rpc = svalin_rpc::Server::new(addr)?;
+        let rpc = svalin_rpc::Server::new(addr, &credentials)?;
 
         Ok(Self {
             rpc,
@@ -124,7 +124,9 @@ impl Server {
     }
 
     async fn init_server(addr: SocketAddr) -> Result<(Certificate, PermCredentials)> {
-        let mut rpc = svalin_rpc::Server::new(addr)?;
+        let temp_credentials = Keypair::generate()?.to_self_signed_cert()?;
+
+        let mut rpc = svalin_rpc::Server::new(addr, &temp_credentials)?;
 
         let (send, mut receive) = mpsc::channel::<(Certificate, PermCredentials)>(1);
 
