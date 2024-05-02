@@ -62,10 +62,11 @@ class ConnectingDialog extends StatelessWidget {
           builder: (context, snapshot) {
             if (snapshot.hasData) {
               switch (snapshot.data!) {
-                case FirstConnect_Init():
+                case FirstConnect_Init(field0: final init):
+                  // init.init(username: username, password: password, totpSecret: totpSecret)
                   return const Text("Waiting for Init");
 
-                case FirstConnect_Login():
+                case FirstConnect_Login(field0: final login):
                   return const Text("Ready for Login");
               }
             } else if (snapshot.error != null) {
