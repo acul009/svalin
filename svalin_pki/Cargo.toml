@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.79"
+anyhow = "1.0.82"
 argon2 = { version = "0.5.3", features = ["simple", "std"] }
 postcard = "1.0.8"
 rcgen = { version = "0.12.1", features = ["pem", "ring", "x509-parser"]}
