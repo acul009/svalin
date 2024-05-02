@@ -8,7 +8,7 @@ fn public_status_key() -> String {
     "public_status".to_owned()
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum PublicStatus {
     WaitingForInit,
     Ready,

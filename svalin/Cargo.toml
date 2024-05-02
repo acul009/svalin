@@ -11,12 +11,11 @@ async-trait = "0.1.80"
 clap = { version = "4.5.4", features = ["derive"] }
 serde = "1.0.200"
 serde_json = "1.0.116"
-svalin_pki = { path = "../svalin_pki"}
-svalin_rpc = { path = "../svalin_rpc"}
-svalin_macros = { path = "../svalin_macros"}
-marmelade = { path = "../marmelade", features = ["postcard" ]}
+svalin_pki = { path = "../svalin_pki" }
+svalin_rpc = { path = "../svalin_rpc" }
+svalin_macros = { path = "../svalin_macros" }
+marmelade = { path = "../marmelade", features = ["postcard"] }
 tokio = { version = "1.37.0", features = ["full"] }
 rand = "0.8.5"
 url = "2.5.0"
 totp-rs = { version = "5.5.1", features = ["qr", "serde_support"] }
-uuid = { version = "1.8.0", features = ["v4", "serde"] }

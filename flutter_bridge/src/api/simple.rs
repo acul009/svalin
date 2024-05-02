@@ -1,7 +1,6 @@
 use std::time::{Duration, SystemTime};
 
-use anyhow::{Ok, Result};
-use svalin::client::{Client, FirstConnect};
+use flutter_rust_bridge::frb;
 
 use crate::frb_generated::StreamSink;
 
@@ -29,12 +28,22 @@ pub fn init_app() {
     flutter_rust_bridge::setup_default_user_utils();
 }
 
-pub fn list_profiles() -> Vec<String> {
-    Client::get_profiles().unwrap()
+#[frb(non_opaque)]
+pub enum Test {
+    A,
+    B(u32),
+    C { name: String, age: u32 },
+    D(HiddenType),
 }
 
-pub async fn first_connect(address: String) -> Result<()> {
-    Client::first_connect(address).await?;
+pub fn test() -> Test {
+    Test::C {
+        name: "test".to_owned(),
+        age: 10,
+    }
+}
 
-    Ok(())
+#[frb(opaque)]
+pub struct HiddenType {
+    _data: String,
 }

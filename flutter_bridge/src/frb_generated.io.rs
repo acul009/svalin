@@ -5,6 +5,7 @@
 
 use super::*;
 use crate::api::client::*;
+use crate::api::simple::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use flutter_rust_bridge::for_generated::transform_result_dco;
 use flutter_rust_bridge::{Handler, IntoIntoDart};
@@ -28,17 +29,17 @@ pub extern "C" fn frbgen_gui_flutter_rust_arc_decrement_strong_count_RustOpaque_
 }
 
 #[no_mangle]
-pub extern "C" fn frbgen_gui_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedrust_asyncRwLockFirstConnect(
+pub extern "C" fn frbgen_gui_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedrust_asyncRwLockHiddenType(
     ptr: *const std::ffi::c_void,
 ) {
-    MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<FirstConnect>>::increment_strong_count(ptr as _);
+    MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<HiddenType>>::increment_strong_count(ptr as _);
 }
 
 #[no_mangle]
-pub extern "C" fn frbgen_gui_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedrust_asyncRwLockFirstConnect(
+pub extern "C" fn frbgen_gui_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedrust_asyncRwLockHiddenType(
     ptr: *const std::ffi::c_void,
 ) {
-    MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<FirstConnect>>::decrement_strong_count(ptr as _);
+    MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<HiddenType>>::decrement_strong_count(ptr as _);
 }
 
 #[no_mangle]
@@ -75,4 +76,18 @@ pub extern "C" fn frbgen_gui_flutter_rust_arc_decrement_strong_count_RustOpaque_
     MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<Login>>::decrement_strong_count(
         ptr as _,
     );
+}
+
+#[no_mangle]
+pub extern "C" fn frbgen_gui_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedrust_asyncRwLocktotp_rsTOTP(
+    ptr: *const std::ffi::c_void,
+) {
+    MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<totp_rs :: TOTP>>::increment_strong_count(ptr as _);
+}
+
+#[no_mangle]
+pub extern "C" fn frbgen_gui_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedrust_asyncRwLocktotp_rsTOTP(
+    ptr: *const std::ffi::c_void,
+) {
+    MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<totp_rs :: TOTP>>::decrement_strong_count(ptr as _);
 }

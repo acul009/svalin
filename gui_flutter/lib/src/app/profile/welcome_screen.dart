@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gui_flutter/src/app/profile/new_profile.dart';
-import 'package:gui_flutter/src/rust/api/simple.dart';
+import 'package:gui_flutter/src/rust/api/client.dart';
 
 class ProfileSelector extends StatefulWidget {
   const ProfileSelector({super.key});
@@ -17,12 +17,12 @@ class _ProfileSelectorState extends State<ProfileSelector> {
   @override
   void initState() {
     super.initState();
-    _profiles = listProfiles();
+    _profiles = Client.getProfiles();
     _profiles.then((value) => {
           if (value.isEmpty)
             {
               Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => ServerDialog()))
+                  MaterialPageRoute(builder: (context) => const ServerDialog()))
             }
         });
     // listProfiles().then((value) => _profiles =

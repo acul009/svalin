@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gui_flutter/src/rust/api/client.dart';
 import 'package:gui_flutter/src/rust/api/simple.dart';
 
 class ServerDialog extends StatefulWidget {
@@ -57,10 +58,16 @@ class ConnectingDialog extends StatelessWidget {
     return Scaffold(
       body: Center(
         child: FutureBuilder(
-          future: firstConnect(address: address),
+          future: Client.firstConnect(address: address),
           builder: (context, snapshot) {
             if (snapshot.hasData) {
-              return Text("Connected");
+              switch (snapshot.data!) {
+                case FirstConnect_Init():
+                  return const Text("Waiting for Init");
+
+                case FirstConnect_Login():
+                  return const Text("Ready for Login");
+              }
             } else if (snapshot.error != null) {
               return Text(snapshot.error.toString());
             } else {

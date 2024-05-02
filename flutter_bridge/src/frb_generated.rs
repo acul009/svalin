@@ -20,6 +20,7 @@
 // Section: imports
 
 use crate::api::client::*;
+use crate::api::simple::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use flutter_rust_bridge::for_generated::transform_result_dco;
 use flutter_rust_bridge::{Handler, IntoIntoDart};
@@ -32,7 +33,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.0.0-dev.32";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1928960595;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1059080375;
 
 // Section: executor
 
@@ -129,12 +130,21 @@ fn wire_Init_init_impl(
             let api_that = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::rust_async::RwLock<Init>,
             >>::sse_decode(&mut deserializer);
+            let api_username = <String>::sse_decode(&mut deserializer);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            let api_totp_secret = <totp_rs::TOTP>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse(
                     (move || async move {
                         let api_that = api_that.rust_auto_opaque_decode_ref();
-                        crate::api::client::Init::init(&api_that).await
+                        crate::api::client::Init::init(
+                            &api_that,
+                            api_username,
+                            api_password,
+                            api_totp_secret,
+                        )
+                        .await
                     })()
                     .await,
                 )
@@ -180,7 +190,7 @@ fn wire_Login_login_impl(
         },
     )
 }
-fn wire_first_connect_impl(
+fn wire_say_hello_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -188,7 +198,7 @@ fn wire_first_connect_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "first_connect",
+            debug_name: "say_hello",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -202,12 +212,10 @@ fn wire_first_connect_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_address = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse(
-                    (move || async move { crate::api::simple::first_connect(api_address).await })()
-                        .await,
+                    (move || async move { crate::api::client::say_hello().await })().await,
                 )
             }
         },
@@ -273,37 +281,6 @@ fn wire_init_app_impl(
         },
     )
 }
-fn wire_list_profiles_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "list_profiles",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            deserializer.end();
-            move |context| {
-                transform_result_sse((move || {
-                    Result::<_, ()>::Ok(crate::api::simple::list_profiles())
-                })())
-            }
-        },
-    )
-}
 fn wire_stream_time_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -342,6 +319,47 @@ fn wire_stream_time_impl(
         },
     )
 }
+fn wire_test_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "test",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse((move || Result::<_, ()>::Ok(crate::api::simple::test()))())
+            }
+        },
+    )
+}
+
+// Section: static_checks
+
+#[allow(clippy::unnecessary_literal_unwrap)]
+const _: fn() = || match None::<crate::api::client::FirstConnect>.unwrap() {
+    crate::api::client::FirstConnect::Init(field0) => {
+        let _: Init = field0;
+    }
+    crate::api::client::FirstConnect::Login(field0) => {
+        let _: Login = field0;
+    }
+};
 
 // Section: related_funcs
 
@@ -349,13 +367,16 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::rust_async::RwLock<Client>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
-    flutter_rust_bridge::for_generated::rust_async::RwLock<FirstConnect>
+    flutter_rust_bridge::for_generated::rust_async::RwLock<HiddenType>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::rust_async::RwLock<Init>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::rust_async::RwLock<Login>
+);
+flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
+    flutter_rust_bridge::for_generated::rust_async::RwLock<totp_rs::TOTP>
 );
 
 // Section: dart2rust
@@ -377,11 +398,11 @@ impl SseDecode for Client {
     }
 }
 
-impl SseDecode for FirstConnect {
+impl SseDecode for HiddenType {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <RustOpaqueMoi<
-            flutter_rust_bridge::for_generated::rust_async::RwLock<FirstConnect>,
+            flutter_rust_bridge::for_generated::rust_async::RwLock<HiddenType>,
         >>::sse_decode(deserializer);
         return inner.rust_auto_opaque_decode_owned();
     }
@@ -405,6 +426,16 @@ impl SseDecode for Login {
     }
 }
 
+impl SseDecode for totp_rs::TOTP {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <RustOpaqueMoi<
+            flutter_rust_bridge::for_generated::rust_async::RwLock<totp_rs::TOTP>,
+        >>::sse_decode(deserializer);
+        return inner.rust_auto_opaque_decode_owned();
+    }
+}
+
 impl SseDecode for RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async::RwLock<Client>> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -414,7 +445,7 @@ impl SseDecode for RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async:
 }
 
 impl SseDecode
-    for RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async::RwLock<FirstConnect>>
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async::RwLock<HiddenType>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -439,6 +470,16 @@ impl SseDecode for RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async:
     }
 }
 
+impl SseDecode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async::RwLock<totp_rs::TOTP>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <usize>::sse_decode(deserializer);
+        return decode_rust_opaque_moi(inner);
+    }
+}
+
 impl SseDecode for StreamSink<String, flutter_rust_bridge::for_generated::SseCodec> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -452,6 +493,26 @@ impl SseDecode for String {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <Vec<u8>>::sse_decode(deserializer);
         return String::from_utf8(inner).unwrap();
+    }
+}
+
+impl SseDecode for crate::api::client::FirstConnect {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut tag_ = <i32>::sse_decode(deserializer);
+        match tag_ {
+            0 => {
+                let mut var_field0 = <Init>::sse_decode(deserializer);
+                return crate::api::client::FirstConnect::Init(var_field0);
+            }
+            1 => {
+                let mut var_field0 = <Login>::sse_decode(deserializer);
+                return crate::api::client::FirstConnect::Login(var_field0);
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
     }
 }
 
@@ -476,6 +537,44 @@ impl SseDecode for Vec<u8> {
             ans_.push(<u8>::sse_decode(deserializer));
         }
         return ans_;
+    }
+}
+
+impl SseDecode for crate::api::simple::Test {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut tag_ = <i32>::sse_decode(deserializer);
+        match tag_ {
+            0 => {
+                return crate::api::simple::Test::A;
+            }
+            1 => {
+                let mut var_field0 = <u32>::sse_decode(deserializer);
+                return crate::api::simple::Test::B(var_field0);
+            }
+            2 => {
+                let mut var_name = <String>::sse_decode(deserializer);
+                let mut var_age = <u32>::sse_decode(deserializer);
+                return crate::api::simple::Test::C {
+                    name: var_name,
+                    age: var_age,
+                };
+            }
+            3 => {
+                let mut var_field0 = <HiddenType>::sse_decode(deserializer);
+                return crate::api::simple::Test::D(var_field0);
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+
+impl SseDecode for u32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u32::<NativeEndian>().unwrap()
     }
 }
 
@@ -521,14 +620,14 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        2 => wire_Client_first_connect_impl(port, ptr, rust_vec_len, data_len),
-        1 => wire_Client_get_profiles_impl(port, ptr, rust_vec_len, data_len),
-        3 => wire_Init_init_impl(port, ptr, rust_vec_len, data_len),
-        4 => wire_Login_login_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire_first_connect_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire_init_app_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire_list_profiles_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire_stream_time_impl(port, ptr, rust_vec_len, data_len),
+        3 => wire_Client_first_connect_impl(port, ptr, rust_vec_len, data_len),
+        2 => wire_Client_get_profiles_impl(port, ptr, rust_vec_len, data_len),
+        4 => wire_Init_init_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire_Login_login_impl(port, ptr, rust_vec_len, data_len),
+        1 => wire_say_hello_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire_init_app_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire_stream_time_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire_test_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -541,7 +640,7 @@ fn pde_ffi_dispatcher_sync_impl(
 ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        5 => wire_greet_impl(ptr, rust_vec_len, data_len),
+        6 => wire_greet_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -564,16 +663,16 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<Client>> for Client {
 }
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for FrbWrapper<FirstConnect> {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<HiddenType> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
             .into_dart()
     }
 }
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<FirstConnect> {}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<HiddenType> {}
 
-impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<FirstConnect>> for FirstConnect {
-    fn into_into_dart(self) -> FrbWrapper<FirstConnect> {
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<HiddenType>> for HiddenType {
+    fn into_into_dart(self) -> FrbWrapper<HiddenType> {
         self.into()
     }
 }
@@ -608,6 +707,72 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<Login>> for Login {
     }
 }
 
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<totp_rs::TOTP> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<totp_rs::TOTP> {}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<totp_rs::TOTP>> for totp_rs::TOTP {
+    fn into_into_dart(self) -> FrbWrapper<totp_rs::TOTP> {
+        self.into()
+    }
+}
+
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::client::FirstConnect> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self.0 {
+            crate::api::client::FirstConnect::Init(field0) => {
+                [0.into_dart(), field0.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::client::FirstConnect::Login(field0) => {
+                [1.into_dart(), field0.into_into_dart().into_dart()].into_dart()
+            }
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::client::FirstConnect>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::client::FirstConnect>>
+    for crate::api::client::FirstConnect
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::client::FirstConnect> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::simple::Test {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            crate::api::simple::Test::A => [0.into_dart()].into_dart(),
+            crate::api::simple::Test::B(field0) => {
+                [1.into_dart(), field0.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::simple::Test::C { name, age } => [
+                2.into_dart(),
+                name.into_into_dart().into_dart(),
+                age.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::simple::Test::D(field0) => {
+                [3.into_dart(), field0.into_into_dart().into_dart()].into_dart()
+            }
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::simple::Test {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::simple::Test> for crate::api::simple::Test {
+    fn into_into_dart(self) -> crate::api::simple::Test {
+        self
+    }
+}
+
 impl SseEncode for flutter_rust_bridge::for_generated::anyhow::Error {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -625,10 +790,10 @@ impl SseEncode for Client {
     }
 }
 
-impl SseEncode for FirstConnect {
+impl SseEncode for HiddenType {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async::RwLock<FirstConnect>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async::RwLock<HiddenType>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
     }
 }
 
@@ -652,6 +817,13 @@ impl SseEncode for Login {
     }
 }
 
+impl SseEncode for totp_rs::TOTP {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async::RwLock<totp_rs :: TOTP>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+    }
+}
+
 impl SseEncode for RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async::RwLock<Client>> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -662,7 +834,7 @@ impl SseEncode for RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async:
 }
 
 impl SseEncode
-    for RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async::RwLock<FirstConnect>>
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async::RwLock<HiddenType>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -690,6 +862,17 @@ impl SseEncode for RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async:
     }
 }
 
+impl SseEncode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::rust_async::RwLock<totp_rs::TOTP>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        let (ptr, size) = self.sse_encode_raw();
+        <usize>::sse_encode(ptr, serializer);
+        <i32>::sse_encode(size, serializer);
+    }
+}
+
 impl SseEncode for StreamSink<String, flutter_rust_bridge::for_generated::SseCodec> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -701,6 +884,22 @@ impl SseEncode for String {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <Vec<u8>>::sse_encode(self.into_bytes(), serializer);
+    }
+}
+
+impl SseEncode for crate::api::client::FirstConnect {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        match self {
+            crate::api::client::FirstConnect::Init(field0) => {
+                <i32>::sse_encode(0, serializer);
+                <Init>::sse_encode(field0, serializer);
+            }
+            crate::api::client::FirstConnect::Login(field0) => {
+                <i32>::sse_encode(1, serializer);
+                <Login>::sse_encode(field0, serializer);
+            }
+        }
     }
 }
 
@@ -721,6 +920,37 @@ impl SseEncode for Vec<u8> {
         for item in self {
             <u8>::sse_encode(item, serializer);
         }
+    }
+}
+
+impl SseEncode for crate::api::simple::Test {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        match self {
+            crate::api::simple::Test::A => {
+                <i32>::sse_encode(0, serializer);
+            }
+            crate::api::simple::Test::B(field0) => {
+                <i32>::sse_encode(1, serializer);
+                <u32>::sse_encode(field0, serializer);
+            }
+            crate::api::simple::Test::C { name, age } => {
+                <i32>::sse_encode(2, serializer);
+                <String>::sse_encode(name, serializer);
+                <u32>::sse_encode(age, serializer);
+            }
+            crate::api::simple::Test::D(field0) => {
+                <i32>::sse_encode(3, serializer);
+                <HiddenType>::sse_encode(field0, serializer);
+            }
+        }
+    }
+}
+
+impl SseEncode for u32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u32::<NativeEndian>(self).unwrap();
     }
 }
 

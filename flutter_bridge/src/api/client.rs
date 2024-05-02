@@ -8,7 +8,11 @@ impl Client {
     pub async fn first_connect(address: String) -> Result<FirstConnect> {}
 }
 
-#[frb(mirror(FirstConnect))]
+pub async fn say_hello() -> Result<String> {
+    Ok("Hello, World!".to_owned())
+}
+
+#[frb(non_opaque, mirror(FirstConnect))]
 pub enum _FirstConnect {
     Init(Init),
     Login(Login),
@@ -16,7 +20,13 @@ pub enum _FirstConnect {
 
 #[frb(external)]
 impl Init {
-    pub async fn init(&self) -> Result<()> {}
+    pub async fn init(
+        &self,
+        username: String,
+        password: String,
+        totp_secret: totp_rs::TOTP,
+    ) -> Result<()> {
+    }
 }
 
 #[frb(external)]

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Ok, Result};
+use anyhow::Result;
 use svalin_macros::rpc_dispatch;
 use svalin_pki::{Certificate, CertificateRequest, Keypair, PermCredentials};
 use svalin_rpc::{CommandHandler, Session, SessionOpen};
@@ -40,6 +40,10 @@ impl CommandHandler for InitHandler {
 
         println!("init request handled");
 
+        session
+            .write_object::<std::result::Result<(), ()>>(&Ok(()))
+            .await?;
+
         self.channel.send((root, my_credentials)).await?;
 
         Ok(())
@@ -51,7 +55,9 @@ impl CommandHandler for InitHandler {
 }
 
 #[rpc_dispatch(init_key())]
-pub(crate) async fn init(session: &mut Session<SessionOpen>) -> Result<PermCredentials> {
+pub(crate) async fn init(
+    session: &mut Session<SessionOpen>,
+) -> Result<(PermCredentials, Certificate)> {
     println!("sending init request");
     let root = Keypair::generate()?.to_self_signed_cert()?;
     session.write_object(root.get_certificate()).await?;
@@ -62,7 +68,9 @@ pub(crate) async fn init(session: &mut Session<SessionOpen>) -> Result<PermCrede
 
     session.write_object(&server_cert).await?;
 
+    let _ok: std::result::Result<(), ()> = session.read_object().await?;
+
     println!("init completed");
 
-    Ok(root)
+    Ok((root, server_cert))
 }
