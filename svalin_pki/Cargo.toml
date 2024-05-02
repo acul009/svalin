@@ -13,5 +13,5 @@ rcgen = { version = "0.12.1", features = ["pem", "ring", "x509-parser"]}
 ring = "0.17.7"
 serde = "1.0.200"
 serde_json = "1.0.111"
-time = "0.3.31"
+time = "0.3.36"
 x509-parser = { version = "0.15.1", features = ["ring", "validate", "verify"] }
