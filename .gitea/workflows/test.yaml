@@ -37,7 +37,7 @@ jobs:
     - name: add jq
       run: |
         apt-get update && apt-get install -y jq
-        git config --global --add safe.directory /opt/hostedtoolcache/flutter
+        git config --global --add safe.directory /opt/hostedtoolcache/flutter/*
     - name: Set Up Flutter
       uses: subosito/flutter-action@v2
       with:
