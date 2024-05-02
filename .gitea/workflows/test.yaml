@@ -3,7 +3,8 @@ on:
   push:
     branches:
       - master
-      - renovate/*
+  pull_request:
+    types: [opened, reopened]
 
 jobs:
   Cargo-Test:
