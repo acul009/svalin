@@ -12,6 +12,15 @@ jobs:
     - name: checkout
       uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@stable
+    - uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/      
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: cargo test
       run: cargo test
 
