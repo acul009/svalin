@@ -62,4 +62,4 @@ jobs:
     - name: debug rust install
       run: ls -la $HOME/.cargo/bin
     - name: build
-      run: $HOME/.cargo/bin/flutter_rust_bridge_codegen generate && flutter build linux
+      run: mkdir -p lib/src/rust && $HOME/.cargo/bin/flutter_rust_bridge_codegen generate && flutter build linux
