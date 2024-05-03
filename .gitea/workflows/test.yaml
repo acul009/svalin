@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: install rust
       uses: dtolnay/rust-toolchain@stable
     - name: cargo test
@@ -23,7 +23,7 @@ jobs:
         working-directory: gui_flutter
     steps:
     - name: checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: install rust
       uses: dtolnay/rust-toolchain@stable
       with:
