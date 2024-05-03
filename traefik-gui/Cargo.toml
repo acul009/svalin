@@ -9,7 +9,7 @@ edition = "2021"
 [dependencies]
 serde = { version = "1.0.200", features = ["derive"] }
 
-dioxus = { version = "0.5", features = ["fullstack", "router"] }
+dioxus = { version = "0.5.1", features = ["fullstack", "router"] }
 
 marmelade = { path = "../marmelade", optional = true }
 
