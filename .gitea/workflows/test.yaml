@@ -11,15 +11,6 @@ jobs:
     steps:
     - name: checkout
       uses: actions/checkout@v3
-    - uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/      
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: install rust
       uses: dtolnay/rust-toolchain@stable
     - name: cargo test
@@ -33,15 +24,6 @@ jobs:
     steps:
     - name: checkout
       uses: actions/checkout@v3
-    - uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/      
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: install rust
       uses: dtolnay/rust-toolchain@stable
       with:
