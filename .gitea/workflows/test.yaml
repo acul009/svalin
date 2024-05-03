@@ -59,7 +59,6 @@ jobs:
         channel: 'stable' 
     - name: install dependencies
       run: git config --global --add safe.directory /opt/hostedtoolcache/flutter/* && flutter pub get && cargo install 'flutter_rust_bridge_codegen@^2.0.0-dev.0'
-    - name: debug rust install
-      run: ls -la $HOME/.cargo/bin
+    - uses: taiki-e/install-action@cargo-llvm-cov
     - name: build
       run: mkdir -p lib/src/rust && $HOME/.cargo/bin/flutter_rust_bridge_codegen generate && flutter build linux
