@@ -38,7 +38,7 @@ jobs:
         distribution: 'oracle'
         java-version: '17'
     - name: add jq
-      run: apt-get update && apt-get install -y jq
+      run: apt-get update && apt-get install -y jq cmake
     - name: Set Up Flutter
       uses: subosito/flutter-action@v2
       with:
