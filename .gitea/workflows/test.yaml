@@ -50,4 +50,4 @@ jobs:
     - name: install dependencies
       run: git config --global --add safe.directory /opt/hostedtoolcache/flutter/* && flutter pub get
     - name: build
-      run: flutter build linux
+      run: flutter_rust_bridge_codegen generate && flutter build linux
