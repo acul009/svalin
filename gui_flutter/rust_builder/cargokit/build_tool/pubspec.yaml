@@ -14,7 +14,7 @@ dependencies:
   # these are pinned on purpose because the bundle_tool_runner doesn't have
   # pubspec.lock. See run_build_tool.sh
   logging: 1.2.0
-  path: 1.8.0
+  path: 1.9.0
   version: 3.0.2
   collection: 1.18.0
   ed25519_edwards: 0.3.1

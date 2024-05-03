@@ -245,10 +245,10 @@ packages:
     dependency: "direct main"
     description:
       name: path
-      sha256: "2ad4cddff7f5cc0e2d13069f2a3f7a73ca18f66abd6f5ecf215219cdb3638edb"
+      sha256: "087ce49c3f0dc39180befefc60fdb4acd8f8620e5682fe2476afd0b3688bb4af"
       url: "https://pub.dev"
     source: hosted
-    version: "1.8.0"
+    version: "1.9.0"
   petitparser:
     dependency: transitive
     description:
