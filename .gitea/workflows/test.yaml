@@ -26,6 +26,9 @@ jobs:
 
   Flutter-Build-Test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gui_flutter
     steps:
     - name: checkout
       uses: actions/checkout@v3
