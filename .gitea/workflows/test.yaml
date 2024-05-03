@@ -48,6 +48,6 @@ jobs:
       with:
         channel: 'stable' 
     - name: install dependencies
-      run: git config --global --add safe.directory /opt/hostedtoolcache/flutter/* && flutter pub get
+      run: git config --global --add safe.directory /opt/hostedtoolcache/flutter/* && flutter pub get && cargo install 'flutter_rust_bridge_codegen@^2.0.0-dev.0'
     - name: build
       run: flutter_rust_bridge_codegen generate && flutter build linux
