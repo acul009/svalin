@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Context, Result};
 
 mod first_connect;
+pub mod verifiers;
 
 pub use first_connect::*;
 use svalin_rpc::SkipServerVerification;

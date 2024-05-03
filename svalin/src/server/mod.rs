@@ -191,7 +191,7 @@ mod test {
             server.run(commands).await.unwrap();
         });
 
-        let host: url::Url = "svalin://localhost:1234".parse().unwrap();
+        let host = "localhost:1234".to_owned();
 
         let init_client = Client::connect(host.clone(), None, SkipServerVerification::new())
             .await

@@ -5058,6 +5058,7 @@ dependencies = [
  "clap",
  "marmelade",
  "rand",
+ "rustls",
  "serde",
  "serde_json",
  "svalin_macros",

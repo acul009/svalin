@@ -9,7 +9,7 @@ pub struct Client {
 
 impl Client {
     pub async fn connect(
-        url: url::Url,
+        address: String,
         identity: Option<PermCredentials>,
         verifier: Arc<dyn rustls::client::ServerCertVerifier>,
     ) -> Result<Client> {
@@ -32,6 +32,8 @@ impl Client {
         let client_config = quinn::ClientConfig::new(Arc::new(rustls_conf));
 
         endpoint.set_default_client_config(client_config);
+
+        let url = url::Url::parse(&format!("svalin://{address}"))?;
 
         let host = url
             .host_str()
