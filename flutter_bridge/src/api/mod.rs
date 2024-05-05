@@ -4,3 +4,4 @@
 
 pub mod client;
 pub mod simple;
+pub mod totp;

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use flutter_rust_bridge::frb;
 pub use svalin::client::{Client, FirstConnect, Init, Login};
+pub use totp_rs::TOTP;
 
 #[frb(external)]
 impl Client {
@@ -20,13 +21,7 @@ pub enum _FirstConnect {
 
 #[frb(external)]
 impl Init {
-    pub async fn init(
-        &self,
-        username: String,
-        password: String,
-        totp_secret: totp_rs::TOTP,
-    ) -> Result<()> {
-    }
+    pub async fn init(&self, username: String, password: String, totp_secret: TOTP) -> Result<()> {}
 }
 
 #[frb(external)]

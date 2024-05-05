@@ -34,6 +34,9 @@
         ];
 
         buildInputs = with pkgs; [
+          rustc
+          cargo
+
           pkg-config
           wayland
           libxkbcommon

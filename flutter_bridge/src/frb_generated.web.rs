@@ -6,6 +6,7 @@
 use super::*;
 use crate::api::client::*;
 use crate::api::simple::*;
+use crate::api::totp::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use flutter_rust_bridge::for_generated::transform_result_dco;
 use flutter_rust_bridge::for_generated::wasm_bindgen;
@@ -81,15 +82,33 @@ pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generat
 }
 
 #[wasm_bindgen]
-pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedrust_asyncRwLocktotp_rsTOTP(
+pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedrust_asyncRwLockSystemTimeError(
     ptr: *const std::ffi::c_void,
 ) {
-    MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<totp_rs :: TOTP>>::increment_strong_count(ptr as _);
+    MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<SystemTimeError>>::increment_strong_count(ptr as _);
 }
 
 #[wasm_bindgen]
-pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedrust_asyncRwLocktotp_rsTOTP(
+pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedrust_asyncRwLockSystemTimeError(
     ptr: *const std::ffi::c_void,
 ) {
-    MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<totp_rs :: TOTP>>::decrement_strong_count(ptr as _);
+    MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<SystemTimeError>>::decrement_strong_count(ptr as _);
+}
+
+#[wasm_bindgen]
+pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedrust_asyncRwLockTOTP(
+    ptr: *const std::ffi::c_void,
+) {
+    MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<TOTP>>::increment_strong_count(
+        ptr as _,
+    );
+}
+
+#[wasm_bindgen]
+pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedrust_asyncRwLockTOTP(
+    ptr: *const std::ffi::c_void,
+) {
+    MoiArc::<flutter_rust_bridge::for_generated::rust_async::RwLock<TOTP>>::decrement_strong_count(
+        ptr as _,
+    );
 }
