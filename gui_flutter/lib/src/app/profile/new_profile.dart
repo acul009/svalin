@@ -322,7 +322,34 @@ class InitDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO: implement build
-    throw UnimplementedError();
+    var initializing = connection.init(
+        username: username, password: password, totpSecret: totp);
+
+    return Scaffold(
+      appBar: AppBar(),
+      body: FutureBuilder(
+        future: connection.init(
+            username: username, password: password, totpSecret: totp),
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            return Center(
+              child: Column(
+                children: [
+                  const Text(
+                      "The Server has been initialized and saved under your profiles. When restarting Svalin, you will be prompted to unlock the profile using your password."),
+                  ElevatedButton(
+                      onPressed: () {
+                        // TODO
+                      },
+                      child: const Text("Continue to main view")),
+                ],
+              ),
+            );
+          } else {
+            return const Center(child: CircularProgressIndicator());
+          }
+        },
+      ),
+    );
   }
 }

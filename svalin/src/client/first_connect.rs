@@ -6,6 +6,7 @@ use svalin_rpc::SkipServerVerification;
 use crate::{
     client::verifiers::upstream_verifier::{self, UpstreamVerifier},
     shared::commands::{
+        add_user::add_userDispatcher,
         init::initDispatcher,
         public_server_status::{get_public_statusDispatcher, PublicStatus},
     },
@@ -67,9 +68,13 @@ impl Init {
 
         let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert);
 
-        svalin_rpc::Client::connect(self.address.clone(), Some(root), verifier).await?;
+        let client =
+            svalin_rpc::Client::connect(self.address.clone(), Some(&root), verifier).await?;
+        let mut connection = client.upstream_connection();
 
-        // create root user on server
+        connection
+            .add_user(root, username, password.as_bytes(), totp_secret)
+            .await?;
 
         // save configuration to profile
 

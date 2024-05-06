@@ -10,7 +10,7 @@ pub struct Client {
 impl Client {
     pub async fn connect(
         address: String,
-        identity: Option<PermCredentials>,
+        identity: Option<&PermCredentials>,
         verifier: Arc<dyn rustls::client::ServerCertVerifier>,
     ) -> Result<Client> {
         let mut endpoint = quinn::Endpoint::client("0.0.0.0:0".parse()?)?;
