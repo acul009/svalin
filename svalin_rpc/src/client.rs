@@ -1,6 +1,7 @@
 use std::{net::ToSocketAddrs, sync::Arc};
 
 use anyhow::{anyhow, Ok, Result};
+use quinn::crypto::rustls::QuicClientConfig;
 use svalin_pki::PermCredentials;
 
 pub struct Client {
@@ -11,25 +12,27 @@ impl Client {
     pub async fn connect(
         address: String,
         identity: Option<&PermCredentials>,
-        verifier: Arc<dyn rustls::client::ServerCertVerifier>,
+        verifier: Arc<dyn quinn::rustls::client::danger::ServerCertVerifier>,
     ) -> Result<Client> {
         let mut endpoint = quinn::Endpoint::client("0.0.0.0:0".parse()?)?;
 
-        let builder = rustls::ClientConfig::builder()
-            .with_safe_defaults()
+        let builder = quinn::rustls::ClientConfig::builder()
+            .dangerous()
             .with_custom_certificate_verifier(verifier);
 
         let rustls_conf = match identity {
             Some(id) => builder.with_client_auth_cert(
-                vec![rustls::Certificate(
+                vec![quinn::rustls::pki_types::CertificateDer::from(
                     id.get_certificate().to_der().to_owned(),
                 )],
-                rustls::PrivateKey(id.get_key_bytes().to_owned()),
+                quinn::rustls::pki_types::PrivateKeyDer::try_from(id.get_key_bytes().to_owned())
+                    .or_else(|err| Err(anyhow!(err)))?,
             )?,
             None => builder.with_no_client_auth(),
         };
 
-        let client_config = quinn::ClientConfig::new(Arc::new(rustls_conf));
+        let client_config =
+            quinn::ClientConfig::new(Arc::new(QuicClientConfig::try_from(rustls_conf)?));
 
         endpoint.set_default_client_config(client_config);
 

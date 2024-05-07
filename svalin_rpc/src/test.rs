@@ -2,7 +2,7 @@ use std::{net::ToSocketAddrs, time::Duration};
 
 use tokio::time::sleep;
 
-use crate::HandlerCollection;
+use crate::{skip_verify::SkipClientVerification, HandlerCollection};
 
 #[tokio::test]
 async fn ping_test() {
@@ -11,7 +11,12 @@ async fn ping_test() {
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
-    let mut server = crate::Server::new(address, &credentials).unwrap();
+    let mut server = crate::Server::new(
+        address,
+        &credentials,
+        SkipClientVerification::new().unwrap(),
+    )
+    .unwrap();
     let commands = HandlerCollection::new();
 
     let server_handle = tokio::spawn(async move {
