@@ -2,5 +2,8 @@
     "nixEnvSelector.nixFile": "${workspaceRoot}/flake.nix",
     "editor.formatOnSave": true,
     "rust-analyzer.cargo.features": "all",
-    "rust-analyzer.check.features": "all"
+    "rust-analyzer.check.features": "all",
+    "dart.analysisExcludedFolders": [
+        "gui_flutter/rust_builder"
+    ]
 }
