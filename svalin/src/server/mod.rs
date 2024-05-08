@@ -167,11 +167,12 @@ mod test {
     use svalin_rpc::{
         ping::{pingDispatcher, PingHandler},
         skip_verify::SkipServerVerification,
-        Client, HandlerCollection,
+        HandlerCollection,
     };
+    use totp_rs::TOTP;
 
-    use crate::server::Server;
     use crate::shared::commands::init::initDispatcher;
+    use crate::{client::Client, server::Server};
 
     #[tokio::test]
     async fn test_init() {
@@ -196,25 +197,30 @@ mod test {
 
         let host = "localhost:1234".to_owned();
 
-        let init_client = Client::connect(host.clone(), None, SkipServerVerification::new())
-            .await
-            .unwrap();
-
-        let mut conn = init_client.upstream_connection();
-        conn.init().await.unwrap();
+        match Client::first_connect(host).await.unwrap() {
+            crate::client::FirstConnect::Init(init) => {
+                let totp_secret = TOTP::default();
+                init.init("admin".into(), "admin".into(), totp_secret)
+                    .await
+                    .unwrap();
+            }
+            crate::client::FirstConnect::Login(_) => {
+                panic!("Server should have been uninitialized")
+            }
+        };
 
         recv_init.await.unwrap();
 
-        let client = Client::connect(host, None, SkipServerVerification::new())
+        let client = Client::open_profile("admin@localhost:1234".into(), "admin".as_bytes())
             .await
             .unwrap();
 
-        let mut conn = client.upstream_connection();
+        let mut conn = client.rpc().upstream_connection();
 
         let duration = conn.ping().await.unwrap();
         println!("ping duration: {:?}", duration);
 
-        init_client.close();
+        client.close();
 
         server_handle.abort();
         let _ = server_handle.await;

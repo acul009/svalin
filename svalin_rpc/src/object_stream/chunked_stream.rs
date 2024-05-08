@@ -1,4 +1,4 @@
-use anyhow::{Ok, Result};
+use anyhow::{anyhow, Ok, Result};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub(super) struct ChunkWriter {
@@ -14,7 +14,7 @@ impl ChunkWriter {
         let len = chunk.len();
         if len > 1 << 31 {
             // error
-            todo!()
+            return Err(anyhow!("The given data chunk is to big"));
         }
         println!("original chunk: {:?}", chunk);
         let len: u32 = len.try_into().unwrap();

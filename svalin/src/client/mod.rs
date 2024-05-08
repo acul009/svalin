@@ -148,4 +148,12 @@ impl Client {
             Err(anyhow!("Profile is empty - database is inconsistent"))
         }
     }
+
+    pub fn rpc(&self) -> &svalin_rpc::Client {
+        &self.rpc
+    }
+
+    pub fn close(&self) {
+        self.rpc.close()
+    }
 }

@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use quinn::rustls::{client::danger::ServerCertVerified, crypto::CryptoProvider};
+use quinn::rustls::{
+    client::danger::ServerCertVerified, crypto::CryptoProvider, server::danger::ClientCertVerified,
+};
 
 // Implementation of `ServerCertVerifier` that verifies everything as trustworthy.
 #[derive(Debug)]
@@ -113,6 +115,6 @@ impl quinn::rustls::server::danger::ClientCertVerifier for SkipClientVerificatio
         quinn::rustls::server::danger::ClientCertVerified,
         quinn::rustls::Error,
     > {
-        todo!()
+        Ok(ClientCertVerified::assertion())
     }
 }

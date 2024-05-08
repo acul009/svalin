@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Context, Ok, Result};
 use svalin_rpc::skip_verify::SkipServerVerification;
 
 use crate::{
@@ -60,7 +60,12 @@ impl Init {
         password: String,
         totp_secret: totp_rs::TOTP,
     ) -> Result<()> {
-        let (root, server_cert) = self.client.upstream_connection().init().await?;
+        let (root, server_cert) = self
+            .client
+            .upstream_connection()
+            .init()
+            .await
+            .context("failed to initialize server certificate")?;
 
         self.client.close();
 
@@ -68,17 +73,17 @@ impl Init {
 
         let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert);
 
-        let client =
-            svalin_rpc::Client::connect(self.address.clone(), Some(&root), verifier).await?;
+        let client = svalin_rpc::Client::connect(self.address.clone(), Some(&root), verifier)
+            .await
+            .context("failed to connect to server after certificate initialization")?;
         let mut connection = client.upstream_connection();
 
         connection
             .add_user(root, username, password.as_bytes(), totp_secret)
-            .await?;
+            .await
+            .context("failed to add root user")?;
 
-        // save configuration to profile
-
-        todo!()
+        Ok(())
     }
 }
 
