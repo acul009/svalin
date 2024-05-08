@@ -6,7 +6,7 @@ mod first_connect;
 pub mod verifiers;
 
 pub use first_connect::*;
-use svalin_rpc::SkipServerVerification;
+use svalin_rpc::skip_verify::SkipServerVerification;
 
 pub struct Client;
 

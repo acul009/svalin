@@ -26,7 +26,7 @@ impl Client {
                     id.get_certificate().to_der().to_owned(),
                 )],
                 quinn::rustls::pki_types::PrivateKeyDer::try_from(id.get_key_bytes().to_owned())
-                    .or_else(|err| Err(anyhow!(err)))?,
+                    .map_err(|err| anyhow!(err))?,
             )?,
             None => builder.with_no_client_auth(),
         };

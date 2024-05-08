@@ -8,11 +8,9 @@ use quinn::rustls::{client::danger::ServerCertVerified, crypto::CryptoProvider};
 pub struct SkipServerVerification(Arc<CryptoProvider>);
 
 impl SkipServerVerification {
-    pub fn new() -> Result<Arc<Self>> {
-        let provider = quinn::rustls::crypto::CryptoProvider::get_default()
-            .ok_or_else(|| anyhow!("missing default rustls crypto provider"))?
-            .clone();
-        Ok(Arc::new(Self(provider)))
+    pub fn new() -> Arc<Self> {
+        let provider = crate::defaults::crypto_provider();
+        Arc::new(Self(provider))
     }
 }
 
@@ -62,11 +60,9 @@ impl quinn::rustls::client::danger::ServerCertVerifier for SkipServerVerificatio
 pub struct SkipClientVerification(Arc<CryptoProvider>);
 
 impl SkipClientVerification {
-    pub fn new() -> Result<Arc<Self>> {
-        let provider = quinn::rustls::crypto::CryptoProvider::get_default()
-            .ok_or_else(|| anyhow!("missing default rustls crypto provider"))?
-            .clone();
-        Ok(Arc::new(Self(provider)))
+    pub fn new() -> Arc<Self> {
+        let provider = crate::defaults::crypto_provider();
+        Arc::new(Self(provider))
     }
 }
 

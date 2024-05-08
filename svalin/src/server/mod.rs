@@ -8,7 +8,7 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, Keypair, PermCredentials};
-use svalin_rpc::HandlerCollection;
+use svalin_rpc::{skip_verify::SkipClientVerification, HandlerCollection};
 use tokio::sync::mpsc;
 
 use crate::shared::commands::{
@@ -81,7 +81,8 @@ impl Server {
             &Server::get_encryption_key(&scope)?,
         )?;
 
-        let rpc = svalin_rpc::Server::new(addr, &credentials)?;
+        // TODO: proper client verification
+        let rpc = svalin_rpc::Server::new(addr, &credentials, SkipClientVerification::new())?;
 
         Ok(Self {
             rpc,
@@ -126,7 +127,8 @@ impl Server {
     async fn init_server(addr: SocketAddr) -> Result<(Certificate, PermCredentials)> {
         let temp_credentials = Keypair::generate()?.to_self_signed_cert()?;
 
-        let mut rpc = svalin_rpc::Server::new(addr, &temp_credentials)?;
+        let mut rpc =
+            svalin_rpc::Server::new(addr, &temp_credentials, SkipClientVerification::new())?;
 
         let (send, mut receive) = mpsc::channel::<(Certificate, PermCredentials)>(1);
 
@@ -164,11 +166,12 @@ mod test {
 
     use svalin_rpc::{
         ping::{pingDispatcher, PingHandler},
-        Client, HandlerCollection, SkipServerVerification,
+        skip_verify::SkipServerVerification,
+        Client, HandlerCollection,
     };
 
+    use crate::server::Server;
     use crate::shared::commands::init::initDispatcher;
-    use crate::Server;
 
     #[tokio::test]
     async fn test_init() {

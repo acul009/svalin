@@ -17,3 +17,4 @@ svalin_macros = { path = "../svalin_macros" }
 svalin_pki = { path = "../svalin_pki" }
 url = { version = "2.5.0", features = ["serde"] }
 quinn = { version = "0.11.0", features = ["ring"] }
+lazy_static = "1.4.0"

@@ -11,12 +11,8 @@ async fn ping_test() {
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
-    let mut server = crate::Server::new(
-        address,
-        &credentials,
-        SkipClientVerification::new().unwrap(),
-    )
-    .unwrap();
+    let mut server =
+        crate::Server::new(address, &credentials, SkipClientVerification::new()).unwrap();
     let commands = HandlerCollection::new();
 
     let server_handle = tokio::spawn(async move {

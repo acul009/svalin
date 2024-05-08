@@ -17,8 +17,10 @@ svalin_macros = { path = "../svalin_macros" }
 marmelade = { path = "../marmelade", features = ["postcard"] }
 tokio = { version = "1.37.0", features = ["full"] }
 rand = "0.8.5"
-rustls = { version = "0.21.0", default-features = false, features = [
-    "dangerous_configuration",
-] }
 url = "2.5.0"
-totp-rs = { version = "5.5.1", features = ["qr", "serde_support", "gen_secret"] }
+totp-rs = { version = "5.5.1", features = [
+    "qr",
+    "serde_support",
+    "gen_secret",
+] }
+quinn = { version = "0.11.0", features = ["ring"] }

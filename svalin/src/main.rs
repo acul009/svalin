@@ -1,7 +1,7 @@
 use std::net::ToSocketAddrs;
 
 use clap::{Parser, Subcommand};
-use svalin::Server;
+use svalin::server::Server;
 use svalin_rpc::Client;
 
 #[derive(Debug, Parser)]

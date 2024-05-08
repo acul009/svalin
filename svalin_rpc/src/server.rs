@@ -2,7 +2,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use quinn::{
-    crypto::rustls::QuicServerConfig,
+    crypto::{self, rustls::QuicServerConfig},
     rustls::{
         pki_types::{CertificateDer, PrivateKeyDer},
         server::danger::ClientCertVerifier,
@@ -37,34 +37,26 @@ impl Server {
         credentials: &PermCredentials,
         client_cert_verifier: Arc<dyn ClientCertVerifier>,
     ) -> Result<quinn::Endpoint> {
-        let priv_key =
-            quinn::rustls::pki_types::PrivateKeyDer::try_from(credentials.get_key_bytes())
-                .or_else(|err| Err(anyhow!(err)))?;
+        let priv_key = quinn::rustls::pki_types::PrivateKeyDer::try_from(
+            credentials.get_key_bytes().to_owned(),
+        )
+        .map_err(|err| anyhow!(err))?;
 
         let cert_chain = vec![quinn::rustls::pki_types::CertificateDer::from(
-            credentials.get_certificate().to_der(),
+            credentials.get_certificate().to_der().to_owned(),
         )];
 
-        let config = quinn::ServerConfig::with_crypto(Server::create_crypto(
-            cert_chain,
-            priv_key,
-            client_cert_verifier,
-        )?);
+        let crypto = quinn::rustls::ServerConfig::builder()
+            .with_client_cert_verifier(client_cert_verifier)
+            .with_single_cert(cert_chain, priv_key)?;
+
+        let config = quinn::ServerConfig::with_crypto(Arc::new(
+            QuicServerConfig::try_from(crypto).map_err(|err| anyhow!(err))?,
+        ));
 
         let endpoint = quinn::Endpoint::server(config, addr)?;
 
         Ok(endpoint)
-    }
-
-    fn create_crypto<'a>(
-        cert_chain: Vec<quinn::rustls::pki_types::CertificateDer<'a>>,
-        priv_key: PrivateKeyDer,
-        client_cert_verifier: Arc<dyn ClientCertVerifier>,
-    ) -> Result<Arc<QuicServerConfig>> {
-        let mut cfg = quinn::rustls::ServerConfig::builder()
-            .with_client_cert_verifier(client_cert_verifier)
-            .with_single_cert(cert_chain, priv_key)?;
-        Ok(Arc::new(QuicServerConfig::try_from(cfg)?))
     }
 
     pub async fn run(&mut self, commands: Arc<HandlerCollection>) -> Result<()> {

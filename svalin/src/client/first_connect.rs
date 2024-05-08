@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use svalin_rpc::SkipServerVerification;
+use svalin_rpc::skip_verify::SkipServerVerification;
 
 use crate::{
     client::verifiers::upstream_verifier::{self, UpstreamVerifier},
