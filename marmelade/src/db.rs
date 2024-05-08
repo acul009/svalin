@@ -52,4 +52,11 @@ impl DB {
 
         Ok(Scope::root_scope(self.clone(), name))
     }
+
+    pub fn delete_scope(&self, name: &str) -> Result<(), jammdb::Error> {
+        let tx = self.jamm.tx(true)?;
+        tx.delete_bucket(name.as_bytes())?;
+        tx.commit()?;
+        Ok(())
+    }
 }
