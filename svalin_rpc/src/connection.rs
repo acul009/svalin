@@ -27,7 +27,8 @@ impl crate::Connection for DirectConnection {
                     open_sessions.spawn(async move {
                         let res = session.handle(commands2).await;
                         if let Err(e) = res {
-                            print!("Error: {}", e);
+                            // TODO: Actually handle Error
+                            panic!("{}", e);
                         }
                     });
                 }

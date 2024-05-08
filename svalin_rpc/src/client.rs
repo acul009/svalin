@@ -52,8 +52,6 @@ impl Client {
 
         let connection = endpoint.connect(addr, host)?.await?;
 
-        println!("{:?}", connection.handshake_data().unwrap());
-
         Ok(Self { connection })
     }
 

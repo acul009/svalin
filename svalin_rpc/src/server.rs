@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, sync::Arc};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use quinn::{
     crypto::{self, rustls::QuicServerConfig},
     rustls::{
@@ -67,7 +67,8 @@ impl Server {
             self.open_connections.spawn(async move {
                 println!("spawn successful");
                 if let Err(e) = fut.await {
-                    print!("Error: {}", e);
+                    // TODO: actually handle error
+                    panic!("{}", e);
                 }
                 println!("connection handled");
             });
@@ -82,15 +83,22 @@ impl Server {
     ) -> Result<()> {
         println!("waiting for connection to get ready...");
 
-        let conn = conn.await?;
+        let conn = conn
+            .await
+            .context("Error when awaiting connection establishment")?;
 
-        let peer_cert = match conn.peer_identity() {
-            None => Ok(None),
-            Some(ident) => match ident.downcast::<CertificateDer>() {
-                core::result::Result::Ok(cert) => Ok(Some(cert)),
-                Err(_) => Err(anyhow!("Failed to get legitimate identity")),
-            },
-        }?;
+        let peer_cert =
+            match conn.peer_identity() {
+                None => None,
+                Some(ident) => Some(ident.downcast::<Vec<CertificateDer>>().map_err(
+                    |uncasted| {
+                        anyhow!(
+                            "Failed to downcast peer_identity of actual type {}",
+                            std::any::type_name_of_val(&*uncasted)
+                        )
+                    },
+                )?),
+            };
 
         if let Some(cert) = peer_cert {
             println!("client cert:\n{:?}", cert.as_ref());
