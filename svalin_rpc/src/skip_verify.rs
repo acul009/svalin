@@ -67,17 +67,12 @@ impl SkipClientVerification {
 }
 
 impl quinn::rustls::server::danger::ClientCertVerifier for SkipClientVerification {
-    fn root_hint_subjects(&self) -> &[quinn::rustls::DistinguishedName] {
-        todo!()
+    fn client_auth_mandatory(&self) -> bool {
+        false
     }
 
-    fn verify_client_cert(
-        &self,
-        end_entity: &quinn::rustls::pki_types::CertificateDer<'_>,
-        intermediates: &[quinn::rustls::pki_types::CertificateDer<'_>],
-        now: quinn::rustls::pki_types::UnixTime,
-    ) -> Result<quinn::rustls::server::danger::ClientCertVerified, quinn::rustls::Error> {
-        todo!()
+    fn root_hint_subjects(&self) -> &[quinn::rustls::DistinguishedName] {
+        &[]
     }
 
     fn verify_tls12_signature(
@@ -86,7 +81,9 @@ impl quinn::rustls::server::danger::ClientCertVerifier for SkipClientVerificatio
         cert: &quinn::rustls::pki_types::CertificateDer<'_>,
         dss: &quinn::rustls::DigitallySignedStruct,
     ) -> Result<quinn::rustls::client::danger::HandshakeSignatureValid, quinn::rustls::Error> {
-        todo!()
+        Err(quinn::rustls::Error::PeerIncompatible(
+            quinn::rustls::PeerIncompatible::ServerTlsVersionIsDisabledByOurConfig,
+        ))
     }
 
     fn verify_tls13_signature(
@@ -95,10 +92,27 @@ impl quinn::rustls::server::danger::ClientCertVerifier for SkipClientVerificatio
         cert: &quinn::rustls::pki_types::CertificateDer<'_>,
         dss: &quinn::rustls::DigitallySignedStruct,
     ) -> Result<quinn::rustls::client::danger::HandshakeSignatureValid, quinn::rustls::Error> {
-        todo!()
+        quinn::rustls::crypto::verify_tls13_signature(
+            message,
+            cert,
+            dss,
+            &self.0.signature_verification_algorithms,
+        )
     }
 
     fn supported_verify_schemes(&self) -> Vec<quinn::rustls::SignatureScheme> {
+        self.0.signature_verification_algorithms.supported_schemes()
+    }
+
+    fn verify_client_cert(
+        &self,
+        end_entity: &quinn::rustls::pki_types::CertificateDer<'_>,
+        intermediates: &[quinn::rustls::pki_types::CertificateDer<'_>],
+        now: quinn::rustls::pki_types::UnixTime,
+    ) -> std::prelude::v1::Result<
+        quinn::rustls::server::danger::ClientCertVerified,
+        quinn::rustls::Error,
+    > {
         todo!()
     }
 }
