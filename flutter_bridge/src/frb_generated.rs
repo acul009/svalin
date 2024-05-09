@@ -128,9 +128,7 @@ fn wire_Init_init_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::rust_async::RwLock<Init>,
-            >>::sse_decode(&mut deserializer);
+            let api_that = <Init>::sse_decode(&mut deserializer);
             let api_username = <String>::sse_decode(&mut deserializer);
             let api_password = <String>::sse_decode(&mut deserializer);
             let api_totp_secret = <TOTP>::sse_decode(&mut deserializer);
@@ -138,9 +136,8 @@ fn wire_Init_init_impl(
             move |context| async move {
                 transform_result_sse(
                     (move || async move {
-                        let api_that = api_that.rust_auto_opaque_decode_ref();
                         crate::api::client::Init::init(
-                            &api_that,
+                            api_that,
                             api_username,
                             api_password,
                             api_totp_secret,

@@ -21,7 +21,7 @@ pub enum _FirstConnect {
 
 #[frb(external)]
 impl Init {
-    pub async fn init(&self, username: String, password: String, totp_secret: TOTP) -> Result<()> {}
+    pub async fn init(self, username: String, password: String, totp_secret: TOTP) -> Result<()> {}
 }
 
 #[frb(external)]
