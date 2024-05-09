@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use tokio::task::JoinSet;
+use tracing::debug;
 
 use crate::{session::SessionCreated, HandlerCollection, Session, SessionOpen};
 
@@ -17,7 +18,7 @@ pub struct DirectConnection {
 
 impl crate::Connection for DirectConnection {
     async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()> {
-        println!("waiting for incoming data stream");
+        debug!("waiting for incoming data stream");
         let mut open_sessions = JoinSet::<()>::new();
 
         loop {

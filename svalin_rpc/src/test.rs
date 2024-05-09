@@ -1,10 +1,11 @@
 use std::{net::ToSocketAddrs, time::Duration};
 
+use test_log::test;
 use tokio::time::sleep;
 
 use crate::{skip_verify::SkipClientVerification, HandlerCollection};
 
-#[tokio::test]
+#[test(tokio::test)]
 async fn ping_test() {
     let address = "127.0.0.1:1234".to_socket_addrs().unwrap().next().unwrap();
     let credentials = svalin_pki::Keypair::generate()

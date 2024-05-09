@@ -1,10 +1,16 @@
-use std::path::Path;
+use std::{fmt::Debug, path::Path};
 
 use crate::Scope;
 
 #[derive(Clone)]
 pub struct DB {
     pub(crate) jamm: jammdb::DB,
+}
+
+impl Debug for DB {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DB").finish()
+    }
 }
 
 impl DB {

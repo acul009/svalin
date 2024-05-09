@@ -5,12 +5,14 @@ use svalin_rpc::{
     skip_verify::SkipServerVerification,
     HandlerCollection,
 };
+use test_log::test;
 use totp_rs::TOTP;
+use tracing::debug;
 
 use crate::shared::commands::init::initDispatcher;
 use crate::{client::Client, server::Server};
 
-#[tokio::test]
+#[test(tokio::test)]
 async fn test_init() {
     let (send_init, recv_init) = tokio::sync::oneshot::channel::<()>();
 
@@ -25,10 +27,7 @@ async fn test_init() {
 
         send_init.send(()).unwrap();
 
-        let commands = HandlerCollection::new();
-        commands.add(PingHandler::new()).await;
-
-        server.run(commands).await.unwrap();
+        server.run().await.unwrap();
     });
 
     let host = "localhost:1234".to_owned();
@@ -54,7 +53,7 @@ async fn test_init() {
     let mut conn = client.rpc().upstream_connection();
 
     let duration = conn.ping().await.unwrap();
-    println!("ping duration: {:?}", duration);
+    debug!("ping duration: {:?}", duration);
 
     client.close();
 

@@ -16,11 +16,11 @@ impl ChunkWriter {
             // error
             return Err(anyhow!("The given data chunk is to big"));
         }
-        println!("original chunk: {:?}", chunk);
+        // println!("original chunk: {:?}", chunk);
         let len: u32 = len.try_into().unwrap();
         if len < 0b1000_0000 {
             let lenbytes = len.to_be_bytes();
-            println!("using short len: {}", lenbytes[3]);
+            // println!("using short len: {}", lenbytes[3]);
             self.binary_writer.write_u8(lenbytes[3]).await?;
         } else {
             let lenbytes = (len | (1 << 31)).to_be_bytes();
@@ -46,13 +46,13 @@ impl ChunkReader {
 
         let len: usize;
 
-        println!("read short len: {}", short_len);
+        // println!("read short len: {}", short_len);
 
         if short_len < 0b1000_0000 {
             len = short_len.into()
         } else {
             // length is 4 bytes
-            println!("use long len");
+            // println!("use long len");
             let mut size_be = [short_len & 0b0111_1111, 0, 0, 0];
             self.binary_reader.read_exact(&mut size_be[1..]).await?;
             len = u32::from_be_bytes(size_be) as usize;
@@ -62,7 +62,7 @@ impl ChunkReader {
 
         self.binary_reader.read_exact(&mut chunk).await?;
 
-        println!("read chunk: {:?}", &chunk);
+        // println!("read chunk: {:?}", &chunk);
 
         Ok(chunk)
     }

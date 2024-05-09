@@ -5,6 +5,7 @@ use svalin_rpc::{CommandHandler, Session, SessionOpen};
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
+use tracing::debug;
 
 pub(crate) struct InitHandler {
     channel: mpsc::Sender<(Certificate, PermCredentials)>,
@@ -23,7 +24,7 @@ fn init_key() -> String {
 #[async_trait]
 impl CommandHandler for InitHandler {
     async fn handle(&self, mut session: Session<SessionOpen>) -> anyhow::Result<()> {
-        println!("incoming init request");
+        debug!("incoming init request");
 
         if self.channel.is_closed() {
             return Ok(());
@@ -38,7 +39,7 @@ impl CommandHandler for InitHandler {
         let my_cert: Certificate = session.read_object().await?;
         let my_credentials = keypair.upgrade(my_cert)?;
 
-        println!("init request handled");
+        debug!("init request handled");
 
         session
             .write_object::<std::result::Result<(), ()>>(&Ok(()))
@@ -58,7 +59,7 @@ impl CommandHandler for InitHandler {
 pub(crate) async fn init(
     session: &mut Session<SessionOpen>,
 ) -> Result<(PermCredentials, Certificate)> {
-    println!("sending init request");
+    debug!("sending init request");
     let root = Keypair::generate()?.to_self_signed_cert()?;
     session.write_object(root.get_certificate()).await?;
 
@@ -70,7 +71,7 @@ pub(crate) async fn init(
 
     let _ok: std::result::Result<(), ()> = session.read_object().await?;
 
-    println!("init completed");
+    debug!("init completed");
 
     Ok((root, server_cert))
 }

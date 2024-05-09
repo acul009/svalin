@@ -8,13 +8,19 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, Keypair, PermCredentials};
-use svalin_rpc::{skip_verify::SkipClientVerification, HandlerCollection};
+use svalin_rpc::{
+    ping::PingHandler, skip_verify::SkipClientVerification, CommandHandler, HandlerCollection,
+};
 use tokio::sync::mpsc;
+use tracing::{debug, error};
 
 use crate::shared::commands::{
+    add_user::AddUserHandler,
     init::InitHandler,
     public_server_status::{PublicStatus, PublicStatusHandler},
 };
+
+use self::users::UserStore;
 
 pub mod users;
 
@@ -92,7 +98,16 @@ impl Server {
         })
     }
 
-    pub async fn run(&mut self, commands: Arc<HandlerCollection>) -> Result<()> {
+    pub async fn run(&mut self) -> Result<()> {
+        let userstore = UserStore::open(self.scope.subscope("users".into()));
+
+        let commands = HandlerCollection::new();
+        commands
+            .add(PingHandler::new())
+            .await
+            .add(AddUserHandler::new(userstore))
+            .await;
+
         self.rpc.run(commands).await
     }
 
@@ -138,22 +153,18 @@ impl Server {
             .add(PublicStatusHandler::new(PublicStatus::WaitingForInit))
             .await;
 
-        let debug = commands.get("init").await.unwrap();
-
-        println!("debug: {:?}", debug.key());
-
-        println!("starting up init server");
+        debug!("starting up init server");
 
         let handle = tokio::spawn(async move { rpc.run(commands).await });
 
-        println!("init server running");
+        debug!("init server running");
 
         if let Some(result) = receive.recv().await {
-            println!("successfully initialized server");
+            debug!("successfully initialized server");
             handle.abort();
             Ok(result)
         } else {
-            println!("error when trying to initialize server");
+            error!("error when trying to initialize server");
             handle.abort();
             Err(anyhow!("error initializing server"))
         }

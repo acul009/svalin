@@ -1,3 +1,5 @@
+use std::{fmt::Debug, sync::Arc};
+
 use anyhow::{anyhow, Ok, Result};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{ArgonParams, Certificate, PasswordHash};
@@ -13,14 +15,14 @@ pub struct StoredUser {
     totp_secret: TOTP,
 }
 
+#[derive(Debug)]
 pub struct UserStore {
     scope: marmelade::Scope,
-    root: Certificate,
 }
 
 impl UserStore {
-    fn new(scope: marmelade::Scope, root: Certificate) -> Self {
-        Self { scope, root }
+    pub fn open(scope: marmelade::Scope) -> Arc<Self> {
+        Arc::new(Self { scope })
     }
 
     fn get_user(&self, public_key: &[u8]) -> Result<Option<StoredUser>> {

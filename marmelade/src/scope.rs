@@ -3,7 +3,7 @@ use crate::{
     Bucket, DB,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Scope {
     db: DB,
     scope: String,

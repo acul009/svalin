@@ -17,21 +17,49 @@ pub struct ArgonParams {
 impl ArgonParams {
     pub fn basic() -> Self {
         let salt = SaltString::generate(&mut OsRng);
-        Self {
-            m_cost: 128 * 1024,
-            t_cost: 2,
-            p_cost: 4,
-            salt: salt.as_str().to_owned(),
+
+        #[cfg(test)]
+        {
+            Self {
+                m_cost: 1,
+                t_cost: 1,
+                p_cost: 1,
+                salt: salt.as_str().to_owned(),
+            }
+        }
+
+        #[cfg(not(test))]
+        {
+            Self {
+                m_cost: 128 * 1024,
+                t_cost: 2,
+                p_cost: 4,
+                salt: salt.as_str().to_owned(),
+            }
         }
     }
 
     pub fn strong() -> Self {
         let salt = SaltString::generate(&mut OsRng);
-        Self {
-            m_cost: 1024 * 1024,
-            t_cost: 5,
-            p_cost: 8,
-            salt: salt.as_str().to_owned(),
+
+        #[cfg(test)]
+        {
+            Self {
+                m_cost: 1,
+                t_cost: 1,
+                p_cost: 1,
+                salt: salt.as_str().to_owned(),
+            }
+        }
+
+        #[cfg(not(test))]
+        {
+            Self {
+                m_cost: 1024 * 1024,
+                t_cost: 5,
+                p_cost: 8,
+                salt: salt.as_str().to_owned(),
+            }
         }
     }
 

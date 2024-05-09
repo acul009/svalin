@@ -1,8 +1,9 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::{fmt::Debug, marker::PhantomData, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncWrite};
+use tracing::{debug, instrument};
 
 use crate::{
     command::HandlerCollection,
@@ -21,6 +22,14 @@ pub struct Session<T> {
     state: PhantomData<T>,
     recv: ObjectReader,
     send: ObjectWriter,
+}
+
+impl<T> Debug for Session<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Session")
+            .field("state", &self.state)
+            .finish()
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -91,7 +100,7 @@ impl Session<SessionCreated> {
     pub(crate) async fn handle(self, commands: Arc<HandlerCollection>) -> Result<()> {
         let (mut session, header) = self.receive_header().await?;
 
-        println!("requested command: {}", header.command_key);
+        debug!("requested command: {}", header.command_key);
 
         if let Some(command) = commands.get(&header.command_key).await {
             let response = SessionResponseHeader::Accept(SessionAcceptedHeader {});
@@ -113,10 +122,12 @@ impl Session<SessionCreated> {
 }
 
 impl Session<SessionOpen> {
+    #[instrument]
     pub async fn read_object<W: serde::de::DeserializeOwned>(&mut self) -> Result<W> {
         self.recv.read_object().await
     }
 
+    #[instrument(skip_all)]
     pub async fn write_object<W: Serialize>(&mut self, object: &W) -> Result<()> {
         self.send.write_object(object).await
     }

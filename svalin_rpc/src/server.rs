@@ -10,6 +10,7 @@ use quinn::{
 };
 use svalin_pki::PermCredentials;
 use tokio::task::JoinSet;
+use tracing::debug;
 
 use crate::{connection::DirectConnection, Connection, HandlerCollection};
 
@@ -60,19 +61,19 @@ impl Server {
     }
 
     pub async fn run(&mut self, commands: Arc<HandlerCollection>) -> Result<()> {
-        println!("starting server");
+        debug!("starting server");
         while let Some(conn) = self.endpoint.accept().await {
-            println!("connection incoming");
+            debug!("connection incoming");
             let fut = Server::handle_connection(conn.accept()?, commands.clone());
             self.open_connections.spawn(async move {
-                println!("spawn successful");
+                debug!("spawn successful");
                 if let Err(e) = fut.await {
                     // TODO: actually handle error
                     panic!("{}", e);
                 }
-                println!("connection handled");
+                debug!("connection handled");
             });
-            println!("Waiting for next connection");
+            debug!("Waiting for next connection");
         }
         todo!()
     }
@@ -81,7 +82,7 @@ impl Server {
         conn: quinn::Connecting,
         commands: Arc<HandlerCollection>,
     ) -> Result<()> {
-        println!("waiting for connection to get ready...");
+        debug!("waiting for connection to get ready...");
 
         let conn = conn
             .await
@@ -101,12 +102,12 @@ impl Server {
             };
 
         if let Some(cert) = peer_cert {
-            println!("client cert:\n{:?}", cert.as_ref());
+            debug!("client cert:\n{:?}", cert.as_ref());
         } else {
-            println!("client did not provide cert")
+            debug!("client did not provide cert")
         }
 
-        println!("connection established");
+        debug!("connection established");
 
         let conn = DirectConnection::new(conn);
 

@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use anyhow::{anyhow, Context, Result};
 
 use ring::signature::{Ed25519KeyPair, KeyPair};
@@ -13,6 +15,14 @@ pub struct PermCredentials {
     keypair: Ed25519KeyPair,
     raw_keypair: Vec<u8>,
     certificate: Certificate,
+}
+
+impl Debug for PermCredentials {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PermCredentials")
+            .field("certificate", &self.certificate)
+            .finish()
+    }
 }
 
 #[derive(Serialize, Deserialize)]
