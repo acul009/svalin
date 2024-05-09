@@ -10,6 +10,7 @@ pub use profile::*;
 
 pub use first_connect::*;
 use svalin_pki::{Certificate, PermCredentials};
+use tracing::debug;
 
 pub struct Client {
     rpc: svalin_rpc::Client,
@@ -117,7 +118,11 @@ impl Client {
     pub async fn open_profile(profile_key: String, password: Vec<u8>) -> Result<Self> {
         let db = Self::open_marmelade()?;
 
-        if !db.list_scopes()?.contains(&profile_key) {
+        let available_scopes = db.list_scopes()?;
+
+        debug!("Available scopes: {:?}", available_scopes);
+
+        if !available_scopes.contains(&profile_key) {
             return Err(anyhow!("Profile not found"));
         }
 

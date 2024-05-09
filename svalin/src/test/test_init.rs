@@ -1,15 +1,10 @@
 use std::net::ToSocketAddrs;
 
-use svalin_rpc::{
-    ping::{pingDispatcher, PingHandler},
-    skip_verify::SkipServerVerification,
-    HandlerCollection,
-};
+use svalin_rpc::ping::pingDispatcher;
 use test_log::test;
 use totp_rs::TOTP;
 use tracing::debug;
 
-use crate::shared::commands::init::initDispatcher;
 use crate::{client::Client, server::Server};
 
 #[test(tokio::test(flavor = "multi_thread"))]

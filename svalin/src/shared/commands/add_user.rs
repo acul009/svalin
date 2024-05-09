@@ -1,17 +1,15 @@
-use std::{fmt::Display, ops::Add, sync::Arc};
+use std::{fmt::Display, sync::Arc};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
 use svalin_pki::{ArgonParams, Certificate, PermCredentials};
 use svalin_rpc::{Session, SessionOpen};
 use totp_rs::TOTP;
-use tracing::{debug, field::debug, instrument, span, Instrument, Level};
+use tracing::{debug, error, instrument, span, Instrument, Level};
 
-use crate::server::users::{StoredUser, UserStore};
-
-use super::public_server_status::PublicStatus;
+use crate::server::users::UserStore;
 
 #[derive(Serialize, Deserialize)]
 struct AddUserRequest {
@@ -94,6 +92,7 @@ impl svalin_rpc::CommandHandler for AddUserHandler {
             .await;
 
         if let Err(err) = add_result {
+            error!("error adding user: {}", err);
             session
                 .write_object::<Result<(), AddUserError>>(&Err(AddUserError::Generic))
                 .await?;
@@ -110,7 +109,7 @@ impl svalin_rpc::CommandHandler for AddUserHandler {
 #[rpc_dispatch(add_user_key())]
 pub async fn add_user(
     session: &mut Session<SessionOpen>,
-    credentials: PermCredentials,
+    credentials: &PermCredentials,
     username: String,
     password: Vec<u8>,
     totp_secret: TOTP,

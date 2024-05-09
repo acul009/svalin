@@ -1,3 +1,5 @@
+use anyhow::{anyhow, Ok, Result};
+
 use crate::{
     transaction_type::{RoTransaction, RwTransaction},
     Bucket, DB,
@@ -28,7 +30,7 @@ impl Scope {
         let bucket = tx.get_bucket(self.scope.as_bytes())?;
 
         let mut ro_bucket = Bucket {
-            bucket: bucket,
+            bucket,
             transaction_type: std::marker::PhantomData::<RoTransaction>,
         };
 
@@ -50,12 +52,12 @@ impl Scope {
         let bucket = tx.get_bucket(self.scope.as_bytes())?;
 
         let mut rw_bucket = Bucket {
-            bucket: bucket,
+            bucket,
             transaction_type: std::marker::PhantomData::<RwTransaction>,
         };
 
         for key in self.path.iter() {
-            rw_bucket = rw_bucket.get_bucket(key.as_bytes())?;
+            rw_bucket = rw_bucket.get_or_create_bucket(key.as_bytes())?;
         }
 
         f(rw_bucket)?;

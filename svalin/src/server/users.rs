@@ -4,6 +4,7 @@ use anyhow::{anyhow, Ok, Result};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{ArgonParams, Certificate, PasswordHash};
 use totp_rs::TOTP;
+use tracing::{debug, field::debug, instrument};
 
 #[derive(Serialize, Deserialize)]
 pub struct StoredUser {
@@ -57,6 +58,7 @@ impl UserStore {
         Ok(user)
     }
 
+    #[instrument(skip_all)]
     pub async fn add_user(
         &self,
         certificate: Certificate,
@@ -77,16 +79,18 @@ impl UserStore {
             totp_secret,
         };
 
+        debug!("requesting user update transaction");
+
         self.scope.update(move |b| {
             let public_key = user.certificate.public_key();
 
-            let usernames = b.get_bucket("usernames")?;
+            let usernames = b.get_or_create_bucket("usernames")?;
 
             if usernames.get_kv(&user.username).is_some() {
                 return Err(anyhow!("Username already in use"));
             }
 
-            let b = b.get_bucket("userdata")?;
+            let b = b.get_or_create_bucket("userdata")?;
             if b.get_kv(public_key).is_some() {
                 return Err(anyhow!("User with uuid already exists"));
             }

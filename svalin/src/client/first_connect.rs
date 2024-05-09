@@ -58,7 +58,7 @@ pub struct Init {
 impl Init {
     #[instrument(skip_all)]
     pub async fn init(
-        &self,
+        self,
         username: String,
         password: String,
         totp_secret: totp_rs::TOTP,
@@ -74,7 +74,7 @@ impl Init {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert);
+        let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert.clone());
 
         let client = svalin_rpc::Client::connect(self.address.clone(), Some(&root), verifier)
             .await
@@ -84,9 +84,24 @@ impl Init {
         debug!("connected to server with certificate");
 
         connection
-            .add_user(root, username, password.into(), totp_secret)
+            .add_user(
+                &root,
+                username.clone(),
+                password.clone().into(),
+                totp_secret,
+            )
             .await
             .context("failed to add root user")?;
+
+        Client::add_profile(
+            username,
+            self.address,
+            server_cert,
+            root.get_certificate().clone(),
+            root,
+            password.into(),
+        )
+        .await?;
 
         Ok(())
     }
