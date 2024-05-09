@@ -12,7 +12,7 @@ use crate::{
 };
 
 pub struct PermCredentials {
-    keypair: Ed25519KeyPair,
+    keypair: Ed25519KeyPair, // Actualy is used below in a trait, compiler is jsut stupid
     raw_keypair: Vec<u8>,
     certificate: Certificate,
 }

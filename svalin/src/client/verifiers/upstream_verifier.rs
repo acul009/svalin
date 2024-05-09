@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 
 #[derive(Debug)]
 pub struct UpstreamVerifier {
     provider: Arc<quinn::rustls::crypto::CryptoProvider>,
-    root_certificate: svalin_pki::Certificate,
+    _root_certificate: svalin_pki::Certificate,
     upstream_certificate: svalin_pki::Certificate,
 }
 
@@ -16,7 +16,7 @@ impl UpstreamVerifier {
     ) -> Arc<Self> {
         let provider = svalin_rpc::defaults::crypto_provider();
         Arc::new(Self {
-            root_certificate,
+            _root_certificate: root_certificate,
             upstream_certificate,
             provider,
         })
@@ -27,10 +27,10 @@ impl quinn::rustls::client::danger::ServerCertVerifier for UpstreamVerifier {
     fn verify_server_cert(
         &self,
         end_entity: &quinn::rustls::pki_types::CertificateDer<'_>,
-        intermediates: &[quinn::rustls::pki_types::CertificateDer<'_>],
-        server_name: &quinn::rustls::pki_types::ServerName<'_>,
-        ocsp_response: &[u8],
-        now: quinn::rustls::pki_types::UnixTime,
+        _intermediates: &[quinn::rustls::pki_types::CertificateDer<'_>],
+        _server_name: &quinn::rustls::pki_types::ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: quinn::rustls::pki_types::UnixTime,
     ) -> Result<quinn::rustls::client::danger::ServerCertVerified, quinn::rustls::Error> {
         if self.upstream_certificate.to_der() != end_entity.as_ref() {
             return Err(quinn::rustls::Error::InvalidCertificate(
@@ -44,9 +44,9 @@ impl quinn::rustls::client::danger::ServerCertVerifier for UpstreamVerifier {
 
     fn verify_tls12_signature(
         &self,
-        message: &[u8],
-        cert: &quinn::rustls::pki_types::CertificateDer<'_>,
-        dss: &quinn::rustls::DigitallySignedStruct,
+        _message: &[u8],
+        _cert: &quinn::rustls::pki_types::CertificateDer<'_>,
+        _dss: &quinn::rustls::DigitallySignedStruct,
     ) -> Result<quinn::rustls::client::danger::HandshakeSignatureValid, quinn::rustls::Error> {
         Err(quinn::rustls::Error::PeerIncompatible(
             quinn::rustls::PeerIncompatible::ServerTlsVersionIsDisabledByOurConfig,

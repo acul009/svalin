@@ -3,13 +3,12 @@ use crate::{
     Certificate, PermCredentials,
 };
 use anyhow::Result;
-use rcgen::{DnType, ExtendedKeyUsagePurpose, KeyUsagePurpose, SignatureAlgorithm};
+use rcgen::{ExtendedKeyUsagePurpose, KeyUsagePurpose, SignatureAlgorithm};
 use ring::{
     rand::SystemRandom,
     signature::{Ed25519KeyPair, KeyPair},
 };
 use time::{Duration, OffsetDateTime};
-use x509_parser::nom::HexDisplay;
 
 pub struct Keypair {
     keypair: Ed25519KeyPair,
