@@ -1,4 +1,4 @@
-use std::net::ToSocketAddrs;
+use std::{net::ToSocketAddrs, process::exit, sync::Arc};
 
 use svalin_rpc::ping::pingDispatcher;
 use test_log::test;
@@ -9,9 +9,10 @@ use crate::{client::Client, server::Server};
 
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_init() {
-    let (send_init, recv_init) = tokio::sync::oneshot::channel::<()>();
+    let init_complete = Arc::new(tokio::sync::Notify::new());
+    let init_complete2 = init_complete.clone();
 
-    let server_handle = tokio::spawn(async {
+    let server_handle = tokio::spawn(async move {
         let addr = "0.0.0.0:1234".to_socket_addrs().unwrap().next().unwrap();
         // delete the test db
         std::fs::remove_file("./server_test.jammdb").unwrap_or(());
@@ -20,7 +21,7 @@ async fn test_init() {
             .await
             .unwrap();
 
-        send_init.send(()).unwrap();
+        init_complete2.notify_one();
 
         server.run().await.unwrap();
     });
@@ -42,7 +43,7 @@ async fn test_init() {
         }
     };
 
-    recv_init.await.unwrap();
+    init_complete.notified().await;
 
     let client = Client::open_profile("admin@localhost:1234".into(), "admin".as_bytes().to_owned())
         .await
@@ -56,5 +57,6 @@ async fn test_init() {
     client.close();
 
     server_handle.abort();
-    let _ = server_handle.await;
+
+    exit(0);
 }

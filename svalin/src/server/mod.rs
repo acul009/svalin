@@ -170,4 +170,8 @@ impl Server {
             Err(anyhow!("error initializing server"))
         }
     }
+
+    pub fn close(&self) {
+        self.rpc.close();
+    }
 }

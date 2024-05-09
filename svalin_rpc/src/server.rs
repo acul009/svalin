@@ -115,4 +115,8 @@ impl Server {
 
         Ok(())
     }
+
+    pub fn close(&self) {
+        self.endpoint.close(0u32.into(), b"");
+    }
 }

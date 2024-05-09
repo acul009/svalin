@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use tokio::task::JoinSet;
-use tracing::debug;
+use tracing::{debug, error};
 
 use crate::{session::SessionCreated, HandlerCollection, Session, SessionOpen};
 
@@ -29,7 +29,7 @@ impl crate::Connection for DirectConnection {
                         let res = session.handle(commands2).await;
                         if let Err(e) = res {
                             // TODO: Actually handle Error
-                            panic!("{}", e);
+                            error!("{}", e);
                         }
                     });
                 }
