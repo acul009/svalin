@@ -25,6 +25,9 @@ async fn test_init() {
         server.run().await.unwrap();
     });
 
+    // delete test client db
+    std::fs::remove_file("./client.jammdb").unwrap_or(());
+
     let host = "localhost:1234".to_owned();
 
     match Client::first_connect(host).await.unwrap() {

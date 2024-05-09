@@ -45,12 +45,10 @@ impl ArgonParams {
         let salt_bytes = self.salt.as_bytes().to_owned();
 
         tokio::task::spawn_blocking(move || {
-            debug!("hashing password in blocking task");
             let mut hash = vec![0u8; 32];
             let result = argon
                 .hash_password_into(&secret, &salt_bytes, &mut hash)
                 .map_err(|err| anyhow!(err));
-            debug!("hashing complete");
 
             if let Err(err) = result {
                 send.send(Err(err)).unwrap();
@@ -59,10 +57,7 @@ impl ArgonParams {
             };
         });
 
-        let hash_result = recv.await?;
-
-        debug!("received hash result from blocking task");
-        hash_result
+        recv.await?
     }
 
     pub async fn derive_password_hash(self, secret: Vec<u8>) -> Result<PasswordHash> {

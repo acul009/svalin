@@ -101,7 +101,8 @@ impl Init {
             root,
             password.into(),
         )
-        .await?;
+        .await
+        .context("failed to save profile")?;
 
         Ok(())
     }

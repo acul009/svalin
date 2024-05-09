@@ -27,12 +27,33 @@ impl Client {
 
     fn open_marmelade() -> Result<marmelade::DB> {
         let mut path = Self::get_config_dir_path()?;
-        path.push("marmelade.jammdb");
+        path.push("client.jammdb");
 
         Ok(marmelade::DB::open(path)?)
     }
 
     fn get_config_dir_path() -> Result<PathBuf> {
+        #[cfg(test)]
+        {
+            Ok(std::env::current_dir()?)
+        }
+
+        #[cfg(not(test))]
+        {
+            let mut path = Self::get_general_config_dir_path()?;
+
+            path.push("svalin");
+
+            // check if config dir exists
+            if !path.exists() {
+                std::fs::create_dir_all(&path)?;
+            }
+
+            Ok(path)
+        }
+    }
+
+    fn get_general_config_dir_path() -> Result<PathBuf> {
         #[cfg(target_os = "windows")]
         {
             let appdata = std::env::var("APPDATA")
@@ -91,7 +112,7 @@ impl Client {
             raw_credentials,
         );
 
-        let db = Self::open_marmelade()?;
+        let db = Self::open_marmelade().context("Failed to open marmelade")?;
 
         db.scope(scope)
             .context("Failed to create profile scope")?
@@ -126,6 +147,8 @@ impl Client {
             return Err(anyhow!("Profile not found"));
         }
 
+        debug!("Opening profile {}", profile_key);
+
         let mut profile: Option<Profile> = None;
 
         let scope = db.scope(profile_key)?;
@@ -136,17 +159,24 @@ impl Client {
             Ok(())
         })?;
 
+        debug!("Data from profile ready");
+
         if let Some(profile) = profile {
+            debug!("unlocking profile");
             let identity = PermCredentials::from_bytes(&profile.raw_credentials, password).await?;
 
+            debug!("creating verifier");
             let verifier = verifiers::upstream_verifier::UpstreamVerifier::new(
                 profile.root_certificate,
                 profile.upstream_certificate,
             );
 
+            debug!("connecting to server");
             let rpc =
                 svalin_rpc::Client::connect(profile.upstream_address, Some(&identity), verifier)
                     .await?;
+
+            debug!("connected to server");
 
             Ok(Self { rpc })
         } else {
