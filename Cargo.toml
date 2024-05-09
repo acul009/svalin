@@ -8,7 +8,5 @@ members = [
     "svalin_macros",
     "svalin_pki",
     "svalin_rpc",
-    "traefik-gui",
-    "iced_test",
     "flutter_bridge",
 ]
