@@ -61,7 +61,7 @@ impl Server {
 
             let conf = BaseConfig {
                 root_cert: root,
-                credentials: credentials.to_bytes(&key)?,
+                credentials: credentials.to_bytes(key).await?,
             };
 
             scope.update(|b| {
@@ -84,8 +84,9 @@ impl Server {
 
         let credentials = PermCredentials::from_bytes(
             &base_config.credentials,
-            &Server::get_encryption_key(&scope)?,
-        )?;
+            Server::get_encryption_key(&scope)?,
+        )
+        .await?;
 
         // TODO: proper client verification
         let rpc = svalin_rpc::Server::new(addr, &credentials, SkipClientVerification::new())?;

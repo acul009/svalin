@@ -53,8 +53,9 @@ impl PermCredentials {
         })
     }
 
-    pub fn to_bytes(&self, password: &[u8]) -> Result<Vec<u8>> {
+    pub async fn to_bytes(&self, password: Vec<u8>) -> Result<Vec<u8>> {
         let encrypted_keypair = EncryptedData::encrypt_with_password(&self.raw_keypair, password)
+            .await
             .context("Failed to encrypt keypair")?;
         let on_disk = CredentialOnDisk {
             encrypted_keypair,
@@ -66,7 +67,7 @@ impl PermCredentials {
         Ok(encoded)
     }
 
-    pub fn from_bytes(bytes: &[u8], password: &[u8]) -> Result<Self> {
+    pub async fn from_bytes(bytes: &[u8], password: Vec<u8>) -> Result<Self> {
         let on_disk: CredentialOnDisk =
             postcard::from_bytes(bytes).context("failed to decode postcard")?;
 
@@ -75,6 +76,7 @@ impl PermCredentials {
 
         let decrypted_keypair =
             EncryptedData::decrypt_with_password(&on_disk.encrypted_keypair, password)
+                .await
                 .context("failed to decrypt keypair")?;
 
         Self::new(decrypted_keypair, certificate)
@@ -121,8 +123,8 @@ mod test {
 
     use crate::{Keypair, PermCredentials};
 
-    #[test]
-    fn test_on_disk_storage() {
+    #[tokio::test]
+    async fn test_on_disk_storage() {
         let original = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
 
         let rand = SystemRandom::new();
@@ -137,9 +139,11 @@ mod test {
         )
         .unwrap();
 
-        let on_disk = original.to_bytes(pw.as_ref()).unwrap();
+        let on_disk = original.to_bytes(pw.clone().into()).await.unwrap();
 
-        let copy = PermCredentials::from_bytes(&on_disk, pw.as_ref()).unwrap();
+        let copy = PermCredentials::from_bytes(&on_disk, pw.into())
+            .await
+            .unwrap();
 
         assert_eq!(copy.raw_keypair, original.raw_keypair);
         assert_eq!(copy.certificate, original.certificate);

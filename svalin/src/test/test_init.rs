@@ -12,7 +12,7 @@ use tracing::debug;
 use crate::shared::commands::init::initDispatcher;
 use crate::{client::Client, server::Server};
 
-#[test(tokio::test)]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_init() {
     let (send_init, recv_init) = tokio::sync::oneshot::channel::<()>();
 
@@ -46,7 +46,7 @@ async fn test_init() {
 
     recv_init.await.unwrap();
 
-    let client = Client::open_profile("admin@localhost:1234".into(), "admin".as_bytes())
+    let client = Client::open_profile("admin@localhost:1234".into(), "admin".as_bytes().to_owned())
         .await
         .unwrap();
 

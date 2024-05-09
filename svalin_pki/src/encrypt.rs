@@ -55,13 +55,17 @@ impl NonceSequence for NonceCounter {
 static DEFAULT_ALG: EncryptionAlgorythm = EncryptionAlgorythm::Chacha20Poly1305;
 
 impl EncryptedData {
-    pub fn encrypt_with_password(data: &[u8], password: &[u8]) -> Result<Vec<u8>> {
-        EncryptedData::encrypt_with_alg(data, password, DEFAULT_ALG)
+    pub async fn encrypt_with_password(data: &[u8], password: Vec<u8>) -> Result<Vec<u8>> {
+        EncryptedData::encrypt_with_alg(data, password, DEFAULT_ALG).await
     }
 
-    fn encrypt_with_alg(data: &[u8], password: &[u8], alg: EncryptionAlgorythm) -> Result<Vec<u8>> {
+    async fn encrypt_with_alg(
+        data: &[u8],
+        password: Vec<u8>,
+        alg: EncryptionAlgorythm,
+    ) -> Result<Vec<u8>> {
         let parameters = ArgonParams::basic();
-        let encryption_key = parameters.derive_key(password)?;
+        let encryption_key = parameters.derive_key(password).await?;
 
         let ring_alg = alg.into();
 
@@ -87,10 +91,10 @@ impl EncryptedData {
             .context("failed postcard encoding")
     }
 
-    pub fn decrypt_with_password(cipherdata: &[u8], password: &[u8]) -> Result<Vec<u8>> {
+    pub async fn decrypt_with_password(cipherdata: &[u8], password: Vec<u8>) -> Result<Vec<u8>> {
         let mut encrypted_data: EncryptedData = postcard::from_bytes(cipherdata)?;
 
-        let encryption_key = encrypted_data.parameters.derive_key(password)?;
+        let encryption_key = encrypted_data.parameters.derive_key(password).await?;
 
         let ring_alg = encrypted_data.alg.into();
 
@@ -115,16 +119,20 @@ mod test {
 
     use super::EncryptedData;
 
-    #[test]
-    fn encrypt_decrypt() {
+    #[tokio::test]
+    async fn encrypt_decrypt() {
         let rand = SystemRandom::new();
         let mut msg = [0u8; 1024];
         rand.fill(&mut msg).unwrap();
 
         let password = "testpass".as_bytes();
 
-        let encrypted = EncryptedData::encrypt_with_password(&msg, password).unwrap();
-        let msg2 = EncryptedData::decrypt_with_password(&encrypted, password).unwrap();
+        let encrypted = EncryptedData::encrypt_with_password(&msg, password.to_owned())
+            .await
+            .unwrap();
+        let msg2 = EncryptedData::decrypt_with_password(&encrypted, password.to_owned())
+            .await
+            .unwrap();
 
         assert_eq!(msg.as_ref(), &msg2);
     }

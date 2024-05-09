@@ -81,14 +81,17 @@ impl svalin_rpc::CommandHandler for AddUserHandler {
 
         debug!("totp check successful");
 
-        let add_result = self.userstore.add_user(
-            request.certificate,
-            request.username,
-            request.encrypted_credentials,
-            request.client_hash,
-            request.client_hash_options,
-            request.totp_secret,
-        );
+        let add_result = self
+            .userstore
+            .add_user(
+                request.certificate,
+                request.username,
+                request.encrypted_credentials,
+                request.client_hash,
+                request.client_hash_options,
+                request.totp_secret,
+            )
+            .await;
 
         if let Err(err) = add_result {
             session
@@ -109,7 +112,7 @@ pub async fn add_user(
     session: &mut Session<SessionOpen>,
     credentials: PermCredentials,
     username: String,
-    password: &[u8],
+    password: Vec<u8>,
     totp_secret: TOTP,
 ) -> Result<()> {
     let client_hash_options = ArgonParams::strong();
@@ -119,10 +122,10 @@ pub async fn add_user(
     let certificate = credentials.get_certificate().to_owned();
     debug!("certificate extracted");
 
-    let encrypted_credentials = credentials.to_bytes(password)?;
+    let encrypted_credentials = credentials.to_bytes(password.clone()).await?;
     debug!("credentials encrypted");
 
-    let client_hash = client_hash_options.derive_key(password)?;
+    let client_hash = client_hash_options.derive_key(password).await?;
     debug!("password hash created");
 
     let request = AddUserRequest {

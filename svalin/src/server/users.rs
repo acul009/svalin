@@ -57,7 +57,7 @@ impl UserStore {
         Ok(user)
     }
 
-    pub fn add_user(
+    pub async fn add_user(
         &self,
         certificate: Certificate,
         username: String,
@@ -71,7 +71,9 @@ impl UserStore {
             username,
             encrypted_credentials,
             client_hash_options,
-            password_double_hash: ArgonParams::basic().derive_password_hash(&client_hash)?,
+            password_double_hash: ArgonParams::basic()
+                .derive_password_hash(client_hash)
+                .await?,
             totp_secret,
         };
 

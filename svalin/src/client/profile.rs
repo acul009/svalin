@@ -27,8 +27,4 @@ impl Profile {
             raw_credentials,
         }
     }
-
-    pub fn unlock_credentials(&self, password: &[u8]) -> Result<PermCredentials> {
-        PermCredentials::from_bytes(&self.raw_credentials, password)
-    }
 }

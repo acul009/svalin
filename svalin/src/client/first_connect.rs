@@ -84,7 +84,7 @@ impl Init {
         debug!("connected to server with certificate");
 
         connection
-            .add_user(root, username, password.as_bytes(), totp_secret)
+            .add_user(root, username, password.into(), totp_secret)
             .await
             .context("failed to add root user")?;
 

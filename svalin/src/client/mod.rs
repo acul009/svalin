@@ -70,15 +70,15 @@ impl Client {
         }
     }
 
-    pub fn add_profile(
+    pub async fn add_profile(
         username: String,
         upstream_address: String,
         upstream_certificate: Certificate,
         root_certificate: Certificate,
         credentials: PermCredentials,
-        password: &[u8],
+        password: Vec<u8>,
     ) -> Result<()> {
-        let raw_credentials = credentials.to_bytes(password)?;
+        let raw_credentials = credentials.to_bytes(password).await?;
 
         let scope = format!("{username}@{upstream_address}");
 
@@ -114,7 +114,7 @@ impl Client {
         Ok(())
     }
 
-    pub async fn open_profile(profile_key: String, password: &[u8]) -> Result<Self> {
+    pub async fn open_profile(profile_key: String, password: Vec<u8>) -> Result<Self> {
         let db = Self::open_marmelade()?;
 
         if !db.list_scopes()?.contains(&profile_key) {
@@ -132,7 +132,7 @@ impl Client {
         })?;
 
         if let Some(profile) = profile {
-            let identity = PermCredentials::from_bytes(&profile.raw_credentials, password)?;
+            let identity = PermCredentials::from_bytes(&profile.raw_credentials, password).await?;
 
             let verifier = verifiers::upstream_verifier::UpstreamVerifier::new(
                 profile.root_certificate,

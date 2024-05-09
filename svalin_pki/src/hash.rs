@@ -63,19 +63,31 @@ impl ArgonParams {
         }
     }
 
-    pub fn derive_key(&self, secret: &[u8]) -> Result<Vec<u8>> {
+    pub async fn derive_key(&self, secret: Vec<u8>) -> Result<Vec<u8>> {
         let params = self.get_params().map_err(|err| anyhow!(err))?;
         let argon = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x10, params);
-        let mut hash = vec![0u8; 32];
-        argon
-            .hash_password_into(secret, self.salt.as_bytes(), &mut hash)
-            .map_err(|err| anyhow!(err))?;
 
-        Ok(hash)
+        let (send, recv) = tokio::sync::oneshot::channel::<Result<Vec<u8>>>();
+        let salt_bytes = self.salt.as_bytes().to_owned();
+
+        tokio::task::spawn_blocking(move || {
+            let mut hash = vec![0u8; 32];
+            let result = argon
+                .hash_password_into(&secret, &salt_bytes, &mut hash)
+                .map_err(|err| anyhow!(err));
+
+            if let Err(err) = result {
+                send.send(Err(err));
+            } else {
+                send.send(Ok(hash));
+            };
+        });
+
+        recv.await?
     }
 
-    pub fn derive_password_hash(self, secret: &[u8]) -> Result<PasswordHash> {
-        let hash = self.derive_key(secret)?;
+    pub async fn derive_password_hash(self, secret: Vec<u8>) -> Result<PasswordHash> {
+        let hash = self.derive_key(secret).await?;
         Ok(PasswordHash {
             params: self,
             hash: hash,
@@ -94,8 +106,8 @@ pub struct PasswordHash {
 }
 
 impl PasswordHash {
-    pub fn verify(&self, secret: &[u8]) -> Result<bool> {
-        let hash = self.params.derive_key(secret)?;
+    pub async fn verify(&self, secret: Vec<u8>) -> Result<bool> {
+        let hash = self.params.derive_key(secret).await?;
         Ok(self.hash == hash)
     }
 }
