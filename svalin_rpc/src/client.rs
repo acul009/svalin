@@ -1,7 +1,7 @@
-use std::{net::ToSocketAddrs, sync::Arc};
+use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Ok, Result};
-use quinn::crypto::rustls::QuicClientConfig;
+use quinn::{crypto::rustls::QuicClientConfig, TransportConfig};
 use svalin_pki::PermCredentials;
 
 pub struct Client {
@@ -31,8 +31,13 @@ impl Client {
             None => builder.with_no_client_auth(),
         };
 
-        let client_config =
+        // TODO: lower keepalive - needs higher server timeout
+        let mut transport_config = TransportConfig::default();
+        transport_config.keep_alive_interval(Some(Duration::from_secs(5)));
+
+        let mut client_config =
             quinn::ClientConfig::new(Arc::new(QuicClientConfig::try_from(rustls_conf)?));
+        client_config.transport_config(Arc::new(transport_config));
 
         endpoint.set_default_client_config(client_config);
 
