@@ -38,7 +38,7 @@ class _ServerDialogState extends State<ServerDialog> {
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
               ),
-              child: const Text("Connect"),
+              child: const Text("Connect To Server"),
               onPressed: () {
                 Navigator.push(context, MaterialPageRoute(builder: (context) {
                   return ConnectingDialog(address: _serverAddress);
