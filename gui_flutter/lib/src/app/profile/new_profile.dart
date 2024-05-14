@@ -250,7 +250,6 @@ class _CreateTotpDialogState extends State<CreateTotpDialog> {
                                 totpToken = value;
                               }),
                           validator: (value) {
-                            RegExp regex = RegExp(r'[0-9]{8}');
                             if (value == null || value.isEmpty) {
                               return "required";
                             } else if (!RegExp(r'^[0-9]{8}$').hasMatch(value)) {
@@ -322,9 +321,6 @@ class InitDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var initializing = connection.init(
-        username: username, password: password, totpSecret: totp);
-
     return Scaffold(
       appBar: AppBar(),
       body: FutureBuilder(
@@ -345,6 +341,8 @@ class InitDialog extends StatelessWidget {
                 ],
               ),
             );
+          } else if (snapshot.hasError) {
+            return Center(child: ErrorWidget(snapshot.error!));
           } else {
             return const Center(child: CircularProgressIndicator());
           }

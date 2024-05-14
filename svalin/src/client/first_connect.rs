@@ -72,7 +72,7 @@ impl Init {
 
         self.client.close();
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(3)).await;
 
         let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert.clone());
 
