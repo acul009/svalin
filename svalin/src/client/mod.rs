@@ -42,8 +42,6 @@ impl Client {
         {
             let mut path = Self::get_general_config_dir_path()?;
 
-            path.push("svalin");
-
             // check if config dir exists
             if !path.exists() {
                 std::fs::create_dir_all(&path)?;

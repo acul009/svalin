@@ -52,7 +52,11 @@ impl Server {
         if base_config.is_none() {
             // initialize
 
+            debug!("Server is not yet initialized, starting initialization routine");
+
             let (root, credentials) = Self::init_server(addr).await?;
+
+            debug!("Initialisation complete, waiting for init server shutdown");
 
             // Sleep until the init server has shut down and released the Port
             tokio::time::sleep(time::Duration::from_secs(1)).await;
@@ -72,6 +76,8 @@ impl Server {
             })?;
 
             base_config = Some(conf);
+        } else {
+            debug!("Server is already initialized");
         }
 
         if base_config.is_none() {
@@ -105,6 +111,8 @@ impl Server {
         let commands = HandlerCollection::new();
         commands
             .add(PingHandler::new())
+            .await
+            .add(PublicStatusHandler::new(PublicStatus::Ready))
             .await
             .add(AddUserHandler::new(userstore))
             .await;

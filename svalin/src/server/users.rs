@@ -100,6 +100,10 @@ impl UserStore {
             usernames.put(user.username.clone(), public_key.to_owned())?;
 
             Ok(())
-        })
+        })?;
+
+        debug!("user successfully added");
+
+        Ok(())
     }
 }

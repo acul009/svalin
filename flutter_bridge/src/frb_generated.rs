@@ -34,7 +34,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.0.0-dev.32";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1940644646;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1981784253;
 
 // Section: executor
 
@@ -106,6 +106,38 @@ fn wire_Client_get_profiles_impl(
         },
     )
 }
+fn wire_Client_remove_profile_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "Client_remove_profile",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_profile_key = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse((move || {
+                    crate::api::client::Client::remove_profile(&api_profile_key)
+                })())
+            }
+        },
+    )
+}
 fn wire_Init_init_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -128,9 +160,7 @@ fn wire_Init_init_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::rust_async::RwLock<Init>,
-            >>::sse_decode(&mut deserializer);
+            let api_that = <Init>::sse_decode(&mut deserializer);
             let api_username = <String>::sse_decode(&mut deserializer);
             let api_password = <String>::sse_decode(&mut deserializer);
             let api_totp_secret = <TOTP>::sse_decode(&mut deserializer);
@@ -138,9 +168,8 @@ fn wire_Init_init_impl(
             move |context| async move {
                 transform_result_sse(
                     (move || async move {
-                        let api_that = api_that.rust_auto_opaque_decode_ref();
                         crate::api::client::Init::init(
-                            &api_that,
+                            api_that,
                             api_username,
                             api_password,
                             api_totp_secret,
@@ -778,16 +807,17 @@ fn pde_ffi_dispatcher_primary_impl(
     match func_id {
         3 => wire_Client_first_connect_impl(port, ptr, rust_vec_len, data_len),
         2 => wire_Client_get_profiles_impl(port, ptr, rust_vec_len, data_len),
-        4 => wire_Init_init_impl(port, ptr, rust_vec_len, data_len),
-        5 => wire_Login_login_impl(port, ptr, rust_vec_len, data_len),
+        4 => wire_Client_remove_profile_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire_Init_init_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire_Login_login_impl(port, ptr, rust_vec_len, data_len),
         1 => wire_say_hello_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire_init_app_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire_stream_time_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire_test_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire_Totp_check_current_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire_Totp_get_qr_png_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire_Totp_get_url_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire_new_totp_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire_init_app_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire_stream_time_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire_test_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire_Totp_check_current_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire_Totp_get_qr_png_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire_Totp_get_url_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire_new_totp_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -800,7 +830,7 @@ fn pde_ffi_dispatcher_sync_impl(
 ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        6 => wire_greet_impl(ptr, rust_vec_len, data_len),
+        7 => wire_greet_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

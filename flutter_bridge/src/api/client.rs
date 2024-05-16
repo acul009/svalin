@@ -7,6 +7,7 @@ pub use totp_rs::TOTP;
 impl Client {
     pub fn get_profiles() -> Result<Vec<String>> {}
     pub async fn first_connect(address: String) -> Result<FirstConnect> {}
+    pub fn remove_profile(profile_key: &str) -> Result<()> {}
 }
 
 pub async fn say_hello() -> Result<String> {

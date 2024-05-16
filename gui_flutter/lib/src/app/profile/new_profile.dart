@@ -69,6 +69,12 @@ class ConnectingDialog extends StatelessWidget {
                 builder: (context) => RegisterRootDialog(connection: init)),
           );
         case FirstConnect_Login():
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog.adaptive(
+              content: Text("Login is not ready yet!"),
+            ),
+          );
         // TODO: Handle this case.
       }
     });
@@ -276,7 +282,7 @@ class _CreateTotpDialogState extends State<CreateTotpDialog> {
                               }
                             } else {
                               if (context.mounted) {
-                                Navigator.push(
+                                Navigator.pushReplacement(
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) => InitDialog(
@@ -327,22 +333,24 @@ class InitDialog extends StatelessWidget {
         future: connection.init(
             username: username, password: password, totpSecret: totp),
         builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            return Center(
-              child: Column(
-                children: [
-                  const Text(
-                      "The Server has been initialized and saved under your profiles. When restarting Svalin, you will be prompted to unlock the profile using your password."),
-                  ElevatedButton(
-                      onPressed: () {
-                        // TODO
-                      },
-                      child: const Text("Continue to main view")),
-                ],
-              ),
-            );
-          } else if (snapshot.hasError) {
-            return Center(child: ErrorWidget(snapshot.error!));
+          if (snapshot.connectionState == ConnectionState.done) {
+            if (snapshot.hasError) {
+              return Center(child: ErrorWidget(snapshot.error!));
+            } else {
+              return Center(
+                child: Column(
+                  children: [
+                    const Text(
+                        "The Server has been initialized and saved under your profiles. When restarting Svalin, you will be prompted to unlock the profile using your password."),
+                    ElevatedButton(
+                        onPressed: () {
+                          // TODO
+                        },
+                        child: const Text("Continue to main view")),
+                  ],
+                ),
+              );
+            }
           } else {
             return const Center(child: CircularProgressIndicator());
           }

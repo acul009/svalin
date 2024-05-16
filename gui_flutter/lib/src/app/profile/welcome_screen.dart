@@ -17,6 +17,12 @@ class _ProfileSelectorState extends State<ProfileSelector> {
   @override
   void initState() {
     super.initState();
+    updateProfiles();
+    // listProfiles().then((value) => _profiles =
+    //     value.map((e) => DropdownMenuEntry(value: e, label: e)).toList());
+  }
+
+  void updateProfiles() {
     _profiles = Client.getProfiles();
     _profiles.then((value) => {
           if (value.isEmpty)
@@ -25,34 +31,88 @@ class _ProfileSelectorState extends State<ProfileSelector> {
                   MaterialPageRoute(builder: (context) => const ServerDialog()))
             }
         });
-    // listProfiles().then((value) => _profiles =
-    //     value.map((e) => DropdownMenuEntry(value: e, label: e)).toList());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text("Select Profile")),
       body: Center(
-        child: FutureBuilder(
-          future: _profiles,
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              var profiles = snapshot.data!;
-              return Column(
-                children: [
-                  DropdownButton<String>(
-                    items: profiles
-                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                        .toList(),
-                    onChanged: (value) =>
-                        setState(() => _selectedProfile = value),
-                  )
-                ],
-              );
-            } else {
-              return const CircularProgressIndicator();
-            }
-          },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+          child: FutureBuilder(
+            future: _profiles,
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                var profiles = snapshot.data!;
+                return Column(
+                  children: [
+                    DropdownMenu<String>(
+                      label: const Text("Profile"),
+                      dropdownMenuEntries: profiles
+                          .map((e) => DropdownMenuEntry(
+                                label: e,
+                                value: e,
+                              ))
+                          .toList(),
+                      onSelected: (value) =>
+                          setState(() => _selectedProfile = value),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                      ),
+                      child: const Text("Next"),
+                      onPressed: () {
+                        // TODO
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          backgroundColor: Color.fromARGB(255, 255, 48, 48),
+                          foregroundColor: Color.fromARGB(255, 64, 0, 0)),
+                      label: Text("Delete Profile"),
+                      icon: Icon(Icons.delete),
+                      onPressed: () {
+                        if (_selectedProfile != null) {
+                          showAdaptiveDialog(
+                            context: context,
+                            builder: (context) => AlertDialog.adaptive(
+                              content: Text(
+                                  "Are you sure you want to delete \"${_selectedProfile!}\""),
+                              actions: [
+                                IconButton(
+                                  icon: Icon(Icons.check),
+                                  onPressed: () async {
+                                    await Client.removeProfile(
+                                        profileKey: _selectedProfile!);
+                                    Navigator.of(context, rootNavigator: true)
+                                        .pop();
+                                    updateProfiles();
+                                  },
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.close),
+                                  onPressed: () =>
+                                      Navigator.of(context, rootNavigator: true)
+                                          .pop(),
+                                )
+                              ],
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                );
+              } else {
+                return const CircularProgressIndicator();
+              }
+            },
+          ),
         ),
       ),
     );

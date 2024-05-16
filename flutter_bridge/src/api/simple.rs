@@ -26,6 +26,8 @@ pub async fn stream_time(sink: StreamSink<String>) {
 pub fn init_app() {
     // Default utilities - feel free to customize
     flutter_rust_bridge::setup_default_user_utils();
+
+    tracing_subscriber::fmt::try_init();
 }
 
 #[frb(non_opaque)]

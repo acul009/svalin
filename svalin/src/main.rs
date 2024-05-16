@@ -1,8 +1,7 @@
-use std::net::ToSocketAddrs;
-
 use clap::{Parser, Subcommand};
 use svalin::server::Server;
-use svalin_rpc::Client;
+
+use tracing_subscriber;
 
 #[derive(Debug, Parser)]
 #[clap(name = "svalin", version)]
@@ -17,6 +16,7 @@ enum Command {
 }
 
 fn main() {
+    tracing_subscriber::fmt::init();
     run();
 }
 
