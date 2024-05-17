@@ -51,6 +51,7 @@ class _ProfileSelectorState extends State<ProfileSelector> {
                 return Column(
                   children: [
                     DropdownMenu<String>(
+                      expandedInsets: EdgeInsets.symmetric(horizontal: 8),
                       label: const Text("Profile"),
                       dropdownMenuEntries: profiles
                           .map((e) => DropdownMenuEntry(
