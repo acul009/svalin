@@ -27,8 +27,11 @@ class _ProfileSelectorState extends State<ProfileSelector> {
     _profiles.then((value) => {
           if (value.isEmpty)
             {
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => const ServerDialog()))
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const ServerDialog()),
+                ModalRoute.withName('/'),
+              )
             }
         });
   }

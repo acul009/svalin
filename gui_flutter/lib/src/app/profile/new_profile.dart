@@ -63,10 +63,11 @@ class ConnectingDialog extends StatelessWidget {
     connecting.then((value) {
       switch (value) {
         case FirstConnect_Init(field0: final init):
-          Navigator.pushReplacement(
+          Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(
                 builder: (context) => RegisterRootDialog(connection: init)),
+            ModalRoute.withName('/'),
           );
         case FirstConnect_Login():
           showDialog(
@@ -282,16 +283,18 @@ class _CreateTotpDialogState extends State<CreateTotpDialog> {
                               }
                             } else {
                               if (context.mounted) {
-                                Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => InitDialog(
-                                        connection: widget.connection,
-                                        username: widget.username,
-                                        password: widget.password,
-                                        totp: totp,
-                                      ),
-                                    ));
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => InitDialog(
+                                      connection: widget.connection,
+                                      username: widget.username,
+                                      password: widget.password,
+                                      totp: totp,
+                                    ),
+                                  ),
+                                  ModalRoute.withName('/'),
+                                );
                               }
                             }
                           }
