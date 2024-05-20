@@ -30,7 +30,7 @@ class _ProfileSelectorState extends State<ProfileSelector> {
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => const ServerDialog()),
-                ModalRoute.withName('/'),
+                (Route<dynamic> route) => false,
               )
             }
         });
@@ -76,7 +76,8 @@ class _ProfileSelectorState extends State<ProfileSelector> {
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                           minimumSize: const Size.fromHeight(50),
-                          backgroundColor: const Color.fromARGB(255, 255, 48, 48),
+                          backgroundColor:
+                              const Color.fromARGB(255, 255, 48, 48),
                           foregroundColor: const Color.fromARGB(255, 64, 0, 0)),
                       label: const Text("Delete Profile"),
                       icon: const Icon(Icons.delete),

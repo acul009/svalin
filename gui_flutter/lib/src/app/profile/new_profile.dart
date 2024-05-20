@@ -66,7 +66,7 @@ class ConnectingDialog extends StatelessWidget {
             context,
             MaterialPageRoute(
                 builder: (context) => RegisterRootDialog(connection: init)),
-            ModalRoute.withName('/'),
+            (Route<dynamic> route) => false,
           );
         case FirstConnect_Login():
           showDialog(
@@ -292,7 +292,7 @@ class _CreateTotpDialogState extends State<CreateTotpDialog> {
                                       totp: totp,
                                     ),
                                   ),
-                                  ModalRoute.withName('/'),
+                                  (Route<dynamic> route) => false,
                                 );
                               }
                             }
