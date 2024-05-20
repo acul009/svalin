@@ -134,6 +134,10 @@ impl Client {
         Ok(())
     }
 
+    pub async fn open_profile_string(profile_key: String, password: String) -> Result<Self> {
+        Self::open_profile(profile_key, password.into_bytes()).await
+    }
+
     pub async fn open_profile(profile_key: String, password: Vec<u8>) -> Result<Self> {
         let db = Self::open_marmelade()?;
 
