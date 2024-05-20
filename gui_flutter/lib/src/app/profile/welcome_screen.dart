@@ -12,7 +12,7 @@ class ProfileSelector extends StatefulWidget {
 class _ProfileSelectorState extends State<ProfileSelector> {
   late Future<List<String>> _profiles;
   // List<DropdownMenuEntry<String>> _profiles = [];
-  String? _selectedProfile = null;
+  String? _selectedProfile;
 
   @override
   void initState() {
@@ -51,7 +51,7 @@ class _ProfileSelectorState extends State<ProfileSelector> {
                 return Column(
                   children: [
                     DropdownMenu<String>(
-                      expandedInsets: EdgeInsets.symmetric(horizontal: 8),
+                      expandedInsets: const EdgeInsets.symmetric(horizontal: 8),
                       label: const Text("Profile"),
                       dropdownMenuEntries: profiles
                           .map((e) => DropdownMenuEntry(
@@ -76,10 +76,10 @@ class _ProfileSelectorState extends State<ProfileSelector> {
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                           minimumSize: const Size.fromHeight(50),
-                          backgroundColor: Color.fromARGB(255, 255, 48, 48),
-                          foregroundColor: Color.fromARGB(255, 64, 0, 0)),
-                      label: Text("Delete Profile"),
-                      icon: Icon(Icons.delete),
+                          backgroundColor: const Color.fromARGB(255, 255, 48, 48),
+                          foregroundColor: const Color.fromARGB(255, 64, 0, 0)),
+                      label: const Text("Delete Profile"),
+                      icon: const Icon(Icons.delete),
                       onPressed: () {
                         if (_selectedProfile != null) {
                           showAdaptiveDialog(
@@ -89,7 +89,7 @@ class _ProfileSelectorState extends State<ProfileSelector> {
                                   "Are you sure you want to delete \"${_selectedProfile!}\""),
                               actions: [
                                 IconButton(
-                                  icon: Icon(Icons.check),
+                                  icon: const Icon(Icons.check),
                                   onPressed: () async {
                                     await Client.removeProfile(
                                         profileKey: _selectedProfile!);
@@ -99,7 +99,7 @@ class _ProfileSelectorState extends State<ProfileSelector> {
                                   },
                                 ),
                                 IconButton(
-                                  icon: Icon(Icons.close),
+                                  icon: const Icon(Icons.close),
                                   onPressed: () =>
                                       Navigator.of(context, rootNavigator: true)
                                           .pop(),

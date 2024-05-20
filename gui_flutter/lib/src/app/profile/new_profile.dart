@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gui_flutter/src/rust/api/client.dart';
-import 'package:gui_flutter/src/rust/api/simple.dart';
 import 'package:gui_flutter/src/rust/api/totp.dart';
 
 class ServerDialog extends StatefulWidget {
@@ -72,7 +71,7 @@ class ConnectingDialog extends StatelessWidget {
         case FirstConnect_Login():
           showDialog(
             context: context,
-            builder: (context) => AlertDialog.adaptive(
+            builder: (context) => const AlertDialog.adaptive(
               content: Text("Login is not ready yet!"),
             ),
           );
