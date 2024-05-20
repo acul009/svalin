@@ -7,7 +7,8 @@ This is my Playground for developing a production ready Svalin.
 ## Todo
 - [X] Init Routine
 - [ ] Login Routine
-- [ ] Unlock Routine
+- [X] Unlock Routine
+- [ ] Unlock Error when password wrong
 - [ ] E2E Encryption
 - [ ] Rate Limiting
 - [ ] Basic Permission System
