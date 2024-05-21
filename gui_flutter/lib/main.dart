@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:gui_flutter/src/rust/api/simple.dart';
 import 'package:gui_flutter/src/rust/frb_generated.dart';
 import 'package:gui_flutter/src/app/profile/welcome_screen.dart';
 

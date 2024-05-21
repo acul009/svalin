@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:gui_flutter/src/app/profile/main_menu.dart';
+import 'package:gui_flutter/src/app/main_menu.dart';
 import 'package:gui_flutter/src/app/profile/new_profile.dart';
 import 'package:gui_flutter/src/rust/api/client.dart';
 
@@ -145,6 +145,18 @@ class UnlockDialog extends StatefulWidget {
 class _UnlockDialogState extends State<UnlockDialog> {
   String _password = "";
 
+  void _unlock() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UnlockingLoadingDialog(
+          selectedProfile: widget.selectedProfile,
+          password: _password,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -156,29 +168,21 @@ class _UnlockDialogState extends State<UnlockDialog> {
           children: [
             TextField(
               obscureText: true,
+              autofocus: true,
               decoration: InputDecoration(
                 border: const OutlineInputBorder(),
                 labelText: "Password for \"${widget.selectedProfile}\"",
               ),
               onChanged: (value) => setState(() => _password = value),
+              onSubmitted: (value) => _unlock(),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
               ),
+              onPressed: _unlock,
               child: const Text("Unlock"),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => UnlockingLoadingDialog(
-                      selectedProfile: widget.selectedProfile,
-                      password: _password,
-                    ),
-                  ),
-                );
-              },
             ),
           ],
         ),
