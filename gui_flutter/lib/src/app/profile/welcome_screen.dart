@@ -218,8 +218,7 @@ class UnlockingLoadingDialog extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("Unlocking Profile...")),
       body: FutureBuilder(
-        future: Client.openProfileString(
-            profileKey: selectedProfile, password: password),
+        future: openingProfile,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(child: Text(snapshot.error.toString()));
