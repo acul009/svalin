@@ -13,7 +13,7 @@ pub trait Connection: Send + Sync {
 
     async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>>;
 
-    fn is_closed(&self) -> bool;
+    async fn closed(&self);
 }
 
 pub struct DirectConnection {
@@ -53,8 +53,8 @@ impl crate::Connection for DirectConnection {
         Ok(session)
     }
 
-    fn is_closed(&self) -> bool {
-        self.conn.close_reason().is_none()
+    async fn closed(&self) {
+        self.closed().await
     }
 }
 
