@@ -1,21 +1,26 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use tokio::task::JoinSet;
 use tracing::{debug, error};
 
 use crate::{session::SessionCreated, HandlerCollection, Session, SessionOpen};
 
-pub trait Connection {
+#[async_trait]
+pub trait Connection: Send + Sync {
     async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()>;
 
     async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>>;
+
+    fn is_closed(&self) -> bool;
 }
 
 pub struct DirectConnection {
     conn: quinn::Connection,
 }
 
+#[async_trait]
 impl crate::Connection for DirectConnection {
     async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()> {
         debug!("waiting for incoming data stream");
@@ -46,6 +51,10 @@ impl crate::Connection for DirectConnection {
         let session = session.request_session(command_key).await?;
 
         Ok(session)
+    }
+
+    fn is_closed(&self) -> bool {
+        self.conn.close_reason().is_none()
     }
 }
 

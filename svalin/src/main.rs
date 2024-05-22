@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use svalin::server::Server;
+use svalin::{agent::Agent, server::Server};
 
 use tracing_subscriber;
 
@@ -12,7 +12,19 @@ pub struct App {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Run in server mode
     Server { address: String },
+    /// Commands for running the agent
+    Agent {
+        #[clap(subcommand)]
+        action: AgentAction,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum AgentAction {
+    /// Initialize the agent by connecting to a server
+    Init { address: String },
 }
 
 fn main() {
@@ -35,5 +47,10 @@ async fn run() {
                 server.run().await.unwrap();
             }
         }
+        Command::Agent { action } => match action {
+            AgentAction::Init { address } => {
+                Agent::init(address).await.unwrap();
+            }
+        },
     }
 }

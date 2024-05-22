@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use async_trait::async_trait;
-use tokio::sync::RwLock;
+use std::sync::RwLock;
 
 use crate::session::{Session, SessionOpen};
 
@@ -27,13 +27,13 @@ impl HandlerCollection {
     where
         T: CommandHandler + 'static,
     {
-        let mut commands = self.commands.write().await;
+        let mut commands = self.commands.write().unwrap();
         commands.insert(command.key(), Arc::new(command));
         self
     }
 
     pub async fn get(&self, key: &str) -> Option<Arc<dyn CommandHandler>> {
-        let commands = self.commands.read().await;
+        let commands = self.commands.read().unwrap();
         commands.get(key).cloned()
     }
 }

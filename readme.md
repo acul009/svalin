@@ -9,6 +9,7 @@ This is my Playground for developing a production ready Svalin.
 - [ ] Login Routine
 - [X] Unlock Routine
 - [ ] Unlock Error when password wrong
+- [ ] Agent init / join
 - [ ] E2E Encryption
 - [ ] Rate Limiting
 - [ ] Basic Permission System
