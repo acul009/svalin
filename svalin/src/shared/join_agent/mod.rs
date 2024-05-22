@@ -10,7 +10,6 @@ struct ServerJoinManager {
 struct ServerJoinManagerData {
     connection_map: HashMap<String, Arc<dyn svalin_rpc::Connection>>,
     joinset: tokio::task::JoinSet<()>,
-    to_remove: Mutex<Vec<String>>,
 }
 
 impl Drop for ServerJoinManagerData {
@@ -23,7 +22,6 @@ impl ServerJoinManager {
     pub fn new() -> Self {
         let data = ServerJoinManagerData {
             connection_map: HashMap::new(),
-            to_remove: Mutex::new(vec![]),
             joinset: tokio::task::JoinSet::new(),
         };
 
