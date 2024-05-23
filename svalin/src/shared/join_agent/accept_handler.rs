@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use svalin_rpc::CommandHandler;
 
 use super::ServerJoinManager;
@@ -12,23 +13,16 @@ impl JoinAcceptHandler {
     }
 }
 
+#[async_trait]
 impl CommandHandler for JoinAcceptHandler {
     fn key(&self) -> String {
         todo!()
     }
 
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn handle<'life0, 'async_trait>(
-        &'life0 self,
-        session: Session<SessionOpen>,
-    ) -> ::core::pin::Pin<
-        Box<dyn ::core::future::Future<Output = Result<()>> + ::core::marker::Send + 'async_trait>,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
+    async fn handle(
+        &self,
+        _session: svalin_rpc::Session<svalin_rpc::SessionOpen>,
+    ) -> anyhow::Result<()> {
         todo!()
     }
 }
