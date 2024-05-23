@@ -10,13 +10,9 @@ use crate::{
     object_stream::{ObjectReader, ObjectWriter},
 };
 
-pub struct SessionCreated {}
+pub struct SessionCreated;
 
-pub struct SessionRequested {}
-
-pub struct SessionOpen {}
-
-pub struct SessionClosed {}
+pub struct SessionOpen;
 
 pub struct Session<T> {
     state: PhantomData<T>,
