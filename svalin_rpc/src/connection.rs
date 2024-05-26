@@ -2,10 +2,16 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use quinn::{RecvStream, SendStream};
+use tokio::io::AsyncRead;
+use tokio::io::AsyncWrite;
 use tokio::task::JoinSet;
 use tracing::{debug, error};
 
-use crate::{session::SessionCreated, HandlerCollection, Session, SessionOpen};
+use crate::{
+    session::SessionCreated, transport::combined_transport::CombinedTransport, HandlerCollection,
+    Session, SessionOpen,
+};
 
 #[async_trait]
 pub trait Connection: Send + Sync {
@@ -44,9 +50,14 @@ impl crate::Connection for DirectConnection {
     }
 
     async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>> {
-        let (send, recv) = self.conn.open_bi().await.map_err(|err| anyhow!(err))?;
+        let transport: CombinedTransport<SendStream, RecvStream> = self
+            .conn
+            .open_bi()
+            .await
+            .map_err(|err| anyhow!(err))?
+            .into();
 
-        let session = Session::new(Box::new(recv), Box::new(send));
+        let session = Session::new(Box::new(transport));
 
         let session = session.request_session(command_key).await?;
 
@@ -64,9 +75,16 @@ impl DirectConnection {
     }
 
     async fn accept_session(&self) -> Result<Session<SessionCreated>> {
-        let (send, recv) = self.conn.accept_bi().await.map_err(|err| anyhow!(err))?;
+        let a = self.conn.accept_bi().await.map_err(|err| anyhow!(err))?;
 
-        let session = Session::new(Box::new(recv), Box::new(send));
+        let transport: CombinedTransport<SendStream, RecvStream> = self
+            .conn
+            .accept_bi()
+            .await
+            .map_err(|err| anyhow!(err))?
+            .into();
+
+        let session = Session::new(Box::new(transport));
 
         Ok(session)
     }

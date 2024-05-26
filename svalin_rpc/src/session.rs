@@ -2,12 +2,11 @@ use std::{fmt::Debug, marker::PhantomData, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::{debug, instrument};
 
 use crate::{
     command::HandlerCollection,
-    object_stream::{ObjectReader, ObjectWriter},
+    transport::{object_transport::ObjectTransport, session_transport::SessionTransport},
 };
 
 pub struct SessionCreated;
@@ -16,8 +15,7 @@ pub struct SessionOpen;
 
 pub struct Session<T> {
     state: PhantomData<T>,
-    recv: ObjectReader,
-    send: ObjectWriter,
+    transport: ObjectTransport,
 }
 
 impl<T> Debug for Session<T> {
@@ -49,14 +47,10 @@ struct SessionDeclinedHeader {
 }
 
 impl Session<()> {
-    pub(crate) fn new(
-        recv: Box<dyn AsyncRead + Send + Unpin>,
-        send: Box<dyn AsyncWrite + Send + Unpin>,
-    ) -> Session<SessionCreated> {
+    pub(crate) fn new(transport: Box<dyn SessionTransport>) -> Session<SessionCreated> {
         Session {
             state: PhantomData,
-            recv: ObjectReader::new(recv),
-            send: ObjectWriter::new(send),
+            transport: ObjectTransport::new(transport),
         }
     }
 }
@@ -65,8 +59,7 @@ impl Session<SessionCreated> {
     fn open(self) -> Session<SessionOpen> {
         Session {
             state: PhantomData,
-            recv: self.recv,
-            send: self.send,
+            transport: self.transport,
         }
     }
 
@@ -120,11 +113,11 @@ impl Session<SessionCreated> {
 impl Session<SessionOpen> {
     #[instrument]
     pub async fn read_object<W: serde::de::DeserializeOwned>(&mut self) -> Result<W> {
-        self.recv.read_object().await
+        self.transport.read_object().await
     }
 
     #[instrument(skip_all)]
     pub async fn write_object<W: Serialize>(&mut self, object: &W) -> Result<()> {
-        self.send.write_object(object).await
+        self.transport.write_object(object).await
     }
 }

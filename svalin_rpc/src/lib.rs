@@ -10,11 +10,11 @@ mod client;
 mod command;
 mod connection;
 pub mod defaults;
-mod object_stream;
 pub mod ping;
 mod server;
 mod session;
 pub mod skip_verify;
+pub mod transport;
 
 #[cfg(test)]
 mod test;

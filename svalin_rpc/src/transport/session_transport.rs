@@ -3,5 +3,5 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 #[async_trait]
 pub trait SessionTransport: AsyncRead + AsyncWrite + Send + Unpin {
-    fn stopped(&mut self);
+    async fn stopped(&mut self);
 }
