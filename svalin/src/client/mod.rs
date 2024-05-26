@@ -175,7 +175,7 @@ impl Client {
 
             debug!("connecting to server");
             let rpc =
-                svalin_rpc::Client::connect(profile.upstream_address, Some(&identity), verifier)
+                svalin_rpc::Client::connect(&profile.upstream_address, Some(&identity), verifier)
                     .await?;
 
             debug!("connected to server");

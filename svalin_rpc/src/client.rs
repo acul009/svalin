@@ -10,7 +10,7 @@ pub struct Client {
 
 impl Client {
     pub async fn connect(
-        address: String,
+        address: &str,
         identity: Option<&PermCredentials>,
         verifier: Arc<dyn quinn::rustls::client::danger::ServerCertVerifier>,
     ) -> Result<Client> {

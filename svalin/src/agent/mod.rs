@@ -17,8 +17,7 @@ impl Agent {
         debug!("try connecting to {address}");
 
         let client =
-            svalin_rpc::Client::connect(address.clone(), None, SkipServerVerification::new())
-                .await?;
+            svalin_rpc::Client::connect(&address, None, SkipServerVerification::new()).await?;
 
         debug!("successfully connected");
 

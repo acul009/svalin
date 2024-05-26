@@ -6,6 +6,7 @@ use quinn::{RecvStream, SendStream};
 use tokio::io::AsyncRead;
 use tokio::io::AsyncWrite;
 use tokio::task::JoinSet;
+use tracing::field::debug;
 use tracing::{debug, error};
 
 use crate::{
@@ -50,6 +51,8 @@ impl crate::Connection for DirectConnection {
     }
 
     async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>> {
+        debug!("creating transport");
+
         let transport: CombinedTransport<SendStream, RecvStream> = self
             .conn
             .open_bi()
@@ -57,9 +60,15 @@ impl crate::Connection for DirectConnection {
             .map_err(|err| anyhow!(err))?
             .into();
 
+        debug!("transport created, pass to session");
+
         let session = Session::new(Box::new(transport));
 
+        debug!("requesting session");
+
         let session = session.request_session(command_key).await?;
+
+        debug!("session request successful");
 
         Ok(session)
     }
@@ -75,14 +84,14 @@ impl DirectConnection {
     }
 
     async fn accept_session(&self) -> Result<Session<SessionCreated>> {
-        let a = self.conn.accept_bi().await.map_err(|err| anyhow!(err))?;
-
         let transport: CombinedTransport<SendStream, RecvStream> = self
             .conn
             .accept_bi()
             .await
             .map_err(|err| anyhow!(err))?
             .into();
+
+        debug("transport created");
 
         let session = Session::new(Box::new(transport));
 

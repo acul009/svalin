@@ -87,6 +87,8 @@ impl Session<SessionCreated> {
     }
 
     pub(crate) async fn handle(self, commands: Arc<HandlerCollection>) -> Result<()> {
+        debug!("waiting for request header");
+
         let (mut session, header) = self.receive_header().await?;
 
         debug!("requested command: {}", header.command_key);

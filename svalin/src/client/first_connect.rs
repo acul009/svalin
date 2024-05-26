@@ -21,8 +21,7 @@ impl Client {
         debug!("try connecting to {address}");
 
         let client =
-            svalin_rpc::Client::connect(address.clone(), None, SkipServerVerification::new())
-                .await?;
+            svalin_rpc::Client::connect(&address, None, SkipServerVerification::new()).await?;
 
         debug!("successfully connected");
 
@@ -76,7 +75,7 @@ impl Init {
 
         let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert.clone());
 
-        let client = svalin_rpc::Client::connect(self.address.clone(), Some(&root), verifier)
+        let client = svalin_rpc::Client::connect(&self.address, Some(&root), verifier)
             .await
             .context("failed to connect to server after certificate initialization")?;
         let mut connection = client.upstream_connection();
