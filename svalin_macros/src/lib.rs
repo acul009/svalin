@@ -40,7 +40,7 @@ fn to_dispatcher(
         ..
     } = sig;
 
-    if asyncness == None {
+    if asyncness.is_none() {
         return Ok(parse_quote! {compile_error!("an RPC-Dispatcher needs to be async.")});
     }
 
