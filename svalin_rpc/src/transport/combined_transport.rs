@@ -1,6 +1,7 @@
 use std::pin::Pin;
 
 use async_trait::async_trait;
+use quinn::{RecvStream, SendStream};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::session_transport::SessionTransport;
@@ -10,14 +11,21 @@ pub struct CombinedTransport<T, U> {
     recv: U,
 }
 
+// #[async_trait]
+// impl<T, U> SessionTransport for CombinedTransport<T, U>
+// where
+//     T: Send + AsyncWrite + Unpin,
+//     U: Send + AsyncRead + Unpin,
+// {
+//     async fn stopped(&mut self) {
+//         todo!()
+//     }
+// }
+
 #[async_trait]
-impl<T, U> SessionTransport for CombinedTransport<T, U>
-where
-    T: Send + AsyncWrite + Unpin,
-    U: Send + AsyncRead + Unpin,
-{
+impl SessionTransport for CombinedTransport<SendStream, RecvStream> {
     async fn stopped(&mut self) {
-        todo!()
+        let _ = self.send.stopped().await;
     }
 }
 

@@ -122,4 +122,8 @@ impl Session<SessionOpen> {
     pub async fn write_object<W: Serialize>(&mut self, object: &W) -> Result<()> {
         self.transport.write_object(object).await
     }
+
+    pub async fn stopped(&mut self) {
+        self.transport.stopped().await
+    }
 }

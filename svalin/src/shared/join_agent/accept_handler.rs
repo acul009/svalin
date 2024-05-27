@@ -3,7 +3,7 @@ use svalin_rpc::CommandHandler;
 
 use super::ServerJoinManager;
 
-pub(super) struct JoinAcceptHandler {
+pub struct JoinAcceptHandler {
     manager: ServerJoinManager,
 }
 

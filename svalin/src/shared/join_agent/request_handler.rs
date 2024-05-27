@@ -4,7 +4,7 @@ use svalin_rpc::{CommandHandler, Session, SessionOpen};
 
 use super::ServerJoinManager;
 
-pub(super) struct JoinRequestHandler {
+pub struct JoinRequestHandler {
     manager: ServerJoinManager,
 }
 

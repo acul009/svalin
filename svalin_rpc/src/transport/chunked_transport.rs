@@ -58,4 +58,8 @@ impl ChunkedTransport {
 
         Ok(chunk)
     }
+
+    pub async fn stopped(&mut self) {
+        self.transport.stopped().await
+    }
 }

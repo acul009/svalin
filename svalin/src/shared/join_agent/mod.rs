@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use svalin_rpc::SessionOpen;
 use tokio::{sync::Mutex, task::AbortHandle};
 
 use self::{accept_handler::JoinAcceptHandler, request_handler::JoinRequestHandler};
@@ -13,7 +14,7 @@ pub struct ServerJoinManager {
 }
 
 struct ServerJoinManagerData {
-    connection_map: HashMap<String, (Arc<dyn svalin_rpc::Connection>, AbortHandle)>,
+    session_map: HashMap<String, (svalin_rpc::Session<SessionOpen>, AbortHandle)>,
     joinset: tokio::task::JoinSet<()>,
 }
 
@@ -26,7 +27,7 @@ impl Drop for ServerJoinManagerData {
 impl ServerJoinManager {
     pub fn new() -> Self {
         let data = ServerJoinManagerData {
-            connection_map: HashMap::new(),
+            session_map: HashMap::new(),
             joinset: tokio::task::JoinSet::new(),
         };
 
@@ -35,38 +36,37 @@ impl ServerJoinManager {
         }
     }
 
-    pub async fn add_connection(
-        &self,
-        joincode: String,
-        connection: Arc<dyn svalin_rpc::Connection>,
-    ) {
+    pub async fn add_session(&self, joincode: String, session: svalin_rpc::Session<SessionOpen>) {
         let mut data = self.data.lock().await;
 
         let joincode_clone = joincode.clone();
-        let connection_clone = connection.clone();
+        // let stopped = session.stopped();
         let data_clone = Arc::downgrade(&self.data);
 
         let abort_handle = data.joinset.spawn(async move {
-            connection_clone.closed().await;
+            // stopped.await;
             if let Some(data) = data_clone.upgrade() {
                 let mut data = data.lock().await;
-                data.connection_map.remove(&joincode_clone);
+                data.session_map.remove(&joincode_clone);
             }
         });
 
-        data.connection_map
-            .insert(joincode, (connection, abort_handle));
+        data.session_map.insert(joincode, (session, abort_handle));
     }
 
-    pub async fn get_connection(&self, joincode: &str) -> Option<Arc<dyn svalin_rpc::Connection>> {
-        let mut data = self.data.lock().await;
+    pub async fn get_session(
+        &self,
+        joincode: &str,
+    ) -> Option<Arc<svalin_rpc::Session<SessionOpen>>> {
+        // let mut data = self.data.lock().await;
 
-        if let Some((connection, abort_handle)) = data.connection_map.remove(joincode) {
-            abort_handle.abort();
-            Some(connection)
-        } else {
-            None
-        }
+        // if let Some((connection, abort_handle)) = data.session_map.remove(joincode) {
+        //     abort_handle.abort();
+        //     Some(connection)
+        // } else {
+        //     None
+        // }
+        todo!()
     }
 
     pub fn create_request_handler(&self) -> JoinRequestHandler {

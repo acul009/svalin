@@ -33,6 +33,10 @@ impl ObjectTransport {
 
         Ok(object)
     }
+
+    pub async fn stopped(&mut self) {
+        self.chunked_transport.stopped().await
+    }
 }
 
 #[cfg(test)]

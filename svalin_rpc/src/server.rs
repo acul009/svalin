@@ -12,7 +12,7 @@ use svalin_pki::PermCredentials;
 use tokio::task::JoinSet;
 use tracing::debug;
 
-use crate::{connection::DirectConnection, Connection, HandlerCollection};
+use crate::{connection::DirectConnection, HandlerCollection, Connection};
 
 pub struct Server {
     endpoint: quinn::Endpoint,
