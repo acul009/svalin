@@ -109,13 +109,15 @@ impl Server {
         let userstore = UserStore::open(self.scope.subscope("users".into()));
 
         let commands = HandlerCollection::new();
+
+        let join_manager = crate::shared::join_agent::ServerJoinManager::new();
+
         commands
             .add(PingHandler::new())
-            .await
             .add(PublicStatusHandler::new(PublicStatus::Ready))
-            .await
             .add(AddUserHandler::new(userstore))
-            .await;
+            .add(join_manager.create_request_handler())
+            .add(join_manager.create_accept_handler());
 
         self.rpc.run(commands).await
     }
@@ -157,10 +159,8 @@ impl Server {
         let (send, mut receive) = mpsc::channel::<(Certificate, PermCredentials)>(1);
 
         let commands = HandlerCollection::new();
-        commands.add(InitHandler::new(send)).await;
-        commands
-            .add(PublicStatusHandler::new(PublicStatus::WaitingForInit))
-            .await;
+        commands.add(InitHandler::new(send));
+        commands.add(PublicStatusHandler::new(PublicStatus::WaitingForInit));
 
         debug!("starting up init server");
 

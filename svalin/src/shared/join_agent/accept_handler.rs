@@ -16,7 +16,7 @@ impl JoinAcceptHandler {
 #[async_trait]
 impl CommandHandler for JoinAcceptHandler {
     fn key(&self) -> String {
-        todo!()
+        "accept_join".to_string()
     }
 
     async fn handle(

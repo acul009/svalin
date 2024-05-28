@@ -25,7 +25,7 @@ async fn ping_test() {
     )
     .unwrap();
     let commands = HandlerCollection::new();
-    commands.add(PingHandler::new()).await;
+    commands.add(PingHandler::new());
 
     let server_handle = tokio::spawn(async move {
         server.run(commands).await.unwrap();

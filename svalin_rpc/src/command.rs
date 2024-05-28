@@ -23,7 +23,7 @@ impl HandlerCollection {
         })
     }
 
-    pub async fn add<'a, T>(self: &'a Arc<Self>, command: T) -> &'a Arc<Self>
+    pub fn add<'a, T>(self: &'a Arc<Self>, command: T) -> &'a Arc<Self>
     where
         T: CommandHandler + 'static,
     {

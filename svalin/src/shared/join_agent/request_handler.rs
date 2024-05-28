@@ -58,6 +58,8 @@ pub async fn request_join(
         .send(join_code)
         .map_err(|err| anyhow!(err))?;
 
+    tokio::time::sleep(Duration::from_secs(60)).await;
+
     todo!();
 
     Ok(())

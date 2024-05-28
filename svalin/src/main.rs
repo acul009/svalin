@@ -49,7 +49,17 @@ async fn run() {
         }
         Command::Agent { action } => match action {
             AgentAction::Init { address } => {
-                Agent::init(address).await.unwrap();
+                let mut welcome_message = "-".repeat(40);
+                welcome_message.push_str("Svalin Agent");
+                welcome_message.push_str("-".repeat(40).as_str());
+                println!("{welcome_message}");
+
+                println!("connecting to {address}...");
+
+                let waiting_for_init = Agent::init(address).await.unwrap();
+
+                println!("Successfully requested to join server.");
+                println!("Join-Code: {}", waiting_for_init.join_code());
             }
         },
     }

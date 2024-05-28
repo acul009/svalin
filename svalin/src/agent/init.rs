@@ -1,5 +1,8 @@
+use std::future::Future;
+
 use anyhow::{anyhow, Result};
 use svalin_rpc::skip_verify::SkipServerVerification;
+use tokio::sync::oneshot;
 use tracing::debug;
 
 use crate::shared::{
@@ -10,7 +13,7 @@ use crate::shared::{
 use super::Agent;
 
 impl Agent {
-    pub async fn init(address: String) -> Result<()> {
+    pub async fn init(address: String) -> Result<WaitingForInit> {
         debug!("try connecting to {address}");
 
         let client =
@@ -52,13 +55,66 @@ impl Agent {
                     }
                 });
 
-                todo!()
+                let join_code = join_code_recv.await?;
+
+                Ok(WaitingForInit::new(
+                    join_code,
+                    confirm_code_recv,
+                    join_success_recv,
+                ))
             }
         }
     }
 }
 
 struct CachedOneShot<T>(CachedOneShotEnum<T>);
+
+pub struct WaitingForInit {
+    join_code: String,
+    confirm_channel: oneshot::Receiver<String>,
+    success_channel: oneshot::Receiver<()>,
+}
+
+impl WaitingForInit {
+    fn new(
+        join_code: String,
+        confirm_channel: oneshot::Receiver<String>,
+        success_channel: oneshot::Receiver<()>,
+    ) -> Self {
+        Self {
+            join_code,
+            confirm_channel,
+            success_channel,
+        }
+    }
+
+    pub fn join_code(&self) -> &str {
+        &self.join_code
+    }
+
+    pub async fn wait_for_init(self) -> Result<WaitForConfirm> {
+        let confirm_code = self.confirm_channel.await?;
+
+        todo!();
+    }
+}
+
+struct WaitForConfirm {
+    join_code: String,
+    confirm_code: String,
+    success_channel: oneshot::Receiver<()>,
+}
+
+impl Future for WaitingForInit {
+    type Output = String;
+
+    fn poll(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        todo!()
+    }
+}
 
 enum CachedOneShotEnum<T> {
     Channel(tokio::sync::oneshot::Receiver<T>),
