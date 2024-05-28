@@ -15,6 +15,12 @@ class ServerDialog extends StatefulWidget {
 class _ServerDialogState extends State<ServerDialog> {
   String _serverAddress = "";
 
+  void _connect(BuildContext context) {
+    Navigator.push(context, MaterialPageRoute(builder: (context) {
+      return ConnectingDialog(address: _serverAddress);
+    }));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -31,6 +37,7 @@ class _ServerDialogState extends State<ServerDialog> {
                 labelText: "Server Address",
               ),
               onChanged: (value) => setState(() => _serverAddress = value),
+              onFieldSubmitted: (value) => _connect(context),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
@@ -38,11 +45,7 @@ class _ServerDialogState extends State<ServerDialog> {
                 minimumSize: const Size.fromHeight(50),
               ),
               child: const Text("Connect To Server"),
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) {
-                  return ConnectingDialog(address: _serverAddress);
-                }));
-              },
+              onPressed: () => _connect(context),
             ),
           ]),
         ),
@@ -103,6 +106,19 @@ class _RegisterRootDialogState extends State<RegisterRootDialog> {
 
   final _formKey = GlobalKey<FormState>();
 
+  void _next(BuildContext context) {
+    if (_formKey.currentState!.validate()) {
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CreateTotpDialog(
+                connection: widget.connection,
+                username: _username,
+                password: _password),
+          ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -146,6 +162,7 @@ class _RegisterRootDialogState extends State<RegisterRootDialog> {
                 ),
                 validator: (value) =>
                     value == _password ? null : "Passwords must match!",
+                onFieldSubmitted: (value) => _next(context),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
@@ -153,16 +170,7 @@ class _RegisterRootDialogState extends State<RegisterRootDialog> {
                   minimumSize: const Size.fromHeight(50),
                 ),
                 onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CreateTotpDialog(
-                              connection: widget.connection,
-                              username: _username,
-                              password: _password),
-                        ));
-                  }
+                  _next(context);
                 },
                 child: const Text("Next"),
               ),
@@ -203,6 +211,34 @@ class _CreateTotpDialogState extends State<CreateTotpDialog> {
     super.initState();
 
     totpFuture = newTotp(accountName: widget.username);
+  }
+
+  Future<void> _next(BuildContext context, Totp totp) async {
+    if (_formKey.currentState!.validate()) {
+      if (!await totp.checkCurrent(token: totpToken)) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            backgroundColor: Colors.red,
+            content: Text("TOTP-token not valid.\nPlease try again!"),
+          ));
+        }
+      } else {
+        if (context.mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => InitDialog(
+                connection: widget.connection,
+                username: widget.username,
+                password: widget.password,
+                totp: totp,
+              ),
+            ),
+            (Route<dynamic> route) => false,
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -247,56 +283,34 @@ class _CreateTotpDialogState extends State<CreateTotpDialog> {
                       ),
                       const Divider(height: 100),
                       TextFormField(
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            labelText: "input current totp token",
-                          ),
-                          onChanged: (value) => setState(() {
-                                totpToken = value;
-                              }),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return "required";
-                            } else if (!RegExp(r'^[0-9]{8}$').hasMatch(value)) {
-                              return "not a TOTP token";
-                            } else {
-                              return null;
-                            }
-                          }),
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: "input current totp token",
+                        ),
+                        onChanged: (value) => setState(() {
+                          totpToken = value;
+                        }),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return "required";
+                          } else if (!RegExp(r'^[0-9]{8}$').hasMatch(value)) {
+                            return "not a TOTP token";
+                          } else {
+                            return null;
+                          }
+                        },
+                        onFieldSubmitted: (value) async {
+                          await _next(context, totp);
+                        },
+                      ),
                       const SizedBox(height: 20),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           minimumSize: const Size.fromHeight(50),
                         ),
                         onPressed: () async {
-                          if (_formKey.currentState!.validate()) {
-                            if (!await totp.checkCurrent(token: totpToken)) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(const SnackBar(
-                                  backgroundColor: Colors.red,
-                                  content: Text(
-                                      "TOTP-token not valid.\nPlease try again!"),
-                                ));
-                              }
-                            } else {
-                              if (context.mounted) {
-                                Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => InitDialog(
-                                      connection: widget.connection,
-                                      username: widget.username,
-                                      password: widget.password,
-                                      totp: totp,
-                                    ),
-                                  ),
-                                  (Route<dynamic> route) => false,
-                                );
-                              }
-                            }
-                          }
+                          await _next(context, totp);
                         },
                         child: const Text("Next"),
                       ),
