@@ -6,9 +6,9 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::session_transport::SessionTransport;
 
-pub struct CombinedTransport<T, U> {
-    send: T,
-    recv: U,
+pub struct CombinedTransport<S, R> {
+    send: S,
+    recv: R,
 }
 
 // #[async_trait]
@@ -29,10 +29,10 @@ impl SessionTransport for CombinedTransport<SendStream, RecvStream> {
     }
 }
 
-impl<T, U> AsyncWrite for CombinedTransport<T, U>
+impl<S, R> AsyncWrite for CombinedTransport<S, R>
 where
-    T: AsyncWrite + Unpin,
-    U: Unpin,
+    S: AsyncWrite + Unpin,
+    R: Unpin,
 {
     fn poll_write(
         mut self: std::pin::Pin<&mut Self>,
@@ -57,10 +57,10 @@ where
     }
 }
 
-impl<T, U> AsyncRead for CombinedTransport<T, U>
+impl<S, R> AsyncRead for CombinedTransport<S, R>
 where
-    T: Unpin,
-    U: AsyncRead + Unpin,
+    S: Unpin,
+    R: AsyncRead + Unpin,
 {
     fn poll_read(
         mut self: std::pin::Pin<&mut Self>,
