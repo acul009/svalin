@@ -62,7 +62,7 @@ impl svalin_rpc::CommandHandler for AddUserHandler {
 
     #[must_use]
     #[instrument(skip_all)]
-    async fn handle(&self, mut session: Session<SessionOpen>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
         debug!("reading request to add user");
         let request: AddUserRequest = session.read_object().await?;
 

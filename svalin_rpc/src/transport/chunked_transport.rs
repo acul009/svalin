@@ -1,7 +1,10 @@
+use std::mem;
+
 use anyhow::{anyhow, Ok, Result};
+use futures::Future;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use super::session_transport::SessionTransport;
+use super::{dummy_transport::DummyTransport, session_transport::SessionTransport};
 
 pub(super) struct ChunkedTransport {
     transport: Box<dyn SessionTransport>,
@@ -59,7 +62,15 @@ impl ChunkedTransport {
         Ok(chunk)
     }
 
-    pub async fn stopped(&mut self) {
-        self.transport.stopped().await
+    pub async fn replace_transport<R, Fut>(&mut self, replacer: R)
+    where
+        R: Fn(Box<dyn SessionTransport>) -> Fut,
+        Fut: Future<Output = Box<dyn SessionTransport>>,
+    {
+        let transport = mem::replace(&mut self.transport, Box::new(DummyTransport::default()));
+
+        let new_transport = replacer(transport).await;
+
+        mem::replace(&mut self.transport, new_transport);
     }
 }

@@ -33,13 +33,16 @@ impl CommandHandler for JoinRequestHandler {
         join_request_key()
     }
 
-    async fn handle(&self, mut session: Session<SessionOpen>) -> Result<()> {
+    async fn handle(&self, session: &mut Session<SessionOpen>) -> Result<()> {
+        let add_session: Session<SessionOpen> = todo!();
         let mut joincode = create_join_code();
-        while let Err(sess) = self.manager.add_session(joincode, session).await {
-            session = sess;
+        while let Err(sess) = self.manager.add_session(joincode, add_session).await {
+            add_session = sess;
             tokio::time::sleep(Duration::from_secs(5)).await;
 
             joincode = create_join_code();
+
+            //todo: dont loop forever
         }
 
         Ok(())

@@ -31,7 +31,7 @@ impl svalin_rpc::CommandHandler for PublicStatusHandler {
     }
 
     #[must_use]
-    async fn handle(&self, mut session: Session<SessionOpen>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
         session.write_object(&self.current_status).await?;
         Ok(())
     }

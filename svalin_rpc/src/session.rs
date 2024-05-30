@@ -1,6 +1,7 @@
 use std::{fmt::Debug, marker::PhantomData, sync::Arc};
 
 use anyhow::{anyhow, Result};
+use futures::Future;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, instrument};
 
@@ -97,7 +98,9 @@ impl Session<SessionCreated> {
             let response = SessionResponseHeader::Accept(SessionAcceptedHeader {});
             session.write_object(&response).await?;
 
-            command.handle(session).await?;
+            command.handle(&mut session).await?;
+
+            //todo
         } else {
             let response = SessionResponseHeader::Decline(SessionDeclinedHeader {
                 code: 404,
@@ -123,7 +126,11 @@ impl Session<SessionOpen> {
         self.transport.write_object(object).await
     }
 
-    pub async fn stopped(&mut self) {
-        self.transport.stopped().await
+    pub async fn replace_transport<R, Fut>(&mut self, replacer: R)
+    where
+        R: Fn(Box<dyn SessionTransport>) -> Fut,
+        Fut: Future<Output = Box<dyn SessionTransport>>,
+    {
+        self.transport.replace_transport(replacer).await
     }
 }

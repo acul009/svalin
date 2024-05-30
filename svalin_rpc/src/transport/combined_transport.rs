@@ -23,11 +23,7 @@ pub struct CombinedTransport<S, R> {
 // }
 
 #[async_trait]
-impl SessionTransport for CombinedTransport<SendStream, RecvStream> {
-    async fn stopped(&mut self) {
-        let _ = self.send.stopped().await;
-    }
-}
+impl SessionTransport for CombinedTransport<SendStream, RecvStream> {}
 
 impl<S, R> AsyncWrite for CombinedTransport<S, R>
 where

@@ -1,4 +1,5 @@
 use anyhow::{Context, Ok, Result};
+use futures::Future;
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::{chunked_transport::ChunkedTransport, session_transport::SessionTransport};
@@ -34,8 +35,12 @@ impl ObjectTransport {
         Ok(object)
     }
 
-    pub async fn stopped(&mut self) {
-        self.chunked_transport.stopped().await
+    pub async fn replace_transport<R, Fut>(&mut self, replacer: R)
+    where
+        R: Fn(Box<dyn SessionTransport>) -> Fut,
+        Fut: Future<Output = Box<dyn SessionTransport>>,
+    {
+        self.chunked_transport.replace_transport(replacer).await
     }
 }
 

@@ -9,7 +9,7 @@ use crate::session::{Session, SessionOpen};
 #[async_trait]
 pub trait CommandHandler: Sync + Send {
     fn key(&self) -> String;
-    async fn handle(&self, mut session: Session<SessionOpen>) -> Result<()>;
+    async fn handle(&self, session: &mut Session<SessionOpen>) -> Result<()>;
 }
 
 pub struct HandlerCollection {

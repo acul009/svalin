@@ -27,7 +27,7 @@ impl CommandHandler for PingHandler {
 
     async fn handle(
         &self,
-        mut session: session::Session<session::SessionOpen>,
+        session: &mut session::Session<session::SessionOpen>,
     ) -> anyhow::Result<()> {
         loop {
             let ping: u64 = session.read_object().await?;

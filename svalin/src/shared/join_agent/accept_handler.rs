@@ -21,7 +21,7 @@ impl CommandHandler for JoinAcceptHandler {
 
     async fn handle(
         &self,
-        _session: svalin_rpc::Session<svalin_rpc::SessionOpen>,
+        _session: &mut svalin_rpc::Session<svalin_rpc::SessionOpen>,
     ) -> anyhow::Result<()> {
         todo!()
     }

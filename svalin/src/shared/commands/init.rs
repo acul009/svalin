@@ -23,7 +23,7 @@ fn init_key() -> String {
 
 #[async_trait]
 impl CommandHandler for InitHandler {
-    async fn handle(&self, mut session: Session<SessionOpen>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
         debug!("incoming init request");
 
         if self.channel.is_closed() {
