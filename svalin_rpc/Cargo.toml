@@ -20,3 +20,4 @@ quinn = { version = "0.11.0", features = ["ring"] }
 lazy_static = "1.4.0"
 tracing = "0.1.40"
 test-log = { version = "0.2.16", features = ["trace"] }
+tokio-rustls = "0.26.0"
