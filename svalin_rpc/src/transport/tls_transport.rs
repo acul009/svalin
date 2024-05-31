@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::{pin::Pin, sync::Arc};
 
 use anyhow::Result;
-use futures::AsyncRead;
+use async_trait::async_trait;
 use quinn::rustls;
 use tokio::{
-    io::{AsyncWrite, AsyncWriteExt},
+    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
     stream,
 };
 use tokio_rustls::{TlsAcceptor, TlsStream};
@@ -46,5 +46,46 @@ where
         let tls_stream = TlsStream::Server(server);
 
         Ok(Self { tls_stream })
+    }
+}
+
+#[async_trait]
+impl<T: SessionTransport> SessionTransport for TlsTransport<T> {
+    async fn shutdown(&mut self) -> Result<(), std::io::Error> {
+        self.tls_stream.shutdown().await
+    }
+}
+
+impl<T: SessionTransport> AsyncRead for TlsTransport<T> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        Pin::new(&mut self.tls_stream).poll_read(cx, buf)
+    }
+}
+
+impl<T: SessionTransport> AsyncWrite for TlsTransport<T> {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<Result<usize, std::io::Error>> {
+        Pin::new(&mut self.tls_stream).poll_write(cx, buf)
+    }
+
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), std::io::Error>> {
+        Pin::new(&mut self.tls_stream).poll_flush(cx)
+    }
+
+    fn poll_shutdown(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), std::io::Error>> {
+        Pin::new(&mut self.tls_stream).poll_shutdown(cx)
     }
 }
