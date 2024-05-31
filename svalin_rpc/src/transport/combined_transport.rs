@@ -2,7 +2,7 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use quinn::{RecvStream, SendStream};
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use super::session_transport::SessionTransport;
 
@@ -23,7 +23,11 @@ pub struct CombinedTransport<S, R> {
 // }
 
 #[async_trait]
-impl SessionTransport for CombinedTransport<SendStream, RecvStream> {}
+impl SessionTransport for CombinedTransport<SendStream, RecvStream> {
+    async fn shutdown(&mut self) -> Result<(), std::io::Error> {
+        self.send.shutdown().await
+    }
+}
 
 impl<S, R> AsyncWrite for CombinedTransport<S, R>
 where

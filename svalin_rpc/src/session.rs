@@ -109,7 +109,7 @@ impl Session<SessionCreated> {
             session.write_object(&response).await?;
         }
 
-        // not sure if I need a todo here?
+        session.shutdown().await?;
 
         Ok(())
     }
@@ -132,5 +132,9 @@ impl Session<SessionOpen> {
         Fut: Future<Output = Box<dyn SessionTransport>>,
     {
         self.transport.replace_transport(replacer).await
+    }
+
+    pub async fn shutdown(mut self) -> Result<(), std::io::Error> {
+        self.transport.shutdown().await
     }
 }
