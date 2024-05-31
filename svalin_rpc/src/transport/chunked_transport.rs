@@ -67,10 +67,14 @@ impl ChunkedTransport {
         R: Fn(Box<dyn SessionTransport>) -> Fut,
         Fut: Future<Output = Box<dyn SessionTransport>>,
     {
-        let transport = mem::replace(&mut self.transport, Box::new(DummyTransport::default()));
+        let transport = mem::replace(&mut self.transport, Box::<DummyTransport>::default());
 
         let new_transport = replacer(transport).await;
 
-        mem::replace(&mut self.transport, new_transport);
+        let _ = mem::replace(&mut self.transport, new_transport);
+    }
+
+    pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
+        self.transport.shutdown().await
     }
 }

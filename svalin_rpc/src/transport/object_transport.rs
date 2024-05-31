@@ -42,6 +42,10 @@ impl ObjectTransport {
     {
         self.chunked_transport.replace_transport(replacer).await
     }
+
+    pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
+        self.chunked_transport.shutdown().await
+    }
 }
 
 #[cfg(test)]
