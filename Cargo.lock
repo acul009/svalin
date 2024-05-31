@@ -1763,7 +1763,6 @@ dependencies = [
  "async-trait",
  "clap",
  "marmelade",
- "quinn",
  "rand",
  "serde",
  "serde_json",
@@ -1820,6 +1819,7 @@ dependencies = [
  "svalin_pki",
  "test-log",
  "tokio",
+ "tokio-rustls",
  "tracing",
  "url",
 ]
@@ -1993,6 +1993,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.60",
+]
+
+[[package]]
+name = "tokio-rustls"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c7bc40d0e5a97695bb96e27995cd3a08538541b0a846f65bba7a359f36700d4"
+dependencies = [
+ "rustls",
+ "rustls-pki-types",
+ "tokio",
 ]
 
 [[package]]
