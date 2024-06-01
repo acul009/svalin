@@ -6,7 +6,7 @@ pub use connection::{Connection, DirectConnection};
 pub use server::Server;
 pub use session::{Session, SessionOpen};
 
-pub use quinn;
+pub use quinn::rustls;
 
 mod client;
 mod command;
