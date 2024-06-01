@@ -47,7 +47,7 @@ async fn ping_test() {
 }
 
 #[test(tokio::test(flavor = "multi_thread"))]
-async fn tls_test() {
+async fn tls_transport_test() {
     println!("starting tls test");
 
     let address = "127.0.0.1:1235";

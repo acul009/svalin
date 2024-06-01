@@ -18,6 +18,8 @@ use crate::{
     transport::combined_transport::CombinedTransport,
 };
 
+use super::peer::Peer;
+
 #[async_trait]
 pub trait Connection: Send + Sync {
     async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()>;
@@ -29,6 +31,7 @@ pub trait Connection: Send + Sync {
 
 pub struct DirectConnection {
     conn: quinn::Connection,
+    peer: Peer,
 }
 
 #[async_trait]
@@ -84,6 +87,24 @@ impl crate::rpc::connection::Connection for DirectConnection {
 
 impl DirectConnection {
     pub(crate) fn new(conn: quinn::Connection) -> Self {
+        let der = conn.peer_identity();
+
+        let peer = match der {
+            Some(der_any) => {
+                let downcast_result: Result<Box<Vec<crate::rustls::pki_types::CertificateDer>>, _> =
+                    der_any.downcast();
+
+                match downcast_result {
+                    //TODO
+                    Ok(der) => Peer::Certificate(()),
+                    Err(_) => Peer::Anonymous,
+                }
+
+                todo!()
+            }
+            None => Peer::Anonymous,
+        };
+
         DirectConnection { conn }
     }
 
