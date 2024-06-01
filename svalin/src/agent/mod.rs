@@ -1,4 +1,5 @@
 use anyhow::Result;
+use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::skip_verify::SkipServerVerification;
 use tracing::debug;
 
@@ -7,7 +8,7 @@ mod init;
 use crate::shared::commands::public_server_status::get_public_statusDispatcher;
 
 pub struct Agent {
-    rpc: svalin_rpc::Client,
+    rpc: RpcClient,
 }
 
 impl Agent {
@@ -16,8 +17,7 @@ impl Agent {
 
         debug!("try connecting to {address}");
 
-        let client =
-            svalin_rpc::Client::connect(&address, None, SkipServerVerification::new()).await?;
+        let client = RpcClient::connect(&address, None, SkipServerVerification::new()).await?;
 
         debug!("successfully connected");
 

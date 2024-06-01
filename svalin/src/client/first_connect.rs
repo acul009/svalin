@@ -1,11 +1,12 @@
 use std::time::Duration;
 
 use anyhow::{Context, Ok, Result};
+use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::skip_verify::SkipServerVerification;
 use tracing::{debug, instrument};
 
 use crate::{
-    client::verifiers::upstream_verifier::{self, UpstreamVerifier},
+    client::verifiers::upstream_verifier::UpstreamVerifier,
     shared::commands::{
         add_user::add_userDispatcher,
         init::initDispatcher,
@@ -20,8 +21,7 @@ impl Client {
     pub async fn first_connect(address: String) -> Result<FirstConnect> {
         debug!("try connecting to {address}");
 
-        let client =
-            svalin_rpc::Client::connect(&address, None, SkipServerVerification::new()).await?;
+        let client = RpcClient::connect(&address, None, SkipServerVerification::new()).await?;
 
         debug!("successfully connected");
 
@@ -50,7 +50,7 @@ pub enum FirstConnect {
 }
 
 pub struct Init {
-    client: svalin_rpc::Client,
+    client: RpcClient,
     address: String,
 }
 
@@ -75,7 +75,7 @@ impl Init {
 
         let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert.clone());
 
-        let client = svalin_rpc::Client::connect(&self.address, Some(&root), verifier)
+        let client = RpcClient::connect(&self.address, Some(&root), verifier)
             .await
             .context("failed to connect to server after certificate initialization")?;
         let mut connection = client.upstream_connection();
@@ -108,7 +108,7 @@ impl Init {
 }
 
 pub struct Login {
-    client: svalin_rpc::Client,
+    client: RpcClient,
 }
 
 impl Login {

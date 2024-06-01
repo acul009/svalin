@@ -1,19 +1,21 @@
 use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Ok, Result};
-use quinn::{crypto::rustls::QuicClientConfig, IdleTimeout, TransportConfig, VarInt};
+use quinn::{crypto::rustls::QuicClientConfig, TransportConfig, VarInt};
 use svalin_pki::PermCredentials;
 
-pub struct Client {
+use crate::rpc::connection::DirectConnection;
+
+pub struct RpcClient {
     connection: quinn::Connection,
 }
 
-impl Client {
+impl RpcClient {
     pub async fn connect(
         address: &str,
         identity: Option<&PermCredentials>,
         verifier: Arc<dyn quinn::rustls::client::danger::ServerCertVerifier>,
-    ) -> Result<Client> {
+    ) -> Result<RpcClient> {
         let mut endpoint = quinn::Endpoint::client("0.0.0.0:0".parse()?)?;
 
         let builder = quinn::rustls::ClientConfig::builder()
@@ -61,8 +63,8 @@ impl Client {
         Ok(Self { connection })
     }
 
-    pub fn upstream_connection(&self) -> crate::DirectConnection {
-        crate::DirectConnection::new(self.connection.clone())
+    pub fn upstream_connection(&self) -> DirectConnection {
+        DirectConnection::new(self.connection.clone())
     }
 
     pub fn close(&self) {

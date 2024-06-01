@@ -1,9 +1,12 @@
 use anyhow::Result;
 use svalin_macros::rpc_dispatch;
 use svalin_pki::{Certificate, CertificateRequest, Keypair, PermCredentials};
-use svalin_rpc::{CommandHandler, Session, SessionOpen};
 
 use async_trait::async_trait;
+use svalin_rpc::rpc::{
+    command::CommandHandler,
+    session::{Session, SessionOpen},
+};
 use tokio::sync::mpsc;
 use tracing::debug;
 

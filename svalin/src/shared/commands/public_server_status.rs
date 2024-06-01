@@ -2,7 +2,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
-use svalin_rpc::{Session, SessionOpen};
+use svalin_rpc::rpc::{
+    command::CommandHandler,
+    session::{Session, SessionOpen},
+};
 
 fn public_status_key() -> String {
     "public_status".to_owned()
@@ -25,7 +28,7 @@ impl PublicStatusHandler {
 }
 
 #[async_trait]
-impl svalin_rpc::CommandHandler for PublicStatusHandler {
+impl CommandHandler for PublicStatusHandler {
     fn key(&self) -> String {
         public_status_key()
     }

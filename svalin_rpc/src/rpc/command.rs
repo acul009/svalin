@@ -4,7 +4,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::RwLock;
 
-use crate::session::{Session, SessionOpen};
+use crate::rpc::session::{Session, SessionOpen};
 
 #[async_trait]
 pub trait CommandHandler: Sync + Send {

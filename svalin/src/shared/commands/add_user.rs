@@ -5,7 +5,10 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
 use svalin_pki::{ArgonParams, Certificate, PermCredentials};
-use svalin_rpc::{Session, SessionOpen};
+use svalin_rpc::rpc::{
+    command::CommandHandler,
+    session::{Session, SessionOpen},
+};
 use totp_rs::TOTP;
 use tracing::{debug, error, instrument, span, Instrument, Level};
 
@@ -55,7 +58,7 @@ fn add_user_key() -> String {
 }
 
 #[async_trait]
-impl svalin_rpc::CommandHandler for AddUserHandler {
+impl CommandHandler for AddUserHandler {
     fn key(&self) -> String {
         add_user_key()
     }
@@ -135,7 +138,7 @@ pub async fn add_user(
         username,
         encrypted_credentials,
         client_hash,
-        client_hash_options: client_hash_options,
+        client_hash_options,
         current_totp: totp_secret.generate_current()?,
         totp_secret,
     };

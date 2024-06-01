@@ -4,7 +4,10 @@ use anyhow::{anyhow, Ok, Result};
 use async_trait::async_trait;
 use rand::Rng;
 use svalin_macros::rpc_dispatch;
-use svalin_rpc::{CommandHandler, Session, SessionOpen};
+use svalin_rpc::rpc::{
+    command::CommandHandler,
+    session::{Session, SessionOpen},
+};
 use tokio::sync::oneshot;
 
 use super::ServerJoinManager;

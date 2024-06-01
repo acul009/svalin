@@ -2,32 +2,32 @@ use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 use quinn::{
-    crypto::{self, rustls::QuicServerConfig},
-    rustls::{
-        pki_types::{CertificateDer, PrivateKeyDer},
-        server::danger::ClientCertVerifier,
-    },
+    crypto::rustls::QuicServerConfig,
+    rustls::{pki_types::CertificateDer, server::danger::ClientCertVerifier},
 };
 use svalin_pki::PermCredentials;
 use tokio::task::JoinSet;
 use tracing::debug;
 
-use crate::{connection::DirectConnection, HandlerCollection, Connection};
+use crate::rpc::{
+    command::HandlerCollection,
+    connection::{Connection, DirectConnection},
+};
 
-pub struct Server {
+pub struct RpcServer {
     endpoint: quinn::Endpoint,
     open_connections: JoinSet<()>,
 }
 
-impl Server {
+impl RpcServer {
     pub fn new(
         addr: SocketAddr,
         credentials: &PermCredentials,
         client_cert_verifier: Arc<dyn ClientCertVerifier>,
     ) -> Result<Self> {
-        let endpoint = Server::create_endpoint(addr, &credentials, client_cert_verifier)?;
+        let endpoint = RpcServer::create_endpoint(addr, &credentials, client_cert_verifier)?;
 
-        Ok(Server {
+        Ok(RpcServer {
             endpoint,
             open_connections: JoinSet::new(),
         })
@@ -64,7 +64,7 @@ impl Server {
         debug!("starting server");
         while let Some(conn) = self.endpoint.accept().await {
             debug!("connection incoming");
-            let fut = Server::handle_connection(conn.accept()?, commands.clone());
+            let fut = RpcServer::handle_connection(conn.accept()?, commands.clone());
             self.open_connections.spawn(async move {
                 debug!("spawn successful");
                 if let Err(e) = fut.await {

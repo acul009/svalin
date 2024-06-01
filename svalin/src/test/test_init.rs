@@ -1,6 +1,6 @@
 use std::{net::ToSocketAddrs, process::exit, sync::Arc};
 
-use svalin_rpc::ping::pingDispatcher;
+use svalin_rpc::commands::ping::pingDispatcher;
 use test_log::test;
 use totp_rs::TOTP;
 use tracing::debug;
