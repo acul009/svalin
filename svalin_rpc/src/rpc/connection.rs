@@ -10,8 +10,12 @@ use tracing::field::debug;
 use tracing::{debug, error};
 
 use crate::{
-    session::SessionCreated, transport::combined_transport::CombinedTransport, HandlerCollection,
-    Session, SessionOpen,
+    rpc::{
+        command::HandlerCollection,
+        session::SessionCreated,
+        session::{Session, SessionOpen},
+    },
+    transport::combined_transport::CombinedTransport,
 };
 
 #[async_trait]
@@ -28,7 +32,7 @@ pub struct DirectConnection {
 }
 
 #[async_trait]
-impl crate::Connection for DirectConnection {
+impl crate::rpc::connection::Connection for DirectConnection {
     async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()> {
         debug!("waiting for incoming data stream");
         let mut open_sessions = JoinSet::<()>::new();

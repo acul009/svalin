@@ -1,15 +1,16 @@
 use core::time;
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
 use anyhow::{anyhow, Result};
 use rand::{
-    distributions::{self, Distribution, Standard},
+    distributions::{self},
     thread_rng, Rng,
 };
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, Keypair, PermCredentials};
 use svalin_rpc::{
-    ping::PingHandler, skip_verify::SkipClientVerification, CommandHandler, HandlerCollection,
+    commands::ping::PingHandler, rpc::command::HandlerCollection,
+    skip_verify::SkipClientVerification,
 };
 use tokio::sync::mpsc;
 use tracing::{debug, error};
@@ -20,12 +21,14 @@ use crate::shared::commands::{
     public_server_status::{PublicStatus, PublicStatusHandler},
 };
 
+use svalin_rpc::rpc::server::RpcServer;
+
 use self::users::UserStore;
 
 pub mod users;
 
 pub struct Server {
-    rpc: svalin_rpc::Server,
+    rpc: RpcServer,
     scope: marmelade::Scope,
     root: Certificate,
     credentials: PermCredentials,
@@ -95,7 +98,7 @@ impl Server {
         .await?;
 
         // TODO: proper client verification
-        let rpc = svalin_rpc::Server::new(addr, &credentials, SkipClientVerification::new())?;
+        let rpc = RpcServer::new(addr, &credentials, SkipClientVerification::new())?;
 
         Ok(Self {
             rpc,
@@ -153,8 +156,7 @@ impl Server {
     async fn init_server(addr: SocketAddr) -> Result<(Certificate, PermCredentials)> {
         let temp_credentials = Keypair::generate()?.to_self_signed_cert()?;
 
-        let mut rpc =
-            svalin_rpc::Server::new(addr, &temp_credentials, SkipClientVerification::new())?;
+        let mut rpc = RpcServer::new(addr, &temp_credentials, SkipClientVerification::new())?;
 
         let (send, mut receive) = mpsc::channel::<(Certificate, PermCredentials)>(1);
 

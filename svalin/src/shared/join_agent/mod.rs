@@ -1,6 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
 
-use svalin_rpc::SessionOpen;
+use svalin_rpc::rpc::{
+    command::CommandHandler,
+    session::{Session, SessionOpen},
+};
 use tokio::{sync::Mutex, task::AbortHandle};
 
 use self::{accept_handler::JoinAcceptHandler, request_handler::JoinRequestHandler};
@@ -14,7 +17,7 @@ pub struct ServerJoinManager {
 }
 
 struct ServerJoinManagerData {
-    session_map: HashMap<String, (svalin_rpc::Session<SessionOpen>, AbortHandle)>,
+    session_map: HashMap<String, (Session<SessionOpen>, AbortHandle)>,
     joinset: tokio::task::JoinSet<()>,
 }
 
@@ -45,8 +48,8 @@ impl ServerJoinManager {
     pub async fn add_session(
         &self,
         joincode: String,
-        mut session: svalin_rpc::Session<SessionOpen>,
-    ) -> Result<(), svalin_rpc::Session<SessionOpen>> {
+        mut session: Session<SessionOpen>,
+    ) -> Result<(), Session<SessionOpen>> {
         let mut data = self.data.lock().await;
 
         if data.session_map.contains_key(&joincode) {
@@ -71,7 +74,7 @@ impl ServerJoinManager {
         Ok(())
     }
 
-    pub async fn get_session(&self, joincode: &str) -> Option<svalin_rpc::Session<SessionOpen>> {
+    pub async fn get_session(&self, joincode: &str) -> Option<Session<SessionOpen>> {
         let mut data = self.data.lock().await;
 
         if let Some((session, abort_handle)) = data.session_map.remove(joincode) {

@@ -6,14 +6,15 @@ mod first_connect;
 pub mod verifiers;
 
 mod profile;
-pub use profile::*;
 
 pub use first_connect::*;
+use profile::Profile;
 use svalin_pki::{Certificate, PermCredentials};
+use svalin_rpc::rpc::client::RpcClient;
 use tracing::debug;
 
 pub struct Client {
-    rpc: svalin_rpc::Client,
+    rpc: RpcClient,
 }
 
 impl Client {
@@ -175,8 +176,7 @@ impl Client {
 
             debug!("connecting to server");
             let rpc =
-                svalin_rpc::Client::connect(&profile.upstream_address, Some(&identity), verifier)
-                    .await?;
+                RpcClient::connect(&profile.upstream_address, Some(&identity), verifier).await?;
 
             debug!("connected to server");
 
@@ -186,7 +186,7 @@ impl Client {
         }
     }
 
-    pub fn rpc(&self) -> &svalin_rpc::Client {
+    pub fn rpc(&self) -> &RpcClient {
         &self.rpc
     }
 

@@ -1,12 +1,9 @@
 use std::{pin::Pin, sync::Arc};
 
+use crate::rustls;
 use anyhow::Result;
 use async_trait::async_trait;
-use quinn::rustls;
-use tokio::{
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
-    stream,
-};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio_rustls::{TlsAcceptor, TlsStream};
 
 use super::session_transport::SessionTransport;
@@ -28,7 +25,7 @@ where
 
         let mut connector = tokio_rustls::TlsConnector::from(config);
 
-        let hostname = tokio_rustls::rustls::pki_types::ServerName::try_from("todo")?;
+        let hostname = rustls::pki_types::ServerName::try_from("todo")?;
         let client = connector.connect(hostname, base_transport).await?;
 
         let tls_stream = TlsStream::Client(client);

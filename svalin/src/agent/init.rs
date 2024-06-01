@@ -1,6 +1,7 @@
 use std::future::Future;
 
 use anyhow::{anyhow, Result};
+use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::skip_verify::SkipServerVerification;
 use tokio::sync::oneshot;
 use tracing::debug;
@@ -16,8 +17,7 @@ impl Agent {
     pub async fn init(address: String) -> Result<WaitingForInit> {
         debug!("try connecting to {address}");
 
-        let client =
-            svalin_rpc::Client::connect(&address, None, SkipServerVerification::new()).await?;
+        let client = RpcClient::connect(&address, None, SkipServerVerification::new()).await?;
 
         debug!("successfully connected");
 

@@ -80,7 +80,7 @@ fn to_dispatcher(
                 async fn #ident(&mut self, #parameters) #output ;
             }
 
-            impl<T> #trait_ident for T where T: svalin_rpc::Connection {
+            impl<T> #trait_ident for T where T: svalin_rpc::rpc::connection::Connection {
                 async fn #ident(&mut self, #parameters) #output {
                     let mut session = self.open_session(#key.to_owned()).await?;
 

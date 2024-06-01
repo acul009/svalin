@@ -1,5 +1,8 @@
 use async_trait::async_trait;
-use svalin_rpc::CommandHandler;
+use svalin_rpc::rpc::{
+    command::CommandHandler,
+    session::{Session, SessionOpen},
+};
 
 use super::ServerJoinManager;
 
@@ -19,10 +22,7 @@ impl CommandHandler for JoinAcceptHandler {
         "accept_join".to_string()
     }
 
-    async fn handle(
-        &self,
-        _session: &mut svalin_rpc::Session<svalin_rpc::SessionOpen>,
-    ) -> anyhow::Result<()> {
+    async fn handle(&self, _session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
         todo!()
     }
 }

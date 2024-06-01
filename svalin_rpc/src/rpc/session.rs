@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, instrument};
 
 use crate::{
-    command::HandlerCollection,
+    rpc::command::HandlerCollection,
     transport::{object_transport::ObjectTransport, session_transport::SessionTransport},
 };
 
