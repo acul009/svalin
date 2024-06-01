@@ -16,6 +16,7 @@ This is my Playground for developing a production ready Svalin.
 - [ ] Basic Managment (Live)
 - [ ] Remote Desktop
 - [ ] Network Security System and Alerting
+- [ ] IPv6 Support
 - [ ] 
 
 ## Svalin Network Architecture
