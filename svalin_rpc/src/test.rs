@@ -50,7 +50,7 @@ async fn ping_test() {
 async fn tls_test() {
     println!("starting tls test");
 
-    let address = "127.0.0.1:1234";
+    let address = "127.0.0.1:1235";
     let credentials = svalin_pki::Keypair::generate()
         .unwrap()
         .to_self_signed_cert()
