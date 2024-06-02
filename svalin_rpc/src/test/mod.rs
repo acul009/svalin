@@ -3,6 +3,8 @@ use std::net::ToSocketAddrs;
 use test_log::test;
 use tracing::debug;
 
+mod tls_test_command;
+
 use crate::{
     commands::ping::{pingDispatcher, PingHandler},
     rpc::{client::RpcClient, command::HandlerCollection, server::RpcServer},
