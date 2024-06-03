@@ -20,7 +20,7 @@ where
     T: SessionTransport,
 {
     pub async fn client(base_transport: T) -> Result<Self> {
-        let config: Arc<quinn::rustls::ClientConfig> = todo!();
+        let config: Arc<rustls::ClientConfig> = todo!();
         let name = todo!();
 
         let mut connector = tokio_rustls::TlsConnector::from(config);
@@ -34,7 +34,7 @@ where
     }
 
     pub async fn server(base_transport: T) -> Result<Self> {
-        let config: Arc<quinn::rustls::ServerConfig> = todo!();
+        let config: Arc<rustls::ServerConfig> = todo!();
 
         let acceptor = TlsAcceptor::from(config);
 

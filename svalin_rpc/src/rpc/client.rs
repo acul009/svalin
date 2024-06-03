@@ -1,5 +1,6 @@
 use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
 
+use crate::rustls;
 use anyhow::{anyhow, Ok, Result};
 use quinn::{crypto::rustls::QuicClientConfig, TransportConfig, VarInt};
 use svalin_pki::PermCredentials;
@@ -14,20 +15,20 @@ impl RpcClient {
     pub async fn connect(
         address: &str,
         identity: Option<&PermCredentials>,
-        verifier: Arc<dyn quinn::rustls::client::danger::ServerCertVerifier>,
+        verifier: Arc<dyn rustls::client::danger::ServerCertVerifier>,
     ) -> Result<RpcClient> {
         let mut endpoint = quinn::Endpoint::client("0.0.0.0:0".parse()?)?;
 
-        let builder = quinn::rustls::ClientConfig::builder()
+        let builder = rustls::ClientConfig::builder()
             .dangerous()
             .with_custom_certificate_verifier(verifier);
 
         let rustls_conf = match identity {
             Some(id) => builder.with_client_auth_cert(
-                vec![quinn::rustls::pki_types::CertificateDer::from(
+                vec![rustls::pki_types::CertificateDer::from(
                     id.get_certificate().to_der().to_owned(),
                 )],
-                quinn::rustls::pki_types::PrivateKeyDer::try_from(id.get_key_bytes().to_owned())
+                rustls::pki_types::PrivateKeyDer::try_from(id.get_key_bytes().to_owned())
                     .map_err(|err| anyhow!(err))?,
             )?,
             None => builder.with_no_client_auth(),
