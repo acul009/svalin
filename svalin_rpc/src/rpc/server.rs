@@ -1,13 +1,12 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
-use quinn::{
-    crypto::rustls::QuicServerConfig,
-    rustls::{pki_types::CertificateDer, server::danger::ClientCertVerifier},
-};
+use quinn::crypto::rustls::QuicServerConfig;
 use svalin_pki::PermCredentials;
 use tokio::task::JoinSet;
 use tracing::debug;
+
+use crate::rustls::{self, pki_types::CertificateDer, server::danger::ClientCertVerifier};
 
 use crate::rpc::{
     command::HandlerCollection,
@@ -38,16 +37,15 @@ impl RpcServer {
         credentials: &PermCredentials,
         client_cert_verifier: Arc<dyn ClientCertVerifier>,
     ) -> Result<quinn::Endpoint> {
-        let priv_key = quinn::rustls::pki_types::PrivateKeyDer::try_from(
-            credentials.get_key_bytes().to_owned(),
-        )
-        .map_err(|err| anyhow!(err))?;
+        let priv_key =
+            rustls::pki_types::PrivateKeyDer::try_from(credentials.get_key_bytes().to_owned())
+                .map_err(|err| anyhow!(err))?;
 
-        let cert_chain = vec![quinn::rustls::pki_types::CertificateDer::from(
+        let cert_chain = vec![rustls::pki_types::CertificateDer::from(
             credentials.get_certificate().to_der().to_owned(),
         )];
 
-        let crypto = quinn::rustls::ServerConfig::builder()
+        let crypto = rustls::ServerConfig::builder()
             .with_client_cert_verifier(client_cert_verifier)
             .with_single_cert(cert_chain, priv_key)?;
 
