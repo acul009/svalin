@@ -36,10 +36,10 @@ impl CommandHandler for PingHandler {
     }
 
     async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
-        loop {
-            let ping: u64 = session.read_object().await?;
-            session.write_object(&ping).await?;
-        }
+        let ping: u64 = session.read_object().await?;
+        session.write_object(&ping).await?;
+
+        Ok(())
     }
 }
 
