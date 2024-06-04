@@ -8,6 +8,7 @@ This is my Playground for developing a production ready Svalin.
 - [X] Init Routine
 - [ ] Login Routine
 - [X] Unlock Routine
+- [ ] Make Credentials use an Arc internally
 - [ ] Unlock Error when password wrong
 - [ ] Agent init / join
 - [ ] E2E Encryption

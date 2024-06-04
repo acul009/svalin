@@ -1,6 +1,7 @@
 use std::net::ToSocketAddrs;
 
 use test_log::test;
+use tls_test_command::{tls_testDispatcher, TlsTestCommandHandler};
 use tracing::debug;
 
 mod tls_test_command;
@@ -64,7 +65,7 @@ async fn tls_transport_test() {
     )
     .unwrap();
     let commands = HandlerCollection::new();
-    commands.add(PingHandler::new());
+    commands.add(TlsTestCommandHandler::new().unwrap());
 
     let server_handle = tokio::spawn(async move {
         server.run(commands).await.unwrap();
@@ -80,7 +81,7 @@ async fn tls_transport_test() {
 
     let mut connection = client.upstream_connection();
 
-    let ping = connection.ping().await.unwrap();
+    connection.tls_test().await.unwrap();
 
     server_handle.abort();
 }

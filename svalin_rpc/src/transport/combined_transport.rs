@@ -23,11 +23,7 @@ pub struct CombinedTransport<S, R> {
 // }
 
 #[async_trait]
-impl SessionTransport for CombinedTransport<SendStream, RecvStream> {
-    async fn shutdown(&mut self) -> Result<(), std::io::Error> {
-        self.send.shutdown().await
-    }
-}
+impl SessionTransport for CombinedTransport<SendStream, RecvStream> {}
 
 impl<S, R> AsyncWrite for CombinedTransport<S, R>
 where
