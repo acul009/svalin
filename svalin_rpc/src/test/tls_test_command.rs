@@ -1,3 +1,5 @@
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
 use crate::{
     self as svalin_rpc,
     transport::tls_transport::{self, TlsTransport},
@@ -58,6 +60,9 @@ impl CommandHandler for TlsTestCommandHandler {
             })
             .await;
 
+        let ping: u64 = session.read_object().await?;
+        session.write_object(&ping).await?;
+
         Ok(())
     }
 }
@@ -84,6 +89,24 @@ pub async fn tls_test(session: &mut Session<SessionOpen>) -> Result<()> {
             }
         })
         .await;
+
+    let ping = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_nanos();
+
+    session.write_object(&ping).await?;
+
+    let pong: u128 = session.read_object().await?;
+
+    let now: u128 = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_nanos();
+
+    let diff = Duration::from_nanos((now - pong).try_into()?);
+
+    println!("TLS-Ping: {:?}", diff);
 
     Ok(())
 }
