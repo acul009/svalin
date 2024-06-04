@@ -5,25 +5,7 @@ use super::session_transport::SessionTransport;
 #[derive(Default)]
 pub(crate) struct DummyTransport {}
 
-impl SessionTransport for DummyTransport {
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
-    fn shutdown<'life0, 'async_trait>(
-        &'life0 mut self,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = Result<(), std::io::Error>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        todo!()
-    }
-}
+impl SessionTransport for DummyTransport {}
 
 impl AsyncWrite for DummyTransport {
     fn poll_write(
@@ -38,14 +20,14 @@ impl AsyncWrite for DummyTransport {
         self: std::pin::Pin<&mut Self>,
         _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), std::io::Error>> {
-        unreachable!()
+        std::task::Poll::Ready(Ok(()))
     }
 
     fn poll_shutdown(
         self: std::pin::Pin<&mut Self>,
         _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), std::io::Error>> {
-        unreachable!()
+        std::task::Poll::Ready(Ok(()))
     }
 }
 
