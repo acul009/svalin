@@ -47,37 +47,37 @@ impl ServerJoinManager {
 
     pub async fn add_session(
         &self,
-        joincode: String,
+        join_code: String,
         mut session: Session<SessionOpen>,
     ) -> Result<(), Session<SessionOpen>> {
         let mut data = self.data.lock().await;
 
-        if data.session_map.contains_key(&joincode) {
+        if data.session_map.contains_key(&join_code) {
             return Err(session);
         }
 
-        session.write_object(&joincode).await.unwrap();
+        session.write_object(&join_code).await.unwrap();
 
-        let joincode_clone = joincode.clone();
+        let join_code_clone = join_code.clone();
         let data_clone = Arc::downgrade(&self.data);
 
         let abort_handle = data.joinset.spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(60 * 5)).await;
             if let Some(data) = data_clone.upgrade() {
                 let mut data = data.lock().await;
-                data.session_map.remove(&joincode_clone);
+                data.session_map.remove(&join_code_clone);
             }
         });
 
-        data.session_map.insert(joincode, (session, abort_handle));
+        data.session_map.insert(join_code, (session, abort_handle));
 
         Ok(())
     }
 
-    pub async fn get_session(&self, joincode: &str) -> Option<Session<SessionOpen>> {
+    pub async fn get_session(&self, join_code: &str) -> Option<Session<SessionOpen>> {
         let mut data = self.data.lock().await;
 
-        if let Some((session, abort_handle)) = data.session_map.remove(joincode) {
+        if let Some((session, abort_handle)) = data.session_map.remove(join_code) {
             abort_handle.abort();
             Some(session)
         } else {

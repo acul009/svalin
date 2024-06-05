@@ -47,11 +47,10 @@ impl Agent {
                 let mut conn2 = client.upstream_connection();
 
                 tokio::spawn(async move {
-                    if let Err(e) = conn2
-                        .request_join(join_code_send, confirm_code_send, join_success_send)
-                        .await
-                    {
+                    if let Err(e) = conn2.request_join(join_code_send, confirm_code_send).await {
                         tracing::error!("failed to request join: {e:?}");
+                    } else {
+                        join_success_send.send(()).unwrap();
                     }
                 });
 

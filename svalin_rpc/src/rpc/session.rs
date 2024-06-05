@@ -133,7 +133,7 @@ impl Session<SessionOpen> {
 
     pub async fn replace_transport<R, Fut>(&mut self, replacer: R)
     where
-        R: Fn(Box<dyn SessionTransport>) -> Fut,
+        R: FnOnce(Box<dyn SessionTransport>) -> Fut,
         Fut: Future<Output = Box<dyn SessionTransport>>,
     {
         self.transport.replace_transport(replacer).await
@@ -141,5 +141,15 @@ impl Session<SessionOpen> {
 
     pub async fn shutdown(mut self) -> Result<(), std::io::Error> {
         self.transport.shutdown().await
+    }
+
+    pub async fn forward(&mut self, partner: &mut Self) -> Result<()> {
+        tokio::io::copy_bidirectional(
+            self.transport.borrow_transport(),
+            partner.transport.borrow_transport(),
+        )
+        .await?;
+
+        Ok(())
     }
 }
