@@ -16,7 +16,7 @@ tokio = { version = "1.37.0", features = ["full"] }
 svalin_macros = { path = "../svalin_macros" }
 svalin_pki = { path = "../svalin_pki" }
 url = { version = "2.5.0", features = ["serde"] }
-quinn = { version = "0.11.0", features = ["ring"] }
+quinn = { version = "0.11.1", features = ["ring"] }
 lazy_static = "1.4.0"
 tracing = "0.1.40"
 test-log = { version = "0.2.16", features = ["trace"] }
