@@ -11,7 +11,7 @@ async-trait = "0.1.80"
 futures = "0.3.30"
 postcard = "1.0.8"
 serde = "1.0.200"
-serde_json = "1.0.116"
+serde_json = "1.0.117"
 tokio = { version = "1.37.0", features = ["full"] }
 svalin_macros = { path = "../svalin_macros" }
 svalin_pki = { path = "../svalin_pki" }

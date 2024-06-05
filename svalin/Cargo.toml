@@ -10,7 +10,7 @@ anyhow = "1.0.83"
 async-trait = "0.1.80"
 clap = { version = "4.5.4", features = ["derive"] }
 serde = "1.0.200"
-serde_json = "1.0.116"
+serde_json = "1.0.117"
 svalin_pki = { path = "../svalin_pki" }
 svalin_rpc = { path = "../svalin_rpc" }
 svalin_macros = { path = "../svalin_macros" }
