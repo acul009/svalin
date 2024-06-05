@@ -5,6 +5,12 @@ use super::session_transport::SessionTransport;
 #[derive(Default)]
 pub(crate) struct DummyTransport {}
 
+impl DummyTransport {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 impl SessionTransport for DummyTransport {}
 
 impl AsyncWrite for DummyTransport {

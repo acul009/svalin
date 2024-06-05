@@ -2,7 +2,7 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use quinn::{RecvStream, SendStream};
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::session_transport::SessionTransport;
 

@@ -52,10 +52,7 @@ impl CommandHandler for TlsTestCommandHandler {
 
                 match tls_transport {
                     Ok(tls_transport) => Box::new(tls_transport),
-                    Err(err) => {
-                        panic!("{}", err.0);
-                        err.1
-                    }
+                    Err(err) => err.1,
                 }
             })
             .await;

@@ -24,7 +24,7 @@ impl RpcServer {
         credentials: &PermCredentials,
         client_cert_verifier: Arc<dyn ClientCertVerifier>,
     ) -> Result<Self> {
-        let endpoint = RpcServer::create_endpoint(addr, &credentials, client_cert_verifier)?;
+        let endpoint = RpcServer::create_endpoint(addr, credentials, client_cert_verifier)?;
 
         Ok(RpcServer {
             endpoint,

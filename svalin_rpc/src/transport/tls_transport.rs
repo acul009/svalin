@@ -5,7 +5,7 @@ use crate::rustls::{client::danger::ServerCertVerifier, server::danger::ClientCe
 use anyhow::anyhow;
 use async_trait::async_trait;
 use svalin_pki::PermCredentials;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::{TlsAcceptor, TlsStream};
 
 use super::session_transport::SessionTransport;

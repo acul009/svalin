@@ -67,7 +67,7 @@ impl ChunkedTransport {
         R: Fn(Box<dyn SessionTransport>) -> Fut,
         Fut: Future<Output = Box<dyn SessionTransport>>,
     {
-        let transport = mem::replace(&mut self.transport, Box::<DummyTransport>::default());
+        let transport = mem::replace(&mut self.transport, Box::new(DummyTransport::new()));
 
         let new_transport = replacer(transport).await;
 
