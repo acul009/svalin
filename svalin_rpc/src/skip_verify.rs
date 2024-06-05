@@ -4,7 +4,7 @@ use crate::rustls::{
     self, client::danger::ServerCertVerified, crypto::CryptoProvider,
     server::danger::ClientCertVerified,
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 
 // Implementation of `ServerCertVerifier` that verifies everything as trustworthy.
 #[derive(Debug)]
@@ -20,20 +20,20 @@ impl SkipServerVerification {
 impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
     fn verify_server_cert(
         &self,
-        end_entity: &rustls::pki_types::CertificateDer<'_>,
-        intermediates: &[rustls::pki_types::CertificateDer<'_>],
-        server_name: &rustls::pki_types::ServerName<'_>,
-        ocsp_response: &[u8],
-        now: rustls::pki_types::UnixTime,
+        _end_entity: &rustls::pki_types::CertificateDer<'_>,
+        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
+        _server_name: &rustls::pki_types::ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: rustls::pki_types::UnixTime,
     ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
         Ok(ServerCertVerified::assertion())
     }
 
     fn verify_tls12_signature(
         &self,
-        message: &[u8],
-        cert: &rustls::pki_types::CertificateDer<'_>,
-        dss: &rustls::DigitallySignedStruct,
+        _message: &[u8],
+        _cert: &rustls::pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
     ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
         Err(rustls::Error::PeerIncompatible(
             rustls::PeerIncompatible::ServerTlsVersionIsDisabledByOurConfig,
@@ -80,9 +80,9 @@ impl rustls::server::danger::ClientCertVerifier for SkipClientVerification {
 
     fn verify_tls12_signature(
         &self,
-        message: &[u8],
-        cert: &rustls::pki_types::CertificateDer<'_>,
-        dss: &rustls::DigitallySignedStruct,
+        _message: &[u8],
+        _cert: &rustls::pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
     ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
         Err(rustls::Error::PeerIncompatible(
             rustls::PeerIncompatible::ServerTlsVersionIsDisabledByOurConfig,
@@ -109,9 +109,9 @@ impl rustls::server::danger::ClientCertVerifier for SkipClientVerification {
 
     fn verify_client_cert(
         &self,
-        end_entity: &rustls::pki_types::CertificateDer<'_>,
-        intermediates: &[rustls::pki_types::CertificateDer<'_>],
-        now: rustls::pki_types::UnixTime,
+        _end_entity: &rustls::pki_types::CertificateDer<'_>,
+        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
+        _now: rustls::pki_types::UnixTime,
     ) -> std::prelude::v1::Result<rustls::server::danger::ClientCertVerified, rustls::Error> {
         Ok(ClientCertVerified::assertion())
     }
