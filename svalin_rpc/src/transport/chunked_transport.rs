@@ -64,7 +64,7 @@ impl ChunkedTransport {
 
     pub async fn replace_transport<R, Fut>(&mut self, replacer: R)
     where
-        R: Fn(Box<dyn SessionTransport>) -> Fut,
+        R: FnOnce(Box<dyn SessionTransport>) -> Fut,
         Fut: Future<Output = Box<dyn SessionTransport>>,
     {
         let transport = mem::replace(&mut self.transport, Box::new(DummyTransport::new()));
@@ -76,5 +76,9 @@ impl ChunkedTransport {
 
     pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
         self.transport.shutdown().await
+    }
+
+    pub fn borrow_transport(&mut self) -> &mut Box<dyn SessionTransport> {
+        &mut self.transport
     }
 }

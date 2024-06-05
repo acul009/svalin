@@ -2,7 +2,7 @@ use std::{pin::Pin, sync::Arc};
 
 use crate::rustls;
 use crate::rustls::{client::danger::ServerCertVerifier, server::danger::ClientCertVerifier};
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use svalin_pki::PermCredentials;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -107,6 +107,22 @@ where
                 let tls_stream = TlsStream::Server(server);
 
                 Ok(Self { tls_stream })
+            }
+        }
+    }
+
+    pub fn derive_key<B>(&self, buffer: B, label: &[u8], context: &[u8]) -> Result<B>
+    where
+        B: AsMut<[u8]>,
+    {
+        match &self.tls_stream {
+            TlsStream::Client(client) => {
+                let (_transport, connection) = client.get_ref();
+                Ok(connection.export_keying_material(buffer, label, Some(context))?)
+            }
+            TlsStream::Server(server) => {
+                let (_transport, connection) = server.get_ref();
+                Ok(connection.export_keying_material(buffer, label, Some(context))?)
             }
         }
     }

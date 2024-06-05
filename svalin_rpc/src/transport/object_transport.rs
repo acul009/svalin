@@ -37,7 +37,7 @@ impl ObjectTransport {
 
     pub async fn replace_transport<R, Fut>(&mut self, replacer: R)
     where
-        R: Fn(Box<dyn SessionTransport>) -> Fut,
+        R: FnOnce(Box<dyn SessionTransport>) -> Fut,
         Fut: Future<Output = Box<dyn SessionTransport>>,
     {
         self.chunked_transport.replace_transport(replacer).await
@@ -45,6 +45,10 @@ impl ObjectTransport {
 
     pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
         self.chunked_transport.shutdown().await
+    }
+
+    pub fn borrow_transport(&mut self) -> &mut Box<dyn SessionTransport> {
+        self.chunked_transport.borrow_transport()
     }
 }
 
