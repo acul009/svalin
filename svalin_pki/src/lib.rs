@@ -7,6 +7,7 @@ mod keypair;
 mod perm_credentials;
 mod public_key;
 mod signed_message;
+pub mod tbrhl;
 
 pub use certificate::Certificate;
 pub use certificate_request::CertificateRequest;
