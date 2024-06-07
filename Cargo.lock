@@ -1796,7 +1796,6 @@ dependencies = [
  "rcgen",
  "ring 0.17.8",
  "serde",
- "serde_json",
  "time",
  "tokio",
  "tracing",
