@@ -129,7 +129,7 @@ The underlying RPC system doesn't know or care about the encryption.
 - [ ] Add support for IPv6
 - [ ] Rate Limiting
 - [X] Init Routine
-- [ ] Login Routine
+- [ ] Login Routine (make sure the server sent hashing parameters are strong enough)
 - [X] Unlock Routine
 - [ ] Agent init / join
 - [ ] E2E Encryption
