@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
 use svalin_macros::rpc_dispatch;
-use svalin_pki::PermCredentials;
+use svalin_pki::{ArgonParams, PermCredentials};
 use svalin_rpc::{
     rpc::{
         command::CommandHandler,
@@ -98,12 +98,10 @@ async fn accept_join(
             match tls_transport {
                 Ok(tls_transport) => {
                     let mut key_material = [0u8; 32];
-                    tls_transport.derive_key(
-                        &mut key_material,
-                        b"join_confirm_key",
-                        join_code.as_bytes(),
-                    );
-                    key_material_send.send(key_material);
+                    tls_transport
+                        .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
+                        .unwrap();
+                    key_material_send.send(key_material).unwrap();
                     Box::new(tls_transport)
                 }
                 Err(err) => err.1,
@@ -112,6 +110,12 @@ async fn accept_join(
         .await;
 
     let key_material = key_material_recv.await?;
+
+    let params = ArgonParams::basic();
+
+    session.write_object(&params).await?;
+
+    let confirm_code = super::derive_confirm_code(params, &key_material).await?;
 
     todo!()
 }

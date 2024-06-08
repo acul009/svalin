@@ -1,9 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
-use svalin_rpc::rpc::{
-    command::CommandHandler,
-    session::{Session, SessionOpen},
-};
+use anyhow::Result;
+use svalin_rpc::rpc::session::{Session, SessionOpen};
 use tokio::{sync::Mutex, task::AbortHandle};
 
 use self::{accept_handler::JoinAcceptHandler, request_handler::JoinRequestHandler};
@@ -92,4 +90,15 @@ impl ServerJoinManager {
     pub fn create_accept_handler(&self) -> JoinAcceptHandler {
         JoinAcceptHandler::new(self.clone())
     }
+}
+
+async fn derive_confirm_code(
+    params: svalin_pki::ArgonParams,
+    derived_secret: &[u8; 32],
+) -> Result<String> {
+    let hashed = params.derive_key(derived_secret.to_vec()).await?;
+
+    let number = u64::from_be_bytes(hashed[0..8].try_into().unwrap());
+
+    Ok((number % 1000000).to_string())
 }

@@ -107,5 +107,9 @@ pub async fn request_join(
 
     let key_material = key_material_recv.await?;
 
+    let params = session.read_object().await?;
+
+    let confirm_code = super::derive_confirm_code(params, &key_material).await?;
+
     Ok(())
 }
