@@ -118,20 +118,34 @@ The underlying RPC system doesn't know or care about the encryption.
 
 
 # Todo
+
+## Simple
+- [ ] Show Unlock Error when password on profile unlock wrong
+- [ ] Make Credentials use an Arc internally
+
+## Bigger
+- [ ] Add translation to flutter app
+- [ ] Add documentation for all public RPC types
+- [ ] Add support for IPv6
+- [ ] Rate Limiting
 - [X] Init Routine
 - [ ] Login Routine
 - [X] Unlock Routine
-- [ ] Make Credentials use an Arc internally
-- [ ] Unlock Error when password wrong
 - [ ] Agent init / join
 - [ ] E2E Encryption
-- [ ] Rate Limiting
+
+## Architecture
+- [ ] crate for local system managment and package management
 - [ ] Basic Permission System
+- [ ] Network Security System and Alerting
+- [ ] Replace certificate distribution with better system (possibly TBRHL)
+- [ ] Think of way to nicely and securely distribute group and system state
+
+## Milestones
 - [ ] Basic Managment (Live)
 - [ ] Remote Desktop
-- [ ] Network Security System and Alerting
-- [ ] IPv6 Support
-- [ ] 
+
+
 
 ## Svalin Network Architecture
 
