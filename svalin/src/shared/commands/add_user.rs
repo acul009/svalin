@@ -19,7 +19,7 @@ struct AddUserRequest {
     certificate: Certificate,
     username: String,
     encrypted_credentials: Vec<u8>,
-    client_hash: Vec<u8>,
+    client_hash: [u8; 32],
     client_hash_options: ArgonParams,
     totp_secret: TOTP,
     current_totp: String,

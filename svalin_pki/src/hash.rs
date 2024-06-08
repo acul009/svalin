@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use anyhow::{anyhow, Ok, Result};
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
@@ -36,15 +38,15 @@ impl ArgonParams {
         }
     }
 
-    pub async fn derive_key(&self, secret: Vec<u8>) -> Result<Vec<u8>> {
+    pub async fn derive_key(&self, secret: Vec<u8>) -> Result<[u8; 32]> {
         let params = self.get_params().map_err(|err| anyhow!(err))?;
         let argon = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x10, params);
 
-        let (send, recv) = tokio::sync::oneshot::channel::<Result<Vec<u8>>>();
+        let (send, recv) = tokio::sync::oneshot::channel::<Result<[u8; 32]>>();
         let salt_bytes = self.salt.as_bytes().to_owned();
 
         tokio::task::spawn_blocking(move || {
-            let mut hash = vec![0u8; 32];
+            let mut hash = [0u8; 32];
             let result = argon
                 .hash_password_into(&secret, &salt_bytes, &mut hash)
                 .map_err(|err| anyhow!(err));
@@ -72,7 +74,7 @@ impl ArgonParams {
 #[derive(Serialize, Deserialize)]
 pub struct PasswordHash {
     params: ArgonParams,
-    hash: Vec<u8>,
+    hash: [u8; 32],
 }
 
 impl PasswordHash {

@@ -64,7 +64,7 @@ impl UserStore {
         certificate: Certificate,
         username: String,
         encrypted_credentials: Vec<u8>,
-        client_hash: Vec<u8>,
+        client_hash: [u8; 32],
         client_hash_options: ArgonParams,
         totp_secret: TOTP,
     ) -> Result<()> {
@@ -74,7 +74,7 @@ impl UserStore {
             encrypted_credentials,
             client_hash_options,
             password_double_hash: ArgonParams::basic()
-                .derive_password_hash(client_hash)
+                .derive_password_hash(client_hash.to_vec())
                 .await?,
             totp_secret,
         };
