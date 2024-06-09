@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
 use svalin_macros::rpc_dispatch;
-use svalin_pki::{ArgonParams, PermCredentials};
+use svalin_pki::{ArgonParams, Certificate, CertificateRequest, PermCredentials};
 use svalin_rpc::{
     rpc::{
         command::CommandHandler,
@@ -68,9 +68,11 @@ impl CommandHandler for JoinAcceptHandler {
 async fn accept_join(
     session: &mut Session<SessionOpen>,
     join_code: String,
-    confirm_code_channel: tokio::sync::oneshot::Sender<String>,
+    confirm_code_channel: tokio::sync::oneshot::Receiver<String>,
     credentials: PermCredentials,
-) -> anyhow::Result<()> {
+    root: &Certificate,
+    upstream: &Certificate,
+) -> anyhow::Result<Certificate> {
     session.write_object(&join_code).await?;
 
     let found: std::result::Result<(), ()> = session.read_object().await?;
@@ -89,11 +91,16 @@ async fn accept_join(
 
     let (key_material_send, key_material_recv) = tokio::sync::oneshot::channel::<[u8; 32]>();
 
+    let credential_borrow = &credentials;
+
     session
         .replace_transport(move |direct_transport| async move {
-            let tls_transport =
-                TlsTransport::client(direct_transport, SkipServerVerification::new(), credentials)
-                    .await;
+            let tls_transport = TlsTransport::client(
+                direct_transport,
+                SkipServerVerification::new(),
+                credential_borrow,
+            )
+            .await;
 
             match tls_transport {
                 Ok(tls_transport) => {
@@ -117,5 +124,19 @@ async fn accept_join(
 
     let confirm_code = super::derive_confirm_code(params, &key_material).await?;
 
-    todo!()
+    let remote_confirm_code = confirm_code_channel.await?;
+
+    if confirm_code != remote_confirm_code {
+        return Err(anyhow!("Confirm Code did no match"));
+    }
+
+    let raw_request: String = session.read_object().await?;
+    let request = CertificateRequest::from_string(raw_request)?;
+    let agent_cert: Certificate = credentials.approve_request(request)?;
+
+    session.write_object(&agent_cert).await?;
+    session.write_object(root).await?;
+    session.write_object(upstream).await?;
+
+    Ok(agent_cert)
 }

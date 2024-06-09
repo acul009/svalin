@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
+use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::rpc::session::{Session, SessionOpen};
 use tokio::{sync::Mutex, task::AbortHandle};
 
@@ -8,6 +9,13 @@ use self::{accept_handler::JoinAcceptHandler, request_handler::JoinRequestHandle
 
 pub mod accept_handler;
 pub mod request_handler;
+
+#[derive(Debug)]
+pub struct AgentInitPayload {
+    credentials: PermCredentials,
+    root: Certificate,
+    upstream: Certificate,
+}
 
 #[derive(Clone)]
 pub struct ServerJoinManager {

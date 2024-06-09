@@ -24,7 +24,7 @@ where
     pub async fn client(
         base_transport: T,
         verifier: Arc<dyn ServerCertVerifier>,
-        credentials: PermCredentials,
+        credentials: &PermCredentials,
     ) -> Result<Self, (anyhow::Error, T)> {
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
             credentials.get_certificate().to_der().to_owned(),
@@ -75,7 +75,7 @@ where
     pub async fn server(
         base_transport: T,
         verifier: Arc<dyn ClientCertVerifier>,
-        credentials: PermCredentials,
+        credentials: &PermCredentials,
     ) -> Result<Self, (anyhow::Error, T)> {
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
             credentials.get_certificate().to_der().to_owned(),

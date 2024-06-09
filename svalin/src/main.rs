@@ -60,6 +60,10 @@ async fn run() {
 
                 println!("Successfully requested to join server.");
                 println!("Join-Code: {}", waiting_for_init.join_code());
+                let waiting_for_confirm = waiting_for_init.wait_for_init().await.unwrap();
+                println!("Confirm-Code: {}", waiting_for_confirm.confirm_code());
+                let init_payload = waiting_for_confirm.wait_for_confirm().await.unwrap();
+                println!("Init-Payload ready: {:?}", init_payload);
             }
         },
     }

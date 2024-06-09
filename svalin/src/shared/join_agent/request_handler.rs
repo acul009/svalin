@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use rand::Rng;
 use svalin_macros::rpc_dispatch;
-use svalin_pki::Keypair;
+use svalin_pki::{Certificate, Keypair};
 use svalin_rpc::{
     rpc::{
         command::CommandHandler,
@@ -15,7 +15,7 @@ use svalin_rpc::{
 };
 use tokio::sync::oneshot;
 
-use super::ServerJoinManager;
+use super::{AgentInitPayload, ServerJoinManager};
 
 pub struct JoinRequestHandler {
     manager: ServerJoinManager,
@@ -62,7 +62,7 @@ pub async fn request_join(
     session: &mut Session<SessionOpen>,
     join_code_channel: oneshot::Sender<String>,
     confirm_code_channel: oneshot::Sender<String>,
-) -> Result<()> {
+) -> Result<AgentInitPayload> {
     let join_code: String = session.read_object().await?;
     join_code_channel
         .send(join_code.clone())
@@ -83,21 +83,22 @@ pub async fn request_join(
 
     session
         .replace_transport(move |direct_transport| async move {
-            let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
+            let temp_credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
 
-            let tls_transport =
-                TlsTransport::server(direct_transport, SkipClientVerification::new(), credentials)
-                    .await;
+            let tls_transport = TlsTransport::server(
+                direct_transport,
+                SkipClientVerification::new(),
+                &temp_credentials,
+            )
+            .await;
 
             match tls_transport {
                 Ok(tls_transport) => {
                     let mut key_material = [0u8; 32];
-                    tls_transport.derive_key(
-                        &mut key_material,
-                        b"join_confirm_key",
-                        join_code.as_bytes(),
-                    );
-                    key_material_send.send(key_material);
+                    tls_transport
+                        .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
+                        .unwrap();
+                    key_material_send.send(key_material).unwrap();
                     Box::new(tls_transport)
                 }
                 Err(err) => err.1,
@@ -111,5 +112,21 @@ pub async fn request_join(
 
     let confirm_code = super::derive_confirm_code(params, &key_material).await?;
 
-    Ok(())
+    confirm_code_channel.send(confirm_code).unwrap();
+
+    let keypair = Keypair::generate()?;
+    let request = keypair.generate_request()?;
+    session.write_object(&request).await?;
+
+    let my_cert: Certificate = session.read_object().await?;
+    let my_credentials = keypair.upgrade(my_cert)?;
+
+    let root: Certificate = session.read_object().await?;
+    let upstream: Certificate = session.read_object().await?;
+
+    Ok(AgentInitPayload {
+        credentials: my_credentials,
+        root,
+        upstream,
+    })
 }

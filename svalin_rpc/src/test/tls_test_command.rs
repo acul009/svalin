@@ -46,7 +46,7 @@ impl CommandHandler for TlsTestCommandHandler {
                 let tls_transport = TlsTransport::server(
                     direct_transport,
                     crate::skip_verify::SkipClientVerification::new(),
-                    credentials,
+                    &credentials,
                 )
                 .await;
 
@@ -73,7 +73,7 @@ pub async fn tls_test(session: &mut Session<SessionOpen>) -> Result<()> {
             let tls_transport = TlsTransport::client(
                 direct_transport,
                 crate::skip_verify::SkipServerVerification::new(),
-                credentials,
+                &credentials,
             )
             .await;
 
