@@ -10,6 +10,8 @@ use crate::{
     transport::{object_transport::ObjectTransport, session_transport::SessionTransport},
 };
 
+use super::peer::{self, Peer};
+
 pub struct SessionCreated;
 
 pub struct SessionOpen;
@@ -17,6 +19,7 @@ pub struct SessionOpen;
 pub struct Session<T> {
     state: PhantomData<T>,
     transport: ObjectTransport,
+    partner: Peer,
 }
 
 impl<T> Debug for Session<T> {
@@ -48,10 +51,11 @@ struct SessionDeclinedHeader {
 }
 
 impl Session<()> {
-    pub(crate) fn new(transport: Box<dyn SessionTransport>) -> Session<SessionCreated> {
+    pub(crate) fn new(transport: Box<dyn SessionTransport>, peer: Peer) -> Session<SessionCreated> {
         Session {
             state: PhantomData,
             transport: ObjectTransport::new(transport),
+            partner: peer,
         }
     }
 }
@@ -61,6 +65,7 @@ impl Session<SessionCreated> {
         Session {
             state: PhantomData,
             transport: self.transport,
+            partner: self.partner,
         }
     }
 

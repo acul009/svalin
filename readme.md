@@ -10,6 +10,16 @@ Feel free to browse the codebase and create issues for any problem you see.
 
 ## What is this ?
 
+## ⚠️WARNING⚠️
+
+**This repository is not yet ready for production use.**
+
+A lot of this code is still being heavily worked and, is missing security checks and has not been reviewed.
+
+Feel free to browse the codebase and create issues for any problem you see.
+
+## What is this ?
+
 This is my Playground for developing a production ready Svalin.
 
 ## Purpose
@@ -131,6 +141,8 @@ The underlying RPC system doesn't know or care about the encryption.
 - [X] Init Routine
 - [ ] Login Routine (make sure the server sent hashing parameters are strong enough)
 - [X] Unlock Routine
+- [ ] Make Credentials use an Arc internally
+- [ ] Unlock Error when password wrong
 - [ ] Agent init / join
 - [ ] E2E Encryption
 
@@ -144,8 +156,9 @@ The underlying RPC system doesn't know or care about the encryption.
 ## Milestones
 - [ ] Basic Managment (Live)
 - [ ] Remote Desktop
-
-
+- [ ] Network Security System and Alerting
+- [ ] IPv6 Support
+- [ ] 
 
 ## Svalin Network Architecture
 
