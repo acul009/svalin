@@ -46,7 +46,7 @@ async fn integration_tests() {
     debug!("ping duration: {:?}", duration);
 
     // test_agent
-    let mut waiting = Agent::init(host.clone()).await.unwrap();
+    let waiting = Agent::init(host.clone()).await.unwrap();
     let join_code = waiting.join_code().to_owned();
     let (confirm_send, confirm_recv) = oneshot::channel();
 
