@@ -13,6 +13,7 @@ use crate::rpc::{
     connection::{Connection, DirectConnection},
 };
 
+#[derive(Debug)]
 pub struct RpcServer {
     endpoint: quinn::Endpoint,
     open_connections: JoinSet<()>,

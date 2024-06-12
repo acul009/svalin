@@ -51,11 +51,11 @@ struct SessionDeclinedHeader {
 }
 
 impl Session<()> {
-    pub(crate) fn new(transport: Box<dyn SessionTransport>, peer: Peer) -> Session<SessionCreated> {
+    pub(crate) fn new(transport: Box<dyn SessionTransport>) -> Session<SessionCreated> {
         Session {
             state: PhantomData,
             transport: ObjectTransport::new(transport),
-            partner: peer,
+            partner: Peer::Anonymous,
         }
     }
 }

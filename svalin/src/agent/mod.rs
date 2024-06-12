@@ -1,6 +1,5 @@
 use anyhow::Result;
 use svalin_rpc::rpc::client::RpcClient;
-use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::skip_verify::SkipServerVerification;
 use tracing::debug;
 
@@ -13,7 +12,7 @@ pub struct Agent {
 }
 
 impl Agent {
-    pub async fn initCmd(address: String) -> Result<()> {
+    pub async fn init_cmd(address: String) -> Result<()> {
         println!("===============================\nWelcome to svalin!\n===============================\nInitializing Agent...");
 
         debug!("try connecting to {address}");

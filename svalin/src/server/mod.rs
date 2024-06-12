@@ -27,6 +27,7 @@ use self::users::UserStore;
 
 pub mod users;
 
+#[derive(Debug)]
 pub struct Server {
     rpc: RpcServer,
     scope: marmelade::Scope,

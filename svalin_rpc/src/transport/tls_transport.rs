@@ -3,12 +3,7 @@ use std::{pin::Pin, sync::Arc};
 use crate::rustls;
 use crate::rustls::{client::danger::ServerCertVerifier, server::danger::ClientCertVerifier};
 use anyhow::{anyhow, Result};
-use crate::rustls;
-use crate::rustls::{client::danger::ServerCertVerifier, server::danger::ClientCertVerifier};
-use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use svalin_pki::PermCredentials;
-use tokio::io::{AsyncRead, AsyncWrite};
 use svalin_pki::PermCredentials;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::{TlsAcceptor, TlsStream};
@@ -66,22 +61,7 @@ where
             .connect(hostname, base_transport)
             .into_fallible()
             .await;
-        let hostname = rustls::pki_types::ServerName::try_from("todo");
 
-        if let Err(err) = hostname {
-            return Err((anyhow!(err), base_transport));
-        }
-        let hostname = hostname.unwrap();
-
-        let client = connector
-            .connect(hostname, base_transport)
-            .into_fallible()
-            .await;
-
-        match client {
-            Err(err) => Err((anyhow!(err.0), err.1)),
-            Ok(client) => {
-                let tls_stream = TlsStream::Client(client);
         match client {
             Err(err) => Err((anyhow!(err.0), err.1)),
             Ok(client) => {
@@ -119,43 +99,13 @@ where
         let config = config.unwrap();
 
         let acceptor = TlsAcceptor::from(Arc::new(config));
-        let acceptor = TlsAcceptor::from(Arc::new(config));
 
         let server = acceptor.accept(base_transport).into_fallible().await;
         match server {
             Err(err) => Err((anyhow!(err.0), err.1)),
             Ok(server) => {
                 let tls_stream = TlsStream::Server(server);
-        let server = acceptor.accept(base_transport).into_fallible().await;
-        match server {
-            Err(err) => Err((anyhow!(err.0), err.1)),
-            Ok(server) => {
-                let tls_stream = TlsStream::Server(server);
 
-                Ok(Self { tls_stream })
-            }
-        }
-    }
-
-    pub fn derive_key<B>(&self, buffer: B, label: &[u8], context: &[u8]) -> Result<B>
-    where
-        B: AsMut<[u8]>,
-    {
-        match &self.tls_stream {
-            TlsStream::Client(client) => {
-                let (_transport, connection) = client.get_ref();
-                Ok(connection.export_keying_material(buffer, label, Some(context))?)
-            }
-            TlsStream::Server(server) => {
-                let (_transport, connection) = server.get_ref();
-                Ok(connection.export_keying_material(buffer, label, Some(context))?)
-            }
-        }
-    }
-}
-
-#[async_trait]
-impl<T: SessionTransport> SessionTransport for TlsTransport<T> {}
                 Ok(Self { tls_stream })
             }
         }

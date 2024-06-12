@@ -21,10 +21,6 @@ fn accept_join_code() -> String {
     "accept_join".to_string()
 }
 
-fn accept_join_code() -> String {
-    "accept_join".to_string()
-}
-
 impl JoinAcceptHandler {
     pub(super) fn new(manager: ServerJoinManager) -> Self {
         Self { manager }

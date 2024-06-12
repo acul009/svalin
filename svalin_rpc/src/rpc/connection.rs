@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use quinn::{RecvStream, SendStream};
+use svalin_pki::Certificate;
 use tokio::task::JoinSet;
 use tracing::field::debug;
 use tracing::{debug, error};
@@ -94,16 +95,14 @@ impl DirectConnection {
 
                 match downcast_result {
                     //TODO
-                    Ok(der) => Peer::Certificate(()),
+                    Ok(der) => Peer::Anonymous,
                     Err(_) => Peer::Anonymous,
                 }
-
-                todo!()
             }
             None => Peer::Anonymous,
         };
 
-        DirectConnection { conn }
+        DirectConnection { conn, peer }
     }
 
     async fn accept_session(&self) -> Result<Session<SessionCreated>> {

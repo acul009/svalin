@@ -49,6 +49,11 @@ impl Client {
     }
 }
 
+pub struct WaitingForConfirmCode {
+    confirm_code_send: oneshot::Sender<String>,
+    result_revc: oneshot::Receiver<Result<Certificate>>,
+}
+
 impl WaitingForConfirmCode {
     pub async fn confirm(self, confirm_code: String) -> Result<()> {
         self.confirm_code_send.send(confirm_code).unwrap();
