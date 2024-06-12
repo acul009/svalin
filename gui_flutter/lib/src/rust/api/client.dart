@@ -11,6 +11,7 @@ part 'client.freezed.dart';
 // The type `__external_impl__436c69656e74` is not used by any `pub` functions, thus it is ignored.
 // The type `__external_impl__496e6974` is not used by any `pub` functions, thus it is ignored.
 // The type `__external_impl__4c6f67696e` is not used by any `pub` functions, thus it is ignored.
+// The type `__external_impl__57616974696e67466f72436f6e6669726d436f6465` is not used by any `pub` functions, thus it is ignored.
 
 Future<String> sayHello({dynamic hint}) =>
     RustLib.instance.api.crateApiClientSayHello(hint: hint);
@@ -31,6 +32,11 @@ class Client extends RustOpaque {
     rustArcDecrementStrongCountPtr:
         RustLib.instance.api.rust_arc_decrement_strong_count_ClientPtr,
   );
+
+  Future<WaitingForConfirmCode> addAgentWithCode(
+          {required String joinCode, dynamic hint}) =>
+      RustLib.instance.api.crateApiClientClientAddAgentWithCode(
+          that: this, joinCode: joinCode, hint: hint);
 
   static Future<FirstConnect> firstConnect(
           {required String address, dynamic hint}) =>
@@ -130,6 +136,29 @@ class Totp extends RustOpaque {
 
   Future<String> getUrl({dynamic hint}) =>
       RustLib.instance.api.crateApiTotpTotpGetUrl(that: this, hint: hint);
+}
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<WaitingForConfirmCode>>
+@sealed
+class WaitingForConfirmCode extends RustOpaque {
+  WaitingForConfirmCode.dcoDecode(List<dynamic> wire)
+      : super.dcoDecode(wire, _kStaticData);
+
+  WaitingForConfirmCode.sseDecode(int ptr, int externalSizeOnNative)
+      : super.sseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+  static final _kStaticData = RustArcStaticData(
+    rustArcIncrementStrongCount: RustLib
+        .instance.api.rust_arc_increment_strong_count_WaitingForConfirmCode,
+    rustArcDecrementStrongCount: RustLib
+        .instance.api.rust_arc_decrement_strong_count_WaitingForConfirmCode,
+    rustArcDecrementStrongCountPtr: RustLib
+        .instance.api.rust_arc_decrement_strong_count_WaitingForConfirmCodePtr,
+  );
+
+  Future<void> confirm({required String confirmCode, dynamic hint}) =>
+      RustLib.instance.api.crateApiClientWaitingForConfirmCodeConfirm(
+          that: this, confirmCode: confirmCode, hint: hint);
 }
 
 @freezed

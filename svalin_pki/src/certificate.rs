@@ -1,14 +1,22 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use serde::{de, Deserialize, Serialize};
 use x509_parser::nom::AsBytes;
 use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
+use zeroize::ZeroizeOnDrop;
 
 use crate::signed_message::CanVerify;
 
-#[derive(Debug, Clone)]
-pub struct Certificate {
+#[derive(Debug, ZeroizeOnDrop)]
+struct CertificateData {
     der: Vec<u8>,
     public_key: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Certificate {
+    data: Arc<CertificateData>,
 }
 
 impl Certificate {
@@ -16,27 +24,29 @@ impl Certificate {
         let (_, cert) = X509Certificate::from_der(der.as_bytes())?;
         let public_key = cert.public_key().raw.to_owned();
 
-        Ok(Certificate { der, public_key })
+        Ok(Certificate {
+            data: Arc::new(CertificateData { der, public_key }),
+        })
     }
 
     pub fn public_key(&self) -> &[u8] {
-        &self.public_key
+        &self.data.public_key
     }
 
     pub fn to_der(&self) -> &[u8] {
-        &self.der
+        &self.data.der
     }
 }
 
 impl PartialEq for Certificate {
     fn eq(&self, other: &Self) -> bool {
-        self.der == other.der
+        self.data.der == other.data.der
     }
 }
 
 impl CanVerify for Certificate {
     fn borrow_public_key(&self) -> &[u8] {
-        return self.public_key.as_ref();
+        return self.data.public_key.as_ref();
     }
 }
 

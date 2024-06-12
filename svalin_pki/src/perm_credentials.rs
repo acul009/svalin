@@ -1,9 +1,10 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
     encrypt::EncryptedData,
@@ -11,16 +12,39 @@ use crate::{
     Certificate, CertificateRequest,
 };
 
-pub struct PermCredentials {
-    keypair: Ed25519KeyPair, // Actualy is used below in a trait, compiler is jsut stupid
+#[derive(Debug)]
+struct PermCredentialData {
+    keypair: Ed25519KeyPair, // Actualy is used below in a trait, compiler is just stupid
     raw_keypair: Vec<u8>,
     certificate: Certificate,
+}
+
+impl ZeroizeOnDrop for PermCredentialData {}
+
+impl Drop for PermCredentialData {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+impl Zeroize for PermCredentialData {
+    fn zeroize(&mut self) {
+        self.raw_keypair.zeroize();
+
+        // cannot zeroize ring keypair :(
+        // self.keypair.zeroize();
+    }
+}
+
+#[derive(Clone)]
+pub struct PermCredentials {
+    data: Arc<PermCredentialData>,
 }
 
 impl Debug for PermCredentials {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PermCredentials")
-            .field("certificate", &self.certificate)
+            .field("certificate", &self.data.certificate)
             .finish()
     }
 }
@@ -47,19 +71,22 @@ impl PermCredentials {
             .context("failed to decode keypair")?;
 
         Ok(PermCredentials {
-            keypair,
-            raw_keypair,
-            certificate,
+            data: Arc::new(PermCredentialData {
+                keypair,
+                raw_keypair,
+                certificate,
+            }),
         })
     }
 
     pub async fn to_bytes(&self, password: Vec<u8>) -> Result<Vec<u8>> {
-        let encrypted_keypair = EncryptedData::encrypt_with_password(&self.raw_keypair, password)
-            .await
-            .context("Failed to encrypt keypair")?;
+        let encrypted_keypair =
+            EncryptedData::encrypt_with_password(&self.data.raw_keypair, password)
+                .await
+                .context("Failed to encrypt keypair")?;
         let on_disk = CredentialOnDisk {
             encrypted_keypair,
-            raw_cert: self.certificate.to_der().to_owned(),
+            raw_cert: self.data.certificate.to_der().to_owned(),
         };
 
         let encoded = postcard::to_extend(&on_disk, Vec::new())?;
@@ -83,17 +110,17 @@ impl PermCredentials {
     }
 
     pub fn get_certificate(&self) -> &Certificate {
-        &self.certificate
+        &self.data.certificate
     }
 
     pub fn get_key_bytes(&self) -> &[u8] {
-        &self.raw_keypair
+        &self.data.raw_keypair
     }
 
     pub fn approve_request(&self, request: CertificateRequest) -> Result<Certificate> {
-        let ca_keypair = rcgen::KeyPair::from_der(&self.raw_keypair)?;
+        let ca_keypair = rcgen::KeyPair::from_der(&self.data.raw_keypair)?;
         let ca_params =
-            rcgen::CertificateParams::from_ca_cert_der(self.certificate.to_der(), ca_keypair)?;
+            rcgen::CertificateParams::from_ca_cert_der(self.data.certificate.to_der(), ca_keypair)?;
 
         let ca = rcgen::Certificate::from_params(ca_params)?;
 
@@ -107,13 +134,13 @@ impl PermCredentials {
 
 impl CanSign for PermCredentials {
     fn borrow_keypair(&self) -> &Ed25519KeyPair {
-        &self.keypair
+        &self.data.keypair
     }
 }
 
 impl CanVerify for PermCredentials {
     fn borrow_public_key(&self) -> &[u8] {
-        self.keypair.public_key().as_ref()
+        self.data.keypair.public_key().as_ref()
     }
 }
 
@@ -145,7 +172,7 @@ mod test {
             .await
             .unwrap();
 
-        assert_eq!(copy.raw_keypair, original.raw_keypair);
-        assert_eq!(copy.certificate, original.certificate);
+        assert_eq!(copy.data.raw_keypair, original.data.raw_keypair);
+        assert_eq!(copy.data.certificate, original.data.certificate);
     }
 }

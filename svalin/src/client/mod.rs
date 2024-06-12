@@ -5,6 +5,7 @@ use anyhow::{anyhow, Context, Result};
 mod first_connect;
 pub mod verifiers;
 
+pub mod add_agent;
 mod profile;
 
 pub use first_connect::*;
@@ -15,6 +16,10 @@ use tracing::debug;
 
 pub struct Client {
     rpc: RpcClient,
+    upstream_address: String,
+    upstream_certificate: Certificate,
+    root_certificate: Certificate,
+    credentials: PermCredentials,
 }
 
 impl Client {
@@ -170,8 +175,8 @@ impl Client {
 
             debug!("creating verifier");
             let verifier = verifiers::upstream_verifier::UpstreamVerifier::new(
-                profile.root_certificate,
-                profile.upstream_certificate,
+                profile.root_certificate.clone(),
+                profile.upstream_certificate.clone(),
             );
 
             debug!("connecting to server");
@@ -180,7 +185,13 @@ impl Client {
 
             debug!("connected to server");
 
-            Ok(Self { rpc })
+            Ok(Self {
+                rpc,
+                upstream_address: profile.upstream_address,
+                upstream_certificate: profile.upstream_certificate,
+                root_certificate: profile.root_certificate,
+                credentials: identity,
+            })
         } else {
             Err(anyhow!("Profile is empty - database is inconsistent"))
         }

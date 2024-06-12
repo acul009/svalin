@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use svalin_macros::rpc_dispatch;
 use svalin_pki::{ArgonParams, Certificate, CertificateRequest, PermCredentials};
@@ -65,14 +65,52 @@ impl CommandHandler for JoinAcceptHandler {
 }
 
 #[rpc_dispatch(accept_join_code())]
-async fn accept_join(
+pub async fn accept_join(
     session: &mut Session<SessionOpen>,
     join_code: String,
+    waiting_for_confirm: tokio::sync::oneshot::Sender<Result<()>>,
     confirm_code_channel: tokio::sync::oneshot::Receiver<String>,
-    credentials: PermCredentials,
+    credentials: &PermCredentials,
     root: &Certificate,
     upstream: &Certificate,
 ) -> anyhow::Result<Certificate> {
+    let confirm_code_result = prepare_agent_enroll(session, join_code, credentials).await;
+
+    match confirm_code_result {
+        Err(err) => {
+            let err_copy = anyhow!("{}", err);
+            let err = err.context("error during enroll");
+            waiting_for_confirm.send(Err(err)).unwrap();
+
+            Err(err_copy)
+        }
+        Ok(confirm_code) => {
+            waiting_for_confirm.send(Ok(())).unwrap();
+
+            let remote_confirm_code = confirm_code_channel.await?;
+
+            if confirm_code != remote_confirm_code {
+                return Err(anyhow!("Confirm Code did no match"));
+            }
+
+            let raw_request: String = session.read_object().await?;
+            let request = CertificateRequest::from_string(raw_request)?;
+            let agent_cert: Certificate = credentials.approve_request(request)?;
+
+            session.write_object(&agent_cert).await?;
+            session.write_object(root).await?;
+            session.write_object(upstream).await?;
+
+            Ok(agent_cert)
+        }
+    }
+}
+
+async fn prepare_agent_enroll(
+    session: &mut Session<SessionOpen>,
+    join_code: String,
+    credentials: &PermCredentials,
+) -> anyhow::Result<String> {
     session.write_object(&join_code).await?;
 
     let found: std::result::Result<(), ()> = session.read_object().await?;
@@ -124,19 +162,5 @@ async fn accept_join(
 
     let confirm_code = super::derive_confirm_code(params, &key_material).await?;
 
-    let remote_confirm_code = confirm_code_channel.await?;
-
-    if confirm_code != remote_confirm_code {
-        return Err(anyhow!("Confirm Code did no match"));
-    }
-
-    let raw_request: String = session.read_object().await?;
-    let request = CertificateRequest::from_string(raw_request)?;
-    let agent_cert: Certificate = credentials.approve_request(request)?;
-
-    session.write_object(&agent_cert).await?;
-    session.write_object(root).await?;
-    session.write_object(upstream).await?;
-
-    Ok(agent_cert)
+    Ok(confirm_code)
 }
