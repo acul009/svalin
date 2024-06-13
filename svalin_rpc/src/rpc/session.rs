@@ -7,7 +7,10 @@ use tracing::{debug, instrument};
 
 use crate::{
     rpc::command::HandlerCollection,
-    transport::{object_transport::ObjectTransport, session_transport::SessionTransport},
+    transport::{
+        dummy_transport::DummyTransport, object_transport::ObjectTransport,
+        session_transport::SessionTransport,
+    },
 };
 
 use super::peer::{self, Peer};
@@ -55,6 +58,14 @@ impl Session<()> {
         Session {
             state: PhantomData,
             transport: ObjectTransport::new(transport),
+            partner: Peer::Anonymous,
+        }
+    }
+
+    pub fn dangerous_create_dummy_session() -> Session<SessionOpen> {
+        Session {
+            state: PhantomData,
+            transport: ObjectTransport::new(Box::new(DummyTransport::new())),
             partner: Peer::Anonymous,
         }
     }

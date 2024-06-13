@@ -1,6 +1,6 @@
-use std::time::Duration;
+use std::{mem, time::Duration};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use rand::Rng;
 use svalin_macros::rpc_dispatch;
@@ -14,6 +14,7 @@ use svalin_rpc::{
     transport::tls_transport::TlsTransport,
 };
 use tokio::sync::oneshot;
+use tracing::debug;
 
 use super::{AgentInitPayload, ServerJoinManager};
 
@@ -42,7 +43,8 @@ impl CommandHandler for JoinRequestHandler {
     }
 
     async fn handle(&self, session: &mut Session<SessionOpen>) -> Result<()> {
-        let add_session: Session<SessionOpen> = todo!();
+        let mut add_session = mem::replace(session, Session::dangerous_create_dummy_session());
+
         let mut join_code = create_join_code();
         while let Err(sess) = self.manager.add_session(join_code, add_session).await {
             add_session = sess;
@@ -58,28 +60,41 @@ impl CommandHandler for JoinRequestHandler {
 }
 
 #[rpc_dispatch(join_request_key())]
+#[instrument(skip_all)]
 pub async fn request_join(
     session: &mut Session<SessionOpen>,
     join_code_channel: oneshot::Sender<String>,
     confirm_code_channel: oneshot::Sender<String>,
 ) -> Result<AgentInitPayload> {
     let join_code: String = session.read_object().await?;
+
+    debug!("received join code from server: {join_code}");
+
     join_code_channel
         .send(join_code.clone())
         .map_err(|err| anyhow!(err))?;
 
+    debug!("waiting for client to confirm join code");
+
     let join_code_confirm: String = session.read_object().await?;
 
+    debug!("received join code from client: {join_code_confirm}");
+
     if join_code != join_code_confirm {
+        debug!("join codes do not match!");
         let answer: Result<(), ()> = Err(());
         session.write_object(&answer).await?;
         return Err(anyhow!("Invalid join code"));
     } else {
+        debug!("join codes match!");
         let answer: Result<(), ()> = Ok(());
         session.write_object(&answer).await?;
     }
 
-    let (key_material_send, key_material_recv) = tokio::sync::oneshot::channel::<[u8; 32]>();
+    debug!("trying to establish tls connection");
+
+    let mut key_material_result: Result<[u8; 32]> = Err(anyhow!("unknown tls error"));
+    let key_material_result_borrow = &mut key_material_result;
 
     session
         .replace_transport(move |direct_transport| async move {
@@ -98,19 +113,26 @@ pub async fn request_join(
                     tls_transport
                         .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
                         .unwrap();
-                    key_material_send.send(key_material).unwrap();
+                    let _ = mem::replace(key_material_result_borrow, Ok(key_material));
                     Box::new(tls_transport)
                 }
-                Err(err) => err.1,
+                Err(err) => {
+                    let _ = mem::replace(key_material_result_borrow, Err(err.0));
+                    err.1
+                }
             }
         })
         .await;
 
-    let key_material = key_material_recv.await?;
+    let key_material = key_material_result.context("error during tls handshake on agent")?;
+
+    debug!("server tls connection established");
 
     let params = session.read_object().await?;
 
     let confirm_code = super::derive_confirm_code(params, &key_material).await?;
+
+    debug!("generated confirm code: {confirm_code}");
 
     confirm_code_channel.send(confirm_code).unwrap();
 

@@ -60,6 +60,8 @@ async fn integration_tests() {
 
     let client_confirm = client.add_agent_with_code(join_code).await.unwrap();
 
+    debug!("waiting for use to confirm agent join");
+
     let agent_cert = client_confirm
         .confirm(confirm_recv.await.unwrap())
         .await

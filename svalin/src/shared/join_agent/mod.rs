@@ -4,6 +4,7 @@ use anyhow::Result;
 use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::rpc::session::{Session, SessionOpen};
 use tokio::{sync::Mutex, task::AbortHandle};
+use tracing::field::debug;
 
 use self::{accept_handler::JoinAcceptHandler, request_handler::JoinRequestHandler};
 
@@ -69,6 +70,7 @@ impl ServerJoinManager {
 
         let abort_handle = data.joinset.spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(60 * 5)).await;
+            debug("timeout for agent join request on server reached");
             if let Some(data) = data_clone.upgrade() {
                 let mut data = data.lock().await;
                 data.session_map.remove(&join_code_clone);

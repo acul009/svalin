@@ -1,4 +1,6 @@
-use anyhow::{anyhow, Result};
+use std::mem;
+
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use svalin_macros::rpc_dispatch;
 use svalin_pki::{ArgonParams, Certificate, CertificateRequest, PermCredentials};
@@ -10,6 +12,7 @@ use svalin_rpc::{
     skip_verify::SkipServerVerification,
     transport::tls_transport::TlsTransport,
 };
+use tracing::{debug, instrument};
 
 use super::ServerJoinManager;
 
@@ -50,7 +53,10 @@ impl CommandHandler for JoinAcceptHandler {
                 let answer: Result<(), ()> = Ok(());
                 session.write_object(&answer).await?;
 
+                debug!("forwarding session to agent");
                 session.forward(&mut agent_session).await?;
+
+                debug!("finished forwarding session");
 
                 Ok(())
             }
@@ -89,6 +95,8 @@ pub async fn accept_join(
 
             let remote_confirm_code = confirm_code_channel.await?;
 
+            debug!("received confirm code from user: {remote_confirm_code}");
+
             if confirm_code != remote_confirm_code {
                 return Err(anyhow!("Confirm Code did no match"));
             }
@@ -106,6 +114,7 @@ pub async fn accept_join(
     }
 }
 
+#[instrument(skip_all)]
 async fn prepare_agent_enroll(
     session: &mut Session<SessionOpen>,
     join_code: String,
@@ -119,7 +128,10 @@ async fn prepare_agent_enroll(
         return Err(anyhow!("Agent not found"));
     }
 
-    // establish tls session
+    debug!("connected to agent");
+
+    // confirm join code with agent
+    session.write_object(&join_code).await?;
 
     let ready: std::result::Result<(), ()> = session.read_object().await?;
 
@@ -127,18 +139,20 @@ async fn prepare_agent_enroll(
         return Err(anyhow!("Agent did not aknowledge connection"));
     }
 
-    let (key_material_send, key_material_recv) = tokio::sync::oneshot::channel::<[u8; 32]>();
+    debug!("agent confirmed join code");
 
-    let credential_borrow = &credentials;
+    // establish tls session
+
+    debug!("trying to establish tls connection");
+
+    let mut key_material_result: Result<[u8; 32]> = Err(anyhow!("unknown tls error"));
+    let key_material_result_borrow = &mut key_material_result;
 
     session
         .replace_transport(move |direct_transport| async move {
-            let tls_transport = TlsTransport::client(
-                direct_transport,
-                SkipServerVerification::new(),
-                credential_borrow,
-            )
-            .await;
+            let tls_transport =
+                TlsTransport::client(direct_transport, SkipServerVerification::new(), credentials)
+                    .await;
 
             match tls_transport {
                 Ok(tls_transport) => {
@@ -146,21 +160,29 @@ async fn prepare_agent_enroll(
                     tls_transport
                         .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
                         .unwrap();
-                    key_material_send.send(key_material).unwrap();
+
+                    let _ = mem::replace(key_material_result_borrow, Ok(key_material));
                     Box::new(tls_transport)
                 }
-                Err(err) => err.1,
+                Err(err) => {
+                    let _ = mem::replace(key_material_result_borrow, Err(err.0));
+                    err.1
+                }
             }
         })
         .await;
 
-    let key_material = key_material_recv.await?;
+    let key_material = key_material_result.context("error during tls handshake on client")?;
+
+    debug!("client tls connection established");
 
     let params = ArgonParams::basic();
 
     session.write_object(&params).await?;
 
     let confirm_code = super::derive_confirm_code(params, &key_material).await?;
+
+    debug!("client side confirm code: {confirm_code}");
 
     Ok(confirm_code)
 }
