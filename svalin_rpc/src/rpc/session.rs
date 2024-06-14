@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-use super::peer::{self, Peer};
+use super::peer::Peer;
 
 pub struct SessionCreated;
 
