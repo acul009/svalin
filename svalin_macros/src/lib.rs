@@ -84,7 +84,11 @@ fn to_dispatcher(
                 async fn #ident(&self, #parameters) #output {
                     let mut session = self.open_session(#key.to_owned()).await?;
 
-                    #ident(&mut session, #call_parameters).await
+                    let result = #ident(&mut session, #call_parameters).await;
+
+                    session.shutdown().await?;
+
+                    result
                 }
             }
         )),
