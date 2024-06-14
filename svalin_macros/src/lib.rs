@@ -86,7 +86,9 @@ fn to_dispatcher(
 
                     let result = #ident(&mut session, #call_parameters).await;
 
-                    session.shutdown().await?;
+                    // TODO
+                    // somehow kills rpc tests?
+                    // session.shutdown().await?;
 
                     result
                 }
