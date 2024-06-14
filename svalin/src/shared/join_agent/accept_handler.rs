@@ -12,6 +12,7 @@ use svalin_rpc::{
     skip_verify::SkipServerVerification,
     transport::tls_transport::TlsTransport,
 };
+use tokio::io::AsyncWriteExt;
 use tracing::{debug, instrument};
 
 use super::ServerJoinManager;
@@ -149,7 +150,8 @@ async fn prepare_agent_enroll(
     let key_material_result_borrow = &mut key_material_result;
 
     session
-        .replace_transport(move |direct_transport| async move {
+        .replace_transport(move |mut direct_transport| async move {
+            direct_transport.flush().await;
             let tls_transport =
                 TlsTransport::client(direct_transport, SkipServerVerification::new(), credentials)
                     .await;

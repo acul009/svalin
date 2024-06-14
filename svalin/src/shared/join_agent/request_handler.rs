@@ -13,7 +13,7 @@ use svalin_rpc::{
     skip_verify::SkipClientVerification,
     transport::tls_transport::TlsTransport,
 };
-use tokio::sync::oneshot;
+use tokio::{io::AsyncWriteExt, sync::oneshot};
 use tracing::debug;
 
 use super::{AgentInitPayload, ServerJoinManager};
@@ -97,7 +97,8 @@ pub async fn request_join(
     let key_material_result_borrow = &mut key_material_result;
 
     session
-        .replace_transport(move |direct_transport| async move {
+        .replace_transport(move |mut direct_transport| async move {
+            direct_transport.flush().await;
             let temp_credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
 
             let tls_transport = TlsTransport::server(
