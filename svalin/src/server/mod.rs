@@ -23,9 +23,9 @@ use crate::shared::commands::{
 
 use svalin_rpc::rpc::server::RpcServer;
 
-use self::users::UserStore;
+use self::user_store::UserStore;
 
-pub mod users;
+pub mod user_store;
 
 #[derive(Debug)]
 pub struct Server {

@@ -12,7 +12,7 @@ use svalin_rpc::rpc::{
 use totp_rs::TOTP;
 use tracing::{debug, error, instrument, span, Instrument, Level};
 
-use crate::server::users::UserStore;
+use crate::server::user_store::UserStore;
 
 #[derive(Serialize, Deserialize)]
 struct AddUserRequest {
