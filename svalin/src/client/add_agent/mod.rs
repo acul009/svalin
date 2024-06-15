@@ -36,11 +36,7 @@ impl Client {
             result_send.send(result).unwrap();
         });
 
-        let mut join_set = JoinSet::new();
-
         wait_for_confirm_recv.await??;
-
-        join_set.join_next().await.unwrap()?;
 
         Ok(WaitingForConfirmCode {
             confirm_code_send,
@@ -57,7 +53,7 @@ pub struct WaitingForConfirmCode {
 impl WaitingForConfirmCode {
     pub async fn confirm(self, confirm_code: String) -> Result<()> {
         self.confirm_code_send.send(confirm_code).unwrap();
-        let certificate = self.result_revc.await?;
+        let certificate = self.result_revc.await??;
         println!("got cert: {:?}", certificate);
 
         Ok(())

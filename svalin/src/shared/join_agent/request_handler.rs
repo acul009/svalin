@@ -96,34 +96,36 @@ pub async fn request_join(
     let mut key_material_result: Result<[u8; 32]> = Err(anyhow!("unknown tls error"));
     let key_material_result_borrow = &mut key_material_result;
 
-    session
-        .replace_transport(move |mut direct_transport| async move {
-            direct_transport.flush().await;
-            let temp_credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
+    // session
+    //     .replace_transport(move |mut direct_transport| async move {
+    //         direct_transport.flush().await;
+    //         let temp_credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
 
-            let tls_transport = TlsTransport::server(
-                direct_transport,
-                SkipClientVerification::new(),
-                &temp_credentials,
-            )
-            .await;
+    //         let tls_transport = TlsTransport::server(
+    //             direct_transport,
+    //             SkipClientVerification::new(),
+    //             &temp_credentials,
+    //         )
+    //         .await;
 
-            match tls_transport {
-                Ok(tls_transport) => {
-                    let mut key_material = [0u8; 32];
-                    tls_transport
-                        .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
-                        .unwrap();
-                    let _ = mem::replace(key_material_result_borrow, Ok(key_material));
-                    Box::new(tls_transport)
-                }
-                Err(err) => {
-                    let _ = mem::replace(key_material_result_borrow, Err(err.0));
-                    err.1
-                }
-            }
-        })
-        .await;
+    //         match tls_transport {
+    //             Ok(tls_transport) => {
+    //                 let mut key_material = [0u8; 32];
+    //                 tls_transport
+    //                     .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
+    //                     .unwrap();
+    //                 let _ = mem::replace(key_material_result_borrow, Ok(key_material));
+    //                 Box::new(tls_transport)
+    //             }
+    //             Err(err) => {
+    //                 let _ = mem::replace(key_material_result_borrow, Err(err.0));
+    //                 err.1
+    //             }
+    //         }
+    //     })
+    //     .await;
+
+    key_material_result = Ok([123u8; 32]);
 
     let key_material = key_material_result.context("error during tls handshake on agent")?;
 
@@ -139,6 +141,7 @@ pub async fn request_join(
 
     let keypair = Keypair::generate()?;
     let request = keypair.generate_request()?;
+    debug!("sending request: {}", request);
     session.write_object(&request).await?;
 
     let my_cert: Certificate = session.read_object().await?;
