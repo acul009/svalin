@@ -39,10 +39,8 @@ jobs:
       uses: subosito/flutter-action@v2
       with:
         channel: 'stable' 
-    - name: fix weird git behaviour
-      run: git config --global --add safe.directory "/opt/hostedtoolcache/flutter/*"
     - name: install flutter dependencies
-      run: flutter pub get
+      run: git config --global --add safe.directory "/opt/hostedtoolcache/flutter/*" && flutter pub get
     - uses: taiki-e/install-action@cargo-llvm-cov
     - name: build
       run: flutter build linux
