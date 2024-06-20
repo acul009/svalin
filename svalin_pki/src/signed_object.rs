@@ -1,12 +1,14 @@
 use std::ops::Deref;
 
+use anyhow::Result;
 use serde::Deserialize;
 
-use crate::{signed_message::Sign, PermCredentials};
+use crate::{signed_message::Sign, Certificate, PermCredentials};
 
 struct SignedObject<T> {
     object: T,
     raw: Vec<u8>,
+    signed_by: Certificate,
 }
 
 impl<T> SignedObject<T> {
@@ -36,7 +38,21 @@ impl<T> SignedObject<T>
 where
     T: serde::Serialize,
 {
-    pub fn new(object: &T, credentials: impl Sign) -> Self {
+    pub fn new(object: T, credentials: PermCredentials) -> Result<Self> {
+        let encoded = postcard::to_extend(&object, Vec::new())?;
+
+        let raw = credentials.sign(&encoded)?;
+
+        Ok(Self {
+            object,
+            raw,
+            signed_by: credentials.get_certificate().clone(),
+        })
+    }
+}
+
+impl<T> SignedObject<T> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         todo!()
     }
 }
