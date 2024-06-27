@@ -1,13 +1,24 @@
 use std::ops::Deref;
 
 use anyhow::Result;
-use serde::Deserialize;
+use ring::hmac::sign;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use x509_parser::objects;
 
-use crate::{signed_message::Sign, Certificate, PermCredentials};
+use crate::{
+    signed_message::{Sign, Verify},
+    Certificate, PermCredentials,
+};
 
-struct SignedObject<T> {
+pub struct SignedObject<T> {
     object: T,
     raw: Vec<u8>,
+    signed_by: Certificate,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct SignedBlob {
+    blob: Vec<u8>,
     signed_by: Certificate,
 }
 
@@ -27,10 +38,20 @@ impl<T> Deref for SignedObject<T> {
 
 impl<'a, T> SignedObject<T>
 where
-    T: Deserialize<'a>,
+    T: DeserializeOwned,
 {
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<SignedObject<T>, impl std::error::Error> {
-        todo!()
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<SignedObject<T>> {
+        let signed_blob: SignedBlob = postcard::from_bytes(&bytes)?;
+
+        let serialized_data = signed_blob.signed_by.verify(&signed_blob.blob)?;
+
+        let object: T = postcard::from_bytes(&serialized_data)?;
+
+        Ok(SignedObject {
+            object,
+            raw: bytes,
+            signed_by: signed_blob.signed_by,
+        })
     }
 }
 
@@ -52,7 +73,16 @@ where
 }
 
 impl<T> SignedObject<T> {
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> &[u8] {
+        &self.raw
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_signed_object() {
         todo!()
     }
 }
