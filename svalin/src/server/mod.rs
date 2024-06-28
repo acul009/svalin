@@ -25,7 +25,7 @@ use svalin_rpc::rpc::server::RpcServer;
 
 use self::user_store::UserStore;
 
-mod agent_store;
+pub mod agent_store;
 pub mod user_store;
 
 #[derive(Debug)]

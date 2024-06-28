@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::rpc::session::{Session, SessionOpen};
 use tokio::{sync::Mutex, task::AbortHandle};
@@ -9,7 +10,14 @@ use tracing::field::debug;
 use self::{accept_handler::JoinAcceptHandler, request_handler::JoinRequestHandler};
 
 pub mod accept_handler;
+pub mod add_agent;
 pub mod request_handler;
+
+#[derive(Serialize, Deserialize)]
+pub struct PublicAgentData {
+    pub name: String,
+    pub cert: Certificate,
+}
 
 #[derive(Debug)]
 pub struct AgentInitPayload {

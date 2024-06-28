@@ -1,4 +1,4 @@
-use jammdb::{Cursor, Data, KVPair, ToBytes};
+pub use jammdb::{Cursor, Data, KVPair, ToBytes};
 
 use crate::transaction_type::RwTransaction;
 
