@@ -22,7 +22,8 @@ pub struct Certificate {
 impl Certificate {
     pub fn from_der(der: Vec<u8>) -> Result<Certificate> {
         let (_, cert) = X509Certificate::from_der(der.as_bytes())?;
-        let public_key = cert.public_key().raw.to_owned();
+
+        let public_key = cert.public_key().subject_public_key.data.to_vec();
 
         Ok(Certificate {
             data: Arc::new(CertificateData { der, public_key }),
@@ -90,8 +91,10 @@ mod test {
 
         let cert = credentials.to_self_signed_cert().unwrap();
         let msg2 = cert.verify(&signed).unwrap();
+        let msg3 = cert.get_certificate().verify(&signed).unwrap();
 
         assert_eq!(msg, msg2.as_ref());
+        assert_eq!(msg, msg3.as_ref());
     }
 
     #[test]
