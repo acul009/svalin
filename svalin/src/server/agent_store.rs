@@ -15,7 +15,7 @@ impl AgentStore {
         Arc::new(Self { scope })
     }
 
-    fn get_agent(&self, public_key: &[u8]) -> Result<Option<SignedObject<PublicAgentData>>> {
+    pub fn get_agent(&self, public_key: &[u8]) -> Result<Option<SignedObject<PublicAgentData>>> {
         let mut raw: Option<Vec<u8>> = None;
         self.scope.view(|b| {
             if let Some(data) = b.get_kv(public_key) {
@@ -31,7 +31,7 @@ impl AgentStore {
         })
     }
 
-    fn add_agent(&self, agent: SignedObject<PublicAgentData>) -> Result<()> {
+    pub fn add_agent(&self, agent: SignedObject<PublicAgentData>) -> Result<()> {
         self.scope.update(|b| {
             let key = agent.cert.public_key().to_owned();
             b.put(key, agent.to_bytes().to_owned())?;
@@ -42,7 +42,7 @@ impl AgentStore {
         Ok(())
     }
 
-    fn list_agents(&self) -> Result<Vec<SignedObject<PublicAgentData>>> {
+    pub fn list_agents(&self) -> Result<Vec<SignedObject<PublicAgentData>>> {
         let mut raw = Vec::<Vec<u8>>::new();
         self.scope.view(|b| {
             for v in b.cursor() {
