@@ -64,7 +64,7 @@ impl<T> SignedObject<T>
 where
     T: serde::Serialize,
 {
-    pub fn new(object: T, credentials: PermCredentials) -> Result<Self> {
+    pub fn new(object: T, credentials: &PermCredentials) -> Result<Self> {
         let encoded = postcard::to_extend(&object, Vec::new())?;
 
         let signed = credentials.sign(&encoded)?;
@@ -144,7 +144,7 @@ mod tests {
 
         let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
 
-        let signed = super::SignedObject::new(object, credentials).unwrap();
+        let signed = super::SignedObject::new(object, &credentials).unwrap();
 
         let encoded = signed.to_bytes().to_owned();
         let signed2 = super::SignedObject::<TestSign>::from_bytes(encoded).unwrap();

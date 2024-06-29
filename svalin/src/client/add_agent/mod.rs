@@ -1,11 +1,16 @@
-use crate::shared::join_agent::accept_handler::accept_joinDispatcher;
+use crate::{
+    agent,
+    shared::join_agent::{accept_handler::accept_joinDispatcher, PublicAgentData},
+};
 
 use super::Client;
 
 use anyhow::{anyhow, Result};
-use svalin_pki::Certificate;
-use svalin_rpc::rpc::connection::{self, Connection};
+use svalin_pki::{signed_object::SignedObject, Certificate, PermCredentials};
+use svalin_rpc::rpc::connection::{self, Connection, DirectConnection};
 use tokio::{sync::oneshot, task::JoinSet};
+
+use crate::shared::join_agent::add_agent::add_agentDispatcher;
 
 impl Client {
     pub async fn add_agent_with_code(&self, join_code: String) -> Result<WaitingForConfirmCode> {
@@ -41,20 +46,33 @@ impl Client {
         Ok(WaitingForConfirmCode {
             confirm_code_send,
             result_revc: result_recv,
+            connection: self.rpc.upstream_connection(),
+            credentials: self.credentials.clone(),
         })
     }
 }
 
 pub struct WaitingForConfirmCode {
+    connection: DirectConnection,
     confirm_code_send: oneshot::Sender<String>,
     result_revc: oneshot::Receiver<Result<Certificate>>,
+    credentials: PermCredentials,
 }
 
 impl WaitingForConfirmCode {
-    pub async fn confirm(self, confirm_code: String) -> Result<()> {
+    pub async fn confirm(self, confirm_code: String, agent_name: String) -> Result<()> {
         self.confirm_code_send.send(confirm_code).unwrap();
         let certificate = self.result_revc.await??;
-        println!("got cert: {:?}", certificate);
+
+        let agent = SignedObject::new(
+            PublicAgentData {
+                cert: certificate,
+                name: agent_name,
+            },
+            &self.credentials,
+        )?;
+
+        self.connection.add_agent(agent).await?;
 
         Ok(())
     }

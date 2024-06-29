@@ -3,6 +3,7 @@ use std::{error::Error, fmt::Display, sync::Arc};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use svalin_macros::rpc_dispatch;
 use svalin_pki::signed_object::SignedObject;
 use svalin_rpc::rpc::{
     command::CommandHandler,
@@ -65,6 +66,7 @@ impl CommandHandler for AddAgentHandler {
     }
 }
 
+#[rpc_dispatch(add_agent_key())]
 pub async fn add_agent(
     session: &mut Session<SessionOpen>,
     agent: SignedObject<PublicAgentData>,

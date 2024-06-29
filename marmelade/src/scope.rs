@@ -1,5 +1,3 @@
-use anyhow::{anyhow, Ok, Result};
-
 use crate::{
     transaction_type::{RoTransaction, RwTransaction},
     Bucket, DB,
