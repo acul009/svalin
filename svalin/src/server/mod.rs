@@ -1,6 +1,7 @@
 use core::time;
 use std::net::SocketAddr;
 
+use agent_store::AgentStore;
 use anyhow::{anyhow, Result};
 use rand::{
     distributions::{self},
@@ -15,10 +16,13 @@ use svalin_rpc::{
 use tokio::sync::mpsc;
 use tracing::{debug, error};
 
-use crate::shared::commands::{
-    add_user::AddUserHandler,
-    init::InitHandler,
-    public_server_status::{PublicStatus, PublicStatusHandler},
+use crate::shared::{
+    commands::{
+        add_user::AddUserHandler,
+        init::InitHandler,
+        public_server_status::{PublicStatus, PublicStatusHandler},
+    },
+    join_agent::add_agent::AddAgentHandler,
 };
 
 use svalin_rpc::rpc::server::RpcServer;
@@ -113,6 +117,8 @@ impl Server {
     pub async fn run(&mut self) -> Result<()> {
         let userstore = UserStore::open(self.scope.subscope("users".into()));
 
+        let agent_store = AgentStore::open(self.scope.subscope("agents".into()));
+
         let commands = HandlerCollection::new();
 
         let join_manager = crate::shared::join_agent::ServerJoinManager::new();
@@ -122,7 +128,8 @@ impl Server {
             .add(PublicStatusHandler::new(PublicStatus::Ready))
             .add(AddUserHandler::new(userstore))
             .add(join_manager.create_request_handler())
-            .add(join_manager.create_accept_handler());
+            .add(join_manager.create_accept_handler())
+            .add(AddAgentHandler::new(agent_store)?);
 
         self.rpc.run(commands).await
     }
