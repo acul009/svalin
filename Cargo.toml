@@ -8,5 +8,6 @@ members = [
     "svalin_macros",
     "svalin_pki",
     "svalin_rpc",
-    "flutter_bridge",
+    # "flutter_bridge",
+    "gui_flutter/rust"
 ]

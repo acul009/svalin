@@ -35,5 +35,5 @@ impl Login {
 
 #[frb(external)]
 impl WaitingForConfirmCode {
-    pub async fn confirm(self, confirm_code: String) -> Result<()> {}
+    pub async fn confirm(self, confirm_code: String, agent_name: String) -> Result<()> {}
 }

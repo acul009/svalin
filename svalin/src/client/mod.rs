@@ -14,6 +14,7 @@ use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::rpc::client::RpcClient;
 use tracing::debug;
 
+/// flutter_rust_bridge:opaque
 pub struct Client {
     rpc: RpcClient,
     upstream_address: String,

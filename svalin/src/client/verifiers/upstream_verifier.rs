@@ -4,6 +4,7 @@ use svalin_rpc::rustls;
 
 use anyhow::Result;
 
+/// flutter_rust_bridge:ignore
 #[derive(Debug)]
 pub struct UpstreamVerifier {
     provider: Arc<rustls::crypto::CryptoProvider>,
