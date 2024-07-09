@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use quinn::{RecvStream, SendStream};
 use svalin_pki::Certificate;
@@ -44,10 +44,17 @@ impl crate::rpc::connection::Connection for DirectConnection {
                 Ok(session) => {
                     let commands2 = commands.clone();
                     open_sessions.spawn(async move {
-                        let res = session.handle(commands2).await;
+                        let res = session
+                            .handle(commands2)
+                            .await
+                            .context("error handling session");
                         if let Err(e) = res {
                             // TODO: Actually handle Error
-                            error!("{}", e);
+                            error!("{:?}", e);
+                            #[cfg(test)]
+                            {
+                                panic!("{:?}", e);
+                            }
                         }
                     });
                 }

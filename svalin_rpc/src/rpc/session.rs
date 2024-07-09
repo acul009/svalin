@@ -134,13 +134,13 @@ impl Session<SessionCreated> {
 impl Session<SessionOpen> {
     #[instrument(skip_all)]
     pub async fn read_object<W: serde::de::DeserializeOwned>(&mut self) -> Result<W> {
-        debug!("Reading: {}", std::any::type_name::<W>());
+        // debug!("Reading: {}", std::any::type_name::<W>());
         self.transport.read_object().await
     }
 
     #[instrument(skip_all)]
     pub async fn write_object<W: Serialize>(&mut self, object: &W) -> Result<()> {
-        debug!("Writing: {}", std::any::type_name::<W>());
+        // debug!("Writing: {}", std::any::type_name::<W>());
         self.transport.write_object(object).await
     }
 

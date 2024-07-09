@@ -9,6 +9,7 @@ use anyhow::{anyhow, Result};
 use svalin_pki::{signed_object::SignedObject, Certificate, PermCredentials};
 use svalin_rpc::rpc::connection::{self, Connection, DirectConnection};
 use tokio::{sync::oneshot, task::JoinSet};
+use tracing::debug;
 
 use crate::shared::join_agent::add_agent::add_agentDispatcher;
 
@@ -64,6 +65,8 @@ impl WaitingForConfirmCode {
         self.confirm_code_send.send(confirm_code).unwrap();
         let certificate = self.result_revc.await??;
 
+        debug!("agent certificate successfully created and sent");
+
         let agent = SignedObject::new(
             PublicAgentData {
                 cert: certificate,
@@ -73,6 +76,8 @@ impl WaitingForConfirmCode {
         )?;
 
         self.connection.add_agent(agent).await?;
+
+        debug!("agent is registered on server");
 
         Ok(())
     }

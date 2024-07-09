@@ -1,5 +1,6 @@
 use std::process;
 
+use clap::error;
 use prepare_server::prepare_server;
 use svalin_rpc::commands::ping::pingDispatcher;
 use test_log::test;
@@ -56,6 +57,7 @@ async fn integration_tests() {
             .send(confirm.confirm_code().to_owned())
             .unwrap();
         let init_payload = confirm.wait_for_confirm().await.unwrap();
+        debug!("agent init payload ready!");
     });
 
     let client_confirm = client.add_agent_with_code(join_code).await.unwrap();
@@ -71,5 +73,9 @@ async fn integration_tests() {
 
     server_handle.abort();
 
-    process::exit(0);
+    agent_handle.abort();
+
+    tracing::error!("TODO: save agent init data permanently and reconnect");
+
+    process::exit(1);
 }

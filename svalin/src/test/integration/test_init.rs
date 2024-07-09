@@ -57,6 +57,9 @@ async fn test_init() {
     client.close();
 
     server_handle.abort();
+}
 
-    exit(0);
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_sleep() {
+    tokio::time::sleep();
 }
