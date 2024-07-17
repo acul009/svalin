@@ -13,7 +13,6 @@ class ProfileSelector extends StatefulWidget {
 class _ProfileSelectorState extends State<ProfileSelector> {
   late Future<List<String>> _profiles;
   // List<DropdownMenuEntry<String>> _profiles = [];
-  String? _selectedProfile;
 
   @override
   void initState() {
@@ -42,91 +41,83 @@ class _ProfileSelectorState extends State<ProfileSelector> {
     return Scaffold(
       appBar: AppBar(title: const Text("Select Profile")),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
-          child: FutureBuilder(
-            future: _profiles,
-            builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                var profiles = snapshot.data!;
-                return Column(
-                  children: [
-                    DropdownMenu<String>(
-                      expandedInsets: const EdgeInsets.symmetric(horizontal: 8),
-                      label: const Text("Profile"),
-                      dropdownMenuEntries: profiles
-                          .map((e) => DropdownMenuEntry(
-                                label: e,
-                                value: e,
-                              ))
-                          .toList(),
-                      onSelected: (value) =>
-                          setState(() => _selectedProfile = value),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                      ),
-                      child: const Text("Next"),
-                      onPressed: () {
-                        if (_selectedProfile != null) {
+        child: FutureBuilder(
+          future: _profiles,
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              var profiles = snapshot.data!;
+              return Column(
+                children: [
+                  ListView.builder(
+                    itemCount: profiles.length,
+                    shrinkWrap: true,
+                    itemBuilder: (context, index) {
+                      final item = profiles[index];
+
+                      return ListTile(
+                        onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => UnlockDialog(
-                                  selectedProfile: _selectedProfile!),
+                              builder: (context) =>
+                                  UnlockDialog(selectedProfile: item),
                             ),
                           );
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(50),
-                          backgroundColor:
-                              const Color.fromARGB(255, 255, 48, 48),
-                          foregroundColor: const Color.fromARGB(255, 64, 0, 0)),
-                      label: const Text("Delete Profile"),
-                      icon: const Icon(Icons.delete),
-                      onPressed: () {
-                        if (_selectedProfile != null) {
-                          showAdaptiveDialog(
-                            context: context,
-                            builder: (context) => AlertDialog.adaptive(
-                              content: Text(
-                                  "Are you sure you want to delete \"${_selectedProfile!}\""),
-                              actions: [
-                                IconButton(
-                                  icon: const Icon(Icons.check),
-                                  onPressed: () async {
-                                    await Client.removeProfile(
-                                        profileKey: _selectedProfile!);
-                                    Navigator.of(context, rootNavigator: true)
-                                        .pop();
-                                    updateProfiles();
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () =>
-                                      Navigator.of(context, rootNavigator: true)
-                                          .pop(),
-                                )
-                              ],
+                        },
+                        title: Row(
+                          children: [
+                            SizedBox(width: 20),
+                            Text(item),
+                            const Spacer(),
+                            ElevatedButton(
+                              onPressed: () {
+                                showAdaptiveDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog.adaptive(
+                                    content: Text(
+                                        "Are you sure you want to delete \"${item}\""),
+                                    actions: [
+                                      IconButton(
+                                        icon: const Icon(Icons.check),
+                                        onPressed: () async {
+                                          await Client.removeProfile(
+                                              profileKey: item);
+                                          Navigator.of(context,
+                                                  rootNavigator: true)
+                                              .pop();
+                                          updateProfiles();
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.close),
+                                        onPressed: () => Navigator.of(context,
+                                                rootNavigator: true)
+                                            .pop(),
+                                      )
+                                    ],
+                                  ),
+                                );
+                              },
+                              child: Icon(Icons.delete),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    const Color.fromARGB(255, 255, 48, 48),
+                                foregroundColor:
+                                    const Color.fromARGB(255, 64, 0, 0),
+                              ),
                             ),
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                );
-              } else {
-                return const CircularProgressIndicator();
-              }
-            },
-          ),
+                            SizedBox(width: 20),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              );
+            } else {
+              return const CircularProgressIndicator();
+            }
+          },
         ),
       ),
     );
