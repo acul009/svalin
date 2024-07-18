@@ -56,8 +56,9 @@ async fn integration_tests() {
         confirm_send
             .send(confirm.confirm_code().to_owned())
             .unwrap();
-        let init_payload = confirm.wait_for_confirm().await.unwrap();
-        debug!("agent init payload ready!");
+        confirm.wait_for_confirm().await.unwrap();
+        // TODO: make initializing just one function call
+        debug!("agent init complete!");
     });
 
     let client_confirm = client.add_agent_with_code(join_code).await.unwrap();
@@ -73,7 +74,7 @@ async fn integration_tests() {
 
     server_handle.abort();
 
-    agent_handle.abort();
+    agent_handle.await.unwrap();
 
     tracing::error!("TODO: save agent init data permanently and reconnect");
 

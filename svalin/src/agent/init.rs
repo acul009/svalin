@@ -22,7 +22,7 @@ impl Agent {
 
         debug!("successfully connected");
 
-        let mut conn = client.upstream_connection();
+        let conn = client.upstream_connection();
 
         debug!("requesting public status");
 
@@ -46,10 +46,13 @@ impl Agent {
                 let (join_success_send, join_success_recv) =
                     tokio::sync::oneshot::channel::<AgentInitPayload>();
 
-                let mut conn2 = client.upstream_connection();
+                let conn2 = client.upstream_connection();
 
                 tokio::spawn(async move {
-                    match conn2.request_join(join_code_send, confirm_code_send).await {
+                    match conn2
+                        .request_join(address, join_code_send, confirm_code_send)
+                        .await
+                    {
                         Ok(init_payload) => {
                             join_success_send.send(init_payload).unwrap();
                         }
@@ -120,7 +123,11 @@ impl WaitForConfirm {
         &self.confirm_code
     }
 
-    pub async fn wait_for_confirm(self) -> Result<AgentInitPayload> {
-        Ok(self.success_channel.await?)
+    pub async fn wait_for_confirm(self) -> Result<()> {
+        let init_data = self.success_channel.await?;
+
+        Agent::init_with(init_data).await?;
+
+        Ok(())
     }
 }

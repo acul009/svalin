@@ -63,6 +63,7 @@ impl CommandHandler for JoinRequestHandler {
 #[instrument(skip_all)]
 pub async fn request_join(
     session: &mut Session<SessionOpen>,
+    address: String,
     join_code_channel: oneshot::Sender<String>,
     confirm_code_channel: oneshot::Sender<String>,
 ) -> Result<AgentInitPayload> {
@@ -150,6 +151,7 @@ pub async fn request_join(
 
     Ok(AgentInitPayload {
         credentials: my_credentials,
+        address,
         root,
         upstream,
     })

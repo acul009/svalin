@@ -21,9 +21,10 @@ pub struct PublicAgentData {
 
 #[derive(Debug)]
 pub struct AgentInitPayload {
-    credentials: PermCredentials,
-    root: Certificate,
-    upstream: Certificate,
+    pub address: String,
+    pub credentials: PermCredentials,
+    pub root: Certificate,
+    pub upstream: Certificate,
 }
 
 #[derive(Clone)]
