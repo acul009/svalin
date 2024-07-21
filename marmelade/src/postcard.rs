@@ -50,8 +50,8 @@ impl<'b, 'tx, S> Bucket<'b, 'tx, S> {
 }
 
 impl<'b, 'tx> Bucket<'b, 'tx, RwTransaction> {
-    pub fn put_object<'a, U>(
-        &'a self,
+    pub fn put_object<U>(
+        &self,
         key: impl ToBytes<'tx>,
         value: &U,
     ) -> Result<(), MarmeladeObjectError>

@@ -1,4 +1,9 @@
+use anyhow::{Ok, Result};
+use jammdb::ToBytes;
+use serde::{de::DeserializeOwned, Serialize};
+
 use crate::{
+    postcard::MarmeladeObjectError,
     transaction_type::{RoTransaction, RwTransaction},
     Bucket, DB,
 };
@@ -41,7 +46,7 @@ impl Scope {
         Ok(())
     }
 
-    pub fn update<DB: FnMut(Bucket<RwTransaction>) -> anyhow::Result<()>>(
+    pub fn update<DB: FnOnce(Bucket<RwTransaction>) -> anyhow::Result<()>>(
         &self,
         mut f: DB,
     ) -> anyhow::Result<()> {
@@ -73,5 +78,29 @@ impl Scope {
             scope: self.scope.clone(),
             path,
         }
+    }
+
+    pub fn get_object<T: DeserializeOwned, U: AsRef<[u8]>>(&self, key: U) -> Result<Option<T>> {
+        let mut object: Option<T> = None;
+        self.view(|b| {
+            object = b.get_object(&key)?;
+
+            Ok(())
+        })?;
+
+        Ok(object)
+    }
+
+    pub fn put_object<'a, U>(&'a self, key: String, value: &U) -> Result<()>
+    where
+        U: Serialize + ?Sized,
+    {
+        self.update(|b| {
+            b.put_object(key, value)?;
+
+            Ok(())
+        })?;
+
+        Ok(())
     }
 }

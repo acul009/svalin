@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::thread::scope;
 
 use anyhow::{anyhow, Context, Result};
+use marmelade::Scope;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::rpc::client::RpcClient;
@@ -54,7 +55,8 @@ impl Agent {
         let config = AgentConfig {
             root_certificate: data.root,
             upstream_certificate: data.upstream,
-            encrypted_credentials: Self::encrypt_credentials(data.credentials)?,
+            encrypted_credentials: Self::encrypt_credentials(data.credentials, scope.clone())
+                .await?,
             upstream_address: data.address,
         };
 
@@ -116,12 +118,44 @@ impl Agent {
         }
     }
 
-    fn encrypt_credentials(credentials: PermCredentials) -> Result<Vec<u8>> {
-        todo!()
+    async fn encrypt_credentials(credentials: PermCredentials, scope: Scope) -> Result<Vec<u8>> {
+        let key_source: Option<KeySource> = scope.get_object("credential_key")?;
+
+        let key_source = match key_source {
+            Some(k) => k,
+            None => {
+                let key = KeySource::BuiltIn(Vec::from(svalin_pki::generate_key()?));
+
+                scope.put_object("credential_key".into(), &key)?;
+
+                key
+            }
+        };
+
+        let key = Self::source_to_key(key_source).await?;
+
+        credentials.to_bytes(key).await
     }
 
-    fn decrypt_credentials(encrypted_credentials: Vec<u8>) -> Result<PermCredentials> {
-        todo!()
+    async fn decrypt_credentials(
+        encrypted_credentials: Vec<u8>,
+        scope: Scope,
+    ) -> Result<PermCredentials> {
+        let key_source: Option<KeySource> = scope.get_object("credential_key")?;
+
+        if let Some(key_source) = key_source {
+            let key = Self::source_to_key(key_source).await?;
+
+            PermCredentials::from_bytes(&encrypted_credentials, key).await
+        } else {
+            return Err(anyhow!("no keysource saved in DB"));
+        }
+    }
+
+    async fn source_to_key(source: KeySource) -> Result<Vec<u8>> {
+        match source {
+            KeySource::BuiltIn(k) => Ok(k),
+        }
     }
 }
 
@@ -131,4 +165,9 @@ struct AgentConfig {
     upstream_certificate: Certificate,
     root_certificate: Certificate,
     encrypted_credentials: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+enum KeySource {
+    BuiltIn(Vec<u8>),
 }
