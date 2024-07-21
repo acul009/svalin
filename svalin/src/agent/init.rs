@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::{future::Future, time::Duration};
 
 use anyhow::{anyhow, Result};
 use svalin_pki::Certificate;
@@ -123,11 +123,15 @@ impl WaitForConfirm {
         &self.confirm_code
     }
 
-    pub async fn wait_for_confirm(self) -> Result<()> {
+    pub async fn wait_for_confirm(self) -> Result<Agent> {
         let init_data = self.success_channel.await?;
 
         Agent::init_with(init_data).await?;
 
-        Ok(())
+        tokio::time::sleep(Duration::from_secs(3)).await;
+
+        let agent = Agent::open().await?;
+
+        Ok(agent)
     }
 }

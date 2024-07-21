@@ -7,10 +7,11 @@ use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::skip_verify::SkipServerVerification;
-use tracing::debug;
+use tracing::{debug, instrument};
 
 mod init;
 
+use crate::client::verifiers;
 use crate::shared::commands::public_server_status::get_public_statusDispatcher;
 use crate::shared::join_agent::AgentInitPayload;
 
@@ -32,7 +33,7 @@ impl Agent {
 
         debug!("successfully connected");
 
-        let mut conn = client.upstream_connection();
+        let conn = client.upstream_connection();
 
         debug!("requesting public status");
 
@@ -45,6 +46,44 @@ impl Agent {
             crate::shared::commands::public_server_status::PublicStatus::Ready => todo!(),
         }
         todo!()
+    }
+
+    #[instrument]
+    pub async fn open() -> Result<Agent> {
+        debug!("opening agent configuration");
+
+        let db = Self::open_marmelade()?;
+
+        let scope = db.scope("default".into())?;
+
+        let config: AgentConfig = scope
+            .get_object("base_config")?
+            .ok_or(anyhow!("agent not yet configured"))?;
+
+        debug!("decrypting credentials");
+
+        let credentials =
+            Self::decrypt_credentials(config.encrypted_credentials, scope.clone()).await?;
+
+        let verifier = verifiers::upstream_verifier::UpstreamVerifier::new(
+            config.root_certificate.clone(),
+            config.upstream_certificate.clone(),
+        );
+
+        debug!("trying to connect to server");
+
+        let rpc =
+            RpcClient::connect(&config.upstream_address, Some(&credentials), verifier).await?;
+
+        debug!("connection to server established");
+
+        Ok(Agent {
+            credentials: credentials,
+            root_certificate: config.root_certificate,
+            rpc: rpc,
+            upstream_address: config.upstream_address,
+            upstream_certificate: config.upstream_certificate,
+        })
     }
 
     pub async fn init_with(data: AgentInitPayload) -> Result<()> {
@@ -61,7 +100,7 @@ impl Agent {
         };
 
         scope.update(|b| {
-            let current = b.get_kv("p");
+            let current = b.get_kv("base_config");
 
             if current.is_some() {
                 return Err(anyhow!("Profile already exists"));

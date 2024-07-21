@@ -1,4 +1,4 @@
-use std::process;
+use std::{process, time::Duration};
 
 use clap::error;
 use prepare_server::prepare_server;
@@ -56,7 +56,7 @@ async fn integration_tests() {
         confirm_send
             .send(confirm.confirm_code().to_owned())
             .unwrap();
-        confirm.wait_for_confirm().await.unwrap();
+        let agent = confirm.wait_for_confirm().await.unwrap();
         // TODO: make initializing just one function call
         debug!("agent init complete!");
     });
@@ -69,6 +69,8 @@ async fn integration_tests() {
         .confirm(confirm_recv.await.unwrap(), "test agent".into())
         .await
         .unwrap();
+
+    tokio::time::sleep(Duration::from_secs(10)).await;
 
     client.close();
 
