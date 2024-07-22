@@ -57,8 +57,9 @@ async fn integration_tests() {
             .send(confirm.confirm_code().to_owned())
             .unwrap();
         let agent = confirm.wait_for_confirm().await.unwrap();
-        // TODO: make initializing just one function call
         debug!("agent init complete!");
+        debug!("starting up agent");
+        agent.run().await.unwrap();
     });
 
     let client_confirm = client.add_agent_with_code(join_code).await.unwrap();
@@ -78,7 +79,7 @@ async fn integration_tests() {
 
     agent_handle.await.unwrap();
 
-    tracing::error!("TODO: save agent init data permanently and reconnect");
+    tracing::error!("TODO: make ping work by implementing forwarding, e2e encryption and basic agent session serving");
 
     process::exit(1);
 }

@@ -5,7 +5,9 @@ use anyhow::{anyhow, Context, Result};
 use marmelade::Scope;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
+use svalin_rpc::commands::ping::PingHandler;
 use svalin_rpc::rpc::client::RpcClient;
+use svalin_rpc::rpc::command::HandlerCollection;
 use svalin_rpc::skip_verify::SkipServerVerification;
 use tracing::{debug, instrument};
 
@@ -24,30 +26,6 @@ pub struct Agent {
 }
 
 impl Agent {
-    pub async fn init_cmd(address: String) -> Result<()> {
-        println!("===============================\nWelcome to svalin!\n===============================\nInitializing Agent...");
-
-        debug!("try connecting to {address}");
-
-        let client = RpcClient::connect(&address, None, SkipServerVerification::new()).await?;
-
-        debug!("successfully connected");
-
-        let conn = client.upstream_connection();
-
-        debug!("requesting public status");
-
-        let server_status = conn.get_public_status().await?;
-
-        debug!("public status: {server_status:?}");
-
-        match server_status {
-            crate::shared::commands::public_server_status::PublicStatus::WaitingForInit => todo!(),
-            crate::shared::commands::public_server_status::PublicStatus::Ready => todo!(),
-        }
-        todo!()
-    }
-
     #[instrument]
     pub async fn open() -> Result<Agent> {
         debug!("opening agent configuration");
@@ -84,6 +62,14 @@ impl Agent {
             upstream_address: config.upstream_address,
             upstream_certificate: config.upstream_certificate,
         })
+    }
+
+    pub async fn run(&self) -> Result<()> {
+        let commands = HandlerCollection::new();
+
+        commands.add(PingHandler::new());
+
+        self.rpc.serve(commands).await
     }
 
     pub async fn init_with(data: AgentInitPayload) -> Result<()> {

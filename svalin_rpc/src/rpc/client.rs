@@ -7,6 +7,8 @@ use svalin_pki::PermCredentials;
 
 use crate::rpc::connection::DirectConnection;
 
+use super::{command::HandlerCollection, connection::Connection};
+
 pub struct RpcClient {
     connection: quinn::Connection,
 }
@@ -70,5 +72,9 @@ impl RpcClient {
 
     pub fn close(&self) {
         self.connection.close(0u32.into(), b"");
+    }
+
+    pub async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()> {
+        self.upstream_connection().serve(commands).await
     }
 }
