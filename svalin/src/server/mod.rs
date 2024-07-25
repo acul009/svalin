@@ -1,8 +1,8 @@
 use core::time;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 use agent_store::AgentStore;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use rand::{
     distributions::{self},
     thread_rng, Rng,
@@ -14,6 +14,7 @@ use svalin_rpc::{
     skip_verify::SkipClientVerification,
 };
 use tokio::sync::mpsc;
+use totp_rs::qrcodegen_image::image::imageops::rotate180;
 use tracing::{debug, error};
 
 use crate::shared::{
@@ -63,7 +64,9 @@ impl Server {
 
             debug!("Server is not yet initialized, starting initialization routine");
 
-            let (root, credentials) = Self::init_server(addr).await?;
+            let (root, credentials) = Self::init_server(addr)
+                .await
+                .context("failed to initialize server")?;
 
             debug!("Initialisation complete, waiting for init server shutdown");
 
@@ -104,7 +107,8 @@ impl Server {
         .await?;
 
         // TODO: proper client verification
-        let rpc = RpcServer::new(addr, &credentials, SkipClientVerification::new())?;
+        let rpc = RpcServer::new(addr, &credentials, SkipClientVerification::new())
+            .context("failed to create rpc server")?;
 
         Ok(Self {
             rpc,
@@ -165,7 +169,12 @@ impl Server {
     async fn init_server(addr: SocketAddr) -> Result<(Certificate, PermCredentials)> {
         let temp_credentials = Keypair::generate()?.to_self_signed_cert()?;
 
-        let mut rpc = RpcServer::new(addr, &temp_credentials, SkipClientVerification::new())?;
+        let rpc = Arc::new(RpcServer::new(
+            addr,
+            &temp_credentials,
+            SkipClientVerification::new(),
+        )?);
+        let rpc_clone = rpc.clone();
 
         let (send, mut receive) = mpsc::channel::<(Certificate, PermCredentials)>(1);
 
@@ -182,10 +191,12 @@ impl Server {
         if let Some(result) = receive.recv().await {
             debug!("successfully initialized server");
             handle.abort();
+            rpc_clone.close();
             Ok(result)
         } else {
             error!("error when trying to initialize server");
             handle.abort();
+            rpc_clone.close();
             Err(anyhow!("error initializing server"))
         }
     }

@@ -10,7 +10,7 @@ use crate::rpc::connection::DirectConnection;
 use super::{command::HandlerCollection, connection::Connection};
 
 pub struct RpcClient {
-    connection: quinn::Connection,
+    connection: DirectConnection,
 }
 
 impl RpcClient {
@@ -63,11 +63,15 @@ impl RpcClient {
 
         let connection = endpoint.connect(addr, host)?.await?;
 
-        Ok(Self { connection })
+        let direct_connection = DirectConnection::new(connection)?;
+
+        Ok(Self {
+            connection: direct_connection,
+        })
     }
 
     pub fn upstream_connection(&self) -> DirectConnection {
-        DirectConnection::new(self.connection.clone())
+        self.connection.clone()
     }
 
     pub fn close(&self) {

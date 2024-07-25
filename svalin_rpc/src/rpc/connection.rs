@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use quinn::{RecvStream, SendStream};
+use quinn::rustls::pki_types::CertificateDer;
+use quinn::{RecvStream, SendStream, VarInt};
 use svalin_pki::Certificate;
 use tokio::task::JoinSet;
 use tracing::field::debug;
@@ -17,7 +18,7 @@ use crate::{
     transport::combined_transport::CombinedTransport,
 };
 
-use super::peer::Peer;
+use super::peer::{self, Peer};
 
 #[async_trait]
 pub trait Connection: Send + Sync {
@@ -25,9 +26,12 @@ pub trait Connection: Send + Sync {
 
     async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>>;
 
+    fn peer(&self) -> &Peer;
+
     async fn closed(&self);
 }
 
+#[derive(Debug, Clone)]
 pub struct DirectConnection {
     conn: quinn::Connection,
     peer: Peer,
@@ -86,30 +90,42 @@ impl crate::rpc::connection::Connection for DirectConnection {
         Ok(session)
     }
 
+    fn peer(&self) -> &Peer {
+        &self.peer
+    }
+
     async fn closed(&self) {
         self.closed().await
     }
 }
 
 impl DirectConnection {
-    pub(crate) fn new(conn: quinn::Connection) -> Self {
-        let der = conn.peer_identity();
+    pub(crate) fn new(conn: quinn::Connection) -> Result<Self> {
+        let peer_cert =
+            match conn.peer_identity() {
+                None => None,
+                Some(ident) => Some(ident.downcast::<Vec<CertificateDer>>().map_err(
+                    |uncasted| {
+                        anyhow!(
+                            "Failed to downcast peer_identity of actual type {}",
+                            std::any::type_name_of_val(&*uncasted)
+                        )
+                    },
+                )?),
+            };
 
-        let peer = match der {
-            Some(der_any) => {
-                let downcast_result: Result<Box<Vec<crate::rustls::pki_types::CertificateDer>>, _> =
-                    der_any.downcast();
-
-                match downcast_result {
-                    //TODO
-                    Ok(der) => Peer::Anonymous,
-                    Err(_) => Peer::Anonymous,
-                }
-            }
+        let peer = match peer_cert {
             None => Peer::Anonymous,
+            Some(der_list) => {
+                let der = der_list
+                    .first()
+                    .ok_or_else(|| anyhow!("expected certificate in some, but empty list found"))?;
+                let cert = Certificate::from_der(der.to_vec())?;
+                Peer::Certificate(cert)
+            }
         };
 
-        DirectConnection { conn, peer }
+        Ok(DirectConnection { conn, peer })
     }
 
     async fn accept_session(&self) -> Result<Session<SessionCreated>> {
@@ -125,5 +141,9 @@ impl DirectConnection {
         let session = Session::new(Box::new(transport));
 
         Ok(session)
+    }
+
+    pub fn close(&self, error_code: VarInt, reason: &[u8]) {
+        self.conn.close(error_code, reason)
     }
 }

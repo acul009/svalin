@@ -1,12 +1,15 @@
+use std::collections::BTreeMap;
 use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 use quinn::crypto::rustls::QuicServerConfig;
-use svalin_pki::PermCredentials;
+use svalin_pki::{Certificate, PermCredentials};
+use tokio::sync::Mutex;
 use tokio::task::JoinSet;
 use tracing::debug;
 
-use crate::rustls::{self, pki_types::CertificateDer, server::danger::ClientCertVerifier};
+use crate::rpc::peer::Peer;
+use crate::rustls::{self, server::danger::ClientCertVerifier};
 
 use crate::rpc::{
     command::HandlerCollection,
@@ -16,7 +19,13 @@ use crate::rpc::{
 #[derive(Debug)]
 pub struct RpcServer {
     endpoint: quinn::Endpoint,
-    open_connections: JoinSet<()>,
+    data: Arc<Mutex<ServerData>>,
+}
+
+#[derive(Debug)]
+struct ServerData {
+    connection_join_set: JoinSet<()>,
+    latest_connections: BTreeMap<Certificate, DirectConnection>,
 }
 
 impl RpcServer {
@@ -25,11 +34,15 @@ impl RpcServer {
         credentials: &PermCredentials,
         client_cert_verifier: Arc<dyn ClientCertVerifier>,
     ) -> Result<Self> {
-        let endpoint = RpcServer::create_endpoint(addr, credentials, client_cert_verifier)?;
+        let endpoint = RpcServer::create_endpoint(addr, credentials, client_cert_verifier)
+            .context("failed to create rpc endpoint")?;
 
         Ok(RpcServer {
             endpoint,
-            open_connections: JoinSet::new(),
+            data: Arc::new(Mutex::new(ServerData {
+                connection_join_set: JoinSet::new(),
+                latest_connections: BTreeMap::new(),
+            })),
         })
     }
 
@@ -54,17 +67,20 @@ impl RpcServer {
             QuicServerConfig::try_from(crypto).map_err(|err| anyhow!(err))?,
         ));
 
-        let endpoint = quinn::Endpoint::server(config, addr)?;
+        let endpoint =
+            quinn::Endpoint::server(config, addr).context("failed to create quinn endpoint")?;
 
         Ok(endpoint)
     }
 
-    pub async fn run(&mut self, commands: Arc<HandlerCollection>) -> Result<()> {
+    pub async fn run(&self, commands: Arc<HandlerCollection>) -> Result<()> {
         debug!("starting server");
         while let Some(conn) = self.endpoint.accept().await {
             debug!("connection incoming");
-            let fut = RpcServer::handle_connection(conn.accept()?, commands.clone());
-            self.open_connections.spawn(async move {
+            let fut =
+                RpcServer::handle_connection(conn.accept()?, commands.clone(), self.data.clone());
+            let mut lock = self.data.lock().await;
+            lock.connection_join_set.spawn(async move {
                 debug!("spawn successful");
                 if let Err(e) = fut.await {
                     // TODO: actually handle error
@@ -80,6 +96,7 @@ impl RpcServer {
     async fn handle_connection(
         conn: quinn::Connecting,
         commands: Arc<HandlerCollection>,
+        data: Arc<Mutex<ServerData>>,
     ) -> Result<()> {
         debug!("waiting for connection to get ready...");
 
@@ -87,28 +104,16 @@ impl RpcServer {
             .await
             .context("Error when awaiting connection establishment")?;
 
-        let peer_cert =
-            match conn.peer_identity() {
-                None => None,
-                Some(ident) => Some(ident.downcast::<Vec<CertificateDer>>().map_err(
-                    |uncasted| {
-                        anyhow!(
-                            "Failed to downcast peer_identity of actual type {}",
-                            std::any::type_name_of_val(&*uncasted)
-                        )
-                    },
-                )?),
-            };
-
-        if let Some(cert) = peer_cert {
-            debug!("client cert:\n{:?}", cert.as_ref());
-        } else {
-            debug!("client did not provide cert")
-        }
+        // TODO: verify cert
 
         debug!("connection established");
 
-        let conn = DirectConnection::new(conn);
+        let conn = DirectConnection::new(conn)?;
+
+        // if let Peer::Certificate(cert) = conn.peer() {
+        // let mut lock = data.lock().await;
+        // lock.latest_connections.insert(cert.clone(), conn.clone());
+        // }
 
         conn.serve(commands).await?;
 
@@ -116,6 +121,10 @@ impl RpcServer {
     }
 
     pub fn close(&self) {
+        let data = self.data.clone();
+        tokio::spawn(async move {
+            data.lock().await.connection_join_set.abort_all();
+        });
         self.endpoint.close(0u32.into(), b"");
     }
 }

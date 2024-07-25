@@ -20,8 +20,10 @@ async fn integration_tests() {
         server.run().await.unwrap();
     });
 
-    // delete test client db
+    // delete test dbs
     std::fs::remove_file("./client.jammdb").unwrap_or(());
+    std::fs::remove_file("./server.jammdb").unwrap_or(());
+    std::fs::remove_file("./agent.jammdb").unwrap_or(());
 
     let host = "localhost:1234".to_owned();
 

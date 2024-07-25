@@ -70,6 +70,20 @@ impl<'de> Deserialize<'de> for Certificate {
     }
 }
 
+impl Ord for Certificate {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.data.der.cmp(&other.data.der)
+    }
+}
+
+impl PartialOrd for Certificate {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.data.der.partial_cmp(&other.data.der)
+    }
+}
+
+impl Eq for Certificate {}
+
 #[cfg(test)]
 mod test {
     use ring::rand::{SecureRandom, SystemRandom};
