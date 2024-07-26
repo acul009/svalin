@@ -16,7 +16,11 @@ Feel free to browse the codebase and create issues for any problem you see.
 
 A lot of this code is still being heavily worked and, is missing security checks and has not been reviewed.
 
-Feel free to browse the codebase and create issues for any problem you see.
+The current focus is getting this behemoth of a project working in any state.
+
+One the programm is usable, it's going to be time to slowly but surely improve everything.
+
+Feel free to browse the codebase and create issues for all problems you see.
 
 ## What is this ?
 
