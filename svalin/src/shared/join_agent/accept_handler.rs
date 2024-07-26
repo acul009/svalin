@@ -48,7 +48,7 @@ impl CommandHandler for JoinAcceptHandler {
                 session.write_object(&answer).await?;
 
                 debug!("forwarding session to agent");
-                session.forward(&mut agent_session).await?;
+                session.forward_session(&mut agent_session).await?;
 
                 debug!("finished forwarding session");
 

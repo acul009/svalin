@@ -8,6 +8,7 @@ use tokio::sync::Mutex;
 use tokio::task::JoinSet;
 use tracing::debug;
 
+use crate::rpc::connection::{ConnectionBase, ServeableConnection};
 use crate::rpc::peer::Peer;
 use crate::rustls::{self, server::danger::ClientCertVerifier};
 
@@ -15,8 +16,11 @@ use crate::rpc::{
     command::HandlerCollection,
     connection::{Connection, DirectConnection},
 };
+use crate::transport::session_transport::SessionTransport;
 
-#[derive(Debug)]
+use super::session::{Session, SessionOpen};
+
+#[derive(Debug, Clone)]
 pub struct RpcServer {
     endpoint: quinn::Endpoint,
     data: Arc<Mutex<ServerData>>,
@@ -138,5 +142,19 @@ impl RpcServer {
             data.lock().await.connection_join_set.abort_all();
         });
         self.endpoint.close(0u32.into(), b"");
+    }
+
+    pub async fn open_raw_session_with(
+        &self,
+        peer: Certificate,
+    ) -> Result<Box<dyn SessionTransport>> {
+        let lock = self.data.lock().await;
+
+        let conn = lock
+            .latest_connections
+            .get(&peer)
+            .ok_or_else(|| anyhow!("no connection to requested peer"))?;
+
+        conn.open_raw_session().await
     }
 }

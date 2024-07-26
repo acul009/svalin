@@ -156,14 +156,22 @@ impl Session<SessionOpen> {
         self.transport.shutdown().await
     }
 
-    pub async fn forward(&mut self, partner: &mut Self) -> Result<()> {
+    pub async fn forward_session(&mut self, partner: &mut Self) -> Result<()> {
         debug!("starting bidirectional copy");
 
-        tokio::io::copy_bidirectional(
-            self.transport.borrow_transport(),
-            partner.transport.borrow_transport(),
-        )
-        .await?;
+        self.forward_transport(partner.transport.borrow_transport())
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn forward_transport(
+        &mut self,
+        transport: &mut Box<dyn SessionTransport>,
+    ) -> Result<()> {
+        debug!("starting bidirectional copy");
+
+        tokio::io::copy_bidirectional(self.transport.borrow_transport(), transport).await?;
 
         debug!("finished bidirectional copy");
 

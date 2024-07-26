@@ -9,6 +9,7 @@ use tokio::task::JoinSet;
 use tracing::field::debug;
 use tracing::{debug, error};
 
+use crate::transport::session_transport::SessionTransport;
 use crate::{
     rpc::{
         command::HandlerCollection,
@@ -21,24 +22,49 @@ use crate::{
 use super::peer::{self, Peer};
 
 #[async_trait]
-pub trait Connection: Send + Sync {
-    async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()>;
-
+pub trait Connection: ConnectionBase {
     async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>>;
-
-    fn peer(&self) -> &Peer;
-
-    async fn closed(&self);
-}
-
-#[derive(Debug, Clone)]
-pub struct DirectConnection {
-    conn: quinn::Connection,
-    peer: Peer,
 }
 
 #[async_trait]
-impl crate::rpc::connection::Connection for DirectConnection {
+impl<T> Connection for T
+where
+    T: ConnectionBase,
+{
+    async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>> {
+        debug!("creating transport");
+
+        let transport = self.open_raw_session().await?;
+
+        debug!("transport created, pass to session");
+
+        let session = Session::new(transport);
+
+        debug!("requesting session");
+
+        let session = session.request_session(command_key).await?;
+
+        debug!("session request successful");
+
+        Ok(session)
+    }
+}
+
+#[async_trait]
+pub trait ServeableConnectionBase: ConnectionBase {
+    async fn accept_session(&self) -> Result<Session<SessionCreated>>;
+}
+
+#[async_trait]
+pub trait ServeableConnection {
+    async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()>;
+}
+
+#[async_trait]
+impl<T> ServeableConnection for T
+where
+    T: ServeableConnectionBase,
+{
     async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()> {
         debug!("waiting for incoming data stream");
         let mut open_sessions = JoinSet::<()>::new();
@@ -66,10 +92,26 @@ impl crate::rpc::connection::Connection for DirectConnection {
             }
         }
     }
+}
 
-    async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>> {
-        debug!("creating transport");
+#[async_trait]
+pub trait ConnectionBase: Send + Sync {
+    async fn open_raw_session(&self) -> Result<Box<dyn SessionTransport>>;
 
+    fn peer(&self) -> &Peer;
+
+    async fn closed(&self);
+}
+
+#[derive(Debug, Clone)]
+pub struct DirectConnection {
+    conn: quinn::Connection,
+    peer: Peer,
+}
+
+#[async_trait]
+impl crate::rpc::connection::ConnectionBase for DirectConnection {
+    async fn open_raw_session(&self) -> Result<Box<dyn SessionTransport>> {
         let transport: CombinedTransport<SendStream, RecvStream> = self
             .conn
             .open_bi()
@@ -77,17 +119,7 @@ impl crate::rpc::connection::Connection for DirectConnection {
             .map_err(|err| anyhow!(err))?
             .into();
 
-        debug!("transport created, pass to session");
-
-        let session = Session::new(Box::new(transport));
-
-        debug!("requesting session");
-
-        let session = session.request_session(command_key).await?;
-
-        debug!("session request successful");
-
-        Ok(session)
+        Ok(Box::new(transport))
     }
 
     fn peer(&self) -> &Peer {
@@ -97,6 +129,24 @@ impl crate::rpc::connection::Connection for DirectConnection {
     async fn closed(&self) {
         // TODO: maybe return connection error from upstream?
         self.conn.closed().await;
+    }
+}
+
+#[async_trait]
+impl ServeableConnectionBase for DirectConnection {
+    async fn accept_session(&self) -> Result<Session<SessionCreated>> {
+        let transport: CombinedTransport<SendStream, RecvStream> = self
+            .conn
+            .accept_bi()
+            .await
+            .map_err(|err| anyhow!(err))?
+            .into();
+
+        debug("transport created");
+
+        let session = Session::new(Box::new(transport));
+
+        Ok(session)
     }
 }
 
@@ -127,21 +177,6 @@ impl DirectConnection {
         };
 
         Ok(DirectConnection { conn, peer })
-    }
-
-    async fn accept_session(&self) -> Result<Session<SessionCreated>> {
-        let transport: CombinedTransport<SendStream, RecvStream> = self
-            .conn
-            .accept_bi()
-            .await
-            .map_err(|err| anyhow!(err))?
-            .into();
-
-        debug("transport created");
-
-        let session = Session::new(Box::new(transport));
-
-        Ok(session)
     }
 
     pub fn close(&self, error_code: VarInt, reason: &[u8]) {

@@ -7,7 +7,10 @@ use svalin_pki::PermCredentials;
 
 use crate::rpc::connection::DirectConnection;
 
-use super::{command::HandlerCollection, connection::Connection};
+use super::{
+    command::HandlerCollection,
+    connection::{Connection, ConnectionBase, ServeableConnection},
+};
 
 pub struct RpcClient {
     connection: DirectConnection,

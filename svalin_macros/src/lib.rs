@@ -72,7 +72,7 @@ fn to_dispatcher(
 
     match key_opt {
         Some(key) => Ok(syn::parse_quote!(
-            async fn #ident(#inputs) #output {
+            #vis async fn #ident(#inputs) #output {
                 #block
             }
 
