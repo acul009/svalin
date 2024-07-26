@@ -110,10 +110,22 @@ impl RpcServer {
 
         let conn = DirectConnection::new(conn)?;
 
-        // if let Peer::Certificate(cert) = conn.peer() {
-        // let mut lock = data.lock().await;
-        // lock.latest_connections.insert(cert.clone(), conn.clone());
-        // }
+        if let Peer::Certificate(cert) = conn.peer() {
+            let mut lock = data.lock().await;
+            lock.latest_connections.insert(cert.clone(), conn.clone());
+            let conn2 = conn.clone();
+            let data2 = data.clone();
+            let cert2 = cert.clone();
+            lock.connection_join_set.spawn(async move {
+                conn2.closed().await;
+                let mut lock = data2.lock().await;
+                if let Some(latest_peer_conn) = lock.latest_connections.get(&cert2) {
+                    if latest_peer_conn.eq(&conn2) {
+                        lock.latest_connections.remove(&cert2);
+                    }
+                }
+            });
+        }
 
         conn.serve(commands).await?;
 

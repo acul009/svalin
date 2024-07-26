@@ -95,7 +95,8 @@ impl crate::rpc::connection::Connection for DirectConnection {
     }
 
     async fn closed(&self) {
-        self.closed().await
+        // TODO: maybe return connection error from upstream?
+        self.conn.closed().await;
     }
 }
 
@@ -145,5 +146,11 @@ impl DirectConnection {
 
     pub fn close(&self, error_code: VarInt, reason: &[u8]) {
         self.conn.close(error_code, reason)
+    }
+}
+
+impl PartialEq for DirectConnection {
+    fn eq(&self, other: &Self) -> bool {
+        self.conn.stable_id() == other.conn.stable_id()
     }
 }
