@@ -98,6 +98,8 @@ One example would be to use Svalin like a Tailscale coordinator and configure Wi
 While the svalin RPC-System is it's own crate, it's still missing a higher level API to build your own network.
 If you're interested in that, I'd be happy to hear about it.
 
+If you're based in the EU, you might also be happy to hear, that Svalin is a german project.
+
 TLDR: Rustdesk is primarily a remote software while Svalin is more similar to a generic coordinator.
 
 # Architecture
@@ -136,6 +138,7 @@ The underlying RPC system doesn't know or care about the encryption.
 ## Simple
 - [ ] Show Unlock Error when password on profile unlock wrong
 - [ ] Make Credentials use an Arc internally
+- [ ] Fix as many warnings as possible
 
 ## Bigger
 - [ ] Add translation to flutter app
@@ -146,9 +149,10 @@ The underlying RPC system doesn't know or care about the encryption.
 - [ ] Login Routine (make sure the server sent hashing parameters are strong enough)
 - [X] Unlock Routine
 - [ ] Make Credentials use an Arc internally
-- [ ] Unlock Error when password wrong
-- [ ] Agent init / join
+- [X] Agent init / join
+- [ ] Connection forwarding
 - [ ] E2E Encryption
+- [ ] Remote Terminal
 
 ## Architecture
 - [ ] crate for local system managment and package management
