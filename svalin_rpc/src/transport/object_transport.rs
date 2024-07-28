@@ -50,6 +50,10 @@ impl ObjectTransport {
     pub fn borrow_transport(&mut self) -> &mut Box<dyn SessionTransport> {
         self.chunked_transport.borrow_transport()
     }
+
+    pub fn extract_transport(self) -> Box<dyn SessionTransport> {
+        self.chunked_transport.extract_transport()
+    }
 }
 
 #[cfg(test)]

@@ -81,4 +81,8 @@ impl ChunkedTransport {
     pub fn borrow_transport(&mut self) -> &mut Box<dyn SessionTransport> {
         &mut self.transport
     }
+
+    pub fn extract_transport(self) -> Box<dyn SessionTransport> {
+        self.transport
+    }
 }

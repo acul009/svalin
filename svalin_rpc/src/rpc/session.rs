@@ -177,4 +177,8 @@ impl Session<SessionOpen> {
 
         Ok(())
     }
+
+    pub fn extract_transport(self) -> Box<dyn SessionTransport> {
+        self.transport.extract_transport()
+    }
 }
