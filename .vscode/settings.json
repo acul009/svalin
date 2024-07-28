@@ -3,6 +3,10 @@
     "editor.formatOnSave": true,
     "rust-analyzer.cargo.features": "all",
     "rust-analyzer.check.features": "all",
+    "rust-analyzer.rustfmt.extraArgs": [
+        "--config",
+        "normalize_comments=true,wrap_comments=true"
+    ],
     "dart.analysisExcludedFolders": [
         "gui_flutter/rust_builder"
     ]
