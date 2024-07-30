@@ -10,7 +10,8 @@ use rand::{
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, Keypair, PermCredentials};
 use svalin_rpc::{
-    commands::ping::PingHandler, rpc::command::HandlerCollection,
+    commands::{forward::ForwardHandler, ping::PingHandler},
+    rpc::command::HandlerCollection,
     skip_verify::SkipClientVerification,
 };
 use tokio::sync::mpsc;
@@ -133,6 +134,7 @@ impl Server {
             .add(AddUserHandler::new(userstore))
             .add(join_manager.create_request_handler())
             .add(join_manager.create_accept_handler())
+            .add(ForwardHandler::new(self.rpc.clone()))
             .add(AddAgentHandler::new(agent_store)?);
 
         self.rpc.run(commands).await

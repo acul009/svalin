@@ -1,9 +1,9 @@
 use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
 
-use crate::rustls;
+use crate::{commands::forward::ForwardConnection, rustls};
 use anyhow::{anyhow, Ok, Result};
 use quinn::{crypto::rustls::QuicClientConfig, TransportConfig, VarInt};
-use svalin_pki::PermCredentials;
+use svalin_pki::{Certificate, PermCredentials};
 
 use crate::rpc::connection::DirectConnection;
 
@@ -75,6 +75,13 @@ impl RpcClient {
 
     pub fn upstream_connection(&self) -> DirectConnection {
         self.connection.clone()
+    }
+
+    pub fn forward_connection(
+        &self,
+        target: Certificate,
+    ) -> Result<ForwardConnection<DirectConnection>> {
+        ForwardConnection::new(self.connection.clone(), target)
     }
 
     pub fn close(&self) {

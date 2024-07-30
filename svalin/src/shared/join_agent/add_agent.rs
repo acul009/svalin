@@ -69,7 +69,7 @@ impl CommandHandler for AddAgentHandler {
 #[rpc_dispatch(add_agent_key())]
 pub async fn add_agent(
     session: &mut Session<SessionOpen>,
-    agent: SignedObject<PublicAgentData>,
+    agent: &SignedObject<PublicAgentData>,
 ) -> Result<()> {
     session.write_object(&agent.to_bytes()).await?;
 

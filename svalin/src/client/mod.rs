@@ -2,12 +2,14 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
 
+pub mod device;
 mod first_connect;
 pub mod verifiers;
 
 pub mod add_agent;
 mod profile;
 
+use device::Device;
 pub use first_connect::*;
 use profile::Profile;
 use svalin_pki::{Certificate, PermCredentials};
@@ -196,6 +198,12 @@ impl Client {
         } else {
             Err(anyhow!("Profile is empty - database is inconsistent"))
         }
+    }
+
+    pub async fn device(&self, certificate: Certificate) -> Result<Device> {
+        let connection = self.rpc.forward_connection(certificate.clone())?;
+
+        Ok(Device::new(connection, certificate))
     }
 
     pub fn rpc(&self) -> &RpcClient {

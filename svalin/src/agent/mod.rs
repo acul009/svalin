@@ -64,6 +64,10 @@ impl Agent {
         })
     }
 
+    pub fn certificate(&self) -> &Certificate {
+        self.credentials.get_certificate()
+    }
+
     pub async fn run(&self) -> Result<()> {
         let commands = HandlerCollection::new();
 

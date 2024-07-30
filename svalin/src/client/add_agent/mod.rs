@@ -75,7 +75,7 @@ impl WaitingForConfirmCode {
             &self.credentials,
         )?;
 
-        self.connection.add_agent(agent).await?;
+        self.connection.add_agent(&agent).await?;
 
         debug!("agent is registered on server");
 

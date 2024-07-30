@@ -49,17 +49,22 @@ async fn integration_tests() {
     debug!("ping duration: {:?}", duration);
 
     // test_agent
+    debug!("initializing agent!");
     let waiting = Agent::init(host.clone()).await.unwrap();
     let join_code = waiting.join_code().to_owned();
+    debug!("received join code");
     let (confirm_send, confirm_recv) = oneshot::channel();
+    let (agent_cert_send, agent_cert_recv) = oneshot::channel();
 
     let agent_handle = tokio::spawn(async move {
         let confirm = waiting.wait_for_init().await.unwrap();
+        debug!("generated confirm code");
         confirm_send
             .send(confirm.confirm_code().to_owned())
             .unwrap();
         let agent = confirm.wait_for_confirm().await.unwrap();
         debug!("agent init complete!");
+        agent_cert_send.send(agent.certificate().clone()).unwrap();
         debug!("starting up agent");
         agent.run().await.unwrap();
     });
@@ -73,7 +78,15 @@ async fn integration_tests() {
         .await
         .unwrap();
 
-    tokio::time::sleep(Duration::from_secs(10)).await;
+    let agent_cert = agent_cert_recv.await.unwrap();
+
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
+    let device = client.device(agent_cert).await.unwrap();
+
+    let ping = device.ping().await.unwrap();
+
+    debug!("ping through forward connection: {}ms", ping.as_millis());
 
     client.close();
 

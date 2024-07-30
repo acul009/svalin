@@ -1,3 +1,6 @@
+use std::error::Error;
+use std::fmt::{Debug, Display};
+
 use crate as svalin_rpc;
 use crate::rpc::connection::{Connection, ConnectionBase, DirectConnection};
 use crate::rpc::peer::Peer;
@@ -7,14 +10,33 @@ use crate::rpc::{
     session::{Session, SessionOpen},
 };
 use crate::transport::session_transport::SessionTransport;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
 use svalin_pki::Certificate;
+use tracing::debug;
 
 fn forward_key() -> String {
-    "public_status".to_owned()
+    "forward".to_owned()
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum ForwardError {
+    TargetNotConnected,
+}
+
+impl Display for ForwardError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ForwardError::TargetNotConnected => {
+                write!(f, "Requested Target is not currently available")
+            }
+        }
+    }
+}
+
+impl Error for ForwardError {}
 
 pub struct ForwardHandler {
     server: RpcServer,
@@ -34,11 +56,28 @@ impl CommandHandler for ForwardHandler {
 
     #[must_use]
     async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
+        debug!("client requesting forward");
+
         let target: Certificate = session.read_object().await?;
 
-        let mut transport = self.server.open_raw_session_with(target).await?;
+        debug!("received forward request to {:?}", target);
 
-        session.forward_transport(&mut transport).await
+        match self.server.open_raw_session_with(target).await {
+            Ok(mut transport) => {
+                session.forward_transport(&mut transport).await?;
+                Ok(())
+            }
+            // TODO: check and return the actual error
+            Err(err) => {
+                tracing::error!("error during session forwarding: {err}");
+                session
+                    .write_object::<Result<(), ForwardError>>(&Err(
+                        ForwardError::TargetNotConnected,
+                    ))
+                    .await?;
+                Err(err)
+            }
+        }
     }
 }
 
@@ -48,11 +87,11 @@ pub struct ForwardConnection<T> {
 }
 
 impl<T> ForwardConnection<T> {
-    pub fn new(base_connection: T, target: Certificate) -> Self {
-        Self {
+    pub fn new(base_connection: T, target: Certificate) -> Result<Self> {
+        Ok(Self {
             connection: base_connection,
             target: target,
-        }
+        })
     }
 }
 
@@ -62,9 +101,19 @@ where
     T: Connection,
 {
     async fn open_raw_session(&self) -> Result<Box<dyn SessionTransport>> {
+        debug!("opening base session");
+
         let mut base_session = self.connection.open_session(forward_key()).await?;
 
+        debug!("requesting forward by server");
+
         base_session.write_object(&self.target).await?;
+
+        base_session
+            .read_object::<Result<(), ForwardError>>()
+            .await
+            .context("error during forward return signal")?
+            .context("server sent error during forward request")?;
 
         Ok(base_session.extract_transport())
     }
