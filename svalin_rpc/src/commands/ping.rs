@@ -10,6 +10,7 @@ use crate::{
 use anyhow::Result;
 use async_trait::async_trait;
 use svalin_macros::rpc_dispatch;
+use tracing::debug;
 
 pub struct PingHandler;
 
@@ -50,9 +51,15 @@ pub async fn ping(session: &mut Session<SessionOpen>) -> Result<Duration> {
         .expect("Time went backwards")
         .as_nanos();
 
+    debug!("sending ping");
+
     session.write_object(&ping).await?;
 
+    debug!("ping sent, waiting for pong!");
+
     let pong: u128 = session.read_object().await?;
+
+    debug!("pong received");
 
     let now: u128 = SystemTime::now()
         .duration_since(UNIX_EPOCH)

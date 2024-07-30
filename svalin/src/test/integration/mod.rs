@@ -86,15 +86,15 @@ async fn integration_tests() {
 
     let ping = device.ping().await.unwrap();
 
-    debug!("ping through forward connection: {}ms", ping.as_millis());
+    debug!("ping through forward connection: {}µs", ping.as_micros());
 
     client.close();
 
     server_handle.abort();
 
-    agent_handle.await.unwrap();
+    agent_handle.abort();
 
-    tracing::error!("TODO: make ping work by implementing forwarding, e2e encryption and basic agent session serving");
+    tracing::error!("TODO: add e2e encryption to ping and basic agent session serving");
 
     process::exit(1);
 }

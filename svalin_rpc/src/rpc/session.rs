@@ -116,7 +116,7 @@ impl Session<SessionCreated> {
 
             command.handle(&mut session).await?;
 
-            //todo
+            // todo
         } else {
             let response = SessionResponseHeader::Decline(SessionDeclinedHeader {
                 code: 404,
@@ -157,8 +157,6 @@ impl Session<SessionOpen> {
     }
 
     pub async fn forward_session(&mut self, partner: &mut Self) -> Result<()> {
-        debug!("starting bidirectional copy");
-
         self.forward_transport(partner.transport.borrow_transport())
             .await?;
 

@@ -64,6 +64,9 @@ impl CommandHandler for ForwardHandler {
 
         match self.server.open_raw_session_with(target).await {
             Ok(mut transport) => {
+                session
+                    .write_object::<Result<(), ForwardError>>(&Ok(()))
+                    .await?;
                 session.forward_transport(&mut transport).await?;
                 Ok(())
             }
