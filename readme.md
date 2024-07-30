@@ -150,8 +150,9 @@ The underlying RPC system doesn't know or care about the encryption.
 - [X] Unlock Routine
 - [ ] Make Credentials use an Arc internally
 - [X] Agent init / join
-- [ ] Connection forwarding
+- [X] Connection forwarding
 - [ ] E2E Encryption
+- [ ] List all agents with connection status
 - [ ] Remote Terminal
 
 ## Architecture
@@ -160,6 +161,7 @@ The underlying RPC system doesn't know or care about the encryption.
 - [ ] Network Security System and Alerting
 - [ ] Replace certificate distribution with better system (possibly TBRHL)
 - [ ] Think of way to nicely and securely distribute group and system state
+- [ ] Information Subscription System (e.g. CPU utilization, connected clients)
 
 ## Milestones
 - [ ] Basic Managment (Live)
