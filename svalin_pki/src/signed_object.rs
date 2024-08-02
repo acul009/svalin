@@ -10,6 +10,7 @@ use crate::{
     Certificate, PermCredentials,
 };
 
+#[derive(Debug)]
 pub struct SignedObject<T> {
     object: T,
     raw: Vec<u8>,
@@ -87,6 +88,31 @@ where
 impl<T> SignedObject<T> {
     pub fn to_bytes(&self) -> &[u8] {
         &self.raw
+    }
+}
+
+impl<T> Serialize for SignedObject<T>
+where
+    T: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.to_bytes())
+    }
+}
+
+impl<'de, T> Deserialize<'de> for SignedObject<T>
+where
+    T: DeserializeOwned,
+{
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let bytes = Vec::deserialize(deserializer)?;
+        Self::from_bytes(bytes).map_err(serde::de::Error::custom)
     }
 }
 

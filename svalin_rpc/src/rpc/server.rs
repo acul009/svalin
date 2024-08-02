@@ -1,10 +1,10 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 use quinn::crypto::rustls::QuicServerConfig;
 use svalin_pki::{Certificate, PermCredentials};
-use tokio::sync::Mutex;
+use tokio::sync::{broadcast, Mutex};
 use tokio::task::JoinSet;
 use tracing::debug;
 
@@ -21,9 +21,16 @@ use crate::transport::session_transport::SessionTransport;
 use super::session::{Session, SessionOpen};
 
 #[derive(Debug, Clone)]
+pub struct ClientConnectionStatus {
+    pub client: Certificate,
+    pub online: bool,
+}
+
+#[derive(Debug, Clone)]
 pub struct RpcServer {
     endpoint: quinn::Endpoint,
     data: Arc<Mutex<ServerData>>,
+    broadcast: broadcast::Sender<ClientConnectionStatus>,
 }
 
 #[derive(Debug)]
@@ -41,12 +48,15 @@ impl RpcServer {
         let endpoint = RpcServer::create_endpoint(addr, credentials, client_cert_verifier)
             .context("failed to create rpc endpoint")?;
 
+        let (br_send, _) = broadcast::channel::<ClientConnectionStatus>(10);
+
         Ok(RpcServer {
             endpoint,
             data: Arc::new(Mutex::new(ServerData {
                 connection_join_set: JoinSet::new(),
                 latest_connections: BTreeMap::new(),
             })),
+            broadcast: br_send,
         })
     }
 
@@ -156,5 +166,19 @@ impl RpcServer {
             .ok_or_else(|| anyhow!("no connection to requested peer"))?;
 
         conn.open_raw_session().await
+    }
+
+    pub fn subscribe_to_connection_status(&self) -> broadcast::Receiver<ClientConnectionStatus> {
+        self.broadcast.subscribe()
+    }
+
+    pub async fn get_current_connected_clients(&self) -> BTreeSet<Certificate> {
+        self.data
+            .lock()
+            .await
+            .latest_connections
+            .keys()
+            .cloned()
+            .collect()
     }
 }

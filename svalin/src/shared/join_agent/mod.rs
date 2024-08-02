@@ -13,7 +13,7 @@ pub mod accept_handler;
 pub mod add_agent;
 pub mod request_handler;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct PublicAgentData {
     pub name: String,
     pub cert: Certificate,
