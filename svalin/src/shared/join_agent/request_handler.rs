@@ -14,7 +14,7 @@ use svalin_rpc::{
     transport::tls_transport::TlsTransport,
 };
 use tokio::{io::AsyncWriteExt, sync::oneshot};
-use tracing::debug;
+use tracing::{debug, error};
 
 use super::{AgentInitPayload, ServerJoinManager};
 
@@ -52,7 +52,7 @@ impl CommandHandler for JoinRequestHandler {
 
             join_code = create_join_code();
 
-            //todo: dont loop forever
+            // todo: dont loop forever
         }
 
         Ok(())
@@ -99,7 +99,9 @@ pub async fn request_join(
 
     session
         .replace_transport(move |mut direct_transport| async move {
-            direct_transport.flush().await;
+            if let Err(err) = direct_transport.flush().await {
+                error!("error while replacing transport: {}", err);
+            }
             let temp_credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
 
             let tls_transport = TlsTransport::server(

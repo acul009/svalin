@@ -23,7 +23,9 @@ impl Error for AddAgentError {}
 
 impl Display for AddAgentError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            AddAgentError::StoreError => write!(f, "Error adding agent to store"),
+        }
     }
 }
 

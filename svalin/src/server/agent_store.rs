@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{Ok, Result};
-use marmelade::{Bucket, Data, KVPair, Scope};
+use marmelade::{Data, Scope};
 use svalin_pki::signed_object::SignedObject;
 
 use crate::shared::join_agent::PublicAgentData;

@@ -4,7 +4,7 @@ use anyhow::{anyhow, Ok, Result};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{ArgonParams, Certificate, PasswordHash};
 use totp_rs::TOTP;
-use tracing::{debug, field::debug, instrument};
+use tracing::{debug, instrument};
 
 #[derive(Serialize, Deserialize)]
 pub struct StoredUser {

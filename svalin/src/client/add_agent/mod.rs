@@ -1,14 +1,11 @@
-use crate::{
-    agent,
-    shared::join_agent::{accept_handler::accept_joinDispatcher, PublicAgentData},
-};
+use crate::shared::join_agent::{accept_handler::accept_joinDispatcher, PublicAgentData};
 
 use super::Client;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use svalin_pki::{signed_object::SignedObject, Certificate, PermCredentials};
-use svalin_rpc::rpc::connection::{self, Connection, DirectConnection};
-use tokio::{sync::oneshot, task::JoinSet};
+use svalin_rpc::rpc::connection::DirectConnection;
+use tokio::sync::oneshot;
 use tracing::debug;
 
 use crate::shared::join_agent::add_agent::add_agentDispatcher;

@@ -1,6 +1,5 @@
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, PermCredentials};
+use svalin_pki::Certificate;
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Profile {

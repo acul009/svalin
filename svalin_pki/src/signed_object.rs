@@ -1,9 +1,7 @@
 use std::ops::Deref;
 
 use anyhow::{Context, Result};
-use ring::hmac::sign;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use x509_parser::objects;
 
 use crate::{
     signed_message::{Sign, Verify},

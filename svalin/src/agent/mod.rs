@@ -1,20 +1,17 @@
 use std::path::PathBuf;
-use std::thread::scope;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use marmelade::Scope;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::commands::ping::PingHandler;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::command::HandlerCollection;
-use svalin_rpc::skip_verify::SkipServerVerification;
 use tracing::{debug, instrument};
 
 mod init;
 
 use crate::client::verifiers;
-use crate::shared::commands::public_server_status::get_public_statusDispatcher;
 use crate::shared::join_agent::AgentInitPayload;
 
 pub struct Agent {

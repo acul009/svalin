@@ -1,7 +1,6 @@
-use std::{future::Future, time::Duration};
+use std::time::Duration;
 
 use anyhow::{anyhow, Result};
-use svalin_pki::Certificate;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::skip_verify::SkipServerVerification;
 use tokio::sync::oneshot;

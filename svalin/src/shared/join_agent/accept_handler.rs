@@ -13,7 +13,7 @@ use svalin_rpc::{
     transport::tls_transport::TlsTransport,
 };
 use tokio::io::AsyncWriteExt;
-use tracing::{debug, instrument};
+use tracing::{debug, error, instrument};
 
 use super::ServerJoinManager;
 
@@ -147,7 +147,9 @@ async fn prepare_agent_enroll(
 
     session
         .replace_transport(move |mut direct_transport| async move {
-            direct_transport.flush().await;
+            if let Err(err) = direct_transport.flush().await {
+                error!("error replacing transport: {}", err);
+            }
             let tls_transport =
                 TlsTransport::client(direct_transport, SkipServerVerification::new(), credentials)
                     .await;

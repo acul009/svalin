@@ -25,7 +25,7 @@ impl Client {
 
         debug!("successfully connected");
 
-        let mut conn = client.upstream_connection();
+        let conn = client.upstream_connection();
 
         debug!("requesting public status");
 

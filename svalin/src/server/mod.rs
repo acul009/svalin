@@ -15,7 +15,6 @@ use svalin_rpc::{
     skip_verify::SkipClientVerification,
 };
 use tokio::sync::mpsc;
-use totp_rs::qrcodegen_image::image::imageops::rotate180;
 use tracing::{debug, error};
 
 use crate::shared::{
