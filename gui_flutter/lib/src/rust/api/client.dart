@@ -11,9 +11,14 @@ part 'client.freezed.dart';
 
 Future<String> sayHello() => RustLib.instance.api.crateApiClientSayHello();
 
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<AgentListItem>>
+abstract class AgentListItem implements RustOpaqueInterface {}
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Client>>
 abstract class Client implements RustOpaqueInterface {
   Future<WaitingForConfirmCode> addAgentWithCode({required String joinCode});
+
+  Future<List<AgentListItem>> deviceList();
 
   static Future<FirstConnect> firstConnect({required String address}) =>
       RustLib.instance.api.crateApiClientClientFirstConnect(address: address);

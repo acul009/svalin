@@ -29,10 +29,10 @@ packages:
     dependency: "direct main"
     description:
       name: args
-      sha256: "7cf60b9f0cc88203c5a190b4cd62a99feea42759a7fa695010eb5de1c0b2252a"
+      sha256: eef6c46b622e0494a36c5a12d10d77fb4e855501a91c1b9ef9339326e58f0596
       url: "https://pub.dev"
     source: hosted
-    version: "2.5.0"
+    version: "2.4.2"
   async:
     dependency: transitive
     description:
@@ -117,10 +117,10 @@ packages:
     dependency: "direct main"
     description:
       name: github
-      sha256: "57f6ad78591f9638e903409977443093f862d25062a6b582a3c89e4ae44e4814"
+      sha256: "9966bc13bf612342e916b0a343e95e5f046c88f602a14476440e9b75d2295411"
       url: "https://pub.dev"
     source: hosted
-    version: "9.24.0"
+    version: "9.17.0"
   glob:
     dependency: transitive
     description:
@@ -141,10 +141,10 @@ packages:
     dependency: "direct main"
     description:
       name: http
-      sha256: "761a297c042deedc1ffbb156d6e2af13886bb305c2a343a4d972504cd67dd938"
+      sha256: "759d1a329847dd0f39226c688d3e06a6b8679668e350e2891a6474f8b4bb8525"
       url: "https://pub.dev"
     source: hosted
-    version: "1.2.1"
+    version: "1.1.0"
   http_multi_server:
     dependency: transitive
     description:
@@ -189,10 +189,10 @@ packages:
     dependency: "direct dev"
     description:
       name: lints
-      sha256: "976c774dd944a42e83e2467f4cc670daef7eed6295b10b36ae8c85bcbf828235"
+      sha256: "0a217c6c989d21039f1498c3ed9f3ed71b354e69873f13a8dfc3c9fe76f1b452"
       url: "https://pub.dev"
     source: hosted
-    version: "4.0.0"
+    version: "2.1.1"
   logging:
     dependency: "direct main"
     description:
@@ -245,18 +245,18 @@ packages:
     dependency: "direct main"
     description:
       name: path
-      sha256: "087ce49c3f0dc39180befefc60fdb4acd8f8620e5682fe2476afd0b3688bb4af"
+      sha256: "2ad4cddff7f5cc0e2d13069f2a3f7a73ca18f66abd6f5ecf215219cdb3638edb"
       url: "https://pub.dev"
     source: hosted
-    version: "1.9.0"
+    version: "1.8.0"
   petitparser:
     dependency: transitive
     description:
       name: petitparser
-      sha256: c15605cd28af66339f8eb6fbe0e541bfe2d1b72d5825efc6598f3e0a31b9ad27
+      sha256: cb3798bef7fc021ac45b308f4b51208a152792445cce0448c9a4ba5879dd8750
       url: "https://pub.dev"
     source: hosted
-    version: "6.0.2"
+    version: "5.4.0"
   pool:
     dependency: transitive
     description:
@@ -389,10 +389,10 @@ packages:
     dependency: "direct main"
     description:
       name: toml
-      sha256: "9968de24e45b632bf1a654fe1ac7b6fe5261c349243df83fd262397799c45a2d"
+      sha256: "157c5dca5160fced243f3ce984117f729c788bb5e475504f3dbcda881accee44"
       url: "https://pub.dev"
     source: hosted
-    version: "0.15.0"
+    version: "0.14.0"
   typed_data:
     dependency: transitive
     description:
@@ -405,10 +405,10 @@ packages:
     dependency: "direct main"
     description:
       name: version
-      sha256: "3d4140128e6ea10d83da32fef2fa4003fccbf6852217bb854845802f04191f94"
+      sha256: "2307e23a45b43f96469eeab946208ed63293e8afca9c28cd8b5241ff31c55f55"
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.2"
+    version: "3.0.0"
   vm_service:
     dependency: transitive
     description:
@@ -425,14 +425,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.0"
-  web:
-    dependency: transitive
-    description:
-      name: web
-      sha256: "97da13628db363c635202ad97068d47c5b8aa555808e7a9411963c533b449b27"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.5.1"
   web_socket_channel:
     dependency: transitive
     description:
@@ -458,4 +450,4 @@ packages:
     source: hosted
     version: "3.1.2"
 sdks:
-  dart: ">=3.3.0 <4.0.0"
+  dart: ">=3.0.0 <4.0.0"
