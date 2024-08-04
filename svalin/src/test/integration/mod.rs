@@ -52,7 +52,6 @@ async fn integration_tests() {
     let join_code = waiting.join_code().to_owned();
     debug!("received join code");
     let (confirm_send, confirm_recv) = oneshot::channel();
-    let (agent_cert_send, agent_cert_recv) = oneshot::channel();
 
     let agent_handle = tokio::spawn(async move {
         let confirm = waiting.wait_for_init().await.unwrap();
@@ -62,7 +61,6 @@ async fn integration_tests() {
             .unwrap();
         let agent = confirm.wait_for_confirm().await.unwrap();
         debug!("agent init complete!");
-        agent_cert_send.send(agent.certificate().clone()).unwrap();
         debug!("starting up agent");
         agent.run().await.unwrap();
     });
@@ -76,9 +74,13 @@ async fn integration_tests() {
         .await
         .unwrap();
 
-    let agent_cert = agent_cert_recv.await.unwrap();
-
     tokio::time::sleep(Duration::from_secs(5)).await;
+
+    let agents = client.device_list().await;
+
+    debug!("agent list: {:?}", agents);
+
+    let agent_cert = agents.first().unwrap().public_data.cert.clone();
 
     let device = client.device(agent_cert).await.unwrap();
 

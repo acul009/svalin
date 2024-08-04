@@ -2,17 +2,25 @@ use std::sync::Arc;
 
 use anyhow::{Ok, Result};
 use marmelade::{Data, Scope};
-use svalin_pki::signed_object::SignedObject;
+use svalin_pki::{signed_object::SignedObject, Certificate};
+use tokio::sync::broadcast;
 
 use crate::shared::join_agent::PublicAgentData;
 
 pub struct AgentStore {
     scope: Scope,
+    broadcast: broadcast::Sender<AgentUpdate>,
+}
+
+#[derive(Clone, Debug)]
+pub enum AgentUpdate {
+    Add(SignedObject<PublicAgentData>),
 }
 
 impl AgentStore {
     pub fn open(scope: Scope) -> Arc<Self> {
-        Arc::new(Self { scope })
+        let (broadcast, _) = broadcast::channel(10);
+        Arc::new(Self { scope, broadcast })
     }
 
     pub fn get_agent(&self, public_key: &[u8]) -> Result<Option<SignedObject<PublicAgentData>>> {
@@ -39,6 +47,8 @@ impl AgentStore {
             Ok(())
         })?;
 
+        self.broadcast.send(AgentUpdate::Add(agent))?;
+
         Ok(())
     }
 
@@ -61,5 +71,9 @@ impl AgentStore {
         }
 
         Ok(agents)
+    }
+
+    pub fn subscribe(&self) -> broadcast::Receiver<AgentUpdate> {
+        self.broadcast.subscribe()
     }
 }

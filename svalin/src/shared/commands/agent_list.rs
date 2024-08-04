@@ -10,12 +10,15 @@ use svalin_rpc::rpc::{
     server::RpcServer,
     session::{Session, SessionOpen},
 };
-use tokio::sync::RwLock;
+use tokio::{select, sync::RwLock};
 use tracing::debug;
 
-use crate::{server::agent_store::AgentStore, shared::join_agent::PublicAgentData};
+use crate::{
+    server::agent_store::{AgentStore, AgentUpdate},
+    shared::join_agent::PublicAgentData,
+};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AgentListItem {
     pub public_data: PublicAgentData,
     pub online_status: bool,
@@ -67,27 +70,51 @@ impl CommandHandler for AgentListHandler {
             session.write_object(&item).await?;
         }
 
+        let mut agent_store_receiver = self.agent_store.subscribe();
+
         loop {
-            let online_update = receiver.recv().await?;
+            select! {
+                online_update = receiver.recv() => {
+                    let online_update = online_update?;
 
-            debug!("Online update from server: {:?}", online_update);
+                    debug!("Online update from server: {:?}", online_update);
 
-            let agent = self
-                .agent_store
-                .get_agent(online_update.client.public_key())?;
+                    let agent = self
+                        .agent_store
+                        .get_agent(online_update.client.public_key())?;
 
-            debug!("retrieved agent from store: {:?}", agent);
+                    debug!("retrieved agent from store: {:?}", agent);
 
-            if let Some(agent) = agent {
-                let item = AgentListItemTransport {
-                    public_data: agent,
-                    online_status: online_update.online,
-                };
+                    if let Some(agent) = agent {
+                        let item = AgentListItemTransport {
+                            public_data: agent,
+                            online_status: online_update.online,
+                        };
 
-                debug!("sending update to client: {:?}", item);
+                        debug!("sending update to client: {:?}", item);
 
-                session.write_object(&item).await?;
-            }
+                        session.write_object(&item).await?;
+                    }
+                },
+                store_update = agent_store_receiver.recv() => {
+                    let store_update = store_update?;
+
+                    match store_update {
+                        AgentUpdate::Add(public_data) => {
+                            let online_status = self.server.is_client_connected(&public_data.cert).await;
+                            let item = AgentListItemTransport {
+                                public_data,
+                                online_status,
+                            };
+
+                            debug!("sending update to client: {:?}", item);
+
+                            session.write_object(&item).await?;
+                        },
+                    };
+
+                }
+            };
         }
     }
 }

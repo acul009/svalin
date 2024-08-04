@@ -181,4 +181,12 @@ impl RpcServer {
             .cloned()
             .collect()
     }
+
+    pub async fn is_client_connected(&self, client: &Certificate) -> bool {
+        self.data
+            .lock()
+            .await
+            .latest_connections
+            .contains_key(client)
+    }
 }

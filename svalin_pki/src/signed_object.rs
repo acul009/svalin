@@ -8,7 +8,7 @@ use crate::{
     Certificate, PermCredentials,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SignedObject<T> {
     object: T,
     raw: Vec<u8>,
