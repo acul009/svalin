@@ -43,9 +43,7 @@ async fn integration_tests() {
         .await
         .unwrap();
 
-    let conn = client.rpc().upstream_connection();
-
-    let duration = conn.ping().await.unwrap();
+    let duration = client.ping_upstream().await.unwrap();
     debug!("ping duration: {:?}", duration);
 
     // test_agent

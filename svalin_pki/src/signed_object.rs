@@ -25,6 +25,10 @@ impl<T> SignedObject<T> {
     pub fn signed_by(&self) -> &Certificate {
         &self.signed_by
     }
+
+    pub fn unpack(self) -> T {
+        self.object
+    }
 }
 
 impl<T> Deref for SignedObject<T> {

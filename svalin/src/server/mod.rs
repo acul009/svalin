@@ -20,6 +20,7 @@ use tracing::{debug, error};
 use crate::shared::{
     commands::{
         add_user::AddUserHandler,
+        agent_list::AgentListHandler,
         init::InitHandler,
         public_server_status::{PublicStatus, PublicStatusHandler},
     },
@@ -134,7 +135,8 @@ impl Server {
             .add(join_manager.create_request_handler())
             .add(join_manager.create_accept_handler())
             .add(ForwardHandler::new(self.rpc.clone()))
-            .add(AddAgentHandler::new(agent_store)?);
+            .add(AddAgentHandler::new(agent_store.clone())?)
+            .add(AgentListHandler::new(agent_store, self.rpc.clone()));
 
         self.rpc.run(commands).await
     }

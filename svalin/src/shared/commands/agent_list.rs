@@ -1,22 +1,30 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_pki::signed_object::SignedObject;
+use svalin_macros::rpc_dispatch;
+use svalin_pki::{signed_object::SignedObject, Certificate};
 use svalin_rpc::rpc::{
     command::CommandHandler,
     server::RpcServer,
     session::{Session, SessionOpen},
 };
-use tokio::sync::broadcast;
+use tokio::sync::RwLock;
+use tracing::debug;
 
-use crate::{agent, server::agent_store::AgentStore, shared::join_agent::PublicAgentData};
+use crate::{server::agent_store::AgentStore, shared::join_agent::PublicAgentData};
+
+#[derive(Clone)]
+pub struct AgentListItem {
+    pub public_data: PublicAgentData,
+    pub online_status: bool,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
-struct AgentListItem {
-    public_data: SignedObject<PublicAgentData>,
-    online_status: bool,
+struct AgentListItemTransport {
+    pub public_data: SignedObject<PublicAgentData>,
+    pub online_status: bool,
 }
 
 pub struct AgentListHandler {
@@ -51,7 +59,7 @@ impl CommandHandler for AgentListHandler {
 
         for agent in agents {
             let online_status = currently_online.contains(&agent.cert);
-            let item = AgentListItem {
+            let item = AgentListItemTransport {
                 public_data: agent,
                 online_status,
             };
@@ -62,18 +70,46 @@ impl CommandHandler for AgentListHandler {
         loop {
             let online_update = receiver.recv().await?;
 
+            debug!("Online update from server: {:?}", online_update);
+
             let agent = self
                 .agent_store
                 .get_agent(online_update.client.public_key())?;
 
+            debug!("retrieved agent from store: {:?}", agent);
+
             if let Some(agent) = agent {
-                let item = AgentListItem {
+                let item = AgentListItemTransport {
                     public_data: agent,
                     online_status: online_update.online,
                 };
 
+                debug!("sending update to client: {:?}", item);
+
                 session.write_object(&item).await?;
             }
         }
+    }
+}
+
+#[rpc_dispatch(agent_list_key())]
+pub async fn agent_list(
+    session: &mut Session<SessionOpen>,
+    list: Arc<RwLock<BTreeMap<Certificate, AgentListItem>>>,
+) -> Result<()> {
+    loop {
+        let list_item_update: AgentListItemTransport = session
+            .read_object()
+            .await
+            .context("failed to receive ItemTransport")?;
+
+        let item = AgentListItem {
+            online_status: list_item_update.online_status,
+            public_data: list_item_update.public_data.unpack(),
+        };
+
+        list.write()
+            .await
+            .insert(item.public_data.cert.clone(), item);
     }
 }
