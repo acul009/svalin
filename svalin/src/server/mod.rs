@@ -120,9 +120,9 @@ impl Server {
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        let userstore = UserStore::open(self.scope.subscope("users".into()));
+        let userstore = UserStore::open(self.scope.subscope("users".into())?);
 
-        let agent_store = AgentStore::open(self.scope.subscope("agents".into()));
+        let agent_store = AgentStore::open(self.scope.subscope("agents".into())?);
 
         let commands = HandlerCollection::new();
 

@@ -1,9 +1,7 @@
 use anyhow::{Ok, Result};
-use jammdb::ToBytes;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    postcard::MarmeladeObjectError,
     transaction_type::{RoTransaction, RwTransaction},
     Bucket, DB,
 };
@@ -22,6 +20,25 @@ impl Scope {
             scope,
             path: vec![],
         }
+    }
+
+    fn new(db: DB, scope: String, path: Vec<String>) -> anyhow::Result<Self> {
+        let tx = db.jamm.tx(true)?;
+
+        let bucket = tx.get_bucket(scope.as_bytes())?;
+
+        let mut rw_bucket = Bucket {
+            bucket,
+            transaction_type: std::marker::PhantomData::<RwTransaction>,
+        };
+
+        for key in path.iter() {
+            rw_bucket = rw_bucket.get_or_create_bucket(key.as_bytes())?;
+        }
+
+        tx.commit()?;
+
+        Ok(Self { db, scope, path })
     }
 
     pub fn view<CB: FnMut(Bucket<RoTransaction>) -> anyhow::Result<()>>(
@@ -48,7 +65,7 @@ impl Scope {
 
     pub fn update<DB: FnOnce(Bucket<RwTransaction>) -> anyhow::Result<()>>(
         &self,
-        mut f: DB,
+        f: DB,
     ) -> anyhow::Result<()> {
         let tx = self.db.jamm.tx(true)?;
 
@@ -60,6 +77,7 @@ impl Scope {
         };
 
         for key in self.path.iter() {
+            // This could also just be get_bucket, but making sure never hurts
             rw_bucket = rw_bucket.get_or_create_bucket(key.as_bytes())?;
         }
 
@@ -70,14 +88,10 @@ impl Scope {
         Ok(())
     }
 
-    pub fn subscope(&self, subscope: String) -> Self {
+    pub fn subscope(&self, subscope: String) -> Result<Self> {
         let mut path = self.path.clone();
         path.push(subscope);
-        Self {
-            db: self.db.clone(),
-            scope: self.scope.clone(),
-            path,
-        }
+        Self::new(self.db.clone(), self.scope.clone(), path)
     }
 
     pub fn get_object<T: DeserializeOwned, U: AsRef<[u8]>>(&self, key: U) -> Result<Option<T>> {

@@ -31,30 +31,11 @@ impl DB {
     }
 
     pub fn scope(&self, name: String) -> Result<Scope, jammdb::Error> {
-        let check_bucket: Option<jammdb::Error>;
         {
-            let tx = self.jamm.tx(false)?;
-            check_bucket = match tx.get_bucket(name.as_bytes()) {
-                Err(err) => Some(err),
-                Ok(_) => None,
-            };
+            let tx = self.jamm.tx(true)?;
+            tx.get_or_create_bucket(name.as_bytes())?;
+            tx.commit()?;
         }
-
-        match check_bucket {
-            // Create Bucket if missing
-            Some(jammdb::Error::BucketMissing) => {
-                let tx = self.jamm.tx(true)?;
-                tx.create_bucket(name.as_bytes())?;
-                tx.commit()?;
-                Ok(())
-            }
-
-            //Forward error with any other cause
-            Some(e) => Err(e),
-
-            // Continue if the bucket was found
-            None => Ok(()),
-        }?;
 
         Ok(Scope::root_scope(self.clone(), name))
     }
