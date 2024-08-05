@@ -91,8 +91,12 @@ impl RpcServer {
         debug!("starting server");
         while let Some(conn) = self.endpoint.accept().await {
             debug!("connection incoming");
-            let fut =
-                RpcServer::handle_connection(conn.accept()?, commands.clone(), self.data.clone());
+            let fut = RpcServer::handle_connection(
+                conn.accept()?,
+                commands.clone(),
+                self.data.clone(),
+                self.broadcast.clone(),
+            );
             let mut lock = self.data.lock().await;
             lock.connection_join_set.spawn(async move {
                 debug!("spawn successful");
@@ -111,6 +115,7 @@ impl RpcServer {
         conn: quinn::Connecting,
         commands: Arc<HandlerCollection>,
         data: Arc<Mutex<ServerData>>,
+        broadcast: broadcast::Sender<ClientConnectionStatus>,
     ) -> Result<()> {
         debug!("waiting for connection to get ready...");
 
@@ -127,6 +132,10 @@ impl RpcServer {
         if let Peer::Certificate(cert) = conn.peer() {
             let mut lock = data.lock().await;
             lock.latest_connections.insert(cert.clone(), conn.clone());
+            broadcast.send(ClientConnectionStatus {
+                client: cert.clone(),
+                online: true,
+            });
             let conn2 = conn.clone();
             let data2 = data.clone();
             let cert2 = cert.clone();
@@ -136,6 +145,10 @@ impl RpcServer {
                 if let Some(latest_peer_conn) = lock.latest_connections.get(&cert2) {
                     if latest_peer_conn.eq(&conn2) {
                         lock.latest_connections.remove(&cert2);
+                        broadcast.send(ClientConnectionStatus {
+                            client: cert2.clone(),
+                            online: false,
+                        });
                     }
                 }
             });

@@ -198,6 +198,7 @@ class UnlockingLoadingDialog extends StatelessWidget {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
+          settings: const RouteSettings(name: "home"),
           builder: (context) => MainMenu(
             client: client,
           ),

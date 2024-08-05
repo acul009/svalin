@@ -11,8 +11,8 @@ part 'client.freezed.dart';
 
 Future<String> sayHello() => RustLib.instance.api.crateApiClientSayHello();
 
-// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<AgentListItem>>
-abstract class AgentListItem implements RustOpaqueInterface {}
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Certificate>>
+abstract class Certificate implements RustOpaqueInterface {}
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Client>>
 abstract class Client implements RustOpaqueInterface {
@@ -64,6 +64,27 @@ abstract class WaitingForConfirmCode implements RustOpaqueInterface {
       {required String confirmCode, required String agentName});
 }
 
+class AgentListItem {
+  final PublicAgentData publicData;
+  final bool onlineStatus;
+
+  const AgentListItem({
+    required this.publicData,
+    required this.onlineStatus,
+  });
+
+  @override
+  int get hashCode => publicData.hashCode ^ onlineStatus.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AgentListItem &&
+          runtimeType == other.runtimeType &&
+          publicData == other.publicData &&
+          onlineStatus == other.onlineStatus;
+}
+
 @freezed
 sealed class FirstConnect with _$FirstConnect {
   const FirstConnect._();
@@ -74,4 +95,25 @@ sealed class FirstConnect with _$FirstConnect {
   const factory FirstConnect.login(
     Login field0,
   ) = FirstConnect_Login;
+}
+
+class PublicAgentData {
+  final String name;
+  final Certificate cert;
+
+  const PublicAgentData({
+    required this.name,
+    required this.cert,
+  });
+
+  @override
+  int get hashCode => name.hashCode ^ cert.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PublicAgentData &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          cert == other.cert;
 }

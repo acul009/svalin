@@ -17,7 +17,7 @@ enum Command {
     /// Commands for running the agent
     Agent {
         #[clap(subcommand)]
-        action: AgentAction,
+        action: Option<AgentAction>,
     },
 }
 
@@ -48,7 +48,7 @@ async fn run() {
             }
         }
         Command::Agent { action } => match action {
-            AgentAction::Init { address } => {
+            Some(AgentAction::Init { address }) => {
                 let mut welcome_message = "-".repeat(40);
                 welcome_message.push_str("Svalin Agent");
                 welcome_message.push_str("-".repeat(40).as_str());
@@ -62,7 +62,13 @@ async fn run() {
                 println!("Join-Code: {}", waiting_for_init.join_code());
                 let waiting_for_confirm = waiting_for_init.wait_for_init().await.unwrap();
                 println!("Confirm-Code: {}", waiting_for_confirm.confirm_code());
-                let init_payload = waiting_for_confirm.wait_for_confirm().await.unwrap();
+                let agent = waiting_for_confirm.wait_for_confirm().await.unwrap();
+                println!("initialisation complete!");
+                agent.close();
+            }
+            None => {
+                let agent = Agent::open().await.unwrap();
+                agent.run().await.unwrap();
             }
         },
     }

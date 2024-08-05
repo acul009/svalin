@@ -1433,6 +1433,7 @@ dependencies = [
  "anyhow",
  "flutter_rust_bridge",
  "svalin",
+ "svalin_pki",
  "tokio",
  "totp-rs",
  "tracing-subscriber",

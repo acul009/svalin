@@ -183,6 +183,10 @@ impl Agent {
             KeySource::BuiltIn(k) => Ok(k),
         }
     }
+
+    pub fn close(self) {
+        self.rpc.close()
+    }
 }
 
 #[derive(Serialize, Deserialize)]
