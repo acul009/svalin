@@ -27,23 +27,27 @@ pub struct Client {
     upstream_certificate: Certificate,
     root_certificate: Certificate,
     credentials: PermCredentials,
-    device_list: Arc<RwLock<BTreeMap<Certificate, AgentListItem>>>,
+    device_list: Arc<RwLock<BTreeMap<Certificate, Device>>>,
     // TODO: These should not be required here, but should be created and canceled as needed
     background_tasks: JoinSet<()>,
 }
 
 impl Client {
-    pub async fn device(&self, certificate: Certificate) -> Result<Device> {
-        let connection = self.rpc.forward_connection(certificate.clone())?;
+    pub async fn device(&self, certificate: Certificate) -> Option<Device> {
+        match self.device_list.read().await.get(&certificate) {
+            Some(device) => Some(device.clone()),
+            None => None,
+        }
+        // let connection = self.rpc.forward_connection(certificate.clone())?;
 
-        Ok(Device::new(connection, certificate))
+        // Ok(Device::new(connection, certificate))
     }
 
     pub async fn ping_upstream(&self) -> Result<Duration> {
         self.rpc.upstream_connection().ping().await
     }
 
-    pub async fn device_list(&self) -> Vec<AgentListItem> {
+    pub async fn device_list(&self) -> Vec<Device> {
         self.device_list.read().await.values().cloned().collect()
     }
 

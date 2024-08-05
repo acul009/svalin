@@ -16,7 +16,7 @@ class DeviceList extends StatefulWidget {
 }
 
 class _DeviceListState extends State<DeviceList> {
-  List<AgentListItem> items = [];
+  List<Device> items = [];
   late Timer timer;
 
   void updateList() {
@@ -42,20 +42,24 @@ class _DeviceListState extends State<DeviceList> {
         ListView.builder(
           itemCount: items.length,
           itemBuilder: (context, index) {
-            var item = items[index];
-            return ListTile(
-              title: Row(
-                children: [
-                  Icon(
-                    size: 50,
-                    color: item.onlineStatus ? Colors.green : Colors.red,
-                    Icons.computer,
-                  ),
-                  const SizedBox(width: 20),
-                  Text(item.publicData.name),
-                ],
-              ),
-            );
+            var device = items[index];
+            return FutureBuilder(
+                future: device.item(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    var item = snapshot.data!;
+                    return ListTile(
+                      leading: Icon(
+                        size: 50,
+                        color: item.onlineStatus ? Colors.green : Colors.red,
+                        Icons.computer,
+                      ),
+                      title: Text(item.publicData.name),
+                    );
+                  } else {
+                    return const CircularProgressIndicator();
+                  }
+                });
           },
         ),
         Positioned(

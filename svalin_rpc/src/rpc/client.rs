@@ -77,13 +77,6 @@ impl RpcClient {
         self.connection.clone()
     }
 
-    pub fn forward_connection(
-        &self,
-        target: Certificate,
-    ) -> Result<ForwardConnection<DirectConnection>> {
-        ForwardConnection::new(self.connection.clone(), target)
-    }
-
     pub fn close(&self) {
         self.connection.close(0u32.into(), b"");
     }

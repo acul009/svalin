@@ -90,11 +90,11 @@ pub struct ForwardConnection<T> {
 }
 
 impl<T> ForwardConnection<T> {
-    pub fn new(base_connection: T, target: Certificate) -> Result<Self> {
-        Ok(Self {
+    pub fn new(base_connection: T, target: Certificate) -> Self {
+        Self {
             connection: base_connection,
             target: target,
-        })
+        }
     }
 }
 

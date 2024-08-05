@@ -27,6 +27,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_ClientPtr => wire
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerClientPtr;
 
+  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_DevicePtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevicePtr;
+
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_HiddenTypePtr =>
       wire._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHiddenTypePtr;
 
@@ -58,6 +61,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   Client
       dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerClient(
+          dynamic raw);
+
+  @protected
+  Device
+      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
           dynamic raw);
 
   @protected
@@ -96,6 +104,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           dynamic raw);
 
   @protected
+  Device
+      dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
+          dynamic raw);
+
+  @protected
   Login
       dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLogin(
           dynamic raw);
@@ -113,6 +126,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   Client
       dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerClient(
+          dynamic raw);
+
+  @protected
+  Device
+      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
           dynamic raw);
 
   @protected
@@ -161,10 +179,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   FirstConnect dco_decode_first_connect(dynamic raw);
 
   @protected
-  List<String> dco_decode_list_String(dynamic raw);
+  List<Device>
+      dco_decode_list_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
+          dynamic raw);
 
   @protected
-  List<AgentListItem> dco_decode_list_agent_list_item(dynamic raw);
+  List<String> dco_decode_list_String(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
@@ -198,6 +218,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   Client
       sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerClient(
+          SseDeserializer deserializer);
+
+  @protected
+  Device
+      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
           SseDeserializer deserializer);
 
   @protected
@@ -236,6 +261,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           SseDeserializer deserializer);
 
   @protected
+  Device
+      sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
+          SseDeserializer deserializer);
+
+  @protected
   Login
       sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLogin(
           SseDeserializer deserializer);
@@ -253,6 +283,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   Client
       sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerClient(
+          SseDeserializer deserializer);
+
+  @protected
+  Device
+      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
           SseDeserializer deserializer);
 
   @protected
@@ -302,11 +337,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   FirstConnect sse_decode_first_connect(SseDeserializer deserializer);
 
   @protected
-  List<String> sse_decode_list_String(SseDeserializer deserializer);
+  List<Device>
+      sse_decode_list_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
+          SseDeserializer deserializer);
 
   @protected
-  List<AgentListItem> sse_decode_list_agent_list_item(
-      SseDeserializer deserializer);
+  List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
@@ -348,6 +384,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
+          Device self, SseSerializer serializer);
+
+  @protected
+  void
       sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHiddenType(
           HiddenType self, SseSerializer serializer);
 
@@ -383,6 +424,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
+          Device self, SseSerializer serializer);
+
+  @protected
+  void
       sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLogin(
           Login self, SseSerializer serializer);
 
@@ -400,6 +446,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
       sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerClient(
           Client self, SseSerializer serializer);
+
+  @protected
+  void
+      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
+          Device self, SseSerializer serializer);
 
   @protected
   void
@@ -448,11 +499,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_first_connect(FirstConnect self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_String(List<String> self, SseSerializer serializer);
+  void
+      sse_encode_list_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
+          List<Device> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_agent_list_item(
-      List<AgentListItem> self, SseSerializer serializer);
+  void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_strict(
@@ -557,6 +609,38 @@ class RustLibWire implements BaseWire {
           'frbgen_gui_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerClient');
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerClient =
       _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerClientPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+      rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevicePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+          'frbgen_gui_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice');
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevicePtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+      rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevicePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+          'frbgen_gui_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice');
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevice =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDevicePtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void

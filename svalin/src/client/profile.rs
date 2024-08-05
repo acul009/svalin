@@ -7,7 +7,7 @@ use svalin_rpc::rpc::client::RpcClient;
 use tokio::{sync::RwLock, task::JoinSet};
 use tracing::{debug, error};
 
-use crate::{client::verifiers, shared::commands::agent_list::agent_listDispatcher};
+use crate::{client::verifiers, shared::commands::agent_list::update_agent_listDispatcher};
 
 use super::Client;
 
@@ -216,7 +216,10 @@ impl Client {
 
             client.background_tasks.spawn(async move {
                 debug!("subscribing to upstream agent list");
-                if let Err(err) = sync_connection.agent_list(list_clone).await {
+                if let Err(err) = sync_connection
+                    .update_agent_list(sync_connection.clone(), list_clone)
+                    .await
+                {
                     for err in err.chain() {
                         error!("error while keeping agent list in sync: {:?}", err);
                     }

@@ -18,7 +18,7 @@ abstract class Certificate implements RustOpaqueInterface {}
 abstract class Client implements RustOpaqueInterface {
   Future<WaitingForConfirmCode> addAgentWithCode({required String joinCode});
 
-  Future<List<AgentListItem>> deviceList();
+  Future<List<Device>> deviceList();
 
   static Future<FirstConnect> firstConnect({required String address}) =>
       RustLib.instance.api.crateApiClientClientFirstConnect(address: address);
@@ -34,6 +34,11 @@ abstract class Client implements RustOpaqueInterface {
   static Future<void> removeProfile({required String profileKey}) =>
       RustLib.instance.api
           .crateApiClientClientRemoveProfile(profileKey: profileKey);
+}
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Device>>
+abstract class Device implements RustOpaqueInterface {
+  Future<AgentListItem> item();
 }
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Init>>

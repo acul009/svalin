@@ -5,15 +5,20 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
 use svalin_pki::{signed_object::SignedObject, Certificate};
-use svalin_rpc::rpc::{
-    command::CommandHandler,
-    server::RpcServer,
-    session::{Session, SessionOpen},
+use svalin_rpc::{
+    commands::forward::ForwardConnection,
+    rpc::{
+        command::CommandHandler,
+        connection::DirectConnection,
+        server::RpcServer,
+        session::{Session, SessionOpen},
+    },
 };
 use tokio::{select, sync::RwLock};
 use tracing::debug;
 
 use crate::{
+    client::device::Device,
     server::agent_store::{AgentStore, AgentUpdate},
     shared::join_agent::PublicAgentData,
 };
@@ -120,9 +125,10 @@ impl CommandHandler for AgentListHandler {
 }
 
 #[rpc_dispatch(agent_list_key())]
-pub async fn agent_list(
+pub async fn update_agent_list(
     session: &mut Session<SessionOpen>,
-    list: Arc<RwLock<BTreeMap<Certificate, AgentListItem>>>,
+    base_connection: DirectConnection,
+    list: Arc<RwLock<BTreeMap<Certificate, Device>>>,
 ) -> Result<()> {
     loop {
         let list_item_update: AgentListItemTransport = session
@@ -135,8 +141,26 @@ pub async fn agent_list(
             public_data: list_item_update.public_data.unpack(),
         };
 
-        list.write()
-            .await
-            .insert(item.public_data.cert.clone(), item);
+        {
+            if let Some(device) = list.read().await.get(&item.public_data.cert) {
+                // Either we update the device...
+
+                device.update(item).await;
+                continue;
+            }
+        }
+
+        {
+            // ...or we create it
+
+            let device_connection =
+                ForwardConnection::new(base_connection.clone(), item.public_data.cert.clone());
+
+            let cert = item.public_data.cert.clone();
+
+            let device = Device::new(device_connection, item);
+
+            list.write().await.insert(cert, device);
+        }
     }
 }

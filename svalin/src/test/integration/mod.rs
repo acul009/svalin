@@ -8,7 +8,11 @@ use tokio::sync::oneshot;
 use totp_rs::TOTP;
 use tracing::debug;
 
-use crate::{agent::Agent, client::Client, server::Server};
+use crate::{
+    agent::Agent,
+    client::{device, Client},
+    server::Server,
+};
 
 mod prepare_server;
 // mod test_init;
@@ -78,11 +82,7 @@ async fn integration_tests() {
 
     let agents = client.device_list().await;
 
-    debug!("agent list: {:?}", agents);
-
-    let agent_cert = agents.first().unwrap().public_data.cert.clone();
-
-    let device = client.device(agent_cert).await.unwrap();
+    let device = agents.first().unwrap();
 
     let ping = device.ping().await.unwrap();
 
