@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:gui_flutter/src/app/devices/add_device.dart';
+import 'package:gui_flutter/src/app/devices/device.dart';
 import 'package:gui_flutter/src/rust/api/client.dart';
 
 class DeviceList extends StatefulWidget {
@@ -49,6 +50,14 @@ class _DeviceListState extends State<DeviceList> {
                   if (snapshot.hasData) {
                     var item = snapshot.data!;
                     return ListTile(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DeviceView(device: device),
+                          ),
+                        );
+                      },
                       leading: Icon(
                         size: 50,
                         color: item.onlineStatus ? Colors.green : Colors.red,
