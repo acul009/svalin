@@ -170,6 +170,11 @@ class WaitForAgentInitComplete extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    waiting.then((value) {
+      Navigator.pop(context);
+      Navigator.pop(context);
+      Navigator.pop(context);
+    });
     return Scaffold(
       appBar: AppBar(title: const Text("Add device")),
       body: Center(
@@ -182,10 +187,7 @@ class WaitForAgentInitComplete extends StatelessWidget {
                 if (snapshot.hasError) {
                   return ErrorWidget(snapshot.error!);
                 } else {
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                  return CircularProgressIndicator();
+                  return const CircularProgressIndicator();
                 }
               } else {
                 return const Column(

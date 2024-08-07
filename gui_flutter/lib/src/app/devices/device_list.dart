@@ -17,12 +17,18 @@ class DeviceList extends StatefulWidget {
 }
 
 class _DeviceListState extends State<DeviceList> {
-  List<Device> items = [];
-  late Timer timer;
+  List<Device> _items = [];
+  late Timer _timer;
+
+  @override
+  void dispose() {
+    super.dispose();
+    _timer.cancel();
+  }
 
   void updateList() {
     widget.client.deviceList().then((value) => setState(() {
-          items = value;
+          _items = value;
         }));
   }
 
@@ -30,7 +36,7 @@ class _DeviceListState extends State<DeviceList> {
   void initState() {
     super.initState();
     updateList();
-    timer = Timer.periodic(
+    _timer = Timer.periodic(
       const Duration(seconds: 1),
       (timer) => updateList(),
     );
@@ -41,9 +47,9 @@ class _DeviceListState extends State<DeviceList> {
     return Stack(
       children: [
         ListView.builder(
-          itemCount: items.length,
+          itemCount: _items.length,
           itemBuilder: (context, index) {
-            var device = items[index];
+            var device = _items[index];
             return FutureBuilder(
                 future: device.item(),
                 builder: (context, snapshot) {

@@ -66,7 +66,7 @@ class _ProfileSelectorState extends State<ProfileSelector> {
                         },
                         title: Row(
                           children: [
-                            SizedBox(width: 20),
+                            const SizedBox(width: 20),
                             Text(item),
                             const Spacer(),
                             ElevatedButton(
@@ -98,15 +98,15 @@ class _ProfileSelectorState extends State<ProfileSelector> {
                                   ),
                                 );
                               },
-                              child: Icon(Icons.delete),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor:
                                     const Color.fromARGB(255, 255, 48, 48),
                                 foregroundColor:
                                     const Color.fromARGB(255, 64, 0, 0),
                               ),
+                              child: const Icon(Icons.delete),
                             ),
-                            SizedBox(width: 20),
+                            const SizedBox(width: 20),
                           ],
                         ),
                       );
