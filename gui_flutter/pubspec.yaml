@@ -37,7 +37,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   rust_lib_gui_flutter:
     path: rust_builder
-  flutter_rust_bridge: 2.1.0
+  flutter_rust_bridge: 2.2.0
   freezed_annotation: ^2.4.4
   pin_code_fields: ^8.0.1
 

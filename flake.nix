@@ -54,7 +54,7 @@
         shellHook = ''
           export PATH=~/.cargo/bin:$PATH
           export PROJECT_ROOT=$(git rev-parse --show-toplevel)
-          export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$PROJECT_ROOT/gui_flutter/client/build/linux/x64/debug/bundle/lib:$PROJECT_ROOT/gui_flutter/client/build/linux/x64/release/bundle/lib:$PROJECT_ROOT/gui_flutter/build/linux/x64/debug/bundle/lib"
+          export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$PROJECT_ROOT/gui_flutter/client/build/linux/x64/debug/bundle/lib:$PROJECT_ROOT/gui_flutter/client/build/linux/x64/release/bundle/lib:$PROJECT_ROOT/gui_flutter/build/linux/x64/debug/bundle/lib:$PROJECT_ROOT/pridwen/client/build/linux/x64/debug/bundle/lib:$PROJECT_ROOT/pridwen/client/build/linux/x64/release/bundle/lib:$PROJECT_ROOT/pridwen/build/linux/x64/debug/bundle/lib"
           zsh
           exit;
         '';

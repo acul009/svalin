@@ -1,0 +1,10 @@
+[package]
+name = "svalin_sysctl"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazy_static = "1.5.0"
+serde = { version = "1.0.204", features = ["derive"] }
+sysinfo = { version = "0.31.2", features = ["windows", "serde"] }
+tokio = { version = "1.39.2", default-features = false, features = ["sync"] }
