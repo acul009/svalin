@@ -19,7 +19,7 @@ use crate::{
     transport::combined_transport::CombinedTransport,
 };
 
-use super::peer::{self, Peer};
+use super::peer::Peer;
 
 #[async_trait]
 pub trait Connection: ConnectionBase {

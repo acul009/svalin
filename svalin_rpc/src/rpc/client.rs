@@ -1,16 +1,13 @@
 use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
 
-use crate::{commands::forward::ForwardConnection, rustls};
+use crate::rustls;
 use anyhow::{anyhow, Ok, Result};
 use quinn::{crypto::rustls::QuicClientConfig, TransportConfig, VarInt};
-use svalin_pki::{Certificate, PermCredentials};
+use svalin_pki::PermCredentials;
 
 use crate::rpc::connection::DirectConnection;
 
-use super::{
-    command::HandlerCollection,
-    connection::{Connection, ConnectionBase, ServeableConnection},
-};
+use super::{command::HandlerCollection, connection::ServeableConnection};
 
 pub struct RpcClient {
     connection: DirectConnection,

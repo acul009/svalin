@@ -12,13 +12,8 @@ use crate::rpc::connection::{ConnectionBase, ServeableConnection};
 use crate::rpc::peer::Peer;
 use crate::rustls::{self, server::danger::ClientCertVerifier};
 
-use crate::rpc::{
-    command::HandlerCollection,
-    connection::{Connection, DirectConnection},
-};
+use crate::rpc::{command::HandlerCollection, connection::DirectConnection};
 use crate::transport::session_transport::SessionTransport;
-
-use super::session::{Session, SessionOpen};
 
 #[derive(Debug, Clone)]
 pub struct ClientConnectionStatus {
@@ -132,7 +127,7 @@ impl RpcServer {
         if let Peer::Certificate(cert) = conn.peer() {
             let mut lock = data.lock().await;
             lock.latest_connections.insert(cert.clone(), conn.clone());
-            broadcast.send(ClientConnectionStatus {
+            let _ = broadcast.send(ClientConnectionStatus {
                 client: cert.clone(),
                 online: true,
             });
@@ -145,7 +140,7 @@ impl RpcServer {
                 if let Some(latest_peer_conn) = lock.latest_connections.get(&cert2) {
                     if latest_peer_conn.eq(&conn2) {
                         lock.latest_connections.remove(&cert2);
-                        broadcast.send(ClientConnectionStatus {
+                        let _ = broadcast.send(ClientConnectionStatus {
                             client: cert2.clone(),
                             online: false,
                         });
