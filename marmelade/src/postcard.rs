@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use jammdb::{KVPair, ToBytes};
+use jammdb::ToBytes;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{transaction_type::RwTransaction, Bucket};
@@ -80,8 +80,8 @@ mod test {
 
     #[test]
     fn test() {
-        //delete old test db
-        std::fs::remove_file("./marmelade_test.jammdb");
+        // delete old test db
+        let _ = std::fs::remove_file("./marmelade_test.jammdb");
         let db = DB::open("./marmelade_test.jammdb").unwrap();
 
         let test = TestStruct {
