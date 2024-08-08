@@ -1,18 +1,12 @@
 use std::{process, time::Duration};
 
-use clap::error;
 use prepare_server::prepare_server;
-use svalin_rpc::commands::ping::pingDispatcher;
 use test_log::test;
 use tokio::sync::oneshot;
 use totp_rs::TOTP;
-use tracing::debug;
+use tracing::{debug, error};
 
-use crate::{
-    agent::Agent,
-    client::{device, Client},
-    server::Server,
-};
+use crate::{agent::Agent, client::Client};
 
 mod prepare_server;
 // mod test_init;
@@ -94,7 +88,7 @@ async fn integration_tests() {
 
     agent_handle.abort();
 
-    tracing::error!("TODO: add e2e encryption to ping and basic agent session serving");
+    error!("Make this test actually fail when something goes wrong");
 
     process::exit(1);
 }

@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
-use svalin_pki::{signed_object::SignedObject, Certificate};
+use svalin_pki::{signed_object::SignedObject, Certificate, PermCredentials};
 use svalin_rpc::{
     commands::forward::ForwardConnection,
     rpc::{
@@ -128,6 +128,7 @@ impl CommandHandler for AgentListHandler {
 pub async fn update_agent_list(
     session: &mut Session<SessionOpen>,
     base_connection: DirectConnection,
+    credentials: PermCredentials,
     list: Arc<RwLock<BTreeMap<Certificate, Device>>>,
 ) -> Result<()> {
     loop {
@@ -153,8 +154,11 @@ pub async fn update_agent_list(
         {
             // ...or we create it
 
-            let device_connection =
-                ForwardConnection::new(base_connection.clone(), item.public_data.cert.clone());
+            let device_connection = ForwardConnection::new(
+                base_connection.clone(),
+                credentials.clone(),
+                item.public_data.cert.clone(),
+            );
 
             let cert = item.public_data.cert.clone();
 

@@ -78,7 +78,7 @@ impl RpcClient {
         self.connection.close(0u32.into(), b"");
     }
 
-    pub async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()> {
+    pub async fn serve(&self, commands: HandlerCollection) -> Result<()> {
         self.upstream_connection().serve(commands).await
     }
 }

@@ -4,6 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use marmelade::Scope;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
+use svalin_rpc::commands::forward::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::command::HandlerCollection;
@@ -66,11 +67,18 @@ impl Agent {
     }
 
     pub async fn run(&self) -> Result<()> {
-        let commands = HandlerCollection::new();
+        let e2e_commands = HandlerCollection::new();
 
-        commands.add(PingHandler::new());
+        e2e_commands.chain().await.add(PingHandler::new());
 
-        self.rpc.serve(commands).await
+        let public_commands = HandlerCollection::new();
+
+        public_commands
+            .chain()
+            .await
+            .add(E2EHandler::new(self.credentials.clone(), e2e_commands));
+
+        self.rpc.serve(public_commands).await
     }
 
     pub async fn init_with(data: AgentInitPayload) -> Result<()> {

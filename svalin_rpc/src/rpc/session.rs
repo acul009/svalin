@@ -80,41 +80,32 @@ impl Session<SessionCreated> {
         }
     }
 
-    async fn receive_header(self) -> Result<(Session<SessionOpen>, SessionRequestHeader)> {
-        let mut session = self.open();
-
-        let header: SessionRequestHeader = session.read_object().await?;
-
-        Ok((session, header))
+    pub(crate) async fn handle(self, commands: HandlerCollection) -> Result<()> {
+        self.open().handle(commands).await
     }
 
     pub(crate) async fn request_session(self, command_key: String) -> Result<Session<SessionOpen>> {
-        let header = SessionRequestHeader { command_key };
-
-        let mut session = self.open();
-        session.write_object(&header).await?;
-
-        let response: SessionResponseHeader = session.read_object().await?;
-        match response {
-            SessionResponseHeader::Decline(declined) => {
-                Err(anyhow!(format!("{}: {}", declined.code, declined.message)))
-            }
-            SessionResponseHeader::Accept(_accepted) => Ok(session),
+        let mut open = self.open();
+        match open.request_session(command_key).await {
+            Ok(_) => Ok(open),
+            Err(err) => Err(err),
         }
     }
+}
 
-    pub(crate) async fn handle(self, commands: Arc<HandlerCollection>) -> Result<()> {
+impl Session<SessionOpen> {
+    pub(crate) async fn handle(&mut self, commands: HandlerCollection) -> Result<()> {
         debug!("waiting for request header");
 
-        let (mut session, header) = self.receive_header().await?;
+        let header: SessionRequestHeader = self.read_object().await?;
 
         debug!("requested command: {}", header.command_key);
 
         if let Some(command) = commands.get(&header.command_key).await {
             let response = SessionResponseHeader::Accept(SessionAcceptedHeader {});
-            session.write_object(&response).await?;
+            self.write_object(&response).await?;
 
-            command.handle(&mut session).await?;
+            command.handle(self).await?;
 
             // todo
         } else {
@@ -122,16 +113,28 @@ impl Session<SessionCreated> {
                 code: 404,
                 message: "command not found".to_string(),
             });
-            session.write_object(&response).await?;
+            self.write_object(&response).await?;
         }
 
-        session.shutdown().await?;
+        self.shutdown().await?;
 
         Ok(())
     }
-}
 
-impl Session<SessionOpen> {
+    pub(crate) async fn request_session(&mut self, command_key: String) -> Result<()> {
+        let header = SessionRequestHeader { command_key };
+
+        self.write_object(&header).await?;
+
+        let response: SessionResponseHeader = self.read_object().await?;
+        match response {
+            SessionResponseHeader::Decline(declined) => {
+                Err(anyhow!(format!("{}: {}", declined.code, declined.message)))
+            }
+            SessionResponseHeader::Accept(_accepted) => Ok(()),
+        }
+    }
+
     #[instrument(skip_all)]
     pub async fn read_object<W: serde::de::DeserializeOwned>(&mut self) -> Result<W> {
         // debug!("Reading: {}", std::any::type_name::<W>());
@@ -152,7 +155,7 @@ impl Session<SessionOpen> {
         self.transport.replace_transport(replacer).await
     }
 
-    pub async fn shutdown(mut self) -> Result<(), std::io::Error> {
+    pub(crate) async fn shutdown(&mut self) -> Result<(), std::io::Error> {
         self.transport.shutdown().await
     }
 
@@ -163,7 +166,7 @@ impl Session<SessionOpen> {
         Ok(())
     }
 
-    pub async fn forward_transport(
+    pub(crate) async fn forward_transport(
         &mut self,
         transport: &mut Box<dyn SessionTransport>,
     ) -> Result<()> {

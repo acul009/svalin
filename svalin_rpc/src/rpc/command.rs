@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use async_trait::async_trait;
-use std::sync::RwLock;
+use tokio::sync::{RwLock, RwLockWriteGuard};
 
 use crate::rpc::session::{Session, SessionOpen};
 
@@ -12,28 +12,39 @@ pub trait CommandHandler: Sync + Send {
     async fn handle(&self, session: &mut Session<SessionOpen>) -> Result<()>;
 }
 
+#[derive(Clone)]
 pub struct HandlerCollection {
-    commands: RwLock<HashMap<String, Arc<dyn CommandHandler>>>,
+    commands: Arc<RwLock<HashMap<String, Arc<dyn CommandHandler>>>>,
 }
 
 impl HandlerCollection {
-    pub fn new() -> Arc<Self> {
-        Arc::new(Self {
-            commands: RwLock::new(HashMap::new()),
-        })
+    pub fn new() -> Self {
+        Self {
+            commands: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
-    pub fn add<'a, T>(self: &'a Arc<Self>, command: T) -> &'a Arc<Self>
-    where
-        T: CommandHandler + 'static,
-    {
-        let mut commands = self.commands.write().unwrap();
-        commands.insert(command.key(), Arc::new(command));
-        self
+    pub async fn chain(&self) -> ChainCommandAdder {
+        let lock = self.commands.write().await;
+        ChainCommandAdder { lock }
     }
 
     pub async fn get(&self, key: &str) -> Option<Arc<dyn CommandHandler>> {
-        let commands = self.commands.read().unwrap();
+        let commands = self.commands.read().await;
         commands.get(key).cloned()
+    }
+}
+
+pub struct ChainCommandAdder<'a> {
+    lock: RwLockWriteGuard<'a, HashMap<String, Arc<dyn CommandHandler>>>,
+}
+
+impl<'a> ChainCommandAdder<'a> {
+    pub fn add<T>(&mut self, command: T) -> &mut Self
+    where
+        T: CommandHandler + 'static,
+    {
+        self.lock.insert(command.key(), Arc::new(command));
+        self
     }
 }

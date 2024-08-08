@@ -57,7 +57,7 @@ pub trait ServeableConnectionBase: ConnectionBase {
 
 #[async_trait]
 pub trait ServeableConnection {
-    async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()>;
+    async fn serve(&self, commands: HandlerCollection) -> Result<()>;
 }
 
 #[async_trait]
@@ -65,7 +65,7 @@ impl<T> ServeableConnection for T
 where
     T: ServeableConnectionBase,
 {
-    async fn serve(&self, commands: Arc<HandlerCollection>) -> Result<()> {
+    async fn serve(&self, commands: HandlerCollection) -> Result<()> {
         debug!("waiting for incoming data stream");
         let mut open_sessions = JoinSet::<()>::new();
 

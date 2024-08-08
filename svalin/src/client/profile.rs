@@ -206,7 +206,7 @@ impl Client {
                 upstream_address: profile.upstream_address,
                 upstream_certificate: profile.upstream_certificate,
                 root_certificate: profile.root_certificate,
-                credentials: identity,
+                credentials: identity.clone(),
                 device_list: Arc::new(RwLock::new(BTreeMap::new())),
                 background_tasks: JoinSet::new(),
             };
@@ -217,7 +217,7 @@ impl Client {
             client.background_tasks.spawn(async move {
                 debug!("subscribing to upstream agent list");
                 if let Err(err) = sync_connection
-                    .update_agent_list(sync_connection.clone(), list_clone)
+                    .update_agent_list(sync_connection.clone(), identity, list_clone)
                     .await
                 {
                     for err in err.chain() {

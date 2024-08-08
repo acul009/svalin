@@ -9,8 +9,8 @@ use svalin_rpc::{
         command::CommandHandler,
         session::{Session, SessionOpen},
     },
-    skip_verify::SkipServerVerification,
     transport::tls_transport::TlsTransport,
+    verifiers::skip_verify::SkipServerVerification,
 };
 use tokio::io::AsyncWriteExt;
 use tracing::{debug, error, instrument};

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use svalin_rpc::rpc::client::RpcClient;
-use svalin_rpc::skip_verify::SkipServerVerification;
+use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tokio::sync::oneshot;
 use tracing::debug;
 

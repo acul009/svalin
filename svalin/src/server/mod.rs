@@ -12,7 +12,7 @@ use svalin_pki::{Certificate, Keypair, PermCredentials};
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
     rpc::command::HandlerCollection,
-    skip_verify::SkipClientVerification,
+    verifiers::skip_verify::SkipClientVerification,
 };
 use tokio::sync::mpsc;
 use tracing::{debug, error};
@@ -129,6 +129,8 @@ impl Server {
         let join_manager = crate::shared::join_agent::ServerJoinManager::new();
 
         commands
+            .chain()
+            .await
             .add(PingHandler::new())
             .add(PublicStatusHandler::new(PublicStatus::Ready))
             .add(AddUserHandler::new(userstore))
@@ -182,8 +184,11 @@ impl Server {
         let (send, mut receive) = mpsc::channel::<(Certificate, PermCredentials)>(1);
 
         let commands = HandlerCollection::new();
-        commands.add(InitHandler::new(send));
-        commands.add(PublicStatusHandler::new(PublicStatus::WaitingForInit));
+        commands
+            .chain()
+            .await
+            .add(InitHandler::new(send))
+            .add(PublicStatusHandler::new(PublicStatus::WaitingForInit));
 
         debug!("starting up init server");
 

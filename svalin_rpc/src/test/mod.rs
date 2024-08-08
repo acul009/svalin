@@ -9,7 +9,7 @@ mod tls_test_command;
 use crate::{
     commands::ping::{pingDispatcher, PingHandler},
     rpc::{client::RpcClient, command::HandlerCollection, server::RpcServer},
-    skip_verify::{SkipClientVerification, SkipServerVerification},
+    verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
 };
 
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -21,14 +21,14 @@ async fn ping_test() {
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
-    let mut server = RpcServer::new(
+    let server = RpcServer::new(
         address.to_socket_addrs().unwrap().next().unwrap(),
         &credentials,
         SkipClientVerification::new(),
     )
     .unwrap();
     let commands = HandlerCollection::new();
-    commands.add(PingHandler::new());
+    commands.chain().await.add(PingHandler::new());
 
     let server_handle = tokio::spawn(async move {
         server.run(commands).await.unwrap();
@@ -42,7 +42,7 @@ async fn ping_test() {
 
     debug!("client connected");
 
-    let mut connection = client.upstream_connection();
+    let connection = client.upstream_connection();
 
     let _ping = connection.ping().await.unwrap();
 
@@ -65,7 +65,10 @@ async fn tls_test() {
     )
     .unwrap();
     let commands = HandlerCollection::new();
-    commands.add(TlsTestCommandHandler::new().unwrap());
+    commands
+        .chain()
+        .await
+        .add(TlsTestCommandHandler::new().unwrap());
 
     let server_handle = tokio::spawn(async move {
         server.run(commands).await.unwrap();

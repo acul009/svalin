@@ -82,7 +82,7 @@ impl RpcServer {
         Ok(endpoint)
     }
 
-    pub async fn run(&self, commands: Arc<HandlerCollection>) -> Result<()> {
+    pub async fn run(&self, commands: HandlerCollection) -> Result<()> {
         debug!("starting server");
         while let Some(conn) = self.endpoint.accept().await {
             debug!("connection incoming");
@@ -108,7 +108,7 @@ impl RpcServer {
 
     async fn handle_connection(
         conn: quinn::Connecting,
-        commands: Arc<HandlerCollection>,
+        commands: HandlerCollection,
         data: Arc<Mutex<ServerData>>,
         broadcast: broadcast::Sender<ClientConnectionStatus>,
     ) -> Result<()> {

@@ -10,8 +10,8 @@ use svalin_rpc::{
         command::CommandHandler,
         session::{Session, SessionOpen},
     },
-    skip_verify::SkipClientVerification,
     transport::tls_transport::TlsTransport,
+    verifiers::skip_verify::SkipClientVerification,
 };
 use tokio::{io::AsyncWriteExt, sync::oneshot};
 use tracing::{debug, error};
