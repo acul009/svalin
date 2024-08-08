@@ -1,9 +1,8 @@
 use std::{
-    sync::atomic::AtomicU64,
+    sync::{atomic::AtomicU64, LazyLock},
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 use tokio::sync::Mutex;
@@ -41,13 +40,11 @@ pub struct SwapStatus {
     pub used: u64,
 }
 
-lazy_static! {
-    static ref sys: Mutex<System> = Mutex::new(System::new());
-}
+static SYS: LazyLock<Mutex<System>> = LazyLock::new(|| Mutex::new(System::new()));
 
 impl RealtimeStatus {
     pub async fn get() -> RealtimeStatus {
-        let mut sys_lock = sys.lock().await;
+        let mut sys_lock = SYS.lock().await;
 
         sys_lock.refresh_specifics(
             RefreshKind::new()

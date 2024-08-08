@@ -1,13 +1,9 @@
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use crate::rustls;
 
-use lazy_static::lazy_static;
-
-lazy_static! {
-    static ref CRYPTO_PROVIDER: Arc<rustls::crypto::CryptoProvider> =
-        Arc::new(crate::rustls::crypto::ring::default_provider());
-}
+static CRYPTO_PROVIDER: LazyLock<Arc<rustls::crypto::CryptoProvider>> =
+    LazyLock::new(|| Arc::new(crate::rustls::crypto::ring::default_provider()));
 
 pub fn crypto_provider() -> Arc<rustls::crypto::CryptoProvider> {
     CRYPTO_PROVIDER.clone()
