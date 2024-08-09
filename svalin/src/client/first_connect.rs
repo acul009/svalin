@@ -78,7 +78,7 @@ impl Init {
         let client = RpcClient::connect(&self.address, Some(&root), verifier)
             .await
             .context("failed to connect to server after certificate initialization")?;
-        let mut connection = client.upstream_connection();
+        let connection = client.upstream_connection();
 
         debug!("connected to server with certificate");
 

@@ -51,7 +51,8 @@ impl Client {
         let mut path = Self::get_config_dir_path()?;
         path.push("client.jammdb");
 
-        Ok(marmelade::DB::open(path)?)
+        let db = marmelade::DB::open(path)?;
+        Ok(db)
     }
 
     fn get_config_dir_path() -> Result<PathBuf> {

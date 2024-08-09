@@ -4,6 +4,7 @@ use argon2::{
     Argon2, Params,
 };
 use serde::{Deserialize, Serialize};
+use tracing::{debug, error};
 
 #[derive(Serialize, Deserialize)]
 pub struct ArgonParams {
@@ -42,21 +43,32 @@ impl ArgonParams {
 
         let (send, recv) = tokio::sync::oneshot::channel::<Result<[u8; 32]>>();
         let salt_bytes = self.salt.as_bytes().to_owned();
+        debug!("spawning blocking task");
 
         tokio::task::spawn_blocking(move || {
+            debug!("running blocking task");
             let mut hash = [0u8; 32];
             let result = argon
                 .hash_password_into(&secret, &salt_bytes, &mut hash)
+                .map(move |_| hash)
                 .map_err(|err| anyhow!(err));
 
-            if let Err(err) = result {
-                send.send(Err(err)).unwrap();
+            debug!("blocking computation ready");
+
+            if send.send(result).is_err() {
+                error!("send to oneshot channel failed");
             } else {
-                send.send(Ok(hash)).unwrap();
+                debug!("send to oneshot channel succeeded");
             };
         });
 
-        recv.await?
+        debug!("waiting for blocking task to complete");
+
+        let result = recv.await?;
+
+        debug!("blocking task completed");
+
+        result
     }
 
     pub async fn derive_password_hash(self, secret: Vec<u8>) -> Result<PasswordHash> {
