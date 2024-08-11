@@ -5,6 +5,7 @@ use test_log::test;
 use tokio::sync::oneshot;
 use totp_rs::TOTP;
 use tracing::{debug, error};
+use url::Url;
 
 use crate::{agent::Agent, client::Client};
 
@@ -23,7 +24,7 @@ async fn integration_tests() {
     let _ = std::fs::remove_file("./server.jammdb");
     let _ = std::fs::remove_file("./agent.jammdb");
 
-    let host = "localhost:1234".to_owned();
+    let host = Url::parse("udp://localhost:1234").unwrap();
 
     let first_connect = Client::first_connect(host.clone()).await.unwrap();
 
@@ -46,7 +47,7 @@ async fn integration_tests() {
 
     // test_agent
     debug!("initializing agent!");
-    let waiting = Agent::init(host.clone()).await.unwrap();
+    let waiting = Agent::init(host).await.unwrap();
     let join_code = waiting.join_code().to_owned();
     debug!("received join code");
     let (confirm_send, confirm_recv) = oneshot::channel();

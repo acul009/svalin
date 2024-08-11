@@ -4,6 +4,7 @@ use anyhow::{Context, Ok, Result};
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tracing::{debug, instrument};
+use url::Url;
 
 use crate::{
     client::verifiers::upstream_verifier::UpstreamVerifier,
@@ -18,10 +19,10 @@ use super::Client;
 
 impl Client {
     #[instrument]
-    pub async fn first_connect(address: String) -> Result<FirstConnect> {
-        debug!("try connecting to {address}");
+    pub async fn first_connect(url: Url) -> Result<FirstConnect> {
+        debug!("try connecting to {url}");
 
-        let client = RpcClient::connect(&address, None, SkipServerVerification::new()).await?;
+        let client = RpcClient::connect(&url, None, SkipServerVerification::new()).await?;
 
         debug!("successfully connected");
 
@@ -34,7 +35,7 @@ impl Client {
         debug!("public status: {server_status:?}");
 
         let first_connect = match server_status {
-            PublicStatus::WaitingForInit => FirstConnect::Init(Init { client, address }),
+            PublicStatus::WaitingForInit => FirstConnect::Init(Init { client, url }),
             PublicStatus::Ready => FirstConnect::Login(Login { client }),
         };
 
@@ -51,7 +52,7 @@ pub enum FirstConnect {
 
 pub struct Init {
     client: RpcClient,
-    address: String,
+    url: Url,
 }
 
 impl Init {
@@ -75,7 +76,7 @@ impl Init {
 
         let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert.clone());
 
-        let client = RpcClient::connect(&self.address, Some(&root), verifier)
+        let client = RpcClient::connect(&self.url, Some(&root), verifier)
             .await
             .context("failed to connect to server after certificate initialization")?;
         let connection = client.upstream_connection();
@@ -94,7 +95,7 @@ impl Init {
 
         Client::add_profile(
             username,
-            self.address,
+            self.url,
             server_cert,
             root.get_certificate().clone(),
             root,

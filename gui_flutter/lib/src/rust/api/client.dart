@@ -20,7 +20,7 @@ abstract class Client implements RustOpaqueInterface {
 
   Future<List<Device>> deviceList();
 
-  static Future<FirstConnect> firstConnect({required String address}) =>
+  static Future<FirstConnect> firstConnect({required Url address}) =>
       RustLib.instance.api.crateApiClientClientFirstConnect(address: address);
 
   static Future<List<String>> getProfiles() =>
@@ -62,6 +62,9 @@ abstract class Totp implements RustOpaqueInterface {
 
   Future<String> getUrl();
 }
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Url>>
+abstract class Url implements RustOpaqueInterface {}
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<WaitingForConfirmCode>>
 abstract class WaitingForConfirmCode implements RustOpaqueInterface {

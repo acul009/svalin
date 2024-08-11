@@ -4,6 +4,7 @@ use crate::rustls;
 use anyhow::{anyhow, Ok, Result};
 use quinn::{crypto::rustls::QuicClientConfig, TransportConfig, VarInt};
 use svalin_pki::PermCredentials;
+use url::Url;
 
 use crate::rpc::connection::DirectConnection;
 
@@ -15,7 +16,7 @@ pub struct RpcClient {
 
 impl RpcClient {
     pub async fn connect(
-        address: &str,
+        url: &Url,
         identity: Option<&PermCredentials>,
         verifier: Arc<dyn rustls::client::danger::ServerCertVerifier>,
     ) -> Result<RpcClient> {
@@ -46,8 +47,6 @@ impl RpcClient {
         client_config.transport_config(Arc::new(transport_config));
 
         endpoint.set_default_client_config(client_config);
-
-        let url = url::Url::parse(&format!("svalin://{address}"))?;
 
         let host = url
             .host_str()

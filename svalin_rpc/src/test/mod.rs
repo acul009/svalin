@@ -3,6 +3,7 @@ use std::net::ToSocketAddrs;
 use test_log::test;
 use tls_test_command::{tls_testDispatcher, TlsTestCommandHandler};
 use tracing::debug;
+use url::Url;
 
 mod tls_test_command;
 
@@ -16,13 +17,17 @@ use crate::{
 async fn ping_test() {
     println!("starting ping test");
 
-    let address = "127.0.0.1:1234";
+    let url = Url::parse("127.0.0.1:1234").unwrap();
     let credentials = svalin_pki::Keypair::generate()
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
     let server = RpcServer::new(
-        address.to_socket_addrs().unwrap().next().unwrap(),
+        (url.host_str().unwrap(), url.port().unwrap())
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap(),
         &credentials,
         SkipClientVerification::new(),
     )
@@ -36,7 +41,7 @@ async fn ping_test() {
 
     debug!("trying to connect client");
 
-    let client = RpcClient::connect(address, None, SkipServerVerification::new())
+    let client = RpcClient::connect(&url, None, SkipServerVerification::new())
         .await
         .unwrap();
 
@@ -53,13 +58,17 @@ async fn ping_test() {
 async fn tls_test() {
     println!("starting tls test");
 
-    let address = "127.0.0.1:1235";
+    let url = Url::parse("127.0.0.1:1235").unwrap();
     let credentials = svalin_pki::Keypair::generate()
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
-    let mut server = RpcServer::new(
-        address.to_socket_addrs().unwrap().next().unwrap(),
+    let server = RpcServer::new(
+        (url.host_str().unwrap(), url.port().unwrap())
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap(),
         &credentials,
         SkipClientVerification::new(),
     )
@@ -76,7 +85,7 @@ async fn tls_test() {
 
     debug!("trying to connect client");
 
-    let client = RpcClient::connect(address, None, SkipServerVerification::new())
+    let client = RpcClient::connect(&url, None, SkipServerVerification::new())
         .await
         .unwrap();
 

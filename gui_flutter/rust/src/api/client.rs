@@ -6,11 +6,12 @@ pub use svalin::shared::commands::agent_list::AgentListItem;
 pub use svalin::shared::join_agent::PublicAgentData;
 pub use svalin_pki::Certificate;
 pub use totp_rs::TOTP;
+pub use url::Url;
 
 #[frb(external)]
 impl Client {
     pub fn get_profiles() -> Result<Vec<String>> {}
-    pub async fn first_connect(address: String) -> Result<FirstConnect> {}
+    pub async fn first_connect(address: Url) -> Result<FirstConnect> {}
     pub fn remove_profile(profile_key: &str) -> Result<()> {}
     pub async fn open_profile_string(profile_key: String, password: String) -> Result<Client> {}
     pub async fn add_agent_with_code(&self, join_code: String) -> Result<WaitingForConfirmCode> {}

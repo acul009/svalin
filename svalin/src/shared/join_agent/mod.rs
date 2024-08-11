@@ -6,6 +6,7 @@ use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::rpc::session::{Session, SessionOpen};
 use tokio::{sync::Mutex, task::AbortHandle};
 use tracing::field::debug;
+use url::Url;
 
 use self::{accept_handler::JoinAcceptHandler, request_handler::JoinRequestHandler};
 
@@ -21,7 +22,7 @@ pub struct PublicAgentData {
 
 #[derive(Debug)]
 pub struct AgentInitPayload {
-    pub address: String,
+    pub url: Url,
     pub credentials: PermCredentials,
     pub root: Certificate,
     pub upstream: Certificate,

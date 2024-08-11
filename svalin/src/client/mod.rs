@@ -17,13 +17,14 @@ use svalin_rpc::commands::ping::pingDispatcher;
 use svalin_rpc::rpc::client::RpcClient;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
+use url::Url;
 
 use crate::shared::commands::agent_list::AgentListItem;
 
 /// flutter_rust_bridge:opaque
 pub struct Client {
     rpc: RpcClient,
-    upstream_address: String,
+    upstream_address: Url,
     upstream_certificate: Certificate,
     root_certificate: Certificate,
     credentials: PermCredentials,

@@ -9,6 +9,7 @@ use svalin_rpc::commands::ping::PingHandler;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::command::HandlerCollection;
 use tracing::{debug, instrument};
+use url::Url;
 
 mod init;
 
@@ -17,7 +18,7 @@ use crate::shared::join_agent::AgentInitPayload;
 
 pub struct Agent {
     rpc: RpcClient,
-    upstream_address: String,
+    upstream_address: Url,
     upstream_certificate: Certificate,
     root_certificate: Certificate,
     credentials: PermCredentials,
@@ -91,7 +92,7 @@ impl Agent {
             upstream_certificate: data.upstream,
             encrypted_credentials: Self::encrypt_credentials(data.credentials, scope.clone())
                 .await?,
-            upstream_address: data.address,
+            upstream_address: data.url,
         };
 
         scope.update(|b| {
@@ -199,7 +200,7 @@ impl Agent {
 
 #[derive(Serialize, Deserialize)]
 struct AgentConfig {
-    upstream_address: String,
+    upstream_address: Url,
     upstream_certificate: Certificate,
     root_certificate: Certificate,
     encrypted_credentials: Vec<u8>,

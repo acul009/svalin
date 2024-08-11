@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, fmt::format, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -6,6 +6,7 @@ use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::rpc::client::RpcClient;
 use tokio::{sync::RwLock, task::JoinSet};
 use tracing::{debug, error};
+use url::Url;
 
 use crate::{client::verifiers, shared::commands::agent_list::update_agent_listDispatcher};
 
@@ -14,7 +15,7 @@ use super::Client;
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Profile {
     pub(crate) username: String,
-    pub(crate) upstream_address: String,
+    pub(crate) upstream_address: Url,
     pub(crate) upstream_certificate: Certificate,
     pub(crate) root_certificate: Certificate,
     pub(crate) raw_credentials: Vec<u8>,
@@ -23,7 +24,7 @@ pub(crate) struct Profile {
 impl Profile {
     pub(crate) fn new(
         username: String,
-        upstream_address: String,
+        upstream_address: Url,
         upstream_certificate: Certificate,
         root_certificate: Certificate,
         raw_credentials: Vec<u8>,
@@ -115,7 +116,7 @@ impl Client {
 
     pub async fn add_profile(
         username: String,
-        upstream_address: String,
+        upstream_address: Url,
         upstream_certificate: Certificate,
         root_certificate: Certificate,
         credentials: PermCredentials,
@@ -123,7 +124,10 @@ impl Client {
     ) -> Result<()> {
         let raw_credentials = credentials.to_bytes(password).await?;
 
-        let scope = format!("{username}@{upstream_address}");
+        let scope = match upstream_address.port() {
+            Some(port) => format!("{username}@{}:{port}", upstream_address.host_str().unwrap()),
+            None => format!("{username}@{}", upstream_address.host_str().unwrap()),
+        };
 
         let profile = Profile::new(
             username,
