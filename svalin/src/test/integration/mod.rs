@@ -19,9 +19,9 @@ async fn integration_tests() {
     });
 
     // delete test dbs
-    std::fs::remove_file("./client.jammdb").unwrap_or(());
-    std::fs::remove_file("./server.jammdb").unwrap_or(());
-    std::fs::remove_file("./agent.jammdb").unwrap_or(());
+    let _ = std::fs::remove_file("./client.jammdb");
+    let _ = std::fs::remove_file("./server.jammdb");
+    let _ = std::fs::remove_file("./agent.jammdb");
 
     let host = "localhost:1234".to_owned();
 

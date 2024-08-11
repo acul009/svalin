@@ -15,7 +15,7 @@ async fn test_init() {
     let server_handle = tokio::spawn(async move {
         let addr = "0.0.0.0:1234".to_socket_addrs().unwrap().next().unwrap();
         // delete the test db
-        std::fs::remove_file("./server_test.jammdb").unwrap_or(());
+        let _ = std::fs::remove_file("./server_test.jammdb");
         let db = marmelade::DB::open("./server_test.jammdb").expect("failed to open client db");
         let mut server = Server::prepare(addr, db.scope("default".into()).unwrap())
             .await
@@ -27,7 +27,7 @@ async fn test_init() {
     });
 
     // delete test client db
-    std::fs::remove_file("./client.jammdb").unwrap_or(());
+    let _ = std::fs::remove_file("./client.jammdb");
 
     let host = "localhost:1234".to_owned();
 
