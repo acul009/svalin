@@ -6,16 +6,6 @@
 
 A lot of this code is still being heavily worked and, is missing security checks and has not been reviewed.
 
-Feel free to browse the codebase and create issues for any problem you see.
-
-## What is this ?
-
-## ⚠️WARNING⚠️
-
-**This repository is not yet ready for production use.**
-
-A lot of this code is still being heavily worked and, is missing security checks and has not been reviewed.
-
 The current focus is getting this behemoth of a project working in any state.
 
 One the programm is usable, it's going to be time to slowly but surely improve everything.
@@ -104,7 +94,11 @@ TLDR: Rustdesk is primarily a remote software while Svalin is more similar to a 
 
 # Architecture
 
-## Connectivity
+## crate svalin
+
+## crate svalin_rpc
+
+This crate contains the inner workings of the RPC system used to send data between devices
 
 Svalins RPC-API is based on these basic primitives.
 
@@ -132,6 +126,21 @@ That very same logic is also used to handle the E2E encryption. To establish an 
 svalin just replaces the normal QUIC transport with a TLS-stream based on tokio-rustls.
 The underlying RPC system doesn't know or care about the encryption.
 
+## svalin_pki
+
+This crate contains the code for certificate generation and encryption.
+
+You'll also find the TBRHL here (Transaction Based Rolling Hash Ledger).
+A very simple transaction store inspired by Blockchain traceability.
+(Don't worry, it's not a real Blockchain)
+
+## svalin_macros
+
+You'll find svalins macros here
+
+## svalin_sysctl
+
+This crate contains code used by the agent for monitoring and managing a system.
 
 # Todo
 
@@ -156,7 +165,7 @@ The underlying RPC system doesn't know or care about the encryption.
 - [ ] Remote Terminal
 
 ## Architecture
-- [ ] crate for local system managment and package management
+- [X] crate for local system managment and package management (WIP)
 - [ ] Basic Permission System
 - [ ] Network Security System and Alerting
 - [ ] Replace certificate distribution with better system (possibly TBRHL)
