@@ -34,8 +34,8 @@
         ];
 
         buildInputs = with pkgs; [
-          rustc
-          cargo
+          # rustc
+          # cargo
 
           pkg-config
           wayland
