@@ -17,7 +17,6 @@ svalin_macros = { path = "../svalin_macros" }
 marmelade = { path = "../marmelade", features = ["postcard"] }
 tokio = { version = "1.38.0", features = ["full", "test-util"] }
 rand = "0.8.5"
-url = "2.5.0"
 totp-rs = { version = "5.5.1", features = [
     "qr",
     "serde_support",

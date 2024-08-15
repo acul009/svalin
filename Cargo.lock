@@ -1858,7 +1858,6 @@ dependencies = [
  "totp-rs",
  "tracing",
  "tracing-subscriber",
- "url",
 ]
 
 [[package]]
@@ -1904,7 +1903,6 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tracing",
- "url",
 ]
 
 [[package]]
@@ -2246,7 +2244,6 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
- "serde",
 ]
 
 [[package]]

@@ -47,14 +47,16 @@ impl RpcClient {
 
         endpoint.set_default_client_config(client_config);
 
-        let url = url::Url::parse(&format!("svalin://{address}"))?;
+        let split: Vec<&str> = address.split(":").collect();
 
-        let host = url
-            .host_str()
-            .ok_or_else(|| anyhow!("missing host in url"))?;
+        let host = *split
+            .get(0)
+            .ok_or_else(|| anyhow!("missing host in endpoint"))?;
 
-        // default port
-        let port = url.port().unwrap_or(1234);
+        let port: u16 = split
+            .get(1)
+            .ok_or_else(|| anyhow!("missing port in endpoint"))?
+            .parse()?;
 
         let addr = (host, port)
             .to_socket_addrs()?
