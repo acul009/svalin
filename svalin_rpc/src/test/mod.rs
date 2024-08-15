@@ -17,7 +17,7 @@ use crate::{
 async fn ping_test() {
     println!("starting ping test");
 
-    let url = Url::parse("udp://127.0.0.1:1234").unwrap();
+    let url = Url::parse("127.0.0.1:1234").unwrap();
     let credentials = svalin_pki::Keypair::generate()
         .unwrap()
         .to_self_signed_cert()
@@ -58,7 +58,7 @@ async fn ping_test() {
 async fn tls_test() {
     println!("starting tls test");
 
-    let url = Url::parse("udp://127.0.0.1:1235").unwrap();
+    let url = Url::parse("127.0.0.1:1235").unwrap();
     let credentials = svalin_pki::Keypair::generate()
         .unwrap()
         .to_self_signed_cert()
