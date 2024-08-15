@@ -3,5 +3,4 @@
 
 pub mod client;
 pub mod simple;
-pub mod streamsink;
 pub mod totp;
