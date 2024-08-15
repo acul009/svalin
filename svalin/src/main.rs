@@ -2,7 +2,6 @@ use clap::{Parser, Subcommand};
 use svalin::{agent::Agent, server::Server};
 
 use tracing_subscriber;
-use url::Url;
 
 #[derive(Debug, Parser)]
 #[clap(name = "svalin", version)]
@@ -25,7 +24,7 @@ enum Command {
 #[derive(Debug, Subcommand)]
 enum AgentAction {
     /// Initialize the agent by connecting to a server
-    Init { address: Url },
+    Init { address: String },
 }
 
 fn main() {

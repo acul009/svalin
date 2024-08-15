@@ -76,7 +76,8 @@ abstract class RustLibApi extends BaseApi {
 
   Future<List<Device>> crateApiClientClientDeviceList({required Client that});
 
-  Future<FirstConnect> crateApiClientClientFirstConnect({required Url address});
+  Future<FirstConnect> crateApiClientClientFirstConnect(
+      {required String address});
 
   Future<List<String>> crateApiClientClientGetProfiles();
 
@@ -174,12 +175,6 @@ abstract class RustLibApi extends BaseApi {
 
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_TotpPtr;
 
-  RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_Url;
-
-  RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_Url;
-
-  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_UrlPtr;
-
   RustArcIncrementStrongCountFnType
       get rust_arc_increment_strong_count_WaitingForConfirmCode;
 
@@ -256,12 +251,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @override
   Future<FirstConnect> crateApiClientClientFirstConnect(
-      {required Url address}) {
+      {required String address}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUrl(
-            address, serializer);
+        sse_encode_String(address, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
             funcId: 3, port: port_);
       },
@@ -752,12 +746,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_Totp =>
       wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerTOTP;
 
-  RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_Url => wire
-      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUrl;
-
-  RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_Url => wire
-      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUrl;
-
   RustArcIncrementStrongCountFnType
       get rust_arc_increment_strong_count_WaitingForConfirmCode => wire
           .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWaitingForConfirmCode;
@@ -834,13 +822,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return TotpImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  Url dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUrl(
-      dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return UrlImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -945,13 +926,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return TotpImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  Url dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUrl(
-      dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return UrlImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -1177,14 +1151,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  Url sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUrl(
-      SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return UrlImpl.frbInternalSseDecode(
-        sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
-  }
-
-  @protected
   WaitingForConfirmCode
       sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWaitingForConfirmCode(
           SseDeserializer deserializer) {
@@ -1298,14 +1264,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return TotpImpl.frbInternalSseDecode(
-        sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
-  }
-
-  @protected
-  Url sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUrl(
-      SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return UrlImpl.frbInternalSseDecode(
         sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
   }
 
@@ -1549,15 +1507,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
-      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUrl(
-          Url self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize(
-        (self as UrlImpl).frbInternalSseEncode(move: true), serializer);
-  }
-
-  @protected
-  void
       sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerWaitingForConfirmCode(
           WaitingForConfirmCode self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1673,15 +1622,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
         (self as TotpImpl).frbInternalSseEncode(move: null), serializer);
-  }
-
-  @protected
-  void
-      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUrl(
-          Url self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize(
-        (self as UrlImpl).frbInternalSseEncode(move: null), serializer);
   }
 
   @protected
@@ -2031,26 +1971,6 @@ class TotpImpl extends RustOpaque implements Totp {
   Future<String> getUrl() => RustLib.instance.api.crateApiClientTotpGetUrl(
         that: this,
       );
-}
-
-@sealed
-class UrlImpl extends RustOpaque implements Url {
-  // Not to be used by end users
-  UrlImpl.frbInternalDcoDecode(List<dynamic> wire)
-      : super.frbInternalDcoDecode(wire, _kStaticData);
-
-  // Not to be used by end users
-  UrlImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative)
-      : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
-
-  static final _kStaticData = RustArcStaticData(
-    rustArcIncrementStrongCount:
-        RustLib.instance.api.rust_arc_increment_strong_count_Url,
-    rustArcDecrementStrongCount:
-        RustLib.instance.api.rust_arc_decrement_strong_count_Url,
-    rustArcDecrementStrongCountPtr:
-        RustLib.instance.api.rust_arc_decrement_strong_count_UrlPtr,
-  );
 }
 
 @sealed

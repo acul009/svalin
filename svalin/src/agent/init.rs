@@ -5,7 +5,6 @@ use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tokio::sync::oneshot;
 use tracing::debug;
-use url::Url;
 
 use crate::shared::{
     commands::public_server_status::get_public_statusDispatcher,
@@ -15,10 +14,10 @@ use crate::shared::{
 use super::Agent;
 
 impl Agent {
-    pub async fn init(url: Url) -> Result<WaitingForInit> {
-        debug!("try connecting to {url}");
+    pub async fn init(address: String) -> Result<WaitingForInit> {
+        debug!("try connecting to {address}");
 
-        let client = RpcClient::connect(&url, None, SkipServerVerification::new()).await?;
+        let client = RpcClient::connect(&address, None, SkipServerVerification::new()).await?;
 
         debug!("successfully connected");
 
@@ -50,7 +49,7 @@ impl Agent {
 
                 tokio::spawn(async move {
                     match conn2
-                        .request_join(url, join_code_send, confirm_code_send)
+                        .request_join(address, join_code_send, confirm_code_send)
                         .await
                     {
                         Ok(init_payload) => {

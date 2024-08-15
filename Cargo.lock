@@ -1507,7 +1507,6 @@ dependencies = [
  "tokio",
  "totp-rs",
  "tracing-subscriber",
- "url",
 ]
 
 [[package]]
