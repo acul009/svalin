@@ -1200,6 +1200,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
 name = "pem"
 version = "3.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1502,6 +1508,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "flutter_rust_bridge",
+ "paste",
  "svalin",
  "svalin_pki",
  "tokio",
@@ -1853,6 +1860,7 @@ dependencies = [
  "svalin_macros",
  "svalin_pki",
  "svalin_rpc",
+ "svalin_sysctl",
  "test-log",
  "tokio",
  "totp-rs",

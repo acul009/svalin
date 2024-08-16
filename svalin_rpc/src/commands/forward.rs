@@ -87,6 +87,7 @@ impl CommandHandler for ForwardHandler {
     }
 }
 
+#[derive(Clone)]
 pub struct ForwardConnection<T> {
     connection: T,
     credentials: PermCredentials,

@@ -9,7 +9,7 @@ macro_rules! create_streamsink_converter {
     ($t:ty) => {
         paste::paste! {
             pub async fn [<$t _receiver_into_streamsink>](
-                receiver: Receiver<$t>,
+                mut receiver: Receiver<$t>,
                 sink: StreamSink<$t>,
             ) {
                 while let Ok(msg) = receiver.recv().await {

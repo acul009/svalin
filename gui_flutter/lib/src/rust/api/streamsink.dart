@@ -4,13 +4,13 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+import 'client.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored (category: IgnoreBecauseNotAllowedOwner): `streamsink`
+Stream<Device> deviceReceiverIntoStreamsink(
+        {required ReceiverDevice receiver}) =>
+    RustLib.instance.api
+        .crateApiStreamsinkDeviceReceiverIntoStreamsink(receiver: receiver);
 
-// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner< T>>
-abstract class T implements RustOpaqueInterface {}
-
-abstract class ToStreamSink {
-  Stream<T> streamsink();
-}
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Receiver < Device >>>
+abstract class ReceiverDevice implements RustOpaqueInterface {}
