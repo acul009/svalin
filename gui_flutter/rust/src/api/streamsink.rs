@@ -1,15 +1,16 @@
 pub use anyhow::anyhow;
 pub use anyhow::Result;
+pub use svalin::client::device::RemoteLiveData;
 pub use svalin::client::{device::Device, Client, FirstConnect, Init, Login};
-pub use tokio::sync::broadcast::Receiver;
+use svalin_sysctl::realtime::RealtimeStatus;
 
 use crate::frb_generated::StreamSink;
 
-macro_rules! create_streamsink_converter {
+macro_rules! create_broadcast_converter {
     ($t:ty) => {
         paste::paste! {
-            pub async fn [<$t _receiver_into_streamsink>](
-                mut receiver: Receiver<$t>,
+            pub async fn [<$t _broadcast_into_streamsink>](
+                mut receiver: tokio::sync::broadcast::Receiver<$t>,
                 sink: StreamSink<$t>,
             ) {
                 while let Ok(msg) = receiver.recv().await {
@@ -22,38 +23,24 @@ macro_rules! create_streamsink_converter {
     };
 }
 
-create_streamsink_converter!(Device);
+macro_rules! create_watcher_converter {
+    ($t:ty) => {
+        paste::paste! {
+            pub async fn [<$t _watcher_into_streamsink>](
+                mut receiver: tokio::sync::watch::Receiver<$t>,
+                sink: frb_generated::StreamSink<$t>,
+            ) {
+                if let Err(_) = sink.add(receiver.borrow().clone()) {
+                    return;
+                }
+                while let Ok(_) = receiver.changed().await {
+                    if let Err(_) = sink.add(receiver.borrow().clone()) {
+                        return;
+                    }
+                }
+            }
+        }
+    };
+}
 
-// pub async fn DeviceListItem_receiver_into_streamsink(
-//     receiver: Receiver<DeviceListItem>,
-//     sink: StreamSink<DeviceListItem>,
-// ) {
-//     while let Ok(msg) = receiver.recv().await {
-//         if let Err(err) = sink.add(msg) {
-//             return;
-//         }
-//     }
-// }
-
-// pub trait ToStreamSink {
-//     type T: Clone;
-
-//     async fn streamsink(&mut self, sink: StreamSink<Self::T>) -> Result<()>;
-// }
-
-// impl<T> ToStreamSink for tokio::sync::broadcast::Receiver<T>
-// where
-//     T: Clone + SseEncode,
-// {
-//     type T = T;
-
-//     async fn streamsink(&mut self, sink: StreamSink<Self::T>) -> Result<()> {
-//         while let Ok(msg) = self.recv().await {
-//             if let Err(err) = sink.add(msg) {
-//                 return Err(anyhow!(err));
-//             }
-//         }
-
-//         Ok(())
-//     }
-// }
+// create_watcher_converter!(RealtimeStatus);

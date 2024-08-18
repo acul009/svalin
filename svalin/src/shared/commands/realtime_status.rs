@@ -10,6 +10,8 @@ use svalin_rpc::rpc::{
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::watch;
 
+use crate::client::device::RemoteLiveData;
+
 fn realtime_status_key() -> String {
     "realtime-status".into()
 }
@@ -35,16 +37,17 @@ impl CommandHandler for RealtimeStatusHandler {
 #[rpc_dispatch(realtime_status_key())]
 pub async fn subscribe_realtime_status(
     session: &mut Session<SessionOpen>,
-    send: watch::Sender<Option<RealtimeStatus>>,
+    send: &watch::Sender<RemoteLiveData<RealtimeStatus>>,
 ) -> Result<()> {
     loop {
         let status: Result<RealtimeStatus> = session.read_object().await;
         match status {
             Ok(status) => {
-                send.send(Some(status));
+                if let Err(_) = send.send(RemoteLiveData::Ready(status)) {
+                    return Ok(());
+                }
             }
             Err(err) => {
-                send.send(None);
                 return Err(err);
             }
         }

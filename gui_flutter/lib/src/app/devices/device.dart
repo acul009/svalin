@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:gui_flutter/src/app/devices/life_info/cpu.dart';
+import 'package:gui_flutter/src/app/devices/life_info/life_info.dart';
 import 'package:gui_flutter/src/rust/api/client.dart';
 
 class DeviceView extends StatelessWidget {
@@ -40,7 +41,7 @@ class DeviceView extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            CpuDisplay(device: device),
+            LiveInfo(device: device),
           ],
         ),
       ),
