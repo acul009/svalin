@@ -153,7 +153,7 @@ impl Agent {
 
         #[cfg(target_os = "linux")]
         {
-            Ok(PathBuf::from("/etc/svalin/agent"))
+            Ok(PathBuf::from("/var/svalin/agent"))
         }
     }
 
