@@ -14,9 +14,9 @@ Feel free to browse the codebase and create issues for all problems you see.
 
 ## What is this ?
 
-This is my Playground for developing a production ready Svalin.
+This is my Repository for developing a production ready Svalin.
 
-## Purpose
+### Purpose
 
 Svalin is suppoed to be the first open-source end-to-end encrypted remote managment software with a focus on small businesses, individuals and goverment agencies.
 This codebase is still far from where I want it to be, but I have to start somewhere.
@@ -26,7 +26,7 @@ Svalin has the following guidelines:
 - Be secure by default
 - Allow self-hosting
 
-## Why I'm building Svalin
+### Why I'm building Svalin
 
 Before I continue, let me say this: If you're happy with your solution, you don't have to switch.
 By it's design Svalin will not be for everyone and if you prefer something else, that's ok.
@@ -71,7 +71,7 @@ I started thinking about what I would like my perfect remote software to look li
 
 Obviously I'm far from reaching all of these, but that won't stop me from trying.
 
-## Why not Rustdesk?
+### Why not Rustdesk?
 
 Rustdesk follows a different approach and Idea. They much more closely resemble the Teamviewer experience.
 
@@ -90,11 +90,64 @@ If you're interested in that, I'd be happy to hear about it.
 
 If you're based in the EU, you might also be happy to hear, that Svalin is a german project.
 
-TLDR: Rustdesk is primarily a remote software while Svalin is more similar to a generic coordinator.
+TLDR: Rustdesk is primarily a remote software while Svalin is more similar to a generic coordinator. Use whatever fits your use case best.
+
+## Quickstart
+
+WIP - this isn't really complete yet.
+
+### Installing the server
+
+The server does not yet have an official installation method.
+
+You can start the server with the following command: `svalin server 0.0.0.0:<PORT>`
+Make sure the client and agents can reach the udp port you specified.
+
+### Setting up the client
+
+The client does not yet have an official installation method.
+
+When starting the client without any existing profiles, you will be asked to create one.
+enter the server address with port (e.g. `svalin.example.com:1234`) and follow the stept to create your root user.
+
+**MAKE SURE YOU WRITE DOWN YOUR ROOT PASSWORD - YOU CANNOT RECOVER IT**
+
+On each new start you can select a profile to use or you can create a new one.
+
+**To open a profile you need the corresponding password to decrypt your certificate**
+
+### Setting up the agent
+
+The agent does not yet have an official installation method.
+
+When first using the client, start it with `svalin agent init <HOST:PORT>`.
+
+The agent will print out a join code. Add a new device in the client and enter the join code when asked.
+
+After receiving the join code, the client will establish an encrypted connection to the agent. The agent should now print out it's confirm code.
+Enter the confirm code along with the device name in the client and click confirm to add the new device.
+
+## Contributing
+
+At the moment there is not an official way to contribute yet.
+If you want to help you can create an issue so we can coordinate our efforts.
+
+## Extending
+
+Currently Svalin isn't really ready to be extended.
+If you have a project or some functionality in mind, please create an issue describing what you would like to do.
+Then we can work on exposing the svalin API to fit your needs.
 
 # Architecture
 
 ## crate svalin
+
+This crate is the actual Svalin library used by the GUI to control the server and devices.
+
+It also builds to the rust standalone which can run as either server or agent.
+
+If you want to build your own UI, you should find everything you need here.
+If you don't - just create an issue.
 
 ## crate svalin_rpc
 
@@ -160,8 +213,9 @@ This crate contains code used by the agent for monitoring and managing a system.
 - [ ] Make Credentials use an Arc internally
 - [X] Agent init / join
 - [X] Connection forwarding
-- [ ] E2E Encryption
-- [ ] List all agents with connection status
+- [X] E2E Encryption
+- [X] List all agents with connection status
+- [ ] Show realtime performance ingo
 - [ ] Remote Terminal
 
 ## Architecture
