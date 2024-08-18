@@ -18,8 +18,13 @@ class CpuDisplay extends StatelessWidget {
               Wrap(
                 children: cpuStatus.cores.map(
                   (element) {
-                    return CircularProgressIndicator(
-                      value: element.load,
+                    return Column(
+                      children: [
+                        CircularProgressIndicator(
+                          value: element.load / 100,
+                        ),
+                        Text(element.load.floor().toString())
+                      ],
                     );
                   },
                 ).toList(),

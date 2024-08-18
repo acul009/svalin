@@ -19,7 +19,7 @@ use tokio::{
     sync::{broadcast, watch, RwLock},
     task::JoinHandle,
 };
-use tracing::{error, instrument::WithSubscriber};
+use tracing::{debug, error, instrument::WithSubscriber};
 
 use crate::shared::commands::{
     agent_list::AgentListItem, realtime_status::subscribe_realtime_statusDispatcher,
@@ -80,6 +80,7 @@ impl Device {
 
     async fn start_realtime_subscriber_if_neccesary(&self) {
         if self.data.item.read().await.online_status == false {
+            debug!("unable to fetch realtime - device offline");
             return;
         }
 
@@ -87,6 +88,7 @@ impl Device {
 
         if let Some(handle) = lock.deref() {
             if handle.is_finished() {
+                debug!("realtime monitor already running");
                 return;
             }
         }
@@ -96,10 +98,16 @@ impl Device {
         let conn = self.data.connection.clone();
         let realtime = self.data.realtime.clone();
 
+        debug!("no realtime monitor left, starting new one");
+
         *lock = Some(tokio::spawn(async move {
             match conn.subscribe_realtime_status(&realtime).await {
-                Ok(_) => {}
-                Err(_) => {
+                Ok(_) => {
+                    debug!("no one left listening to realtime status");
+                    let _ = realtime.send(RemoteLiveData::Unavailable);
+                }
+                Err(err) => {
+                    error!("{err}");
                     let _ = realtime.send(RemoteLiveData::Unavailable);
                 }
             }
@@ -107,7 +115,8 @@ impl Device {
     }
 
     pub async fn subscribe_realtime(&self) -> watch::Receiver<RemoteLiveData<RealtimeStatus>> {
+        let receiver = self.data.realtime.subscribe();
         self.start_realtime_subscriber_if_neccesary().await;
-        self.data.realtime.subscribe()
+        receiver
     }
 }

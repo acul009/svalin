@@ -7,25 +7,25 @@ use serde::{Deserialize, Serialize};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 use tokio::sync::Mutex;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RealtimeStatus {
     pub cpu: CpuStatus,
     pub memory: MemoryStatus,
     pub swap: SwapStatus,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CpuStatus {
     pub cores: Vec<CoreStatus>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CoreStatus {
     pub load: f32,
     pub frequency: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MemoryStatus {
     pub total: u64,
     pub available: u64,
@@ -33,7 +33,7 @@ pub struct MemoryStatus {
     pub used: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SwapStatus {
     pub total: u64,
     pub free: u64,

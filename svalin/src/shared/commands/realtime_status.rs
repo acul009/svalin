@@ -9,6 +9,7 @@ use svalin_rpc::rpc::{
 };
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::watch;
+use tracing::debug;
 
 use crate::client::device::RemoteLiveData;
 
@@ -31,8 +32,11 @@ impl CommandHandler for RealtimeStatusHandler {
     }
 
     async fn handle(&self, session: &mut Session<SessionOpen>) -> Result<()> {
+        debug!("realtime status requested");
         loop {
             let status = RealtimeStatus::get().await;
+            debug!("sending realtime status");
+            debug!("cpu: {:?}", status.cpu);
             session.write_object(&status).await?;
 
             tokio::time::sleep(Duration::from_secs(5)).await;
