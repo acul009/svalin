@@ -197,6 +197,15 @@ This crate contains code used by the agent for monitoring and managing a system.
 
 # Todo
 
+## Strategy
+- [ ] get really basic version working
+- [ ] add test so refactors arent as risky
+- [ ] find some epic rust nerds who can help me fix my architecture and get this in a stable state
+- [ ] find a way to reveal this with a big bang so I can find even more really cool nerds to gather feedback and extend this
+- [ ] have a small but nice community around svalin
+- [ ] ???
+- [ ] profit
+
 ## Simple
 - [ ] Show Unlock Error when password on profile unlock wrong
 - [ ] Make Credentials use an Arc internally
