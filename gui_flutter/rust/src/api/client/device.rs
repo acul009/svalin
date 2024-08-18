@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::frb_generated::StreamSink;
 use flutter_rust_bridge::frb;
 pub use svalin::client::device::Device;
@@ -5,6 +7,7 @@ pub use svalin::client::device::RemoteLiveData;
 pub use svalin::shared::commands::agent_list::AgentListItem;
 pub use svalin::shared::join_agent::PublicAgentData;
 pub use svalin_pki::Certificate;
+pub use svalin_sysctl::realtime::CoreStatus;
 pub use svalin_sysctl::realtime::CpuStatus;
 pub use svalin_sysctl::realtime::MemoryStatus;
 pub use svalin_sysctl::realtime::RealtimeStatus;
@@ -27,13 +30,37 @@ pub struct _PublicAgentData {
     pub cert: Certificate,
 }
 
-pub type RemoteLiveDataRealtimeStatus = RemoteLiveData<RealtimeStatus>;
+// pub type RemoteLiveDataRealtimeStatus = RemoteLiveData<RealtimeStatus>;
 
-#[frb(non_opaque, mirror(RemoteLiveDataRealtimeStatus))]
-pub enum _RemoteLiveDataRealtimeStatus {
+// #[frb(non_opaque, mirror(RemoteLiveDataRealtimeStatus))]
+pub enum RemoteLiveDataRealtimeStatus {
     Unavailable,
     Pending,
     Ready(RealtimeStatus),
+}
+
+impl From<&RemoteLiveData<RealtimeStatus>> for RemoteLiveDataRealtimeStatus {
+    fn from(value: &RemoteLiveData<RealtimeStatus>) -> Self {
+        match value {
+            RemoteLiveData::Unavailable => Self::Unavailable,
+            RemoteLiveData::Pending => Self::Pending,
+            RemoteLiveData::Ready(value) => Self::Ready(value.clone()),
+        }
+    }
+}
+
+pub async fn device_subscribe_realtime_status(
+    sink: StreamSink<RemoteLiveDataRealtimeStatus>,
+    device: Device,
+) {
+    let mut watch = device.subscribe_realtime().await;
+    sink.add(watch.borrow().deref().into()).unwrap();
+
+    while let Ok(_) = watch.changed().await {
+        if let Err(_) = sink.add(watch.borrow().deref().into()) {
+            return;
+        };
+    }
 }
 
 #[frb(non_opaque, mirror(RealtimeStatus))]
@@ -43,16 +70,13 @@ pub struct _RealtimeStatus {
     pub swap: SwapStatus,
 }
 
-pub async fn device_subscribe_realtime_status(
-    sink: StreamSink<RemoteLiveDataRealtimeStatus>,
-    device: Device,
-) {
-    let mut watch = device.subscribe_realtime().await;
-    sink.add(watch.borrow().clone()).unwrap();
+#[frb(non_opaque, mirror(CpuStatus))]
+pub struct _CpuStatus {
+    pub cores: Vec<CoreStatus>,
+}
 
-    while let Ok(_) = watch.changed().await {
-        if let Err(_) = sink.add(watch.borrow().clone()) {
-            return;
-        };
-    }
+#[frb(non_opaque, mirror(CoreStatus))]
+pub struct _CoreStatus {
+    pub load: f32,
+    pub frequency: u64,
 }

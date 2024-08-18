@@ -13,6 +13,7 @@ use tracing::{debug, instrument};
 mod init;
 
 use crate::client::verifiers;
+use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::join_agent::AgentInitPayload;
 
 pub struct Agent {
@@ -69,7 +70,11 @@ impl Agent {
     pub async fn run(&self) -> Result<()> {
         let e2e_commands = HandlerCollection::new();
 
-        e2e_commands.chain().await.add(PingHandler::new());
+        e2e_commands
+            .chain()
+            .await
+            .add(PingHandler::new())
+            .add(RealtimeStatusHandler::new());
 
         let public_commands = HandlerCollection::new();
 

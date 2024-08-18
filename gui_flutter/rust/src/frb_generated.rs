@@ -29,6 +29,7 @@ use crate::api::client::device::*;
 use crate::api::client::*;
 use crate::api::simple::*;
 use crate::api::totp::*;
+use crate::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
 use flutter_rust_bridge::{Handler, IntoIntoDart};
@@ -687,7 +688,7 @@ fn wire__crate__api__client__device__device_subscribe_realtime_status_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_sink = <StreamSink<
-                RemoteLiveData<RealtimeStatus>,
+                crate::api::client::device::RemoteLiveDataRealtimeStatus,
                 flutter_rust_bridge::for_generated::SseCodec,
             >>::sse_decode(&mut deserializer);
             let api_device = <Device>::sse_decode(&mut deserializer);
@@ -891,6 +892,15 @@ const _: fn() = || {
         let _: crate::api::client::device::PublicAgentData = AgentListItem.public_data;
         let _: bool = AgentListItem.online_status;
     }
+    {
+        let CoreStatus = None::<crate::api::client::device::CoreStatus>.unwrap();
+        let _: f32 = CoreStatus.load;
+        let _: u64 = CoreStatus.frequency;
+    }
+    {
+        let CpuStatus = None::<crate::api::client::device::CpuStatus>.unwrap();
+        let _: Vec<crate::api::client::device::CoreStatus> = CpuStatus.cores;
+    }
     match None::<crate::api::client::FirstConnect>.unwrap() {
         crate::api::client::FirstConnect::Init(field0) => {
             let _: Init = field0;
@@ -903,6 +913,12 @@ const _: fn() = || {
         let PublicAgentData = None::<crate::api::client::device::PublicAgentData>.unwrap();
         let _: String = PublicAgentData.name;
         let _: Certificate = PublicAgentData.cert;
+    }
+    {
+        let RealtimeStatus = None::<crate::api::client::device::RealtimeStatus>.unwrap();
+        let _: crate::api::client::device::CpuStatus = RealtimeStatus.cpu;
+        let _: MemoryStatus = RealtimeStatus.memory;
+        let _: SwapStatus = RealtimeStatus.swap;
     }
 };
 
@@ -927,7 +943,10 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Login>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
-    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>
+    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MemoryStatus>
+);
+flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
+    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SwapStatus>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SystemTimeError>
@@ -1009,11 +1028,21 @@ impl SseDecode for Login {
     }
 }
 
-impl SseDecode for RemoteLiveData<RealtimeStatus> {
+impl SseDecode for MemoryStatus {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <RustOpaqueMoi<
-            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
+            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MemoryStatus>,
+        >>::sse_decode(deserializer);
+        return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
+    }
+}
+
+impl SseDecode for SwapStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <RustOpaqueMoi<
+            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SwapStatus>,
         >>::sse_decode(deserializer);
         return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
     }
@@ -1102,9 +1131,17 @@ impl SseDecode for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpa
 }
 
 impl SseDecode
-    for RustOpaqueMoi<
-        flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
-    >
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MemoryStatus>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <usize>::sse_decode(deserializer);
+        return decode_rust_opaque_moi(inner);
+    }
+}
+
+impl SseDecode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SwapStatus>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1143,9 +1180,7 @@ impl SseDecode
     }
 }
 
-impl SseDecode
-    for StreamSink<RemoteLiveData<RealtimeStatus>, flutter_rust_bridge::for_generated::SseCodec>
-{
+impl SseDecode for StreamSink<String, flutter_rust_bridge::for_generated::SseCodec> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <String>::sse_decode(deserializer);
@@ -1153,7 +1188,12 @@ impl SseDecode
     }
 }
 
-impl SseDecode for StreamSink<String, flutter_rust_bridge::for_generated::SseCodec> {
+impl SseDecode
+    for StreamSink<
+        crate::api::client::device::RemoteLiveDataRealtimeStatus,
+        flutter_rust_bridge::for_generated::SseCodec,
+    >
+{
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <String>::sse_decode(deserializer);
@@ -1186,6 +1226,33 @@ impl SseDecode for bool {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         deserializer.cursor.read_u8().unwrap() != 0
+    }
+}
+
+impl SseDecode for crate::api::client::device::CoreStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_load = <f32>::sse_decode(deserializer);
+        let mut var_frequency = <u64>::sse_decode(deserializer);
+        return crate::api::client::device::CoreStatus {
+            load: var_load,
+            frequency: var_frequency,
+        };
+    }
+}
+
+impl SseDecode for crate::api::client::device::CpuStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_cores = <Vec<crate::api::client::device::CoreStatus>>::sse_decode(deserializer);
+        return crate::api::client::device::CpuStatus { cores: var_cores };
+    }
+}
+
+impl SseDecode for f32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_f32::<NativeEndian>().unwrap()
     }
 }
 
@@ -1233,6 +1300,20 @@ impl SseDecode for Vec<String> {
     }
 }
 
+impl SseDecode for Vec<crate::api::client::device::CoreStatus> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = vec![];
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::client::device::CoreStatus>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1254,6 +1335,43 @@ impl SseDecode for crate::api::client::device::PublicAgentData {
             name: var_name,
             cert: var_cert,
         };
+    }
+}
+
+impl SseDecode for crate::api::client::device::RealtimeStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_cpu = <crate::api::client::device::CpuStatus>::sse_decode(deserializer);
+        let mut var_memory = <MemoryStatus>::sse_decode(deserializer);
+        let mut var_swap = <SwapStatus>::sse_decode(deserializer);
+        return crate::api::client::device::RealtimeStatus {
+            cpu: var_cpu,
+            memory: var_memory,
+            swap: var_swap,
+        };
+    }
+}
+
+impl SseDecode for crate::api::client::device::RemoteLiveDataRealtimeStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut tag_ = <i32>::sse_decode(deserializer);
+        match tag_ {
+            0 => {
+                return crate::api::client::device::RemoteLiveDataRealtimeStatus::Unavailable;
+            }
+            1 => {
+                return crate::api::client::device::RemoteLiveDataRealtimeStatus::Pending;
+            }
+            2 => {
+                let mut var_field0 =
+                    <crate::api::client::device::RealtimeStatus>::sse_decode(deserializer);
+                return crate::api::client::device::RemoteLiveDataRealtimeStatus::Ready(var_field0);
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
     }
 }
 
@@ -1292,6 +1410,13 @@ impl SseDecode for u32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         deserializer.cursor.read_u32::<NativeEndian>().unwrap()
+    }
+}
+
+impl SseDecode for u64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u64::<NativeEndian>().unwrap()
     }
 }
 
@@ -1480,21 +1605,31 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<Login>> for Login {
 }
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for FrbWrapper<RemoteLiveData<RealtimeStatus>> {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<MemoryStatus> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
             .into_dart()
     }
 }
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for FrbWrapper<RemoteLiveData<RealtimeStatus>>
-{
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<MemoryStatus> {}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<MemoryStatus>> for MemoryStatus {
+    fn into_into_dart(self) -> FrbWrapper<MemoryStatus> {
+        self.into()
+    }
 }
 
-impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<RemoteLiveData<RealtimeStatus>>>
-    for RemoteLiveData<RealtimeStatus>
-{
-    fn into_into_dart(self) -> FrbWrapper<RemoteLiveData<RealtimeStatus>> {
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<SwapStatus> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<SwapStatus> {}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<SwapStatus>> for SwapStatus {
+    fn into_into_dart(self) -> FrbWrapper<SwapStatus> {
         self.into()
     }
 }
@@ -1571,6 +1706,44 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::client::device::Ag
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::client::device::CoreStatus> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.0.load.into_into_dart().into_dart(),
+            self.0.frequency.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::client::device::CoreStatus>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::client::device::CoreStatus>>
+    for crate::api::client::device::CoreStatus
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::client::device::CoreStatus> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::client::device::CpuStatus> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.0.cores.into_into_dart().into_dart()].into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::client::device::CpuStatus>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::client::device::CpuStatus>>
+    for crate::api::client::device::CpuStatus
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::client::device::CpuStatus> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::client::FirstConnect> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self.0 {
@@ -1616,6 +1789,58 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::client::device::Pu
 {
     fn into_into_dart(self) -> FrbWrapper<crate::api::client::device::PublicAgentData> {
         self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::client::device::RealtimeStatus> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.0.cpu.into_into_dart().into_dart(),
+            self.0.memory.into_into_dart().into_dart(),
+            self.0.swap.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::client::device::RealtimeStatus>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::client::device::RealtimeStatus>>
+    for crate::api::client::device::RealtimeStatus
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::client::device::RealtimeStatus> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::client::device::RemoteLiveDataRealtimeStatus {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            crate::api::client::device::RemoteLiveDataRealtimeStatus::Unavailable => {
+                [0.into_dart()].into_dart()
+            }
+            crate::api::client::device::RemoteLiveDataRealtimeStatus::Pending => {
+                [1.into_dart()].into_dart()
+            }
+            crate::api::client::device::RemoteLiveDataRealtimeStatus::Ready(field0) => {
+                [2.into_dart(), field0.into_into_dart().into_dart()].into_dart()
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::client::device::RemoteLiveDataRealtimeStatus
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::client::device::RemoteLiveDataRealtimeStatus>
+    for crate::api::client::device::RemoteLiveDataRealtimeStatus
+{
+    fn into_into_dart(self) -> crate::api::client::device::RemoteLiveDataRealtimeStatus {
+        self
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -1703,15 +1928,17 @@ impl SseEncode for Login {
     }
 }
 
-impl SseEncode for RemoteLiveData<RealtimeStatus> {
+impl SseEncode for MemoryStatus {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <RustOpaqueMoi<
-            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
-        >>::sse_encode(
-            flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self),
-            serializer,
-        );
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MemoryStatus>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+    }
+}
+
+impl SseEncode for SwapStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SwapStatus>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
     }
 }
 
@@ -1803,9 +2030,18 @@ impl SseEncode for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpa
 }
 
 impl SseEncode
-    for RustOpaqueMoi<
-        flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
-    >
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MemoryStatus>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        let (ptr, size) = self.sse_encode_raw();
+        <usize>::sse_encode(ptr, serializer);
+        <i32>::sse_encode(size, serializer);
+    }
+}
+
+impl SseEncode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SwapStatus>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1848,16 +2084,19 @@ impl SseEncode
     }
 }
 
-impl SseEncode
-    for StreamSink<RemoteLiveData<RealtimeStatus>, flutter_rust_bridge::for_generated::SseCodec>
-{
+impl SseEncode for StreamSink<String, flutter_rust_bridge::for_generated::SseCodec> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         unimplemented!("")
     }
 }
 
-impl SseEncode for StreamSink<String, flutter_rust_bridge::for_generated::SseCodec> {
+impl SseEncode
+    for StreamSink<
+        crate::api::client::device::RemoteLiveDataRealtimeStatus,
+        flutter_rust_bridge::for_generated::SseCodec,
+    >
+{
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         unimplemented!("")
@@ -1883,6 +2122,28 @@ impl SseEncode for bool {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_u8(self as _).unwrap();
+    }
+}
+
+impl SseEncode for crate::api::client::device::CoreStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <f32>::sse_encode(self.load, serializer);
+        <u64>::sse_encode(self.frequency, serializer);
+    }
+}
+
+impl SseEncode for crate::api::client::device::CpuStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<crate::api::client::device::CoreStatus>>::sse_encode(self.cores, serializer);
+    }
+}
+
+impl SseEncode for f32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_f32::<NativeEndian>(self).unwrap();
     }
 }
 
@@ -1925,6 +2186,16 @@ impl SseEncode for Vec<String> {
     }
 }
 
+impl SseEncode for Vec<crate::api::client::device::CoreStatus> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::client::device::CoreStatus>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1940,6 +2211,36 @@ impl SseEncode for crate::api::client::device::PublicAgentData {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.name, serializer);
         <Certificate>::sse_encode(self.cert, serializer);
+    }
+}
+
+impl SseEncode for crate::api::client::device::RealtimeStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::client::device::CpuStatus>::sse_encode(self.cpu, serializer);
+        <MemoryStatus>::sse_encode(self.memory, serializer);
+        <SwapStatus>::sse_encode(self.swap, serializer);
+    }
+}
+
+impl SseEncode for crate::api::client::device::RemoteLiveDataRealtimeStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        match self {
+            crate::api::client::device::RemoteLiveDataRealtimeStatus::Unavailable => {
+                <i32>::sse_encode(0, serializer);
+            }
+            crate::api::client::device::RemoteLiveDataRealtimeStatus::Pending => {
+                <i32>::sse_encode(1, serializer);
+            }
+            crate::api::client::device::RemoteLiveDataRealtimeStatus::Ready(field0) => {
+                <i32>::sse_encode(2, serializer);
+                <crate::api::client::device::RealtimeStatus>::sse_encode(field0, serializer);
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
     }
 }
 
@@ -1974,6 +2275,13 @@ impl SseEncode for u32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_u32::<NativeEndian>(self).unwrap();
+    }
+}
+
+impl SseEncode for u64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u64::<NativeEndian>(self).unwrap();
     }
 }
 
@@ -2018,6 +2326,7 @@ mod io {
     use crate::api::client::*;
     use crate::api::simple::*;
     use crate::api::totp::*;
+    use crate::*;
     use flutter_rust_bridge::for_generated::byteorder::{
         NativeEndian, ReadBytesExt, WriteBytesExt,
     };
@@ -2113,21 +2422,31 @@ mod io {
     }
 
     #[no_mangle]
-    pub extern "C" fn frbgen_gui_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteLiveDataRealtimeStatus(
+    pub extern "C" fn frbgen_gui_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
         ptr: *const std::ffi::c_void,
     ) {
-        MoiArc::<
-            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
-        >::increment_strong_count(ptr as _);
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MemoryStatus>>::increment_strong_count(ptr as _);
     }
 
     #[no_mangle]
-    pub extern "C" fn frbgen_gui_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteLiveDataRealtimeStatus(
+    pub extern "C" fn frbgen_gui_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
         ptr: *const std::ffi::c_void,
     ) {
-        MoiArc::<
-            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
-        >::decrement_strong_count(ptr as _);
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MemoryStatus>>::decrement_strong_count(ptr as _);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn frbgen_gui_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SwapStatus>>::increment_strong_count(ptr as _);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn frbgen_gui_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SwapStatus>>::decrement_strong_count(ptr as _);
     }
 
     #[no_mangle]
@@ -2188,6 +2507,7 @@ mod web {
     use crate::api::client::*;
     use crate::api::simple::*;
     use crate::api::totp::*;
+    use crate::*;
     use flutter_rust_bridge::for_generated::byteorder::{
         NativeEndian, ReadBytesExt, WriteBytesExt,
     };
@@ -2285,21 +2605,31 @@ mod web {
     }
 
     #[wasm_bindgen]
-    pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteLiveDataRealtimeStatus(
+    pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
         ptr: *const std::ffi::c_void,
     ) {
-        MoiArc::<
-            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
-        >::increment_strong_count(ptr as _);
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MemoryStatus>>::increment_strong_count(ptr as _);
     }
 
     #[wasm_bindgen]
-    pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteLiveDataRealtimeStatus(
+    pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
         ptr: *const std::ffi::c_void,
     ) {
-        MoiArc::<
-            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
-        >::decrement_strong_count(ptr as _);
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MemoryStatus>>::decrement_strong_count(ptr as _);
+    }
+
+    #[wasm_bindgen]
+    pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SwapStatus>>::increment_strong_count(ptr as _);
+    }
+
+    #[wasm_bindgen]
+    pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SwapStatus>>::decrement_strong_count(ptr as _);
     }
 
     #[wasm_bindgen]

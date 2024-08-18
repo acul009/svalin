@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
-import 'package:gui_flutter/src/rust/api/client.dart';
+import 'package:gui_flutter/src/rust/api/client/device.dart';
 
 class CpuDisplay extends StatelessWidget {
-  const CpuDisplay({super.key, required this.device});
+  const CpuDisplay({super.key, required this.cpuStatus});
 
-  final Device device;
+  final CpuStatus cpuStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -17,10 +16,13 @@ class CpuDisplay extends StatelessWidget {
               const Text(style: TextStyle(fontSize: 20), "CPU"),
               const SizedBox(height: 10),
               Wrap(
-                children: [
-                  const Text("CPU1"),
-                  const Text("CPU2"),
-                ],
+                children: cpuStatus.cores.map(
+                  (element) {
+                    return CircularProgressIndicator(
+                      value: element.load,
+                    );
+                  },
+                ).toList(),
               ),
             ],
           )),

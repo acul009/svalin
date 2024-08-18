@@ -18,6 +18,12 @@ fn realtime_status_key() -> String {
 
 pub struct RealtimeStatusHandler {}
 
+impl RealtimeStatusHandler {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 #[async_trait]
 impl CommandHandler for RealtimeStatusHandler {
     fn key(&self) -> String {
