@@ -24,6 +24,15 @@ pub enum RemoteLiveData<T> {
     Ready(T),
 }
 
+impl<T> RemoteLiveData<T> {
+    pub fn is_pending(&self) -> bool {
+        match self {
+            RemoteLiveData::Pending => true,
+            _ => false,
+        }
+    }
+}
+
 pub type RealtimeStatusReceiver =
     lazy_watch::Receiver<RemoteLiveData<RealtimeStatus>, RealtimeStatusWatchHandler>;
 

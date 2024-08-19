@@ -65,19 +65,19 @@ where
     handler: Arc<Mutex<HandlerWrapper<H>>>,
 }
 
-// impl<T, H> Receiver<T, H>
-// where
-//     H: Handler<T = T>,
-//     T: Clone,
-// {
-//     pub fn current_owned(&self) -> T {
-//         self.receiver.borrow().clone()
-//     }
+impl<T, H> Receiver<T, H>
+where
+    H: Handler<T = T>,
+    T: Clone,
+{
+    pub fn current_owned(&self) -> T {
+        self.receiver.borrow().clone()
+    }
 
-//     pub async fn changed(&mut self) -> Result<(), watch::error::RecvError> {
-//         self.receiver.changed().await
-//     }
-// }
+    // pub async fn changed(&mut self) -> Result<(), watch::error::RecvError> {
+    //     self.receiver.changed().await
+    // }
+}
 
 impl<T, H> Deref for Receiver<T, H>
 where

@@ -35,6 +35,8 @@ abstract class Client implements RustOpaqueInterface {
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Device>>
 abstract class Device implements RustOpaqueInterface {
   Future<AgentListItem> item();
+
+  Future<RealtimeStatusReceiver> subscribeRealtime();
 }
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Init>>
