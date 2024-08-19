@@ -39,7 +39,7 @@ impl CommandHandler for RealtimeStatusHandler {
             debug!("cpu: {:?}", status.cpu);
             session.write_object(&status).await?;
 
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            tokio::time::sleep(Duration::from_secs(2)).await;
         }
     }
 }
