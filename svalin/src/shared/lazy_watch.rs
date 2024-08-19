@@ -1,82 +1,92 @@
 use std::{
-    future::Future,
-    sync::{atomic::AtomicUsize, Arc},
+    ops::Deref,
+    sync::{Arc, Mutex},
 };
 
-use tokio::sync::{watch, Mutex};
+use tokio::sync::watch;
 
 pub trait Handler: Send + 'static {
     type T;
 
-    fn start(&mut self, send: watch::Sender<Self::T>) -> impl Future<Output = ()> + Send;
-    fn stop(&mut self) -> impl Future<Output = ()> + Send;
+    fn start(&mut self, send: &watch::Sender<Self::T>);
+    fn stop(&mut self);
 }
 
-struct Sender<T, H> {
-    send: watch::Sender<T>,
-    recv: watch::Receiver<T>,
+pub struct LazyWatch<T, H> {
+    sender: watch::Sender<T>,
     handler: Arc<Mutex<HandlerWrapper<H>>>,
 }
 
 struct HandlerWrapper<H> {
-    count: usize,
+    receiver_count: usize,
     handler: H,
 }
 
-struct Watcher<T, H>
-where
-    H: Handler<T = T>,
-{
-    recv: watch::Receiver<T>,
-    handler: Arc<Mutex<HandlerWrapper<H>>>,
-}
-
-impl<T, H> Sender<T, H>
-where
-    H: Handler<T = T>,
-{
-    pub fn new(handler: H, init: T) -> Self {
-        let (send, recv) = watch::channel(init);
-        Sender {
-            send: send,
-            recv: recv,
+impl<T, H> LazyWatch<T, H> {
+    pub fn new(init: T, handler: H) -> Self {
+        let (send, _recv) = watch::channel(init);
+        Self {
+            sender: send,
             handler: Arc::new(Mutex::new(HandlerWrapper {
-                count: 0,
-                handler: handler,
+                receiver_count: 0,
+                handler,
             })),
         }
     }
+}
 
-    pub async fn watch(&self) -> Watcher<T, H> {
-        let mut lock = self.handler.lock().await;
+impl<T, H> LazyWatch<T, H>
+where
+    H: Handler<T = T>,
+{
+    pub fn subscribe(&self) -> Receiver<T, H> {
+        let mut lock = self.handler.lock().unwrap();
 
-        if lock.count == 0 {
-            lock.handler.start(self.send.clone()).await;
+        let receiver = self.sender.subscribe();
+
+        if lock.receiver_count == 0 {
+            lock.handler.start(&self.sender)
         }
 
-        lock.count += 1;
+        lock.receiver_count += 1;
 
-        Watcher {
-            recv: self.recv.clone(),
+        Receiver {
+            receiver,
             handler: self.handler.clone(),
         }
     }
 }
 
-impl<T, H> Drop for Watcher<T, H>
+pub struct Receiver<T, H>
+where
+    H: Handler<T = T>,
+{
+    receiver: watch::Receiver<T>,
+    handler: Arc<Mutex<HandlerWrapper<H>>>,
+}
+
+impl<T, H> Deref for Receiver<T, H>
+where
+    H: Handler<T = T>,
+{
+    type Target = watch::Receiver<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.receiver
+    }
+}
+
+impl<T, H> Drop for Receiver<T, H>
 where
     H: Handler<T = T>,
 {
     fn drop(&mut self) {
-        let handler = self.handler.clone();
-        tokio::spawn(async move {
-            let mut lock = handler.lock().await;
+        let mut lock = self.handler.lock().unwrap();
 
-            lock.count -= 1;
+        lock.receiver_count -= 1;
 
-            if lock.count == 0 {
-                lock.handler.stop().await;
-            }
-        });
+        if lock.receiver_count == 0 {
+            lock.handler.stop();
+        }
     }
 }
