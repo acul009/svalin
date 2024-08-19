@@ -82,13 +82,9 @@ impl CommandHandler for AgentListHandler {
                 online_update = receiver.recv() => {
                     let online_update = online_update?;
 
-                    debug!("Online update from server: {:?}", online_update);
-
                     let agent = self
                         .agent_store
                         .get_agent(online_update.client.public_key())?;
-
-                    debug!("retrieved agent from store: {:?}", agent);
 
                     if let Some(agent) = agent {
                         let item = AgentListItemTransport {
@@ -96,7 +92,7 @@ impl CommandHandler for AgentListHandler {
                             online_status: online_update.online,
                         };
 
-                        debug!("sending update to client: {:?}", item);
+                        debug!("sending update to client: {}: {}", item.public_data.name, if item.online_status { "online"} else { "offline"});
 
                         session.write_object(&item).await?;
                     }
