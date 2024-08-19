@@ -1,6 +1,5 @@
 use std::{
-    ops::Deref,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, RwLock},
     time::Duration,
 };
 
@@ -10,11 +9,12 @@ use svalin_rpc::{
     rpc::connection::DirectConnection,
 };
 use svalin_sysctl::realtime::RealtimeStatus;
-use tokio::{sync::watch, task::JoinHandle};
+use tokio::sync::{oneshot, watch};
 use tracing::{debug, error};
 
-use crate::shared::commands::{
-    agent_list::AgentListItem, realtime_status::subscribe_realtime_statusDispatcher,
+use crate::shared::{
+    commands::{agent_list::AgentListItem, realtime_status::subscribe_realtime_statusDispatcher},
+    lazy_watch::{self, LazyWatch},
 };
 
 #[derive(Clone)]
@@ -24,6 +24,9 @@ pub enum RemoteLiveData<T> {
     Ready(T),
 }
 
+pub type RealtimeStatusReceiver =
+    lazy_watch::Receiver<RemoteLiveData<RealtimeStatus>, RealtimeStatusWatchHandler>;
+
 #[derive(Clone)]
 pub struct Device {
     data: Arc<DeviceData>,
@@ -32,22 +35,21 @@ pub struct Device {
 struct DeviceData {
     connection: ForwardConnection<DirectConnection>,
     item: RwLock<AgentListItem>,
-    realtime: watch::Sender<RemoteLiveData<RealtimeStatus>>,
-    realtime_task: Mutex<Option<JoinHandle<()>>>,
+    realtime: LazyWatch<RemoteLiveData<RealtimeStatus>, RealtimeStatusWatchHandler>,
 }
 
 impl Device {
     pub fn new(connection: ForwardConnection<DirectConnection>, item: AgentListItem) -> Self {
         let item = RwLock::new(item);
 
-        let (realtime_send, _realtime_recv) = watch::channel(RemoteLiveData::Unavailable);
-
         return Self {
             data: Arc::new(DeviceData {
-                connection,
+                connection: connection.clone(),
                 item,
-                realtime: realtime_send,
-                realtime_task: Mutex::new(None),
+                realtime: LazyWatch::new(
+                    RemoteLiveData::Unavailable,
+                    RealtimeStatusWatchHandler::new(connection),
+                ),
             }),
         };
     }
@@ -68,10 +70,6 @@ impl Device {
 
             *current = item;
         }
-
-        if !self.data.realtime.is_closed() {
-            self.start_realtime_subscriber_if_neccesary().await;
-        }
     }
 
     pub async fn ping(&self) -> Result<Duration> {
@@ -82,49 +80,50 @@ impl Device {
         self.data.item.read().unwrap().clone()
     }
 
-    async fn start_realtime_subscriber_if_neccesary(&self) {
-        if self.data.item.read().unwrap().online_status == false {
-            debug!("unable to fetch realtime - device offline");
-            return;
+    pub async fn subscribe_realtime(&self) -> RealtimeStatusReceiver {
+        self.data.realtime.subscribe()
+    }
+}
+
+pub struct RealtimeStatusWatchHandler {
+    connection: ForwardConnection<DirectConnection>,
+    stop: oneshot::Sender<()>,
+}
+
+impl RealtimeStatusWatchHandler {
+    fn new(connection: ForwardConnection<DirectConnection>) -> Self {
+        let (send, _recv) = oneshot::channel();
+
+        Self {
+            connection,
+            stop: send,
         }
+    }
+}
 
-        if self.data.realtime.is_closed() {
-            debug!("no one listening for realtime updates");
-        }
+impl lazy_watch::Handler for RealtimeStatusWatchHandler {
+    type T = RemoteLiveData<RealtimeStatus>;
 
-        let mut lock = self.data.realtime_task.lock().unwrap();
+    fn start(&mut self, send: &watch::Sender<Self::T>) {
+        let connection = self.connection.clone();
+        let _ = send.send(RemoteLiveData::Pending);
+        let (stop_send, stop_recv) = oneshot::channel();
+        self.stop = stop_send;
+        let send = send.clone();
 
-        if let Some(handle) = lock.deref() {
-            if !handle.is_finished() {
-                debug!("realtime monitor already running");
+        tokio::spawn(async move {
+            let mut stop_recv = stop_recv;
+            if stop_recv.try_recv().is_ok() {
                 return;
             }
-        }
-
-        let _ = self.data.realtime.send(RemoteLiveData::Pending);
-
-        let conn = self.data.connection.clone();
-        let realtime = self.data.realtime.clone();
-
-        debug!("no realtime monitor left, starting new one");
-
-        *lock = Some(tokio::spawn(async move {
-            match conn.subscribe_realtime_status(&realtime).await {
-                Ok(_) => {
-                    debug!("no one left listening to realtime status");
-                    let _ = realtime.send(RemoteLiveData::Unavailable);
-                }
-                Err(err) => {
-                    error!("{err}");
-                    let _ = realtime.send(RemoteLiveData::Unavailable);
-                }
-            }
-        }));
+            if let Err(err) = connection.subscribe_realtime_status(&send, stop_recv).await {
+                let _ = send.send(RemoteLiveData::Unavailable);
+                error!("error while receiving RealtimeStatus: {err}");
+            };
+        });
     }
 
-    pub async fn subscribe_realtime(&self) -> watch::Receiver<RemoteLiveData<RealtimeStatus>> {
-        let receiver = self.data.realtime.subscribe();
-        self.start_realtime_subscriber_if_neccesary().await;
-        receiver
+    fn stop(&mut self) {
+        todo!()
     }
 }

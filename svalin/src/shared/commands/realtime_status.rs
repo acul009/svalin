@@ -2,13 +2,14 @@ use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::{select, FutureExt};
 use svalin_macros::rpc_dispatch;
 use svalin_rpc::rpc::{
     command::CommandHandler,
     session::{Session, SessionOpen},
 };
 use svalin_sysctl::realtime::RealtimeStatus;
-use tokio::sync::watch;
+use tokio::sync::{oneshot, watch};
 use tracing::debug;
 
 use crate::client::device::RemoteLiveData;
@@ -48,18 +49,26 @@ impl CommandHandler for RealtimeStatusHandler {
 pub async fn subscribe_realtime_status(
     session: &mut Session<SessionOpen>,
     send: &watch::Sender<RemoteLiveData<RealtimeStatus>>,
+    stop: oneshot::Receiver<()>,
 ) -> Result<()> {
+    let mut stop = pin!(stop.fuse());
     loop {
-        let status: Result<RealtimeStatus> = session.read_object().await;
-        match status {
-            Ok(status) => {
-                if let Err(_) = send.send(RemoteLiveData::Ready(status)) {
-                    return Ok(());
-                }
-            }
-            Err(err) => {
-                return Err(err);
-            }
+        select! {
+            _ = stop => {
+                return Ok(());
+            },
+            status  = session.read_object::<RealtimeStatus>().fuse() => {
+                match status {
+                    Ok(status) => {
+                        if let Err(_) = send.send(RemoteLiveData::Ready(status)) {
+                            return Ok(());
+                        }
+                    }
+                    Err(err) => {
+                        return Err(err);
+                    }
+                };
+            },
         }
     }
 }

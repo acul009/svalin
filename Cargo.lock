@@ -1864,6 +1864,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
+ "futures",
  "marmelade",
  "rand",
  "serde",
