@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{pin::pin, time::Duration};
 
 use anyhow::Result;
 use async_trait::async_trait;
