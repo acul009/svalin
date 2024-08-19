@@ -1,25 +1,17 @@
 use std::{
-    borrow::BorrowMut,
-    future::Pending,
-    ops::{Deref, DerefMut},
-    sync::{Arc, Mutex, MutexGuard},
+    ops::Deref,
+    sync::{Arc, Mutex, RwLock},
     time::Duration,
 };
 
 use anyhow::Result;
-use svalin_pki::Certificate;
 use svalin_rpc::{
     commands::{forward::ForwardConnection, ping::pingDispatcher},
-    rpc::connection::{self, DirectConnection},
-    rustls::lock,
+    rpc::connection::DirectConnection,
 };
 use svalin_sysctl::realtime::RealtimeStatus;
-use tokio::{
-    runtime::Handle,
-    sync::{broadcast, watch, RwLock},
-    task::JoinHandle,
-};
-use tracing::{debug, error, instrument::WithSubscriber};
+use tokio::{sync::watch, task::JoinHandle};
+use tracing::{debug, error};
 
 use crate::shared::commands::{
     agent_list::AgentListItem, realtime_status::subscribe_realtime_statusDispatcher,
@@ -61,13 +53,25 @@ impl Device {
     }
 
     pub(crate) async fn update(&self, item: AgentListItem) {
-        let mut current = self.data.item.write().await;
+        {
+            let mut current = self.data.item.write().unwrap();
+
+            debug!(
+                "updating device status: {}: {}",
+                item.public_data.name,
+                if item.online_status {
+                    "online"
+                } else {
+                    "offline"
+                }
+            );
+
+            *current = item;
+        }
 
         if !self.data.realtime.is_closed() {
             self.start_realtime_subscriber_if_neccesary().await;
         }
-
-        *current = item
     }
 
     pub async fn ping(&self) -> Result<Duration> {
@@ -75,19 +79,23 @@ impl Device {
     }
 
     pub async fn item(&self) -> AgentListItem {
-        self.data.item.read().await.clone()
+        self.data.item.read().unwrap().clone()
     }
 
     async fn start_realtime_subscriber_if_neccesary(&self) {
-        if self.data.item.read().await.online_status == false {
+        if self.data.item.read().unwrap().online_status == false {
             debug!("unable to fetch realtime - device offline");
             return;
+        }
+
+        if self.data.realtime.is_closed() {
+            debug!("no one listening for realtime updates");
         }
 
         let mut lock = self.data.realtime_task.lock().unwrap();
 
         if let Some(handle) = lock.deref() {
-            if handle.is_finished() {
+            if !handle.is_finished() {
                 debug!("realtime monitor already running");
                 return;
             }
