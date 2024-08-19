@@ -16,7 +16,7 @@ svalin_rpc = { path = "../svalin_rpc" }
 svalin_sysctl = { path = "../svalin_sysctl" }
 svalin_macros = { path = "../svalin_macros" }
 marmelade = { path = "../marmelade", features = ["postcard"] }
-tokio = { version = "1.38.0", features = ["full", "test-util"] }
+tokio = { version = "1.39.3", features = ["full", "test-util"] }
 rand = "0.8.5"
 totp-rs = { version = "5.5.1", features = [
     "qr",
