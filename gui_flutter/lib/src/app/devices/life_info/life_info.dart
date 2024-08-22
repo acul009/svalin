@@ -9,35 +9,36 @@ class LiveInfo extends StatelessWidget {
 
   final Device device;
 
+  Stream<RemoteLiveDataRealtimeStatus> _realtimeStream() async* {
+    var receiver = await device.subscribeRealtime();
+    while (true) {
+      await receiver.changed();
+      yield await receiver.currentOwned();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      child: StreamBuilder(
-        stream: deviceSubscribeRealtimeStatus(device: device),
-        builder: (context, snapshot) {
-          if (snapshot.data == null) {
-            return CircularProgressIndicator();
+    return StreamBuilder(
+      stream: _realtimeStream(),
+      builder: (context, snapshot) {
+        if (snapshot.data == null || snapshot.data!.isPending()) {
+          return const CircularProgressIndicator();
+        } else {
+          var realtime = snapshot.data!.getReady();
+          if (realtime != null) {
+            return Column(
+              children: [
+                CpuDisplay(
+                  cpuStatus: realtime.cpu,
+                )
+              ],
+            );
           } else {
-            switch (snapshot.data!) {
-              case RemoteLiveDataRealtimeStatus_Unavailable():
-                return Text("Live data unavailable");
-              case RemoteLiveDataRealtimeStatus_Pending():
-                return CircularProgressIndicator();
-              case RemoteLiveDataRealtimeStatus_Ready(
-                  field0: final realtimeStatus
-                ):
-                return Column(
-                  children: [
-                    CpuDisplay(
-                      cpuStatus: realtimeStatus.cpu,
-                    )
-                  ],
-                );
-            }
+            return const Text("Realtime status not available at the moment");
           }
-          return Text("Todo :)");
-        },
-      ),
+        }
+      },
     );
   }
 }

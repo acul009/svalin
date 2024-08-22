@@ -2,6 +2,7 @@ use std::{
     ops::Deref,
     sync::{Arc, Mutex},
 };
+use tracing::debug;
 
 use tokio::sync::watch;
 
@@ -45,7 +46,8 @@ where
         let receiver = self.sender.subscribe();
 
         if lock.receiver_count == 0 {
-            lock.handler.start(&self.sender)
+            lock.handler.start(&self.sender);
+            debug!("starting lazy watch");
         }
 
         lock.receiver_count += 1;
@@ -74,9 +76,9 @@ where
         self.receiver.borrow().clone()
     }
 
-    // pub async fn changed(&mut self) -> Result<(), watch::error::RecvError> {
-    //     self.receiver.changed().await
-    // }
+    pub async fn changed(&mut self) -> Result<(), watch::error::RecvError> {
+        self.receiver.changed().await
+    }
 }
 
 impl<T, H> Deref for Receiver<T, H>
@@ -101,6 +103,7 @@ where
 
         if lock.receiver_count == 0 {
             lock.handler.stop();
+            debug!("stopping lazy watch");
         }
     }
 }

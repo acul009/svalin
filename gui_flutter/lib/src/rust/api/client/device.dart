@@ -6,20 +6,33 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These types are ignored because they are not used by any `pub` functions: `CoreStatus`, `CpuStatus`, `_RemoteLiveDataRealtimeStatus`
-
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Certificate>>
 abstract class Certificate implements RustOpaqueInterface {}
 
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MemoryStatus>>
+abstract class MemoryStatus implements RustOpaqueInterface {}
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RealtimeStatusReceiver>>
 abstract class RealtimeStatusReceiver implements RustOpaqueInterface {
+  Future<void> changed();
+
   Future<RemoteLiveDataRealtimeStatus> currentOwned();
 }
 
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RecvError>>
+abstract class RecvError implements RustOpaqueInterface {}
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData < RealtimeStatus >>>
 abstract class RemoteLiveDataRealtimeStatus implements RustOpaqueInterface {
-  Future<bool> isPending();
+  RealtimeStatus? getReady();
+
+  bool isPending();
+
+  bool isUnavailable();
 }
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SwapStatus>>
+abstract class SwapStatus implements RustOpaqueInterface {}
 
 class AgentListItem {
   final PublicAgentData publicData;
@@ -42,6 +55,45 @@ class AgentListItem {
           onlineStatus == other.onlineStatus;
 }
 
+class CoreStatus {
+  final double load;
+  final BigInt frequency;
+
+  const CoreStatus({
+    required this.load,
+    required this.frequency,
+  });
+
+  @override
+  int get hashCode => load.hashCode ^ frequency.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CoreStatus &&
+          runtimeType == other.runtimeType &&
+          load == other.load &&
+          frequency == other.frequency;
+}
+
+class CpuStatus {
+  final List<CoreStatus> cores;
+
+  const CpuStatus({
+    required this.cores,
+  });
+
+  @override
+  int get hashCode => cores.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CpuStatus &&
+          runtimeType == other.runtimeType &&
+          cores == other.cores;
+}
+
 class PublicAgentData {
   final String name;
   final Certificate cert;
@@ -61,4 +113,28 @@ class PublicAgentData {
           runtimeType == other.runtimeType &&
           name == other.name &&
           cert == other.cert;
+}
+
+class RealtimeStatus {
+  final CpuStatus cpu;
+  final MemoryStatus memory;
+  final SwapStatus swap;
+
+  const RealtimeStatus({
+    required this.cpu,
+    required this.memory,
+    required this.swap,
+  });
+
+  @override
+  int get hashCode => cpu.hashCode ^ memory.hashCode ^ swap.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RealtimeStatus &&
+          runtimeType == other.runtimeType &&
+          cpu == other.cpu &&
+          memory == other.memory &&
+          swap == other.swap;
 }

@@ -1,6 +1,3 @@
-use std::ops::Deref;
-
-use crate::frb_generated::StreamSink;
 use flutter_rust_bridge::frb;
 pub use svalin::client::device::Device;
 pub use svalin::client::device::RealtimeStatusReceiver;
@@ -13,6 +10,7 @@ pub use svalin_sysctl::realtime::CpuStatus;
 pub use svalin_sysctl::realtime::MemoryStatus;
 pub use svalin_sysctl::realtime::RealtimeStatus;
 pub use svalin_sysctl::realtime::SwapStatus;
+pub use tokio::sync::watch::error::RecvError;
 
 #[frb(external)]
 impl Device {
@@ -35,11 +33,17 @@ pub struct _PublicAgentData {
 #[frb(external)]
 impl RealtimeStatusReceiver {
     pub fn current_owned(&self) -> RemoteLiveData<RealtimeStatus> {}
+    pub async fn changed(&mut self) -> Result<(), RecvError> {}
 }
 
 #[frb(external)]
 impl RemoteLiveData<RealtimeStatus> {
+    #[frb(sync)]
     pub fn is_pending(&self) -> bool {}
+    #[frb(sync)]
+    pub fn is_unavailable(&self) -> bool {}
+    #[frb(sync)]
+    pub fn get_ready(self) -> Option<RealtimeStatus> {}
 }
 
 // impl From<&RemoteLiveData<RealtimeStatus>> for RemoteLiveDataRealtimeStatus {

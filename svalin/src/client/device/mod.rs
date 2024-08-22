@@ -31,6 +31,20 @@ impl<T> RemoteLiveData<T> {
             _ => false,
         }
     }
+
+    pub fn is_unavailable(&self) -> bool {
+        match self {
+            Self::Unavailable => true,
+            _ => false,
+        }
+    }
+
+    pub fn get_ready(self) -> Option<T> {
+        match self {
+            Self::Ready(data) => Some(data),
+            _ => None,
+        }
+    }
 }
 
 pub type RealtimeStatusReceiver =
@@ -96,16 +110,14 @@ impl Device {
 
 pub struct RealtimeStatusWatchHandler {
     connection: ForwardConnection<DirectConnection>,
-    stop: oneshot::Sender<()>,
+    stop: Option<oneshot::Sender<()>>,
 }
 
 impl RealtimeStatusWatchHandler {
     fn new(connection: ForwardConnection<DirectConnection>) -> Self {
-        let (send, _recv) = oneshot::channel();
-
         Self {
             connection,
-            stop: send,
+            stop: None,
         }
     }
 }
@@ -117,7 +129,7 @@ impl lazy_watch::Handler for RealtimeStatusWatchHandler {
         let connection = self.connection.clone();
         let _ = send.send(RemoteLiveData::Pending);
         let (stop_send, stop_recv) = oneshot::channel();
-        self.stop = stop_send;
+        self.stop = Some(stop_send);
         let send = send.clone();
 
         tokio::spawn(async move {
@@ -133,6 +145,8 @@ impl lazy_watch::Handler for RealtimeStatusWatchHandler {
     }
 
     fn stop(&mut self) {
-        todo!()
+        if let Some(channel) = self.stop.take() {
+            channel.send(());
+        }
     }
 }
