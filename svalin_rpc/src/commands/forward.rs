@@ -4,11 +4,7 @@ use std::fmt::{Debug, Display};
 use crate::rpc::command::HandlerCollection;
 use crate::rpc::connection::{Connection, ConnectionBase};
 use crate::rpc::peer::Peer;
-use crate::rpc::{
-    command::CommandHandler,
-    server::RpcServer,
-    session::{Session, SessionOpen},
-};
+use crate::rpc::{command::CommandHandler, server::RpcServer, session::Session};
 use crate::transport::session_transport::SessionTransport;
 use crate::transport::tls_transport::TlsTransport;
 use crate::verifiers::exact::ExactServerVerification;
@@ -58,7 +54,7 @@ impl CommandHandler for ForwardHandler {
     }
 
     #[must_use]
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
         debug!("client requesting forward");
 
         let target: Certificate = session.read_object().await?;
@@ -173,7 +169,7 @@ impl CommandHandler for E2EHandler {
         e2e_key()
     }
 
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
         session
             .replace_transport(move |mut direct_transport| async move {
                 if let Err(err) = direct_transport.flush().await {

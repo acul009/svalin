@@ -42,15 +42,6 @@ impl RemoteLiveData<RealtimeStatus> {
     pub fn is_pending(&self) -> bool {}
 }
 
-// pub type RemoteLiveDataRealtimeStatus = RemoteLiveData<RealtimeStatus>;
-
-#[frb(non_opaque, mirror(RemoteLiveData<RealtimeStatus>))]
-pub enum _RemoteLiveDataRealtimeStatus {
-    Unavailable,
-    Pending,
-    Ready(RealtimeStatus),
-}
-
 // impl From<&RemoteLiveData<RealtimeStatus>> for RemoteLiveDataRealtimeStatus {
 //     fn from(value: &RemoteLiveData<RealtimeStatus>) -> Self {
 //         match value {

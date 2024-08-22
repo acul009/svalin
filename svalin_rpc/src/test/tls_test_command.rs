@@ -13,7 +13,7 @@ use tracing::error;
 
 use crate::rpc::{
     command::CommandHandler,
-    session::{Session, SessionOpen},
+    session::{Session},
 };
 
 pub struct TlsTestCommandHandler {
@@ -38,7 +38,7 @@ impl CommandHandler for TlsTestCommandHandler {
         tls_test_key()
     }
 
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
         session
             .replace_transport(|direct_transport| async {
                 let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
@@ -65,7 +65,7 @@ impl CommandHandler for TlsTestCommandHandler {
 }
 
 #[rpc_dispatch(tls_test_key())]
-pub async fn tls_test(session: &mut Session<SessionOpen>) -> Result<()> {
+pub async fn tls_test(session: &mut Session) -> Result<()> {
     session
         .replace_transport(|direct_transport| async {
             let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();

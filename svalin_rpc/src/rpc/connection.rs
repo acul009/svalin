@@ -11,11 +11,7 @@ use tracing::{debug, error};
 
 use crate::transport::session_transport::SessionTransport;
 use crate::{
-    rpc::{
-        command::HandlerCollection,
-        session::SessionCreated,
-        session::{Session, SessionOpen},
-    },
+    rpc::{command::HandlerCollection, session::Session},
     transport::combined_transport::CombinedTransport,
 };
 
@@ -23,7 +19,7 @@ use super::peer::Peer;
 
 #[async_trait]
 pub trait Connection: ConnectionBase {
-    async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>>;
+    async fn open_session(&self, command_key: String) -> Result<Session>;
 }
 
 #[async_trait]
@@ -31,18 +27,18 @@ impl<T> Connection for T
 where
     T: ConnectionBase,
 {
-    async fn open_session(&self, command_key: String) -> Result<Session<SessionOpen>> {
+    async fn open_session(&self, command_key: String) -> Result<Session> {
         debug!("creating transport");
 
         let transport = self.open_raw_session().await?;
 
         debug!("transport created, pass to session");
 
-        let session = Session::new(transport);
+        let mut session = Session::new(transport);
 
         debug!("requesting session");
 
-        let session = session.request_session(command_key).await?;
+        session.request_session(command_key).await?;
 
         debug!("session request successful");
 
@@ -52,7 +48,7 @@ where
 
 #[async_trait]
 pub trait ServeableConnectionBase: ConnectionBase {
-    async fn accept_session(&self) -> Result<Session<SessionCreated>>;
+    async fn accept_session(&self) -> Result<Session>;
 }
 
 #[async_trait]
@@ -71,7 +67,7 @@ where
 
         loop {
             match self.accept_session().await {
-                Ok(session) => {
+                Ok(mut session) => {
                     let commands2 = commands.clone();
                     open_sessions.spawn(async move {
                         let res = session
@@ -134,7 +130,7 @@ impl crate::rpc::connection::ConnectionBase for DirectConnection {
 
 #[async_trait]
 impl ServeableConnectionBase for DirectConnection {
-    async fn accept_session(&self) -> Result<Session<SessionCreated>> {
+    async fn accept_session(&self) -> Result<Session> {
         let transport: CombinedTransport<SendStream, RecvStream> = self
             .conn
             .accept_bi()

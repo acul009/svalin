@@ -7,7 +7,7 @@ use svalin_pki::{ArgonParams, Certificate, CertificateRequest, PermCredentials};
 use svalin_rpc::{
     rpc::{
         command::CommandHandler,
-        session::{Session, SessionOpen},
+        session::{Session},
     },
     transport::tls_transport::TlsTransport,
     verifiers::skip_verify::SkipServerVerification,
@@ -37,7 +37,7 @@ impl CommandHandler for JoinAcceptHandler {
         accept_join_code()
     }
 
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
         let join_code: String = session.read_object().await?;
 
         let agent_session = self.manager.get_session(&join_code).await;
@@ -66,7 +66,7 @@ impl CommandHandler for JoinAcceptHandler {
 
 #[rpc_dispatch(accept_join_code())]
 pub async fn accept_join(
-    session: &mut Session<SessionOpen>,
+    session: &mut Session,
     join_code: String,
     waiting_for_confirm: tokio::sync::oneshot::Sender<Result<()>>,
     confirm_code_channel: tokio::sync::oneshot::Receiver<String>,
@@ -113,7 +113,7 @@ pub async fn accept_join(
 
 #[instrument(skip_all)]
 async fn prepare_agent_enroll(
-    session: &mut Session<SessionOpen>,
+    session: &mut Session,
     join_code: String,
     credentials: &PermCredentials,
 ) -> anyhow::Result<String> {

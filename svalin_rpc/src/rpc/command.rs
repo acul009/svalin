@@ -4,12 +4,12 @@ use anyhow::Result;
 use async_trait::async_trait;
 use tokio::sync::{RwLock, RwLockWriteGuard};
 
-use crate::rpc::session::{Session, SessionOpen};
+use crate::rpc::session::{Session};
 
 #[async_trait]
 pub trait CommandHandler: Sync + Send {
     fn key(&self) -> String;
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> Result<()>;
+    async fn handle(&self, session: &mut Session) -> Result<()>;
 }
 
 #[derive(Clone)]

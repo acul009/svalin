@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
 use svalin_rpc::rpc::{
     command::CommandHandler,
-    session::{Session, SessionOpen},
+    session::{Session},
 };
 
 fn public_status_key() -> String {
@@ -34,14 +34,14 @@ impl CommandHandler for PublicStatusHandler {
     }
 
     #[must_use]
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
         session.write_object(&self.current_status).await?;
         Ok(())
     }
 }
 
 #[rpc_dispatch(public_status_key())]
-pub async fn get_public_status(session: &mut Session<SessionOpen>) -> Result<PublicStatus> {
+pub async fn get_public_status(session: &mut Session) -> Result<PublicStatus> {
     let status = session.read_object().await?;
 
     Ok(status)

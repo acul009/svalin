@@ -5,7 +5,7 @@ use svalin_pki::{Certificate, CertificateRequest, Keypair, PermCredentials};
 use async_trait::async_trait;
 use svalin_rpc::rpc::{
     command::CommandHandler,
-    session::{Session, SessionOpen},
+    session::{Session},
 };
 use tokio::sync::mpsc;
 use tracing::debug;
@@ -26,7 +26,7 @@ fn init_key() -> String {
 
 #[async_trait]
 impl CommandHandler for InitHandler {
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
         debug!("incoming init request");
 
         if self.channel.is_closed() {
@@ -60,7 +60,7 @@ impl CommandHandler for InitHandler {
 
 #[rpc_dispatch(init_key())]
 pub(crate) async fn init(
-    session: &mut Session<SessionOpen>,
+    session: &mut Session,
 ) -> Result<(PermCredentials, Certificate)> {
     debug!("sending init request");
     let root = Keypair::generate()?.to_self_signed_cert()?;

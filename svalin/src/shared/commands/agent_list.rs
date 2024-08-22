@@ -11,7 +11,7 @@ use svalin_rpc::{
         command::CommandHandler,
         connection::DirectConnection,
         server::RpcServer,
-        session::{Session, SessionOpen},
+        session::{Session},
     },
 };
 use tokio::{select, sync::RwLock};
@@ -59,7 +59,7 @@ impl CommandHandler for AgentListHandler {
         agent_list_key()
     }
 
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> Result<()> {
+    async fn handle(&self, session: &mut Session) -> Result<()> {
         let mut receiver = self.server.subscribe_to_connection_status();
         let currently_online = self.server.get_current_connected_clients().await;
 
@@ -122,7 +122,7 @@ impl CommandHandler for AgentListHandler {
 
 #[rpc_dispatch(agent_list_key())]
 pub async fn update_agent_list(
-    session: &mut Session<SessionOpen>,
+    session: &mut Session,
     base_connection: DirectConnection,
     credentials: PermCredentials,
     list: Arc<RwLock<BTreeMap<Certificate, Device>>>,

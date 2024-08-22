@@ -7,7 +7,7 @@ use svalin_macros::rpc_dispatch;
 use svalin_pki::{ArgonParams, Certificate, PermCredentials};
 use svalin_rpc::rpc::{
     command::CommandHandler,
-    session::{Session, SessionOpen},
+    session::{Session},
 };
 use totp_rs::TOTP;
 use tracing::{debug, error, instrument, span, Instrument, Level};
@@ -65,7 +65,7 @@ impl CommandHandler for AddUserHandler {
 
     #[must_use]
     #[instrument(skip_all)]
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
         debug!("reading request to add user");
         let request: AddUserRequest = session.read_object().await?;
 
@@ -114,7 +114,7 @@ impl CommandHandler for AddUserHandler {
 #[instrument(skip_all)]
 #[rpc_dispatch(add_user_key())]
 pub async fn add_user(
-    session: &mut Session<SessionOpen>,
+    session: &mut Session,
     credentials: &PermCredentials,
     username: String,
     password: Vec<u8>,

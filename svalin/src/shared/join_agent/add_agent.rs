@@ -7,7 +7,7 @@ use svalin_macros::rpc_dispatch;
 use svalin_pki::signed_object::SignedObject;
 use svalin_rpc::rpc::{
     command::CommandHandler,
-    session::{Session, SessionOpen},
+    session::{Session},
 };
 
 use crate::server::agent_store::AgentStore;
@@ -49,7 +49,7 @@ impl CommandHandler for AddAgentHandler {
         add_agent_key()
     }
 
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> Result<()> {
+    async fn handle(&self, session: &mut Session) -> Result<()> {
         let agent = SignedObject::<PublicAgentData>::from_bytes(session.read_object().await?)?;
 
         if let Err(err) = self.store.add_agent(agent) {
@@ -69,10 +69,7 @@ impl CommandHandler for AddAgentHandler {
 }
 
 #[rpc_dispatch(add_agent_key())]
-pub async fn add_agent(
-    session: &mut Session<SessionOpen>,
-    agent: &SignedObject<PublicAgentData>,
-) -> Result<()> {
+pub async fn add_agent(session: &mut Session, agent: &SignedObject<PublicAgentData>) -> Result<()> {
     session.write_object(&agent.to_bytes()).await?;
 
     session.read_object::<Result<(), AddAgentError>>().await??;

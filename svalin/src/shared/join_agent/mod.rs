@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
-use svalin_rpc::rpc::session::{Session, SessionOpen};
+use svalin_rpc::rpc::session::{Session};
 use tokio::{sync::Mutex, task::AbortHandle};
 use tracing::field::debug;
 
@@ -33,7 +33,7 @@ pub struct ServerJoinManager {
 }
 
 struct ServerJoinManagerData {
-    session_map: HashMap<String, (Session<SessionOpen>, AbortHandle)>,
+    session_map: HashMap<String, (Session, AbortHandle)>,
     joinset: tokio::task::JoinSet<()>,
 }
 
@@ -64,8 +64,8 @@ impl ServerJoinManager {
     pub async fn add_session(
         &self,
         join_code: String,
-        mut session: Session<SessionOpen>,
-    ) -> Result<(), Session<SessionOpen>> {
+        mut session: Session,
+    ) -> Result<(), Session> {
         let mut data = self.data.lock().await;
 
         if data.session_map.contains_key(&join_code) {
@@ -91,7 +91,7 @@ impl ServerJoinManager {
         Ok(())
     }
 
-    pub async fn get_session(&self, join_code: &str) -> Option<Session<SessionOpen>> {
+    pub async fn get_session(&self, join_code: &str) -> Option<Session> {
         let mut data = self.data.lock().await;
 
         if let Some((session, abort_handle)) = data.session_map.remove(join_code) {

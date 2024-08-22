@@ -15,21 +15,14 @@ use crate::{
 
 use super::peer::Peer;
 
-pub struct SessionCreated;
-
-pub struct SessionOpen;
-
-pub struct Session<T> {
-    state: PhantomData<T>,
+pub struct Session {
     transport: ObjectTransport,
     partner: Peer,
 }
 
-impl<T> Debug for Session<T> {
+impl Debug for Session {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Session")
-            .field("state", &self.state)
-            .finish()
+        f.debug_struct("Session").finish()
     }
 }
 
@@ -53,47 +46,21 @@ struct SessionDeclinedHeader {
     message: String,
 }
 
-impl Session<()> {
-    pub(crate) fn new(transport: Box<dyn SessionTransport>) -> Session<SessionCreated> {
-        Session {
-            state: PhantomData,
+impl Session {
+    pub(crate) fn new(transport: Box<dyn SessionTransport>) -> Self {
+        Self {
             transport: ObjectTransport::new(transport),
             partner: Peer::Anonymous,
         }
     }
 
-    pub fn dangerous_create_dummy_session() -> Session<SessionOpen> {
-        Session {
-            state: PhantomData,
+    pub fn dangerous_create_dummy_session() -> Self {
+        Self {
             transport: ObjectTransport::new(Box::new(DummyTransport::new())),
             partner: Peer::Anonymous,
         }
     }
-}
 
-impl Session<SessionCreated> {
-    fn open(self) -> Session<SessionOpen> {
-        Session {
-            state: PhantomData,
-            transport: self.transport,
-            partner: self.partner,
-        }
-    }
-
-    pub(crate) async fn handle(self, commands: HandlerCollection) -> Result<()> {
-        self.open().handle(commands).await
-    }
-
-    pub(crate) async fn request_session(self, command_key: String) -> Result<Session<SessionOpen>> {
-        let mut open = self.open();
-        match open.request_session(command_key).await {
-            Ok(_) => Ok(open),
-            Err(err) => Err(err),
-        }
-    }
-}
-
-impl Session<SessionOpen> {
     pub(crate) async fn handle(&mut self, commands: HandlerCollection) -> Result<()> {
         debug!("waiting for request header");
 

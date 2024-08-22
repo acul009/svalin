@@ -8,7 +8,7 @@ use svalin_pki::{Certificate, Keypair};
 use svalin_rpc::{
     rpc::{
         command::CommandHandler,
-        session::{Session, SessionOpen},
+        session::{Session},
     },
     transport::tls_transport::TlsTransport,
     verifiers::skip_verify::SkipClientVerification,
@@ -42,7 +42,7 @@ impl CommandHandler for JoinRequestHandler {
         join_request_key()
     }
 
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> Result<()> {
+    async fn handle(&self, session: &mut Session) -> Result<()> {
         let mut add_session = mem::replace(session, Session::dangerous_create_dummy_session());
 
         let mut join_code = create_join_code();
@@ -62,7 +62,7 @@ impl CommandHandler for JoinRequestHandler {
 #[rpc_dispatch(join_request_key())]
 #[instrument(skip_all)]
 pub async fn request_join(
-    session: &mut Session<SessionOpen>,
+    session: &mut Session,
     address: String,
     join_code_channel: oneshot::Sender<String>,
     confirm_code_channel: oneshot::Sender<String>,

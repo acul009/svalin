@@ -2,10 +2,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::{
     self as svalin_rpc,
-    rpc::{
-        command::CommandHandler,
-        session::{Session, SessionOpen},
-    },
+    rpc::{command::CommandHandler, session::Session},
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -36,7 +33,7 @@ impl CommandHandler for PingHandler {
         ping_key()
     }
 
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
         let ping: u64 = session.read_object().await?;
         session.write_object(&ping).await?;
 
@@ -45,7 +42,7 @@ impl CommandHandler for PingHandler {
 }
 
 #[rpc_dispatch(ping_key())]
-pub async fn ping(session: &mut Session<SessionOpen>) -> Result<Duration> {
+pub async fn ping(session: &mut Session) -> Result<Duration> {
     let ping = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")

@@ -6,7 +6,7 @@ use futures::{select, FutureExt};
 use svalin_macros::rpc_dispatch;
 use svalin_rpc::rpc::{
     command::CommandHandler,
-    session::{Session, SessionOpen},
+    session::{Session},
 };
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::{oneshot, watch};
@@ -32,7 +32,7 @@ impl CommandHandler for RealtimeStatusHandler {
         realtime_status_key()
     }
 
-    async fn handle(&self, session: &mut Session<SessionOpen>) -> Result<()> {
+    async fn handle(&self, session: &mut Session) -> Result<()> {
         debug!("realtime status requested");
         loop {
             let status = RealtimeStatus::get().await;
@@ -47,7 +47,7 @@ impl CommandHandler for RealtimeStatusHandler {
 
 #[rpc_dispatch(realtime_status_key())]
 pub async fn subscribe_realtime_status(
-    session: &mut Session<SessionOpen>,
+    session: &mut Session,
     send: &watch::Sender<RemoteLiveData<RealtimeStatus>>,
     stop: oneshot::Receiver<()>,
 ) -> Result<()> {
