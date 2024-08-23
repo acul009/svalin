@@ -96,7 +96,7 @@ class CpuDisplay extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        "Core ${entry.key}",
+                        "Core ${entry.key + 1}",
                         style: const TextStyle(fontSize: 14),
                       ),
                     ],
