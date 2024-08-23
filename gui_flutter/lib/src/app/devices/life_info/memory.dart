@@ -89,7 +89,10 @@ class MemoryDisplay extends StatelessWidget {
                   ],
                 );
               }
-              return const Text("No Swap configured");
+              return const Text(
+                "No Swap configured",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              );
             }),
           ],
         ),
