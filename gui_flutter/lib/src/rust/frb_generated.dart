@@ -189,14 +189,6 @@ abstract class RustLibApi extends BaseApi {
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_LoginPtr;
 
   RustArcIncrementStrongCountFnType
-      get rust_arc_increment_strong_count_MemoryStatus;
-
-  RustArcDecrementStrongCountFnType
-      get rust_arc_decrement_strong_count_MemoryStatus;
-
-  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_MemoryStatusPtr;
-
-  RustArcIncrementStrongCountFnType
       get rust_arc_increment_strong_count_RealtimeStatusReceiver;
 
   RustArcDecrementStrongCountFnType
@@ -221,14 +213,6 @@ abstract class RustLibApi extends BaseApi {
 
   CrossPlatformFinalizerArg
       get rust_arc_decrement_strong_count_RemoteLiveDataRealtimeStatusPtr;
-
-  RustArcIncrementStrongCountFnType
-      get rust_arc_increment_strong_count_SwapStatus;
-
-  RustArcDecrementStrongCountFnType
-      get rust_arc_decrement_strong_count_SwapStatus;
-
-  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_SwapStatusPtr;
 
   RustArcIncrementStrongCountFnType
       get rust_arc_increment_strong_count_SystemTimeError;
@@ -952,14 +936,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLogin;
 
   RustArcIncrementStrongCountFnType
-      get rust_arc_increment_strong_count_MemoryStatus => wire
-          .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus;
-
-  RustArcDecrementStrongCountFnType
-      get rust_arc_decrement_strong_count_MemoryStatus => wire
-          .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus;
-
-  RustArcIncrementStrongCountFnType
       get rust_arc_increment_strong_count_RealtimeStatusReceiver => wire
           .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRealtimeStatusReceiver;
 
@@ -982,14 +958,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RustArcDecrementStrongCountFnType
       get rust_arc_decrement_strong_count_RemoteLiveDataRealtimeStatus => wire
           .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteLiveDataRealtimeStatus;
-
-  RustArcIncrementStrongCountFnType
-      get rust_arc_increment_strong_count_SwapStatus => wire
-          .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus;
-
-  RustArcDecrementStrongCountFnType
-      get rust_arc_decrement_strong_count_SwapStatus => wire
-          .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus;
 
   RustArcIncrementStrongCountFnType
       get rust_arc_increment_strong_count_SystemTimeError => wire
@@ -1068,14 +1036,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  MemoryStatus
-      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
-          dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return MemoryStatusImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
   RealtimeStatusReceiver
       dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRealtimeStatusReceiver(
           dynamic raw) {
@@ -1099,14 +1059,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return RemoteLiveDataRealtimeStatusImpl.frbInternalDcoDecode(
         raw as List<dynamic>);
-  }
-
-  @protected
-  SwapStatus
-      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
-          dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return SwapStatusImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -1241,14 +1193,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  MemoryStatus
-      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
-          dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return MemoryStatusImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
   RealtimeStatusReceiver
       dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRealtimeStatusReceiver(
           dynamic raw) {
@@ -1272,14 +1216,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return RemoteLiveDataRealtimeStatusImpl.frbInternalDcoDecode(
         raw as List<dynamic>);
-  }
-
-  @protected
-  SwapStatus
-      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
-          dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return SwapStatusImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -1420,6 +1356,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  MemoryStatus dco_decode_memory_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return MemoryStatus(
+      total: dco_decode_u_64(arr[0]),
+      available: dco_decode_u_64(arr[1]),
+      free: dco_decode_u_64(arr[2]),
+      used: dco_decode_u_64(arr[3]),
+    );
+  }
+
+  @protected
   RealtimeStatus? dco_decode_opt_box_autoadd_realtime_status(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_realtime_status(raw);
@@ -1447,12 +1397,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return RealtimeStatus(
       cpu: dco_decode_cpu_status(arr[0]),
-      memory:
-          dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
-              arr[1]),
-      swap:
-          dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
-              arr[2]),
+      memory: dco_decode_memory_status(arr[1]),
+      swap: dco_decode_swap_status(arr[2]),
+    );
+  }
+
+  @protected
+  SwapStatus dco_decode_swap_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return SwapStatus(
+      total: dco_decode_u_64(arr[0]),
+      free: dco_decode_u_64(arr[1]),
+      used: dco_decode_u_64(arr[2]),
     );
   }
 
@@ -1573,15 +1532,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  MemoryStatus
-      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
-          SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return MemoryStatusImpl.frbInternalSseDecode(
-        sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
-  }
-
-  @protected
   RealtimeStatusReceiver
       sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRealtimeStatusReceiver(
           SseDeserializer deserializer) {
@@ -1605,15 +1555,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return RemoteLiveDataRealtimeStatusImpl.frbInternalSseDecode(
-        sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
-  }
-
-  @protected
-  SwapStatus
-      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
-          SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return SwapStatusImpl.frbInternalSseDecode(
         sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
   }
 
@@ -1762,15 +1703,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  MemoryStatus
-      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
-          SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return MemoryStatusImpl.frbInternalSseDecode(
-        sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
-  }
-
-  @protected
   RealtimeStatusReceiver
       sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRealtimeStatusReceiver(
           SseDeserializer deserializer) {
@@ -1794,15 +1726,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return RemoteLiveDataRealtimeStatusImpl.frbInternalSseDecode(
-        sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
-  }
-
-  @protected
-  SwapStatus
-      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
-          SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return SwapStatusImpl.frbInternalSseDecode(
         sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
   }
 
@@ -1959,6 +1882,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  MemoryStatus sse_decode_memory_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_total = sse_decode_u_64(deserializer);
+    var var_available = sse_decode_u_64(deserializer);
+    var var_free = sse_decode_u_64(deserializer);
+    var var_used = sse_decode_u_64(deserializer);
+    return MemoryStatus(
+        total: var_total,
+        available: var_available,
+        free: var_free,
+        used: var_used);
+  }
+
+  @protected
   RealtimeStatus? sse_decode_opt_box_autoadd_realtime_status(
       SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1984,13 +1921,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RealtimeStatus sse_decode_realtime_status(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_cpu = sse_decode_cpu_status(deserializer);
-    var var_memory =
-        sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
-            deserializer);
-    var var_swap =
-        sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
-            deserializer);
+    var var_memory = sse_decode_memory_status(deserializer);
+    var var_swap = sse_decode_swap_status(deserializer);
     return RealtimeStatus(cpu: var_cpu, memory: var_memory, swap: var_swap);
+  }
+
+  @protected
+  SwapStatus sse_decode_swap_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_total = sse_decode_u_64(deserializer);
+    var var_free = sse_decode_u_64(deserializer);
+    var var_used = sse_decode_u_64(deserializer);
+    return SwapStatus(total: var_total, free: var_free, used: var_used);
   }
 
   @protected
@@ -2116,16 +2058,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
-      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
-          MemoryStatus self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize(
-        (self as MemoryStatusImpl).frbInternalSseEncode(move: true),
-        serializer);
-  }
-
-  @protected
-  void
       sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRealtimeStatusReceiver(
           RealtimeStatusReceiver self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -2152,15 +2084,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         (self as RemoteLiveDataRealtimeStatusImpl)
             .frbInternalSseEncode(move: true),
         serializer);
-  }
-
-  @protected
-  void
-      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
-          SwapStatus self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize(
-        (self as SwapStatusImpl).frbInternalSseEncode(move: true), serializer);
   }
 
   @protected
@@ -2315,16 +2238,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
-      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
-          MemoryStatus self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize(
-        (self as MemoryStatusImpl).frbInternalSseEncode(move: null),
-        serializer);
-  }
-
-  @protected
-  void
       sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRealtimeStatusReceiver(
           RealtimeStatusReceiver self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -2351,15 +2264,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         (self as RemoteLiveDataRealtimeStatusImpl)
             .frbInternalSseEncode(move: null),
         serializer);
-  }
-
-  @protected
-  void
-      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
-          SwapStatus self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize(
-        (self as SwapStatusImpl).frbInternalSseEncode(move: null), serializer);
   }
 
   @protected
@@ -2507,6 +2411,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_memory_status(MemoryStatus self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_64(self.total, serializer);
+    sse_encode_u_64(self.available, serializer);
+    sse_encode_u_64(self.free, serializer);
+    sse_encode_u_64(self.used, serializer);
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_realtime_status(
       RealtimeStatus? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -2531,10 +2444,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       RealtimeStatus self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_cpu_status(self.cpu, serializer);
-    sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMemoryStatus(
-        self.memory, serializer);
-    sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSwapStatus(
-        self.swap, serializer);
+    sse_encode_memory_status(self.memory, serializer);
+    sse_encode_swap_status(self.swap, serializer);
+  }
+
+  @protected
+  void sse_encode_swap_status(SwapStatus self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_64(self.total, serializer);
+    sse_encode_u_64(self.free, serializer);
+    sse_encode_u_64(self.used, serializer);
   }
 
   @protected
@@ -2748,26 +2667,6 @@ class LoginImpl extends RustOpaque implements Login {
 }
 
 @sealed
-class MemoryStatusImpl extends RustOpaque implements MemoryStatus {
-  // Not to be used by end users
-  MemoryStatusImpl.frbInternalDcoDecode(List<dynamic> wire)
-      : super.frbInternalDcoDecode(wire, _kStaticData);
-
-  // Not to be used by end users
-  MemoryStatusImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative)
-      : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
-
-  static final _kStaticData = RustArcStaticData(
-    rustArcIncrementStrongCount:
-        RustLib.instance.api.rust_arc_increment_strong_count_MemoryStatus,
-    rustArcDecrementStrongCount:
-        RustLib.instance.api.rust_arc_decrement_strong_count_MemoryStatus,
-    rustArcDecrementStrongCountPtr:
-        RustLib.instance.api.rust_arc_decrement_strong_count_MemoryStatusPtr,
-  );
-}
-
-@sealed
 class RealtimeStatusReceiverImpl extends RustOpaque
     implements RealtimeStatusReceiver {
   // Not to be used by end users
@@ -2854,26 +2753,6 @@ class RemoteLiveDataRealtimeStatusImpl extends RustOpaque
           .crateApiClientDeviceRemoteLiveDataRealtimeStatusIsUnavailable(
         that: this,
       );
-}
-
-@sealed
-class SwapStatusImpl extends RustOpaque implements SwapStatus {
-  // Not to be used by end users
-  SwapStatusImpl.frbInternalDcoDecode(List<dynamic> wire)
-      : super.frbInternalDcoDecode(wire, _kStaticData);
-
-  // Not to be used by end users
-  SwapStatusImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative)
-      : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
-
-  static final _kStaticData = RustArcStaticData(
-    rustArcIncrementStrongCount:
-        RustLib.instance.api.rust_arc_increment_strong_count_SwapStatus,
-    rustArcDecrementStrongCount:
-        RustLib.instance.api.rust_arc_decrement_strong_count_SwapStatus,
-    rustArcDecrementStrongCountPtr:
-        RustLib.instance.api.rust_arc_decrement_strong_count_SwapStatusPtr,
-  );
 }
 
 @sealed

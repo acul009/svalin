@@ -9,9 +9,6 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Certificate>>
 abstract class Certificate implements RustOpaqueInterface {}
 
-// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MemoryStatus>>
-abstract class MemoryStatus implements RustOpaqueInterface {}
-
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RealtimeStatusReceiver>>
 abstract class RealtimeStatusReceiver implements RustOpaqueInterface {
   Future<void> changed();
@@ -30,9 +27,6 @@ abstract class RemoteLiveDataRealtimeStatus implements RustOpaqueInterface {
 
   bool isUnavailable();
 }
-
-// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SwapStatus>>
-abstract class SwapStatus implements RustOpaqueInterface {}
 
 class AgentListItem {
   final PublicAgentData publicData;
@@ -94,6 +88,34 @@ class CpuStatus {
           cores == other.cores;
 }
 
+class MemoryStatus {
+  final BigInt total;
+  final BigInt available;
+  final BigInt free;
+  final BigInt used;
+
+  const MemoryStatus({
+    required this.total,
+    required this.available,
+    required this.free,
+    required this.used,
+  });
+
+  @override
+  int get hashCode =>
+      total.hashCode ^ available.hashCode ^ free.hashCode ^ used.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MemoryStatus &&
+          runtimeType == other.runtimeType &&
+          total == other.total &&
+          available == other.available &&
+          free == other.free &&
+          used == other.used;
+}
+
 class PublicAgentData {
   final String name;
   final Certificate cert;
@@ -137,4 +159,28 @@ class RealtimeStatus {
           cpu == other.cpu &&
           memory == other.memory &&
           swap == other.swap;
+}
+
+class SwapStatus {
+  final BigInt total;
+  final BigInt free;
+  final BigInt used;
+
+  const SwapStatus({
+    required this.total,
+    required this.free,
+    required this.used,
+  });
+
+  @override
+  int get hashCode => total.hashCode ^ free.hashCode ^ used.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SwapStatus &&
+          runtimeType == other.runtimeType &&
+          total == other.total &&
+          free == other.free &&
+          used == other.used;
 }

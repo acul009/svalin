@@ -87,3 +87,18 @@ pub struct _CoreStatus {
     pub load: f32,
     pub frequency: u64,
 }
+
+#[frb(non_opaque, mirror(MemoryStatus))]
+pub struct _MemoryStatus {
+    pub total: u64,
+    pub available: u64,
+    pub free: u64,
+    pub used: u64,
+}
+
+#[frb(non_opaque, mirror(SwapStatus))]
+pub struct _SwapStatus {
+    pub total: u64,
+    pub free: u64,
+    pub used: u64,
+}

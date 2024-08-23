@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:gui_flutter/src/app/devices/life_info/cpu.dart';
+import 'package:gui_flutter/src/app/devices/life_info/memory.dart';
 import 'package:gui_flutter/src/rust/api/client.dart';
 import 'package:gui_flutter/src/rust/api/client/device.dart';
 
@@ -31,7 +32,11 @@ class LiveInfo extends StatelessWidget {
               children: [
                 CpuDisplay(
                   cpuStatus: realtime.cpu,
-                )
+                ),
+                MemoryDisplay(
+                  memoryStatus: realtime.memory,
+                  swapStatus: realtime.swap,
+                ),
               ],
             );
           } else {
