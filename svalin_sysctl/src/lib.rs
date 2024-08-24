@@ -1,3 +1,2 @@
-use sysinfo::System;
-
+pub mod pty;
 pub mod realtime;
