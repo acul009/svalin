@@ -42,14 +42,12 @@ class CpuDisplay extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 5),
-                ClipRRect(
+                LinearProgressIndicator(
+                  value: averageLoad / 100,
+                  minHeight: 10,
+                  backgroundColor: Colors.grey[300],
+                  color: Colors.blue,
                   borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: averageLoad / 100,
-                    minHeight: 10,
-                    backgroundColor: Colors.grey[300],
-                    color: Colors.blue,
-                  ),
                 ),
                 const SizedBox(height: 5),
                 Text(

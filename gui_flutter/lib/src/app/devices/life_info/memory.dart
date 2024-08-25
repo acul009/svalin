@@ -40,14 +40,12 @@ class MemoryDisplay extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 5),
-                ClipRRect(
+                LinearProgressIndicator(
+                  value: memoryStatus.used / memoryStatus.total,
+                  minHeight: 10,
+                  backgroundColor: Colors.grey[300],
+                  color: Colors.blue,
                   borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: memoryStatus.used / memoryStatus.total,
-                    minHeight: 10,
-                    backgroundColor: Colors.grey[300],
-                    color: Colors.blue,
-                  ),
                 ),
                 const SizedBox(height: 5),
                 Text(
@@ -70,14 +68,12 @@ class MemoryDisplay extends StatelessWidget {
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                     ),
                     const SizedBox(height: 5),
-                    ClipRRect(
+                    LinearProgressIndicator(
+                      value: swapStatus.used / swapStatus.total,
+                      minHeight: 10,
+                      backgroundColor: Colors.grey[300],
+                      color: Colors.blue,
                       borderRadius: BorderRadius.circular(10),
-                      child: LinearProgressIndicator(
-                        value: swapStatus.used / swapStatus.total,
-                        minHeight: 10,
-                        backgroundColor: Colors.grey[300],
-                        color: Colors.blue,
-                      ),
                     ),
                     const SizedBox(height: 5),
                     Text(
