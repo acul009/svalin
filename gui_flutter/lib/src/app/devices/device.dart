@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
-import 'package:gui_flutter/src/app/devices/life_info/cpu.dart';
 import 'package:gui_flutter/src/app/devices/life_info/life_info.dart';
+import 'package:gui_flutter/src/app/devices/terminal.dart';
 import 'package:gui_flutter/src/rust/api/client.dart';
 
 class DeviceView extends StatelessWidget {
@@ -42,6 +41,16 @@ class DeviceView extends StatelessWidget {
         child: Column(
           children: [
             LiveInfo(device: device),
+            const SizedBox(height: 20),
+            ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TerminalWidget(device: device),
+                      ));
+                },
+                child: const Text("Terminal"))
           ],
         ),
       ),
