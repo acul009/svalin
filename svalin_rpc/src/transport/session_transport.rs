@@ -1,8 +1,13 @@
-use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite};
 
-#[async_trait]
-pub trait SessionTransport: AsyncRead + AsyncWrite + Send + Unpin + Send + Sync {}
+pub trait SessionTransport: SessionTransportReader + SessionTransportWriter {}
+impl<T> SessionTransport for T where T: SessionTransportReader + SessionTransportWriter {}
 
-#[async_trait]
-impl SessionTransport for Box<dyn SessionTransport> {}
+pub trait SessionTransportReader: AsyncRead + Send + Unpin + Send + Sync {}
+impl<T> SessionTransportReader for T where T: AsyncRead + Send + Unpin + Send + Sync {}
+
+pub trait SessionTransportWriter: AsyncWrite + Send + Unpin + Send + Sync {}
+impl<T> SessionTransportWriter for T where T: AsyncWrite + Send + Unpin + Send + Sync {}
+
+// #[async_trait]
+// impl SessionTransport for Box<dyn SessionTransport> {}

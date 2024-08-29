@@ -128,9 +128,6 @@ where
     }
 }
 
-#[async_trait]
-impl<T: SessionTransport> SessionTransport for TlsTransport<T> {}
-
 impl<T: SessionTransport> AsyncRead for TlsTransport<T> {
     fn poll_read(
         mut self: Pin<&mut Self>,

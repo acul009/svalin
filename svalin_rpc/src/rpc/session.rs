@@ -3,20 +3,23 @@ use std::{fmt::Debug, marker::PhantomData, sync::Arc};
 use anyhow::{anyhow, Result};
 use futures::Future;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, instrument};
+use tracing::{debug, error, instrument};
 
 use crate::{
     rpc::command::HandlerCollection,
     transport::{
-        dummy_transport::DummyTransport, object_transport::ObjectTransport,
-        session_transport::SessionTransport,
+        chunked_transport::{ChunkReader, ChunkWriter},
+        dummy_transport::{DummyTransport, DummyTransportReader, DummyTransportWriter},
+        object_transport::{ObjectReader, ObjectTransport, ObjectWriter},
+        session_transport::{SessionTransport, SessionTransportReader, SessionTransportWriter},
     },
 };
 
 use super::peer::Peer;
 
 pub struct Session {
-    transport: ObjectTransport,
+    read: ObjectReader,
+    write: ObjectWriter,
     partner: Peer,
 }
 
@@ -46,19 +49,29 @@ struct SessionDeclinedHeader {
     message: String,
 }
 
+pub struct SessionClosed {}
+
 impl Session {
-    pub(crate) fn new(transport: Box<dyn SessionTransport>) -> Self {
+    pub(crate) fn new(
+        read: Box<dyn SessionTransportReader>,
+        write: Box<dyn SessionTransportWriter>,
+    ) -> Self {
+        let read = ObjectReader::new(ChunkReader::new(read));
+
+        let write = ObjectWriter::new(ChunkWriter::new(write));
+
         Self {
-            transport: ObjectTransport::new(transport),
+            read,
+            write,
             partner: Peer::Anonymous,
         }
     }
 
     pub fn dangerous_create_dummy_session() -> Self {
-        Self {
-            transport: ObjectTransport::new(Box::new(DummyTransport::new())),
-            partner: Peer::Anonymous,
-        }
+        Self::new(
+            Box::new(DummyTransportReader::default()),
+            Box::new(DummyTransportWriter::default()),
+        )
     }
 
     pub(crate) async fn handle(&mut self, commands: HandlerCollection) -> Result<()> {
@@ -105,48 +118,45 @@ impl Session {
     #[instrument(skip_all)]
     pub async fn read_object<W: serde::de::DeserializeOwned>(&mut self) -> Result<W> {
         // debug!("Reading: {}", std::any::type_name::<W>());
-        self.transport.read_object().await
+        self.read.read_object().await
     }
 
     #[instrument(skip_all)]
     pub async fn write_object<W: Serialize>(&mut self, object: &W) -> Result<()> {
         // debug!("Writing: {}", std::any::type_name::<W>());
-        self.transport.write_object(object).await
+        self.write.write_object(object).await
     }
 
-    pub async fn replace_transport<R, Fut>(&mut self, replacer: R)
-    where
-        R: FnOnce(Box<dyn SessionTransport>) -> Fut,
-        Fut: Future<Output = Box<dyn SessionTransport>>,
-    {
-        self.transport.replace_transport(replacer).await
+    pub(crate) async fn shutdown(mut self) -> SessionClosed {
+        if let Err(err) = self.write.shutdown().await {
+            error!("error shuting down session: {err}");
+        }
+
+        SessionClosed {}
     }
 
-    pub(crate) async fn shutdown(&mut self) -> Result<(), std::io::Error> {
-        self.transport.shutdown().await
-    }
+    // pub async fn forward_session(&mut self, partner: &mut Self) -> Result<()> {
+    //     self.forward_transport(partner.transport.borrow_transport())
+    //         .await?;
 
-    pub async fn forward_session(&mut self, partner: &mut Self) -> Result<()> {
-        self.forward_transport(partner.transport.borrow_transport())
-            .await?;
+    //     Ok(())
+    // }
 
-        Ok(())
-    }
+    // pub(crate) async fn forward_transport(
+    //     &mut self,
+    //     transport: &mut Box<dyn SessionTransport>,
+    // ) -> Result<()> {
+    //     debug!("starting bidirectional copy");
 
-    pub(crate) async fn forward_transport(
-        &mut self,
-        transport: &mut Box<dyn SessionTransport>,
-    ) -> Result<()> {
-        debug!("starting bidirectional copy");
+    //     tokio::io::copy_bidirectional(self.transport.borrow_transport(),
+    // transport).await?;
 
-        tokio::io::copy_bidirectional(self.transport.borrow_transport(), transport).await?;
+    //     debug!("finished bidirectional copy");
 
-        debug!("finished bidirectional copy");
+    //     Ok(())
+    // }
 
-        Ok(())
-    }
-
-    pub fn extract_transport(self) -> Box<dyn SessionTransport> {
-        self.transport.extract_transport()
-    }
+    // pub fn extract_transport(self) -> Box<dyn SessionTransport> {
+    //     self.transport.extract_transport()
+    // }
 }

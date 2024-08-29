@@ -1,19 +1,12 @@
 use tokio::io::{AsyncRead, AsyncWrite};
 
-use super::session_transport::SessionTransport;
+#[derive(Default)]
+pub(crate) struct DummyTransportReader {}
 
 #[derive(Default)]
-pub(crate) struct DummyTransport {}
+pub(crate) struct DummyTransportWriter {}
 
-impl DummyTransport {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl SessionTransport for DummyTransport {}
-
-impl AsyncWrite for DummyTransport {
+impl AsyncWrite for DummyTransportWriter {
     fn poll_write(
         self: std::pin::Pin<&mut Self>,
         _cx: &mut std::task::Context<'_>,
@@ -37,7 +30,7 @@ impl AsyncWrite for DummyTransport {
     }
 }
 
-impl AsyncRead for DummyTransport {
+impl AsyncRead for DummyTransportReader {
     fn poll_read(
         self: std::pin::Pin<&mut Self>,
         _cx: &mut std::task::Context<'_>,

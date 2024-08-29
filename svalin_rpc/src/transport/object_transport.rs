@@ -1,31 +1,24 @@
 use anyhow::{Context, Ok, Result};
-use futures::Future;
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{chunked_transport::ChunkedTransport, session_transport::SessionTransport};
+use super::chunked_transport::{ChunkReader, ChunkWriter};
 
-pub(crate) struct ObjectTransport {
-    chunked_transport: ChunkedTransport,
+pub(crate) struct ObjectReader {
+    read: ChunkReader,
 }
 
-impl ObjectTransport {
-    pub(crate) fn new(transport: Box<dyn SessionTransport>) -> Self {
-        Self {
-            chunked_transport: ChunkedTransport::new(transport),
-        }
-    }
+pub(crate) struct ObjectWriter {
+    write: ChunkWriter,
+}
 
-    pub async fn write_object<U: Serialize>(&mut self, object: &U) -> Result<()> {
-        let encoded = postcard::to_extend(&object, Vec::new())?;
-
-        self.chunked_transport.write_chunk(&encoded).await?;
-
-        Ok(())
+impl ObjectReader {
+    pub fn new(read: ChunkReader) -> Self {
+        Self { read }
     }
 
     pub async fn read_object<U: DeserializeOwned>(&mut self) -> Result<U> {
         let chunk = self
-            .chunked_transport
+            .read
             .read_chunk()
             .await
             .context("failed reading chunk")?;
@@ -34,25 +27,23 @@ impl ObjectTransport {
 
         Ok(object)
     }
+}
 
-    pub async fn replace_transport<R, Fut>(&mut self, replacer: R)
-    where
-        R: FnOnce(Box<dyn SessionTransport>) -> Fut,
-        Fut: Future<Output = Box<dyn SessionTransport>>,
-    {
-        self.chunked_transport.replace_transport(replacer).await
+impl ObjectWriter {
+    pub fn new(write: ChunkWriter) -> Self {
+        Self { write }
+    }
+
+    pub async fn write_object<U: Serialize>(&mut self, object: &U) -> Result<()> {
+        let encoded = postcard::to_extend(&object, Vec::new())?;
+
+        self.write.write_chunk(&encoded).await?;
+
+        Ok(())
     }
 
     pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
-        self.chunked_transport.shutdown().await
-    }
-
-    pub fn borrow_transport(&mut self) -> &mut Box<dyn SessionTransport> {
-        self.chunked_transport.borrow_transport()
-    }
-
-    pub fn extract_transport(self) -> Box<dyn SessionTransport> {
-        self.chunked_transport.extract_transport()
+        self.write.shutdown().await
     }
 }
 
