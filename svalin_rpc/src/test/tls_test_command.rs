@@ -11,10 +11,7 @@ use svalin_macros::rpc_dispatch;
 use svalin_pki::{Keypair, PermCredentials};
 use tracing::error;
 
-use crate::rpc::{
-    command::CommandHandler,
-    session::{Session},
-};
+use crate::rpc::{command::CommandHandler, session::Session};
 
 pub struct TlsTestCommandHandler {
     credentials: PermCredentials,
@@ -38,7 +35,7 @@ impl CommandHandler for TlsTestCommandHandler {
         tls_test_key()
     }
 
-    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Option<Session>) -> anyhow::Result<()> {
         session
             .replace_transport(|direct_transport| async {
                 let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();

@@ -5,9 +5,10 @@ use anyhow::{anyhow, Ok, Result};
 use quinn::{crypto::rustls::QuicClientConfig, TransportConfig, VarInt};
 use svalin_pki::PermCredentials;
 
-use crate::rpc::connection::DirectConnection;
-
-use super::{command::HandlerCollection, connection::ServeableConnection};
+use super::{
+    command::HandlerCollection,
+    connection::{direct_connection::DirectConnection, ServeableConnection},
+};
 
 pub struct RpcClient {
     connection: DirectConnection,

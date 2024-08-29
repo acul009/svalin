@@ -12,8 +12,12 @@ use crate::rpc::connection::{ConnectionBase, ServeableConnection};
 use crate::rpc::peer::Peer;
 use crate::rustls::{self, server::danger::ClientCertVerifier};
 
-use crate::rpc::{command::HandlerCollection, connection::DirectConnection};
-use crate::transport::session_transport::SessionTransport;
+use crate::rpc::command::HandlerCollection;
+use crate::transport::session_transport::{
+    SessionTransport, SessionTransportReader, SessionTransportWriter,
+};
+
+use super::connection::direct_connection::DirectConnection;
 
 #[derive(Debug, Clone)]
 pub struct ClientConnectionStatus {
@@ -165,7 +169,10 @@ impl RpcServer {
     pub async fn open_raw_session_with(
         &self,
         peer: Certificate,
-    ) -> Result<Box<dyn SessionTransport>> {
+    ) -> Result<(
+        Box<dyn SessionTransportReader>,
+        Box<dyn SessionTransportWriter>,
+    )> {
         let lock = self.data.lock().await;
 
         let conn = lock

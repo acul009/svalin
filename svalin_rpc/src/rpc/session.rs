@@ -1,7 +1,6 @@
-use std::{fmt::Debug, marker::PhantomData, sync::Arc};
+use std::fmt::Debug;
 
 use anyhow::{anyhow, Result};
-use futures::Future;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, instrument};
 
@@ -9,9 +8,8 @@ use crate::{
     rpc::command::HandlerCollection,
     transport::{
         chunked_transport::{ChunkReader, ChunkWriter},
-        dummy_transport::{DummyTransport, DummyTransportReader, DummyTransportWriter},
-        object_transport::{ObjectReader, ObjectTransport, ObjectWriter},
-        session_transport::{SessionTransport, SessionTransportReader, SessionTransportWriter},
+        object_transport::{ObjectReader, ObjectWriter},
+        session_transport::{SessionTransportReader, SessionTransportWriter},
     },
 };
 
@@ -49,7 +47,11 @@ struct SessionDeclinedHeader {
     message: String,
 }
 
-pub struct SessionClosed {}
+pub enum SessionAction {
+    Error(Session, anyhow::Error),
+    Closed,
+    Moved,
+}
 
 impl Session {
     pub(crate) fn new(
@@ -67,14 +69,14 @@ impl Session {
         }
     }
 
-    pub fn dangerous_create_dummy_session() -> Self {
-        Self::new(
-            Box::new(DummyTransportReader::default()),
-            Box::new(DummyTransportWriter::default()),
-        )
-    }
+    // pub fn dangerous_create_dummy_session() -> Self {
+    //     Self::new(
+    //         Box::new(DummyTransportReader::default()),
+    //         Box::new(DummyTransportWriter::default()),
+    //     )
+    // }
 
-    pub(crate) async fn handle(&mut self, commands: HandlerCollection) -> Result<()> {
+    pub(crate) async fn handle(mut self, commands: HandlerCollection) -> Result<()> {
         debug!("waiting for request header");
 
         let header: SessionRequestHeader = self.read_object().await?;
@@ -85,7 +87,13 @@ impl Session {
             let response = SessionResponseHeader::Accept(SessionAcceptedHeader {});
             self.write_object(&response).await?;
 
-            command.handle(self).await?;
+            let mut session = Some(self);
+
+            command.handle(&mut session).await?;
+
+            if let Some(session) = session {
+                session.shutdown();
+            }
 
             // todo
         } else {
@@ -94,9 +102,8 @@ impl Session {
                 message: "command not found".to_string(),
             });
             self.write_object(&response).await?;
+            self.shutdown().await;
         }
-
-        self.shutdown().await?;
 
         Ok(())
     }
@@ -127,12 +134,10 @@ impl Session {
         self.write.write_object(object).await
     }
 
-    pub(crate) async fn shutdown(mut self) -> SessionClosed {
+    pub(crate) async fn shutdown(mut self) {
         if let Err(err) = self.write.shutdown().await {
             error!("error shuting down session: {err}");
         }
-
-        SessionClosed {}
     }
 
     // pub async fn forward_session(&mut self, partner: &mut Self) -> Result<()> {

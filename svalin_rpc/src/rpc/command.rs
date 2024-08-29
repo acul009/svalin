@@ -1,10 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use tokio::sync::{RwLock, RwLockWriteGuard};
 
-use crate::rpc::session::{Session};
+use crate::rpc::session::Session;
 
 #[async_trait]
 pub trait CommandHandler: Sync + Send {
@@ -12,9 +12,33 @@ pub trait CommandHandler: Sync + Send {
     async fn handle(&self, session: &mut Session) -> Result<()>;
 }
 
+#[async_trait]
+pub trait TakeableCommandHandler: Sync + Send {
+    fn key(&self) -> String;
+    async fn handle(&self, session: &mut Option<Session>) -> Result<()>;
+}
+
+#[async_trait]
+impl<T> TakeableCommandHandler for T
+where
+    T: CommandHandler,
+{
+    fn key(&self) -> String {
+        self.key()
+    }
+
+    async fn handle(&self, session: &mut Option<Session>) -> Result<()> {
+        if let Some(session) = session {
+            self.handle(session).await
+        } else {
+            Err(anyhow!("tried executing commandhandler with None"))
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct HandlerCollection {
-    commands: Arc<RwLock<HashMap<String, Arc<dyn CommandHandler>>>>,
+    commands: Arc<RwLock<HashMap<String, Arc<dyn TakeableCommandHandler>>>>,
 }
 
 impl HandlerCollection {
@@ -29,14 +53,14 @@ impl HandlerCollection {
         ChainCommandAdder { lock }
     }
 
-    pub async fn get(&self, key: &str) -> Option<Arc<dyn CommandHandler>> {
+    pub async fn get(&self, key: &str) -> Option<Arc<dyn TakeableCommandHandler>> {
         let commands = self.commands.read().await;
         commands.get(key).cloned()
     }
 }
 
 pub struct ChainCommandAdder<'a> {
-    lock: RwLockWriteGuard<'a, HashMap<String, Arc<dyn CommandHandler>>>,
+    lock: RwLockWriteGuard<'a, HashMap<String, Arc<dyn TakeableCommandHandler>>>,
 }
 
 impl<'a> ChainCommandAdder<'a> {
