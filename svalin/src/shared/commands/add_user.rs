@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
 use svalin_pki::{ArgonParams, Certificate, PermCredentials};
 use svalin_rpc::rpc::{
-    command::handler::CommandHandler,
-    session::{Session},
+    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    session::Session,
 };
 use totp_rs::TOTP;
 use tracing::{debug, error, instrument, span, Instrument, Level};
@@ -111,54 +111,60 @@ impl CommandHandler for AddUserHandler {
     }
 }
 
-#[instrument(skip_all)]
-#[rpc_dispatch(add_user_key())]
-pub async fn add_user(
-    session: &mut Session,
-    credentials: &PermCredentials,
-    username: String,
-    password: Vec<u8>,
-    totp_secret: TOTP,
-) -> Result<()> {
-    let client_hash_options = ArgonParams::strong();
+pub struct AddUser<'a> {
+    pub credentials: &'a PermCredentials,
+    pub username: String,
+    pub password: Vec<u8>,
+    pub totp_secret: TOTP,
+}
 
-    debug!("requesting user to be added");
+#[async_trait]
+impl<'a> CommandDispatcher<()> for AddUser<'a> {
+    fn key(&self) -> String {
+        add_user_key()
+    }
 
-    let certificate = credentials.get_certificate().to_owned();
-    debug!("certificate extracted");
+    async fn dispatch(self, session: &mut Session) -> Result<()> {
+        let client_hash_options = ArgonParams::strong();
 
-    let encrypted_credentials = credentials.to_bytes(password.clone()).await?;
-    debug!("credentials encrypted");
+        debug!("requesting user to be added");
 
-    let client_hash = client_hash_options.derive_key(password).await?;
-    debug!("password hash created");
+        let certificate = self.credentials.get_certificate().to_owned();
+        debug!("certificate extracted");
 
-    let request = AddUserRequest {
-        certificate,
-        username,
-        encrypted_credentials,
-        client_hash,
-        client_hash_options,
-        current_totp: totp_secret.generate_current()?,
-        totp_secret,
-    };
+        let encrypted_credentials = self.credentials.to_bytes(self.password.clone()).await?;
+        debug!("credentials encrypted");
 
-    debug!("user request ready to be added");
+        let client_hash = client_hash_options.derive_key(self.password).await?;
+        debug!("password hash created");
 
-    session
-        .write_object(&request)
-        .instrument(span!(Level::TRACE, "write add user request"))
-        .await?;
+        let request = AddUserRequest {
+            certificate,
+            username: self.username,
+            encrypted_credentials,
+            client_hash,
+            client_hash_options,
+            current_totp: self.totp_secret.generate_current()?,
+            totp_secret: self.totp_secret,
+        };
 
-    debug!("waiting on confirmation for new user");
+        debug!("user request ready to be added");
 
-    let success: Result<(), AddUserError> = session.read_object().await?;
+        session
+            .write_object(&request)
+            .instrument(span!(Level::TRACE, "write add user request"))
+            .await?;
 
-    debug!("received answer");
+        debug!("waiting on confirmation for new user");
 
-    success?;
+        let success: Result<(), AddUserError> = session.read_object().await?;
 
-    debug!("user confirmed as successfully added");
+        debug!("received answer");
 
-    Ok(())
+        success?;
+
+        debug!("user confirmed as successfully added");
+
+        Ok(())
+    }
 }

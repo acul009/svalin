@@ -52,7 +52,7 @@ impl CommandDispatcher<Duration> for Ping {
         ping_key()
     }
 
-    async fn dispatch(&self, session: &mut Session) -> Result<Duration> {
+    async fn dispatch(self, session: &mut Session) -> Result<Duration> {
         let ping = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")

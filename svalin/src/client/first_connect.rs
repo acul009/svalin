@@ -1,14 +1,14 @@
 use std::time::Duration;
 
 use anyhow::{Context, Ok, Result};
-use svalin_rpc::rpc::client::RpcClient;
+use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tracing::{debug, instrument};
 
+use crate::shared::commands::add_user::AddUser;
 use crate::{
     client::verifiers::upstream_verifier::UpstreamVerifier,
     shared::commands::{
-        add_user::add_userDispatcher,
         init::initDispatcher,
         public_server_status::{get_public_statusDispatcher, PublicStatus},
     },
@@ -83,14 +83,23 @@ impl Init {
         debug!("connected to server with certificate");
 
         connection
-            .add_user(
-                &root,
-                username.clone(),
-                password.clone().into(),
-                totp_secret,
-            )
+            .dispatch(AddUser {
+                credentials: &root,
+                username: username.clone(),
+                password: password.clone().into(),
+                totp_secret: totp_secret,
+            })
             .await
             .context("failed to add root user")?;
+        // connection
+        //     .add_user(
+        //         &root,
+        //         username.clone(),
+        //         password.clone().into(),
+        //         totp_secret,
+        //     )
+        //     .await
+        //     .context("failed to add root user")?;
 
         Client::add_profile(
             username,

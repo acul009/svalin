@@ -6,13 +6,13 @@ use crate::rpc::session::Session;
 #[async_trait]
 pub trait CommandDispatcher<T>: Send + Sync {
     fn key(&self) -> String;
-    async fn dispatch(&self, session: &mut Session) -> Result<T>;
+    async fn dispatch(self, session: &mut Session) -> Result<T>;
 }
 
 #[async_trait]
 pub trait TakeableCommandDispatcher<T>: Send + Sync {
     fn key(&self) -> String;
-    async fn dispatch(&self, session: &mut Option<Session>) -> Result<T>;
+    async fn dispatch(self, session: &mut Option<Session>) -> Result<T>;
 }
 
 #[async_trait]
@@ -24,7 +24,7 @@ where
         self.key()
     }
 
-    async fn dispatch(&self, session: &mut Option<Session>) -> Result<T> {
+    async fn dispatch(self, session: &mut Option<Session>) -> Result<T> {
         if let Some(session) = session {
             self.dispatch(session).await
             // self.dispatch(session).await

@@ -71,7 +71,7 @@ impl TakeableCommandDispatcher<()> for TlsTest {
     fn key(&self) -> String {
         tls_test_key()
     }
-    async fn dispatch(&self, session: &mut Option<Session>) -> Result<()> {
+    async fn dispatch(self, session: &mut Option<Session>) -> Result<()> {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure();
 
