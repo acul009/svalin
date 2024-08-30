@@ -1,10 +1,9 @@
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use marmelade::Scope;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
-use svalin_rpc::commands::forward::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::command::handler::HandlerCollection;

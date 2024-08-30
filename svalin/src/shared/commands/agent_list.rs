@@ -5,14 +5,11 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
 use svalin_pki::{signed_object::SignedObject, Certificate, PermCredentials};
-use svalin_rpc::{
-    commands::forward::ForwardConnection,
-    rpc::{
-        command::handler::CommandHandler,
-        connection::DirectConnection,
-        server::RpcServer,
-        session::{Session},
-    },
+use svalin_rpc::rpc::{
+    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    connection::direct_connection::DirectConnection,
+    server::RpcServer,
+    session::Session,
 };
 use tokio::{select, sync::RwLock};
 use tracing::debug;
@@ -120,47 +117,54 @@ impl CommandHandler for AgentListHandler {
     }
 }
 
-#[rpc_dispatch(agent_list_key())]
-pub async fn update_agent_list(
-    session: &mut Session,
-    base_connection: DirectConnection,
-    credentials: PermCredentials,
-    list: Arc<RwLock<BTreeMap<Certificate, Device>>>,
-) -> Result<()> {
-    loop {
-        let list_item_update: AgentListItemTransport = session
-            .read_object()
-            .await
-            .context("failed to receive ItemTransport")?;
+pub struct UpdateAgentList {
+    pub base_connection: DirectConnection,
+    pub credentials: PermCredentials,
+    pub list: Arc<RwLock<BTreeMap<Certificate, Device>>>,
+}
 
-        let item = AgentListItem {
-            online_status: list_item_update.online_status,
-            public_data: list_item_update.public_data.unpack(),
-        };
+#[async_trait]
+impl CommandDispatcher<()> for UpdateAgentList {
+    fn key(&self) -> String {
+        agent_list_key()
+    }
 
-        {
-            if let Some(device) = list.read().await.get(&item.public_data.cert) {
-                // Either we update the device...
+    async fn dispatch(self, session: &mut Session) -> Result<()> {
+        loop {
+            let list_item_update: AgentListItemTransport = session
+                .read_object()
+                .await
+                .context("failed to receive ItemTransport")?;
 
-                device.update(item).await;
-                continue;
+            let item = AgentListItem {
+                online_status: list_item_update.online_status,
+                public_data: list_item_update.public_data.unpack(),
+            };
+
+            {
+                if let Some(device) = self.list.read().await.get(&item.public_data.cert) {
+                    // Either we update the device...
+
+                    device.update(item).await;
+                    continue;
+                }
             }
-        }
 
-        {
-            // ...or we create it
+            {
+                // ...or we create it
 
-            let device_connection = ForwardConnection::new(
-                base_connection.clone(),
-                credentials.clone(),
-                item.public_data.cert.clone(),
-            );
+                let device_connection = ForwardConnection::new(
+                    self.base_connection.clone(),
+                    self.credentials.clone(),
+                    item.public_data.cert.clone(),
+                );
 
-            let cert = item.public_data.cert.clone();
+                let cert = item.public_data.cert.clone();
 
-            let device = Device::new(device_connection, item);
+                let device = Device::new(device_connection, item);
 
-            list.write().await.insert(cert, device);
+                self.list.write().await.insert(cert, device);
+            }
         }
     }
 }

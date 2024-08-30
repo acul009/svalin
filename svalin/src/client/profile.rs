@@ -3,11 +3,11 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
-use svalin_rpc::rpc::client::RpcClient;
+use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::{sync::RwLock, task::JoinSet};
 use tracing::{debug, error};
 
-use crate::{client::verifiers, shared::commands::agent_list::update_agent_listDispatcher};
+use crate::{client::verifiers, shared::commands::agent_list::UpdateAgentList};
 
 use super::Client;
 
@@ -218,7 +218,11 @@ impl Client {
             client.background_tasks.spawn(async move {
                 debug!("subscribing to upstream agent list");
                 if let Err(err) = sync_connection
-                    .update_agent_list(sync_connection.clone(), identity, list_clone)
+                    .dispatch(UpdateAgentList {
+                        base_connection: sync_connection.clone(),
+                        credentials: identity,
+                        list: list_clone,
+                    })
                     .await
                 {
                     for err in err.chain() {

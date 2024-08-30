@@ -4,7 +4,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::{select, FutureExt};
 use svalin_macros::rpc_dispatch;
-use svalin_rpc::rpc::{command::handler::CommandHandler, session::Session};
+use svalin_rpc::rpc::{
+    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    session::Session,
+};
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::{oneshot, watch};
 use tracing::debug;
@@ -42,31 +45,37 @@ impl CommandHandler for RealtimeStatusHandler {
     }
 }
 
-#[rpc_dispatch(realtime_status_key())]
-pub async fn subscribe_realtime_status(
-    session: &mut Session,
-    send: &watch::Sender<RemoteLiveData<RealtimeStatus>>,
-    stop: oneshot::Receiver<()>,
-) -> Result<()> {
-    let mut stop = pin!(stop.fuse());
-    loop {
-        select! {
-            _ = stop => {
-                return Ok(());
-            },
-            status  = session.read_object::<RealtimeStatus>().fuse() => {
-                match status {
-                    Ok(status) => {
-                        debug!("received realtime status");
-                        if let Err(_) = send.send(RemoteLiveData::Ready(status)) {
-                            return Ok(());
+pub struct SubscribeRealtimeStatus {
+    pub send: watch::Sender<RemoteLiveData<RealtimeStatus>>,
+    pub stop: oneshot::Receiver<()>,
+}
+
+#[async_trait]
+impl CommandDispatcher<()> for SubscribeRealtimeStatus {
+    fn key(&self) -> String {
+        realtime_status_key()
+    }
+    async fn dispatch(self, session: &mut Session) -> Result<()> {
+        let mut stop = pin!(self.stop.fuse());
+        loop {
+            select! {
+                _ = stop => {
+                    return Ok(());
+                },
+                status  = session.read_object::<RealtimeStatus>().fuse() => {
+                    match status {
+                        Ok(status) => {
+                            debug!("received realtime status");
+                            if let Err(_) = self.send.send(RemoteLiveData::Ready(status)) {
+                                return Ok(());
+                            }
                         }
-                    }
-                    Err(err) => {
-                        return Err(err);
-                    }
-                };
-            },
+                        Err(err) => {
+                            return Err(err);
+                        }
+                    };
+                },
+            }
         }
     }
 }

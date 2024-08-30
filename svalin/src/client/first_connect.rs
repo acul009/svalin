@@ -6,12 +6,11 @@ use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tracing::{debug, instrument};
 
 use crate::shared::commands::add_user::AddUser;
+use crate::shared::commands::init;
+use crate::shared::commands::public_server_status::GetPutblicStatus;
 use crate::{
     client::verifiers::upstream_verifier::UpstreamVerifier,
-    shared::commands::{
-        init::initDispatcher,
-        public_server_status::{get_public_statusDispatcher, PublicStatus},
-    },
+    shared::commands::public_server_status::PublicStatus,
 };
 
 use super::Client;
@@ -29,7 +28,7 @@ impl Client {
 
         debug!("requesting public status");
 
-        let server_status = conn.get_public_status().await?;
+        let server_status = conn.dispatch(GetPutblicStatus).await?;
 
         debug!("public status: {server_status:?}");
 
@@ -65,7 +64,7 @@ impl Init {
         let (root, server_cert) = self
             .client
             .upstream_connection()
-            .init()
+            .dispatch(init::Init)
             .await
             .context("failed to initialize server certificate")?;
 

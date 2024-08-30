@@ -4,11 +4,9 @@ use super::Client;
 
 use anyhow::Result;
 use svalin_pki::{signed_object::SignedObject, Certificate, PermCredentials};
-use svalin_rpc::rpc::connection::DirectConnection;
+use svalin_rpc::rpc::connection::direct_connection::DirectConnection;
 use tokio::sync::oneshot;
 use tracing::debug;
-
-use crate::shared::join_agent::add_agent::add_agentDispatcher;
 
 impl Client {
     pub async fn add_agent_with_code(&self, join_code: String) -> Result<WaitingForConfirmCode> {

@@ -13,12 +13,11 @@ mod profile;
 use device::Device;
 pub use first_connect::*;
 use svalin_pki::{Certificate, PermCredentials};
-use svalin_rpc::commands::ping::pingDispatcher;
+use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
+use svalin_rpc::rpc::connection::Connection;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
-
-use crate::shared::commands::agent_list::AgentListItem;
 
 /// flutter_rust_bridge:opaque
 pub struct Client {
@@ -44,7 +43,7 @@ impl Client {
     }
 
     pub async fn ping_upstream(&self) -> Result<Duration> {
-        self.rpc.upstream_connection().ping().await
+        self.rpc.upstream_connection().dispatch(Ping).await
     }
 
     pub async fn device_list(&self) -> Vec<Device> {

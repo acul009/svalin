@@ -4,8 +4,8 @@ use svalin_pki::{Certificate, CertificateRequest, Keypair, PermCredentials};
 
 use async_trait::async_trait;
 use svalin_rpc::rpc::{
-    command::handler::CommandHandler,
-    session::{Session},
+    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    session::Session,
 };
 use tokio::sync::mpsc;
 use tracing::debug;
@@ -58,23 +58,29 @@ impl CommandHandler for InitHandler {
     }
 }
 
-#[rpc_dispatch(init_key())]
-pub(crate) async fn init(
-    session: &mut Session,
-) -> Result<(PermCredentials, Certificate)> {
-    debug!("sending init request");
-    let root = Keypair::generate()?.to_self_signed_cert()?;
-    session.write_object(root.get_certificate()).await?;
+pub struct Init;
 
-    let raw_request: String = session.read_object().await?;
-    let request = CertificateRequest::from_string(raw_request)?;
-    let server_cert: Certificate = root.approve_request(request)?;
+#[async_trait]
+impl CommandDispatcher<(PermCredentials, Certificate)> for Init {
+    fn key(&self) -> String {
+        init_key()
+    }
 
-    session.write_object(&server_cert).await?;
+    async fn dispatch(self, session: &mut Session) -> Result<(PermCredentials, Certificate)> {
+        debug!("sending init request");
+        let root = Keypair::generate()?.to_self_signed_cert()?;
+        session.write_object(root.get_certificate()).await?;
 
-    let _ok: std::result::Result<(), ()> = session.read_object().await?;
+        let raw_request: String = session.read_object().await?;
+        let request = CertificateRequest::from_string(raw_request)?;
+        let server_cert: Certificate = root.approve_request(request)?;
 
-    debug!("init completed");
+        session.write_object(&server_cert).await?;
 
-    Ok((root, server_cert))
+        let _ok: std::result::Result<(), ()> = session.read_object().await?;
+
+        debug!("init completed");
+
+        Ok((root, server_cert))
+    }
 }

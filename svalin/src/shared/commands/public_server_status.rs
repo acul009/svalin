@@ -3,8 +3,8 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
 use svalin_rpc::rpc::{
-    command::handler::CommandHandler,
-    session::{Session},
+    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    session::Session,
 };
 
 fn public_status_key() -> String {
@@ -40,9 +40,17 @@ impl CommandHandler for PublicStatusHandler {
     }
 }
 
-#[rpc_dispatch(public_status_key())]
-pub async fn get_public_status(session: &mut Session) -> Result<PublicStatus> {
-    let status = session.read_object().await?;
+pub struct GetPutblicStatus;
 
-    Ok(status)
+#[async_trait]
+impl CommandDispatcher<PublicStatus> for GetPutblicStatus {
+    fn key(&self) -> String {
+        public_status_key()
+    }
+
+    async fn dispatch(self, session: &mut Session) -> Result<PublicStatus> {
+        let status = session.read_object().await?;
+
+        Ok(status)
+    }
 }
