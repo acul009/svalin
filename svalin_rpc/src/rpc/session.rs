@@ -7,18 +7,20 @@ use tracing::{debug, error, instrument};
 use crate::{
     rpc::command::handler::HandlerCollection,
     transport::{
-        chunked_transport::{ChunkReader, ChunkWriter},
         object_transport::{ObjectReader, ObjectWriter},
         session_transport::{SessionTransportReader, SessionTransportWriter},
     },
 };
 
-use super::{command::dispatcher::CommandDispatcher, peer::Peer};
+use super::{
+    command::dispatcher::{CommandDispatcher, TakeableCommandDispatcher},
+    peer::Peer,
+};
 
 pub struct Session {
     read: ObjectReader,
     write: ObjectWriter,
-    partner: Peer,
+    peer: Peer,
 }
 
 impl Debug for Session {
@@ -57,24 +59,14 @@ impl Session {
     pub(crate) fn new(
         read: Box<dyn SessionTransportReader>,
         write: Box<dyn SessionTransportWriter>,
+        peer: Peer,
     ) -> Self {
-        let read = ObjectReader::new(ChunkReader::new(read));
+        let read = ObjectReader::new(read);
 
-        let write = ObjectWriter::new(ChunkWriter::new(write));
+        let write = ObjectWriter::new(write);
 
-        Self {
-            read,
-            write,
-            partner: Peer::Anonymous,
-        }
+        Self { read, write, peer }
     }
-
-    // pub fn dangerous_create_dummy_session() -> Self {
-    //     Self::new(
-    //         Box::new(DummyTransportReader::default()),
-    //         Box::new(DummyTransportWriter::default()),
-    //     )
-    // }
 
     pub(crate) async fn handle(mut self, commands: HandlerCollection) -> Result<()> {
         debug!("waiting for request header");
@@ -108,12 +100,23 @@ impl Session {
         Ok(())
     }
 
-    pub async fn dispatch<T, D: CommandDispatcher<T>>(&mut self, dispatcher: D) -> Result<T> {
+    pub async fn dispatch<T, D: TakeableCommandDispatcher<T>>(
+        mut self,
+        dispatcher: D,
+    ) -> Result<T> {
         let command_key = dispatcher.key();
 
         self.request_session(command_key).await?;
 
-        dispatcher.dispatch(self).await
+        let mut opt = Some(self);
+
+        let result = dispatcher.dispatch(&mut opt).await;
+
+        if let Some(session) = opt {
+            session.shutdown().await;
+        }
+
+        result
     }
 
     pub(crate) async fn request_session(&mut self, command_key: String) -> Result<()> {
@@ -146,6 +149,16 @@ impl Session {
         if let Err(err) = self.write.shutdown().await {
             error!("error shuting down session: {err}");
         }
+    }
+
+    pub fn destructure(
+        self,
+    ) -> (
+        Box<dyn SessionTransportReader>,
+        Box<dyn SessionTransportWriter>,
+        Peer,
+    ) {
+        (self.read.get_reader(), self.write.get_writer(), self.peer)
     }
 
     // pub async fn forward_session(&mut self, partner: &mut Self) -> Result<()> {

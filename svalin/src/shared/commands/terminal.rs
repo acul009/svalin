@@ -25,15 +25,6 @@ fn remote_terminal_key() -> String {
     "remote-terminal".into()
 }
 
-enum CopyState<A, B> {
-    WaitOnRead(A),
-    WaitOnWrite(B),
-    Continue,
-    Finished,
-}
-
-impl Future for CopyState<String, String> {}
-
 pub struct RemoteTerminalHandler {}
 
 impl RemoteTerminalHandler {}

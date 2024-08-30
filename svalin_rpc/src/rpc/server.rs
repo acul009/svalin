@@ -13,9 +13,7 @@ use crate::rpc::peer::Peer;
 use crate::rustls::{self, server::danger::ClientCertVerifier};
 
 use crate::rpc::command::handler::HandlerCollection;
-use crate::transport::session_transport::{
-    SessionTransport, SessionTransportReader, SessionTransportWriter,
-};
+use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
 
 use super::connection::direct_connection::DirectConnection;
 

@@ -3,7 +3,6 @@ use std::{pin::Pin, sync::Arc};
 use crate::rustls;
 use crate::rustls::{client::danger::ServerCertVerifier, server::danger::ClientCertVerifier};
 use anyhow::{anyhow, Result};
-use async_trait::async_trait;
 use svalin_pki::PermCredentials;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::{TlsAcceptor, TlsStream};
@@ -25,90 +24,56 @@ where
         base_transport: T,
         verifier: Arc<dyn ServerCertVerifier>,
         credentials: &PermCredentials,
-    ) -> Result<Self, (anyhow::Error, T)> {
+    ) -> Result<Self> {
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
             credentials.get_certificate().to_der().to_owned(),
         )];
 
         let key_der =
-            rustls::pki_types::PrivateKeyDer::try_from(credentials.get_key_bytes().to_owned());
-
-        if let Err(err) = key_der {
-            return Err((anyhow!(err), base_transport));
-        }
-        let key_der = key_der.unwrap();
+            rustls::pki_types::PrivateKeyDer::try_from(credentials.get_key_bytes().to_owned())
+                .map_err(|err| anyhow!(err))?;
 
         let config = rustls::ClientConfig::builder()
             .dangerous()
             .with_custom_certificate_verifier(verifier)
-            .with_client_auth_cert(cert_chain, key_der);
-
-        if let Err(err) = config {
-            return Err((anyhow!(err), base_transport));
-        }
-        let config = config.unwrap();
+            .with_client_auth_cert(cert_chain, key_der)?;
 
         let connector = tokio_rustls::TlsConnector::from(Arc::new(config));
 
-        let hostname = rustls::pki_types::ServerName::try_from("todo");
+        // todo
+        let hostname = rustls::pki_types::ServerName::try_from("todo")?;
 
-        if let Err(err) = hostname {
-            return Err((anyhow!(err), base_transport));
-        }
-        let hostname = hostname.unwrap();
+        let client = connector.connect(hostname, base_transport).await?;
 
-        let client = connector
-            .connect(hostname, base_transport)
-            .into_fallible()
-            .await;
+        let tls_stream = TlsStream::Client(client);
 
-        match client {
-            Err(err) => Err((anyhow!(err.0), err.1)),
-            Ok(client) => {
-                let tls_stream = TlsStream::Client(client);
-
-                Ok(Self { tls_stream })
-            }
-        }
+        Ok(Self { tls_stream })
     }
 
     pub async fn server(
         base_transport: T,
         verifier: Arc<dyn ClientCertVerifier>,
         credentials: &PermCredentials,
-    ) -> Result<Self, (anyhow::Error, T)> {
+    ) -> Result<Self> {
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
             credentials.get_certificate().to_der().to_owned(),
         )];
 
         let key_der =
-            rustls::pki_types::PrivateKeyDer::try_from(credentials.get_key_bytes().to_owned());
-
-        if let Err(err) = key_der {
-            return Err((anyhow!(err), base_transport));
-        }
-        let key_der = key_der.unwrap();
+            rustls::pki_types::PrivateKeyDer::try_from(credentials.get_key_bytes().to_owned())
+                .map_err(|err| anyhow!(err))?;
 
         let config = rustls::ServerConfig::builder()
             .with_client_cert_verifier(verifier)
-            .with_single_cert(cert_chain, key_der);
-
-        if let Err(err) = config {
-            return Err((anyhow!(err), base_transport));
-        }
-        let config = config.unwrap();
+            .with_single_cert(cert_chain, key_der)?;
 
         let acceptor = TlsAcceptor::from(Arc::new(config));
 
-        let server = acceptor.accept(base_transport).into_fallible().await;
-        match server {
-            Err(err) => Err((anyhow!(err.0), err.1)),
-            Ok(server) => {
-                let tls_stream = TlsStream::Server(server);
+        let server = acceptor.accept(base_transport).await?;
 
-                Ok(Self { tls_stream })
-            }
-        }
+        let tls_stream = TlsStream::Server(server);
+
+        Ok(Self { tls_stream })
     }
 
     pub fn derive_key<B>(&self, buffer: B, label: &[u8], context: &[u8]) -> Result<B>

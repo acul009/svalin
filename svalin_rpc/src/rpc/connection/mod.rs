@@ -20,13 +20,15 @@ pub trait ConnectionBase: Send + Sync {
     async fn closed(&self);
 }
 
+use super::command::dispatcher::TakeableCommandDispatcher;
 use super::peer::Peer;
 
 pub mod direct_connection;
 
 #[async_trait]
 pub trait Connection: ConnectionBase {
-    async fn open_session(&self, command_key: String) -> Result<Session>;
+    // async fn open_session(&self, command_key: String) -> Result<Session>;
+    async fn dispatch<T: Send, D: TakeableCommandDispatcher<T>>(self, dispatcher: D) -> Result<T>;
 }
 
 #[async_trait]
@@ -34,22 +36,32 @@ impl<T> Connection for T
 where
     T: ConnectionBase,
 {
-    async fn open_session(&self, command_key: String) -> Result<Session> {
-        debug!("creating transport");
+    // async fn open_session(&self, command_key: String) -> Result<Session> {
+    //     debug!("creating transport");
 
+    //     let (read, write) = self.open_raw_session().await?;
+
+    //     debug!("transport created, pass to session");
+
+    //     let mut session = Session::new(read, write, Peer::Anonymous);
+
+    //     debug!("requesting session");
+
+    //     session.request_session(command_key).await?;
+
+    //     debug!("session request successful");
+
+    //     Ok(session)
+    // }
+
+    async fn dispatch<U: Send, D: TakeableCommandDispatcher<U>>(self, dispatcher: D) -> Result<U> {
         let (read, write) = self.open_raw_session().await?;
 
-        debug!("transport created, pass to session");
+        let session = Session::new(read, write, Peer::Anonymous);
 
-        let mut session = Session::new(read, write);
+        let result = session.dispatch(dispatcher).await?;
 
-        debug!("requesting session");
-
-        session.request_session(command_key).await?;
-
-        debug!("session request successful");
-
-        Ok(session)
+        Ok(result)
     }
 }
 
@@ -80,7 +92,7 @@ where
         loop {
             match self.accept_raw_session().await {
                 Ok((read, write)) => {
-                    let mut session = Session::new(read, write);
+                    let session = Session::new(read, write, Peer::Anonymous);
 
                     let commands2 = commands.clone();
                     open_sessions.spawn(async move {

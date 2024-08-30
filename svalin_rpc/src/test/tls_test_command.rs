@@ -2,7 +2,17 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::{
     self as svalin_rpc,
-    transport::tls_transport::{self, TlsTransport},
+    rpc::{
+        command::{
+            dispatcher::{CommandDispatcher, TakeableCommandDispatcher},
+            handler::TakeableCommandHandler,
+        },
+        peer::Peer,
+    },
+    transport::{
+        combined_transport::CombinedTransport,
+        tls_transport::{self, TlsTransport},
+    },
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -30,77 +40,85 @@ fn tls_test_key() -> String {
 }
 
 #[async_trait]
-impl CommandHandler for TlsTestCommandHandler {
+impl TakeableCommandHandler for TlsTestCommandHandler {
     fn key(&self) -> String {
         tls_test_key()
     }
 
     async fn handle(&self, session: &mut Option<Session>) -> anyhow::Result<()> {
-        session
-            .replace_transport(|direct_transport| async {
-                let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
+        if let Some(session_ready) = session.take() {
+            let (read, write, _) = session_ready.destructure();
 
-                let tls_transport = TlsTransport::server(
-                    direct_transport,
-                    crate::verifiers::skip_verify::SkipClientVerification::new(),
-                    &credentials,
-                )
-                .await;
+            let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
 
-                match tls_transport {
-                    Ok(tls_transport) => Box::new(tls_transport),
-                    Err(err) => err.1,
-                }
-            })
-            .await;
+            let tls_transport = TlsTransport::server(
+                CombinedTransport::new(read, write),
+                crate::verifiers::skip_verify::SkipClientVerification::new(),
+                &credentials,
+            )
+            .await?;
 
-        let ping: u64 = session.read_object().await?;
-        session.write_object(&ping).await?;
+            let (read, write) = tokio::io::split(tls_transport);
 
-        Ok(())
+            let mut session_ready = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+
+            let ping: u64 = session_ready.read_object().await?;
+            session_ready.write_object(&ping).await?;
+
+            *session = Some(session_ready);
+
+            Ok(())
+        } else {
+            Err(anyhow!("no session given"))
+        }
     }
 }
 
-#[rpc_dispatch(tls_test_key())]
-pub async fn tls_test(session: &mut Session) -> Result<()> {
-    session
-        .replace_transport(|direct_transport| async {
+pub struct TlsTestDispatcher {}
+
+impl TakeableCommandDispatcher<()> for TlsTestDispatcher {
+    fn key(&self) -> String {
+        tls_test_key()
+    }
+    async fn dispatch(&self, session: &mut Option<Session>) -> Result<()> {
+        if let Some(session_ready) = session.take() {
+            let (read, write, _) = session_ready.destructure();
+
             let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
 
             let tls_transport = TlsTransport::client(
-                direct_transport,
+                CombinedTransport::new(read, write),
                 crate::verifiers::skip_verify::SkipServerVerification::new(),
                 &credentials,
             )
-            .await;
+            .await?;
 
-            match tls_transport {
-                Ok(tls_transport) => Box::new(tls_transport),
-                Err(err) => {
-                    panic!("{}", err.0);
-                    err.1
-                }
-            }
-        })
-        .await;
+            let (read, write) = tokio::io::split(tls_transport);
 
-    let ping = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_nanos();
+            let mut session_ready = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
 
-    session.write_object(&ping).await?;
+            let ping = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_nanos();
 
-    let pong: u128 = session.read_object().await?;
+            session_ready.write_object(&ping).await?;
 
-    let now: u128 = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_nanos();
+            let pong: u128 = session_ready.read_object().await?;
 
-    let diff = Duration::from_nanos((now - pong).try_into()?);
+            let now: u128 = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_nanos();
 
-    println!("TLS-Ping: {:?}", diff);
+            let diff = Duration::from_nanos((now - pong).try_into()?);
 
-    Ok(())
+            println!("TLS-Ping: {:?}", diff);
+
+            *session = Some(session_ready);
+            Ok(())
+        } else {
+            Err(anyhow!("no session given"))
+        }
+    }
 }

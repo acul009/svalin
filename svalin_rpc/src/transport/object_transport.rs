@@ -1,7 +1,10 @@
 use anyhow::{Context, Ok, Result};
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::chunked_transport::{ChunkReader, ChunkWriter};
+use super::{
+    chunked_transport::{ChunkReader, ChunkWriter},
+    session_transport::{SessionTransportReader, SessionTransportWriter},
+};
 
 pub(crate) struct ObjectReader {
     read: ChunkReader,
@@ -12,8 +15,10 @@ pub(crate) struct ObjectWriter {
 }
 
 impl ObjectReader {
-    pub fn new(read: ChunkReader) -> Self {
-        Self { read }
+    pub(crate) fn new(read: Box<dyn SessionTransportReader>) -> Self {
+        Self {
+            read: ChunkReader::new(read),
+        }
     }
 
     pub async fn read_object<U: DeserializeOwned>(&mut self) -> Result<U> {
@@ -27,11 +32,17 @@ impl ObjectReader {
 
         Ok(object)
     }
+
+    pub fn get_reader(self) -> Box<dyn SessionTransportReader> {
+        self.read.get_reader()
+    }
 }
 
 impl ObjectWriter {
-    pub fn new(write: ChunkWriter) -> Self {
-        Self { write }
+    pub(crate) fn new(write: Box<dyn SessionTransportWriter>) -> Self {
+        Self {
+            write: ChunkWriter::new(write),
+        }
     }
 
     pub async fn write_object<U: Serialize>(&mut self, object: &U) -> Result<()> {
@@ -44,6 +55,10 @@ impl ObjectWriter {
 
     pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
         self.write.shutdown().await
+    }
+
+    pub fn get_writer(self) -> Box<dyn SessionTransportWriter> {
+        self.write.get_writer()
     }
 }
 

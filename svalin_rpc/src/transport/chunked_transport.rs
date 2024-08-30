@@ -41,6 +41,10 @@ impl ChunkReader {
 
         Ok(chunk)
     }
+
+    pub fn get_reader(self) -> Box<dyn SessionTransportReader> {
+        self.read
+    }
 }
 
 impl ChunkWriter {
@@ -71,5 +75,9 @@ impl ChunkWriter {
 
     pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
         self.write.shutdown().await
+    }
+
+    pub fn get_writer(self) -> Box<dyn SessionTransportWriter> {
+        self.write
     }
 }
