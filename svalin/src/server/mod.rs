@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, Keypair, PermCredentials};
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
-    rpc::command::HandlerCollection,
+    rpc::command::handler::HandlerCollection,
     verifiers::skip_verify::SkipClientVerification,
 };
 use tokio::sync::mpsc;

@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::{
     self as svalin_rpc,
-    rpc::{command::CommandHandler, session::Session},
+    rpc::{command::handler::CommandHandler, session::Session},
 };
 use anyhow::Result;
 use async_trait::async_trait;

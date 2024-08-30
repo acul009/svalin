@@ -6,7 +6,7 @@ use quinn::{crypto::rustls::QuicClientConfig, TransportConfig, VarInt};
 use svalin_pki::PermCredentials;
 
 use super::{
-    command::HandlerCollection,
+    command::handler::HandlerCollection,
     connection::{direct_connection::DirectConnection, ServeableConnection},
 };
 

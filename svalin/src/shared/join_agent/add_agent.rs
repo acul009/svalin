@@ -5,10 +5,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
 use svalin_pki::signed_object::SignedObject;
-use svalin_rpc::rpc::{
-    command::CommandHandler,
-    session::{Session},
-};
+use svalin_rpc::rpc::{command::handler::CommandHandler, session::Session};
 
 use crate::server::agent_store::AgentStore;
 

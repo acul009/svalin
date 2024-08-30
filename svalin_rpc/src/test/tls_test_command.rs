@@ -11,7 +11,7 @@ use svalin_macros::rpc_dispatch;
 use svalin_pki::{Keypair, PermCredentials};
 use tracing::error;
 
-use crate::rpc::{command::CommandHandler, session::Session};
+use crate::rpc::{command::handler::CommandHandler, session::Session};
 
 pub struct TlsTestCommandHandler {
     credentials: PermCredentials,

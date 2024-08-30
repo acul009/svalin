@@ -8,7 +8,7 @@ mod tls_test_command;
 
 use crate::{
     commands::ping::{pingDispatcher, PingHandler},
-    rpc::{client::RpcClient, command::HandlerCollection, server::RpcServer},
+    rpc::{client::RpcClient, command::handler::HandlerCollection, server::RpcServer},
     verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
 };
 

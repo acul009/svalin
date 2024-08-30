@@ -1,10 +1,10 @@
 use std::error::Error;
 use std::fmt::{Debug, Display};
 
-use crate::rpc::command::HandlerCollection;
+use crate::rpc::command::handler::HandlerCollection;
 use crate::rpc::connection::{Connection, ConnectionBase};
 use crate::rpc::peer::Peer;
-use crate::rpc::{command::CommandHandler, server::RpcServer, session::Session};
+use crate::rpc::{command::handler::CommandHandler, server::RpcServer, session::Session};
 use crate::transport::session_transport::SessionTransport;
 use crate::transport::tls_transport::TlsTransport;
 use crate::verifiers::exact::ExactServerVerification;
@@ -13,7 +13,6 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
-use tokio::io::AsyncWriteExt;
 use tracing::{debug, error};
 
 fn forward_key() -> String {

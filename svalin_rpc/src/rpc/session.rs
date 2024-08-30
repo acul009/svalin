@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, instrument};
 
 use crate::{
-    rpc::command::HandlerCollection,
+    rpc::command::handler::HandlerCollection,
     transport::{
         chunked_transport::{ChunkReader, ChunkWriter},
         object_transport::{ObjectReader, ObjectWriter},
@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-use super::peer::Peer;
+use super::{command::dispatcher::CommandDispatcher, peer::Peer};
 
 pub struct Session {
     read: ObjectReader,
@@ -106,6 +106,14 @@ impl Session {
         }
 
         Ok(())
+    }
+
+    pub async fn dispatch<T, D: CommandDispatcher<T>>(&mut self, dispatcher: D) -> Result<T> {
+        let command_key = dispatcher.key();
+
+        self.request_session(command_key).await?;
+
+        dispatcher.dispatch(self).await
     }
 
     pub(crate) async fn request_session(&mut self, command_key: String) -> Result<()> {

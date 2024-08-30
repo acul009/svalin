@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
 use svalin_pki::{ArgonParams, Certificate, PermCredentials};
 use svalin_rpc::rpc::{
-    command::CommandHandler,
+    command::handler::CommandHandler,
     session::{Session},
 };
 use totp_rs::TOTP;

@@ -12,7 +12,7 @@ use crate::rpc::connection::{ConnectionBase, ServeableConnection};
 use crate::rpc::peer::Peer;
 use crate::rustls::{self, server::danger::ClientCertVerifier};
 
-use crate::rpc::command::HandlerCollection;
+use crate::rpc::command::handler::HandlerCollection;
 use crate::transport::session_transport::{
     SessionTransport, SessionTransportReader, SessionTransportWriter,
 };

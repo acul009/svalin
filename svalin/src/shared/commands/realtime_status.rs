@@ -4,7 +4,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::{select, FutureExt};
 use svalin_macros::rpc_dispatch;
-use svalin_rpc::rpc::{command::CommandHandler, session::Session};
+use svalin_rpc::rpc::{command::handler::CommandHandler, session::Session};
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::{oneshot, watch};
 use tracing::debug;

@@ -7,7 +7,7 @@ use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::commands::forward::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
 use svalin_rpc::rpc::client::RpcClient;
-use svalin_rpc::rpc::command::HandlerCollection;
+use svalin_rpc::rpc::command::handler::HandlerCollection;
 use tracing::{debug, instrument};
 
 mod init;

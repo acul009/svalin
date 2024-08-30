@@ -6,7 +6,7 @@ use svalin_macros::rpc_dispatch;
 use svalin_pki::{ArgonParams, Certificate, CertificateRequest, PermCredentials};
 use svalin_rpc::{
     rpc::{
-        command::CommandHandler,
+        command::handler::CommandHandler,
         session::{Session},
     },
     transport::tls_transport::TlsTransport,

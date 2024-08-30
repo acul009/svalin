@@ -6,10 +6,7 @@ use rand::Rng;
 use svalin_macros::rpc_dispatch;
 use svalin_pki::{Certificate, Keypair};
 use svalin_rpc::{
-    rpc::{
-        command::CommandHandler,
-        session::{Session},
-    },
+    rpc::{command::handler::CommandHandler, session::Session},
     transport::tls_transport::TlsTransport,
     verifiers::skip_verify::SkipClientVerification,
 };

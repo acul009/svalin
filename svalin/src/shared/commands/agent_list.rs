@@ -8,7 +8,7 @@ use svalin_pki::{signed_object::SignedObject, Certificate, PermCredentials};
 use svalin_rpc::{
     commands::forward::ForwardConnection,
     rpc::{
-        command::CommandHandler,
+        command::handler::CommandHandler,
         connection::DirectConnection,
         server::RpcServer,
         session::{Session},

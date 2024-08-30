@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use tokio::task::JoinSet;
 use tracing::{debug, error};
 
-use crate::rpc::{command::HandlerCollection, session::Session};
+use crate::rpc::{command::handler::HandlerCollection, session::Session};
 use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
 
 #[async_trait]

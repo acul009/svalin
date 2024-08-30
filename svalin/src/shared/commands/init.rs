@@ -4,7 +4,7 @@ use svalin_pki::{Certificate, CertificateRequest, Keypair, PermCredentials};
 
 use async_trait::async_trait;
 use svalin_rpc::rpc::{
-    command::CommandHandler,
+    command::handler::CommandHandler,
     session::{Session},
 };
 use tokio::sync::mpsc;

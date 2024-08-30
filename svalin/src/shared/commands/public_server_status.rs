@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
 use svalin_rpc::rpc::{
-    command::CommandHandler,
+    command::handler::CommandHandler,
     session::{Session},
 };
 
