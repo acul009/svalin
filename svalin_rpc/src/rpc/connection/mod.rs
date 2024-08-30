@@ -59,9 +59,7 @@ where
 
         let session = Session::new(read, write, Peer::Anonymous);
 
-        let result = session.dispatch(dispatcher).await?;
-
-        Ok(result)
+        session.dispatch(dispatcher).await
     }
 }
 

@@ -66,7 +66,7 @@ pub struct ChainCommandAdder<'a> {
 impl<'a> ChainCommandAdder<'a> {
     pub fn add<T>(&mut self, command: T) -> &mut Self
     where
-        T: CommandHandler + 'static,
+        T: TakeableCommandHandler + 'static,
     {
         self.lock.insert(command.key(), Arc::new(command));
         self

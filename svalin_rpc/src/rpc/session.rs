@@ -12,10 +12,7 @@ use crate::{
     },
 };
 
-use super::{
-    command::dispatcher::{CommandDispatcher, TakeableCommandDispatcher},
-    peer::Peer,
-};
+use super::{command::dispatcher::TakeableCommandDispatcher, peer::Peer};
 
 pub struct Session {
     read: ObjectReader,
@@ -100,7 +97,7 @@ impl Session {
         Ok(())
     }
 
-    pub async fn dispatch<T, D: TakeableCommandDispatcher<T>>(
+    pub async fn dispatch<T: Send, D: TakeableCommandDispatcher<T>>(
         mut self,
         dispatcher: D,
     ) -> Result<T> {

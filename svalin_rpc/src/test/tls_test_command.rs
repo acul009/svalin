@@ -1,27 +1,17 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::{
-    self as svalin_rpc,
     rpc::{
-        command::{
-            dispatcher::{CommandDispatcher, TakeableCommandDispatcher},
-            handler::TakeableCommandHandler,
-        },
+        command::{dispatcher::TakeableCommandDispatcher, handler::TakeableCommandHandler},
         peer::Peer,
     },
-    transport::{
-        combined_transport::CombinedTransport,
-        tls_transport::{self, TlsTransport},
-    },
+    transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use futures::future::ok;
-use svalin_macros::rpc_dispatch;
 use svalin_pki::{Keypair, PermCredentials};
-use tracing::error;
 
-use crate::rpc::{command::handler::CommandHandler, session::Session};
+use crate::rpc::session::Session;
 
 pub struct TlsTestCommandHandler {
     credentials: PermCredentials,
@@ -74,9 +64,10 @@ impl TakeableCommandHandler for TlsTestCommandHandler {
     }
 }
 
-pub struct TlsTestDispatcher {}
+pub struct TlsTest;
 
-impl TakeableCommandDispatcher<()> for TlsTestDispatcher {
+#[async_trait]
+impl TakeableCommandDispatcher<()> for TlsTest {
     fn key(&self) -> String {
         tls_test_key()
     }

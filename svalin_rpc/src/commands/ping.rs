@@ -2,7 +2,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::{
     self as svalin_rpc,
-    rpc::{command::handler::CommandHandler, session::Session},
+    rpc::{
+        command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+        session::Session,
+    },
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -41,29 +44,37 @@ impl CommandHandler for PingHandler {
     }
 }
 
-#[rpc_dispatch(ping_key())]
-pub async fn ping(session: &mut Session) -> Result<Duration> {
-    let ping = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_nanos();
+pub struct Ping;
 
-    debug!("sending ping");
+#[async_trait]
+impl CommandDispatcher<Duration> for Ping {
+    fn key(&self) -> String {
+        ping_key()
+    }
 
-    session.write_object(&ping).await?;
+    async fn dispatch(&self, session: &mut Session) -> Result<Duration> {
+        let ping = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_nanos();
 
-    debug!("ping sent, waiting for pong!");
+        debug!("sending ping");
 
-    let pong: u128 = session.read_object().await?;
+        session.write_object(&ping).await?;
 
-    debug!("pong received");
+        debug!("ping sent, waiting for pong!");
 
-    let now: u128 = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_nanos();
+        let pong: u128 = session.read_object().await?;
 
-    let diff = Duration::from_nanos((now - pong).try_into()?);
+        debug!("pong received");
 
-    Ok(diff)
+        let now: u128 = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_nanos();
+
+        let diff = Duration::from_nanos((now - pong).try_into()?);
+
+        Ok(diff)
+    }
 }

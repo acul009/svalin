@@ -1,14 +1,17 @@
 use std::net::ToSocketAddrs;
 
 use test_log::test;
-use tls_test_command::{tls_testDispatcher, TlsTestCommandHandler};
+use tls_test_command::{TlsTest, TlsTestCommandHandler};
 use tracing::debug;
 
 mod tls_test_command;
 
 use crate::{
-    commands::ping::{pingDispatcher, PingHandler},
-    rpc::{client::RpcClient, command::handler::HandlerCollection, server::RpcServer},
+    commands::ping::{Ping, PingHandler},
+    rpc::{
+        client::RpcClient, command::handler::HandlerCollection, connection::Connection,
+        server::RpcServer,
+    },
     verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
 };
 
@@ -44,7 +47,7 @@ async fn ping_test() {
 
     let connection = client.upstream_connection();
 
-    let _ping = connection.ping().await.unwrap();
+    let _ping = connection.dispatch(Ping).await.unwrap();
 
     server_handle.abort();
 }
@@ -84,7 +87,7 @@ async fn tls_test() {
 
     let mut connection = client.upstream_connection();
 
-    connection.tls_test().await.unwrap();
+    connection.dispatch(TlsTest).await.unwrap();
 
     server_handle.abort();
 }
