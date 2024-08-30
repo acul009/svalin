@@ -36,6 +36,10 @@ impl ObjectReader {
     pub fn get_reader(self) -> Box<dyn SessionTransportReader> {
         self.read.get_reader()
     }
+
+    pub fn borrow_reader(&mut self) -> &mut dyn SessionTransportReader {
+        self.read.borrow_reader()
+    }
 }
 
 impl ObjectWriter {
@@ -59,6 +63,10 @@ impl ObjectWriter {
 
     pub fn get_writer(self) -> Box<dyn SessionTransportWriter> {
         self.write.get_writer()
+    }
+
+    pub fn borrow_writer(&mut self) -> &mut dyn SessionTransportWriter {
+        self.write.borrow_writer()
     }
 }
 

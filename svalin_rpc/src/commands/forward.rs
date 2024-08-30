@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt::{Debug, Display};
 
-use crate::rpc::command::handler::HandlerCollection;
+use crate::rpc::command::handler::{HandlerCollection, TakeableCommandHandler};
 use crate::rpc::connection::{Connection, ConnectionBase};
 use crate::rpc::peer::Peer;
 use crate::rpc::{command::handler::CommandHandler, server::RpcServer, session::Session};
@@ -61,11 +61,17 @@ impl CommandHandler for ForwardHandler {
         debug!("received forward request to {:?}", target);
 
         match self.server.open_raw_session_with(target).await {
-            Ok(mut transport) => {
+            Ok((mut read, mut write)) => {
                 session
                     .write_object::<Result<(), ForwardError>>(&Ok(()))
                     .await?;
-                session.forward_transport(&mut transport).await?;
+
+                let reader = session.borrow_reader();
+
+                let writer = session.borrow_writer();
+
+                // Todo
+
                 Ok(())
             }
             // TODO: check and return the actual error

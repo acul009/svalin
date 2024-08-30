@@ -45,6 +45,10 @@ impl ChunkReader {
     pub fn get_reader(self) -> Box<dyn SessionTransportReader> {
         self.read
     }
+
+    pub fn borrow_reader(&mut self) -> &mut dyn SessionTransportReader {
+        &mut self.read
+    }
 }
 
 impl ChunkWriter {
@@ -79,5 +83,9 @@ impl ChunkWriter {
 
     pub fn get_writer(self) -> Box<dyn SessionTransportWriter> {
         self.write
+    }
+
+    pub fn borrow_writer(&mut self) -> &mut dyn SessionTransportWriter {
+        &mut self.write
     }
 }
