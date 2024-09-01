@@ -158,12 +158,13 @@ impl Session {
         (self.read.get_reader(), self.write.get_writer(), self.peer)
     }
 
-    pub fn borrow_reader(&mut self) -> &mut dyn SessionTransportReader {
-        self.read.borrow_reader()
-    }
-
-    pub fn borrow_writer(&mut self) -> &mut dyn SessionTransportWriter {
-        self.write.borrow_writer()
+    pub fn borrow_transport(
+        &mut self,
+    ) -> (
+        &mut dyn SessionTransportReader,
+        &mut dyn SessionTransportWriter,
+    ) {
+        (self.read.borrow_reader(), self.write.borrow_writer())
     }
 
     // pub async fn forward_session(&mut self, partner: &mut Self) -> Result<()> {

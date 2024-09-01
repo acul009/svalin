@@ -5,6 +5,7 @@ use crate::rpc::command::handler::{HandlerCollection, TakeableCommandHandler};
 use crate::rpc::connection::{Connection, ConnectionBase};
 use crate::rpc::peer::Peer;
 use crate::rpc::{command::handler::CommandHandler, server::RpcServer, session::Session};
+use crate::transport::combined_transport::CombinedTransport;
 use crate::transport::session_transport::SessionTransport;
 use crate::transport::tls_transport::TlsTransport;
 use crate::verifiers::exact::ExactServerVerification;
@@ -61,14 +62,17 @@ impl CommandHandler for ForwardHandler {
         debug!("received forward request to {:?}", target);
 
         match self.server.open_raw_session_with(target).await {
-            Ok((mut read, mut write)) => {
+            Ok((read2, write2)) => {
                 session
                     .write_object::<Result<(), ForwardError>>(&Ok(()))
                     .await?;
 
-                let reader = session.borrow_reader();
+                let (read1, write1) = session.borrow_transport();
 
-                let writer = session.borrow_writer();
+                let mut transport1 = CombinedTransport::new(read1, write2);
+                let mut transport2 = CombinedTransport::new(read2, write1);
+
+                tokio::io::copy_bidirectional(&mut transport1, &mut transport2).await?;
 
                 // Todo
 
