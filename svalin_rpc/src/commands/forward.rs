@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt::{Debug, Display};
 
+use crate::rpc::command::dispatcher::{CommandDispatcher, TakeableCommandDispatcher};
 use crate::rpc::command::handler::{HandlerCollection, TakeableCommandHandler};
 use crate::rpc::connection::{Connection, ConnectionBase};
 use crate::rpc::peer::Peer;
@@ -14,6 +15,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
+use tokio::io::AsyncWriteExt;
 use tracing::{debug, error};
 
 fn forward_key() -> String {
@@ -74,7 +76,8 @@ impl CommandHandler for ForwardHandler {
 
                 tokio::io::copy_bidirectional(&mut transport1, &mut transport2).await?;
 
-                // Todo
+                transport1.shutdown().await;
+                transport2.shutdown().await;
 
                 Ok(())
             }
@@ -89,6 +92,33 @@ impl CommandHandler for ForwardHandler {
                 Err(err)
             }
         }
+    }
+}
+
+pub struct ForwardDispatcher<T> {
+    pub target: Certificate,
+    pub nested_dispatch: T,
+}
+
+#[async_trait]
+impl<T, Out> CommandDispatcher<Out> for ForwardDispatcher<T>
+where
+    T: CommandDispatcher<Out>,
+    Out: Send,
+{
+    fn key(&self) -> String {
+        forward_key()
+    }
+    async fn dispatch(self, session: &mut Session) -> Result<Out> {
+        session.write_object(&self.target).await?;
+
+        session
+            .read_object::<Result<(), ForwardError>>()
+            .await
+            .context("error during forward return signal")?
+            .context("server sent error during forward request")?;
+
+        self.nested_dispatch.dispatch(session).await
     }
 }
 
@@ -110,97 +140,58 @@ impl<T> ForwardConnection<T> {
 }
 
 #[async_trait]
-impl<T> ConnectionBase for ForwardConnection<T>
+impl<T> Connection for ForwardConnection<T>
 where
-    T: Connection,
+    T: Connection + Send,
 {
-    async fn open_raw_session(&self) -> Result<Box<dyn SessionTransport>> {
-        debug!("opening base session");
+    async fn dispatch<Out: Send, D: TakeableCommandDispatcher<Out>>(
+        &self,
+        dispatcher: D,
+    ) -> Result<Out> {
+        // let dispatch = ForwardDispatcher {
+        //     target: self.target,
+        //     nested_dispatch: E2EDispatcher {
 
-        let mut base_session = self.connection.open_session(forward_key()).await?;
-
-        debug!("requesting forward by server");
-
-        base_session.write_object(&self.target).await?;
-
-        base_session
-            .read_object::<Result<(), ForwardError>>()
-            .await
-            .context("error during forward return signal")?
-            .context("server sent error during forward request")?;
-
-        base_session.request_session(e2e_key()).await?;
-
-        let tls_transport = TlsTransport::client(
-            base_session.extract_transport(),
-            ExactServerVerification::new(&self.target),
-            &self.credentials,
-        )
-        .await
-        .map_err(|err| err.0)?;
-
-        Ok(Box::new(tls_transport))
-    }
-
-    /// For the ForwardConnection we always return anonymous, since there is no
-    /// E2E tunnel yet, we can't guarantee, that the server didn't intercept the
-    /// session.
-    fn peer(&self) -> &Peer {
-        &Peer::Anonymous
-    }
-
-    async fn closed(&self) {
-        self.connection.closed().await
+        //     },
+        // };
+        todo!()
     }
 }
+// async fn open_raw_session(&self) -> Result<Box<dyn SessionTransport>> {
+//     debug!("opening base session");
 
-fn e2e_key() -> String {
-    "e2e".into()
-}
+//     let (read, write) = self.connection.open_raw_session().await?;
 
-pub struct E2EHandler {
-    credentials: PermCredentials,
-    handler_collection: HandlerCollection,
-}
+//     debug!("requesting forward by server");
 
-impl E2EHandler {
-    pub fn new(credentials: PermCredentials, handler_collection: HandlerCollection) -> Self {
-        Self {
-            credentials,
-            handler_collection,
-        }
-    }
-}
+//     base_session.write_object(&self.target).await?;
 
-#[async_trait]
-impl CommandHandler for E2EHandler {
-    fn key(&self) -> String {
-        e2e_key()
-    }
+//     base_session
+//         .read_object::<Result<(), ForwardError>>()
+//         .await
+//         .context("error during forward return signal")?
+//         .context("server sent error during forward request")?;
 
-    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
-        session
-            .replace_transport(move |mut direct_transport| async move {
-                if let Err(err) = direct_transport.flush().await {
-                    error!("error replacing transport: {}", err);
-                }
-                let tls_transport = TlsTransport::server(
-                    direct_transport,
-                    // TODO: actually fucking verify the connecting peer
-                    SkipClientVerification::new(),
-                    &self.credentials,
-                )
-                .await;
+//     base_session.request_session(e2e_key()).await?;
 
-                match tls_transport {
-                    Ok(tls_transport) => Box::new(tls_transport),
-                    Err(err) => err.1,
-                }
-            })
-            .await;
+//     let tls_transport = TlsTransport::client(
+//         base_session.extract_transport(),
+//         ExactServerVerification::new(&self.target),
+//         &self.credentials,
+//     )
+//     .await
+//     .map_err(|err| err.0)?;
 
-        session.handle(self.handler_collection.clone()).await?;
+//     Ok(Box::new(tls_transport))
+// }
 
-        Ok(())
-    }
-}
+// For the ForwardConnection we always return anonymous, since there is no
+// E2E tunnel yet, we can't guarantee, that the server didn't intercept the
+// session.
+// fn peer(&self) -> &Peer {
+//     &Peer::Anonymous
+// }
+
+// async fn closed(&self) {
+//     self.connection.closed().await
+// }

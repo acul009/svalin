@@ -26,7 +26,7 @@ use super::peer::Peer;
 pub mod direct_connection;
 
 #[async_trait]
-pub trait Connection: ConnectionBase {
+pub trait Connection: Sync {
     // async fn open_session(&self, command_key: String) -> Result<Session>;
     async fn dispatch<T: Send, D: TakeableCommandDispatcher<T>>(&self, dispatcher: D) -> Result<T>;
 }
@@ -94,8 +94,9 @@ where
 
                     let commands2 = commands.clone();
                     open_sessions.spawn(async move {
+                        let commands2 = commands2;
                         let res = session
-                            .handle(commands2)
+                            .handle(&commands2)
                             .await
                             .context("error handling session");
                         if let Err(e) = res {

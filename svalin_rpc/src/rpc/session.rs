@@ -65,7 +65,7 @@ impl Session {
         Self { read, write, peer }
     }
 
-    pub(crate) async fn handle(mut self, commands: HandlerCollection) -> Result<()> {
+    pub(crate) async fn handle(mut self, commands: &HandlerCollection) -> Result<()> {
         debug!("waiting for request header");
 
         let header: SessionRequestHeader = self.read_object().await?;
