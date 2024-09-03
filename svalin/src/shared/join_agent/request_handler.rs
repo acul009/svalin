@@ -6,9 +6,16 @@ use rand::Rng;
 use svalin_macros::rpc_dispatch;
 use svalin_pki::{Certificate, Keypair};
 use svalin_rpc::{
-    rpc::{command::handler::CommandHandler, session::Session},
-    transport::tls_transport::TlsTransport,
-    verifiers::skip_verify::SkipClientVerification,
+    rpc::{
+        command::{
+            dispatcher::TakeableCommandDispatcher,
+            handler::{CommandHandler, TakeableCommandHandler},
+        },
+        peer::Peer,
+        session::Session,
+    },
+    transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
+    verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
 };
 use tokio::{io::AsyncWriteExt, sync::oneshot};
 use tracing::{debug, error};
@@ -34,124 +41,122 @@ fn join_request_key() -> String {
 }
 
 #[async_trait]
-impl CommandHandler for JoinRequestHandler {
+impl TakeableCommandHandler for JoinRequestHandler {
     fn key(&self) -> String {
         join_request_key()
     }
 
-    async fn handle(&self, session: &mut Session) -> Result<()> {
-        let mut add_session = mem::replace(session, Session::dangerous_create_dummy_session());
+    async fn handle(&self, session: &mut Option<Session>) -> Result<()> {
+        if let Some(mut session) = session.take() {
+            let mut join_code = create_join_code();
+            while let Err(sess) = self.manager.add_session(join_code, session).await {
+                session = sess;
+                tokio::time::sleep(Duration::from_secs(5)).await;
 
-        let mut join_code = create_join_code();
-        while let Err(sess) = self.manager.add_session(join_code, add_session).await {
-            add_session = sess;
-            tokio::time::sleep(Duration::from_secs(5)).await;
+                join_code = create_join_code();
 
-            join_code = create_join_code();
+                // todo: dont loop forever
+            }
 
-            // todo: dont loop forever
+            Ok(())
+        } else {
+            Err(anyhow!("tried executing commandhandler with None"))
         }
-
-        Ok(())
     }
 }
 
-#[rpc_dispatch(join_request_key())]
-#[instrument(skip_all)]
-pub async fn request_join(
-    session: &mut Session,
-    address: String,
-    join_code_channel: oneshot::Sender<String>,
-    confirm_code_channel: oneshot::Sender<String>,
-) -> Result<AgentInitPayload> {
-    let join_code: String = session.read_object().await?;
+pub struct RequestJoin {
+    pub address: String,
+    pub join_code_channel: oneshot::Sender<String>,
+    pub confirm_code_channel: oneshot::Sender<String>,
+}
 
-    debug!("received join code from server: {join_code}");
+#[async_trait]
+impl TakeableCommandDispatcher for RequestJoin {
+    type Output = AgentInitPayload;
 
-    join_code_channel
-        .send(join_code.clone())
-        .map_err(|err| anyhow!(err))?;
-
-    debug!("waiting for client to confirm join code");
-
-    let join_code_confirm: String = session.read_object().await?;
-
-    debug!("received join code from client: {join_code_confirm}");
-
-    if join_code != join_code_confirm {
-        debug!("join codes do not match!");
-        let answer: Result<(), ()> = Err(());
-        session.write_object(&answer).await?;
-        return Err(anyhow!("Invalid join code"));
-    } else {
-        debug!("join codes match!");
-        let answer: Result<(), ()> = Ok(());
-        session.write_object(&answer).await?;
+    fn key(&self) -> String {
+        join_request_key()
     }
 
-    debug!("trying to establish tls connection");
+    async fn dispatch(self, session: &mut Option<Session>) -> Result<Self::Output> {
+        if let Some(mut session) = session.take() {
+            let join_code: String = session.read_object().await?;
 
-    let mut key_material_result: Result<[u8; 32]> = Err(anyhow!("unknown tls error"));
-    let key_material_result_borrow = &mut key_material_result;
+            debug!("received join code from server: {join_code}");
 
-    session
-        .replace_transport(move |mut direct_transport| async move {
-            if let Err(err) = direct_transport.flush().await {
-                error!("error while replacing transport: {}", err);
+            self.join_code_channel
+                .send(join_code.clone())
+                .map_err(|err| anyhow!(err))?;
+
+            debug!("waiting for client to confirm join code");
+
+            let join_code_confirm: String = session.read_object().await?;
+
+            debug!("received join code from client: {join_code_confirm}");
+
+            if join_code != join_code_confirm {
+                debug!("join codes do not match!");
+                let answer: Result<(), ()> = Err(());
+                session.write_object(&answer).await?;
+                return Err(anyhow!("Invalid join code"));
+            } else {
+                debug!("join codes match!");
+                let answer: Result<(), ()> = Ok(());
+                session.write_object(&answer).await?;
             }
-            let temp_credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
 
-            let tls_transport = TlsTransport::server(
-                direct_transport,
-                SkipClientVerification::new(),
+            debug!("trying to establish tls connection");
+
+            let (read, write, _) = session.destructure();
+
+            let temp_credentials = Keypair::generate().unwrap().to_self_signed_cert()?;
+
+            let tls_transport = TlsTransport::client(
+                CombinedTransport::new(read, write),
+                SkipServerVerification::new(),
                 &temp_credentials,
             )
-            .await;
+            .await?;
 
-            match tls_transport {
-                Ok(tls_transport) => {
-                    let mut key_material = [0u8; 32];
-                    tls_transport
-                        .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
-                        .unwrap();
-                    let _ = mem::replace(key_material_result_borrow, Ok(key_material));
-                    Box::new(tls_transport)
-                }
-                Err(err) => {
-                    let _ = mem::replace(key_material_result_borrow, Err(err.0));
-                    err.1
-                }
-            }
-        })
-        .await;
+            let mut key_material = [0u8; 32];
+            tls_transport
+                .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
+                .unwrap();
 
-    let key_material = key_material_result.context("error during tls handshake on agent")?;
+            let (read, write) = tokio::io::split(tls_transport);
 
-    debug!("server tls connection established");
+            let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
 
-    let params = session.read_object().await?;
+            debug!("server tls connection established");
 
-    let confirm_code = super::derive_confirm_code(params, &key_material).await?;
+            let params = session.read_object().await?;
 
-    debug!("generated confirm code: {confirm_code}");
+            let confirm_code = super::derive_confirm_code(params, &key_material).await?;
 
-    confirm_code_channel.send(confirm_code).unwrap();
+            debug!("generated confirm code: {confirm_code}");
 
-    let keypair = Keypair::generate()?;
-    let request = keypair.generate_request()?;
-    debug!("sending request: {}", request);
-    session.write_object(&request).await?;
+            self.confirm_code_channel.send(confirm_code).unwrap();
 
-    let my_cert: Certificate = session.read_object().await?;
-    let my_credentials = keypair.upgrade(my_cert)?;
+            let keypair = Keypair::generate()?;
+            let request = keypair.generate_request()?;
+            debug!("sending request: {}", request);
+            session.write_object(&request).await?;
 
-    let root: Certificate = session.read_object().await?;
-    let upstream: Certificate = session.read_object().await?;
+            let my_cert: Certificate = session.read_object().await?;
+            let my_credentials = keypair.upgrade(my_cert)?;
 
-    Ok(AgentInitPayload {
-        credentials: my_credentials,
-        address,
-        root,
-        upstream,
-    })
+            let root: Certificate = session.read_object().await?;
+            let upstream: Certificate = session.read_object().await?;
+
+            Ok(AgentInitPayload {
+                credentials: my_credentials,
+                address: self.address,
+                root,
+                upstream,
+            })
+        } else {
+            Err(anyhow!("tried dispatching command with None"))
+        }
+    }
 }

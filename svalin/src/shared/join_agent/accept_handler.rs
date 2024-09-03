@@ -6,13 +6,20 @@ use svalin_macros::rpc_dispatch;
 use svalin_pki::{ArgonParams, Certificate, CertificateRequest, PermCredentials};
 use svalin_rpc::{
     rpc::{
-        command::handler::CommandHandler,
-        session::{Session},
+        command::{
+            dispatcher::{CommandDispatcher, TakeableCommandDispatcher},
+            handler::CommandHandler,
+        },
+        peer::Peer,
+        session::Session,
     },
-    transport::tls_transport::TlsTransport,
+    transport::{
+        combined_transport::CombinedTransport,
+        tls_transport::{self, TlsTransport},
+    },
     verifiers::skip_verify::SkipServerVerification,
 };
-use tokio::io::AsyncWriteExt;
+use tokio::io::copy_bidirectional;
 use tracing::{debug, error, instrument};
 
 use super::ServerJoinManager;
@@ -48,7 +55,14 @@ impl CommandHandler for JoinAcceptHandler {
                 session.write_object(&answer).await?;
 
                 debug!("forwarding session to agent");
-                session.forward_session(&mut agent_session).await?;
+
+                let (read1, write1) = session.borrow_transport();
+                let (read2, write2) = agent_session.borrow_transport();
+
+                let mut transport1 = CombinedTransport::new(read1, write2);
+                let mut transport2 = CombinedTransport::new(read2, write1);
+
+                copy_bidirectional(&mut transport1, &mut transport2).await;
 
                 debug!("finished forwarding session");
 
@@ -64,59 +78,73 @@ impl CommandHandler for JoinAcceptHandler {
     }
 }
 
-#[rpc_dispatch(accept_join_code())]
-pub async fn accept_join(
-    session: &mut Session,
-    join_code: String,
-    waiting_for_confirm: tokio::sync::oneshot::Sender<Result<()>>,
-    confirm_code_channel: tokio::sync::oneshot::Receiver<String>,
-    credentials: &PermCredentials,
-    root: &Certificate,
-    upstream: &Certificate,
-) -> anyhow::Result<Certificate> {
-    let confirm_code_result = prepare_agent_enroll(session, join_code, credentials).await;
+pub struct AcceptJoin<'a> {
+    pub join_code: String,
+    pub waiting_for_confirm: tokio::sync::oneshot::Sender<Result<()>>,
+    pub confirm_code_channel: tokio::sync::oneshot::Receiver<String>,
+    pub credentials: &'a PermCredentials,
+    pub root: &'a Certificate,
+    pub upstream: &'a Certificate,
+}
 
-    match confirm_code_result {
-        Err(err) => {
-            let err_copy = anyhow!("{}", err);
-            let err = err.context("error during enroll");
-            waiting_for_confirm.send(Err(err)).unwrap();
+#[async_trait]
+impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
+    type Output = Certificate;
 
-            Err(err_copy)
-        }
-        Ok(confirm_code) => {
-            waiting_for_confirm.send(Ok(())).unwrap();
+    fn key(&self) -> String {
+        accept_join_code()
+    }
 
-            let remote_confirm_code = confirm_code_channel.await?;
+    async fn dispatch(self, session: &mut Option<Session>) -> Result<Self::Output> {
+        if let Some(session) = session.take() {
+            let confirm_code_result =
+                prepare_agent_enroll(session, self.join_code, self.credentials).await;
 
-            debug!("received confirm code from user: {remote_confirm_code}");
+            match confirm_code_result {
+                Err(err) => {
+                    let err_copy = anyhow!("{}", err);
+                    let err = err.context("error during enroll");
+                    self.waiting_for_confirm.send(Err(err)).unwrap();
 
-            if confirm_code != remote_confirm_code {
-                return Err(anyhow!("Confirm Code did no match"));
+                    Err(err_copy)
+                }
+                Ok((confirm_code, mut session_e2e)) => {
+                    self.waiting_for_confirm.send(Ok(())).unwrap();
+
+                    let remote_confirm_code = self.confirm_code_channel.await?;
+
+                    debug!("received confirm code from user: {remote_confirm_code}");
+
+                    if confirm_code != remote_confirm_code {
+                        return Err(anyhow!("Confirm Code did no match"));
+                    }
+
+                    debug!("Confirm Codes match!");
+
+                    let raw_request: String = session_e2e.read_object().await?;
+                    debug!("received request: {}", raw_request);
+                    let request = CertificateRequest::from_string(raw_request)?;
+                    let agent_cert: Certificate = self.credentials.approve_request(request)?;
+
+                    session_e2e.write_object(&agent_cert).await?;
+                    session_e2e.write_object(self.root).await?;
+                    session_e2e.write_object(self.upstream).await?;
+
+                    Ok(agent_cert)
+                }
             }
-
-            debug!("Confirm Codes match!");
-
-            let raw_request: String = session.read_object().await?;
-            debug!("received request: {}", raw_request);
-            let request = CertificateRequest::from_string(raw_request)?;
-            let agent_cert: Certificate = credentials.approve_request(request)?;
-
-            session.write_object(&agent_cert).await?;
-            session.write_object(root).await?;
-            session.write_object(upstream).await?;
-
-            Ok(agent_cert)
+        } else {
+            Err(anyhow!("tried dispatching command with None"))
         }
     }
 }
 
 #[instrument(skip_all)]
 async fn prepare_agent_enroll(
-    session: &mut Session,
+    mut session: Session,
     join_code: String,
     credentials: &PermCredentials,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<(String, Session)> {
     session.write_object(&join_code).await?;
 
     let found: std::result::Result<(), ()> = session.read_object().await?;
@@ -142,37 +170,23 @@ async fn prepare_agent_enroll(
 
     debug!("trying to establish tls connection");
 
-    let mut key_material_result: Result<[u8; 32]> = Err(anyhow!("unknown tls error"));
-    let key_material_result_borrow = &mut key_material_result;
+    let (read, write, _) = session.destructure();
 
-    session
-        .replace_transport(move |mut direct_transport| async move {
-            if let Err(err) = direct_transport.flush().await {
-                error!("error replacing transport: {}", err);
-            }
-            let tls_transport =
-                TlsTransport::client(direct_transport, SkipServerVerification::new(), credentials)
-                    .await;
+    let tls_transport = TlsTransport::client(
+        CombinedTransport::new(read, write),
+        SkipServerVerification::new(),
+        credentials,
+    )
+    .await?;
 
-            match tls_transport {
-                Ok(tls_transport) => {
-                    let mut key_material = [0u8; 32];
-                    tls_transport
-                        .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
-                        .unwrap();
+    let mut key_material = [0u8; 32];
+    tls_transport
+        .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
+        .unwrap();
 
-                    let _ = mem::replace(key_material_result_borrow, Ok(key_material));
-                    Box::new(tls_transport)
-                }
-                Err(err) => {
-                    let _ = mem::replace(key_material_result_borrow, Err(err.0));
-                    err.1
-                }
-            }
-        })
-        .await;
+    let (read, write) = tokio::io::split(tls_transport);
 
-    let key_material = key_material_result.context("error during tls handshake on client")?;
+    let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
 
     debug!("client tls connection established");
 
@@ -184,5 +198,5 @@ async fn prepare_agent_enroll(
 
     debug!("client side confirm code: {confirm_code}");
 
-    Ok(confirm_code)
+    Ok((confirm_code, session))
 }

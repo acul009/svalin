@@ -1,7 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_macros::rpc_dispatch;
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::Session,
@@ -43,7 +42,9 @@ impl CommandHandler for PublicStatusHandler {
 pub struct GetPutblicStatus;
 
 #[async_trait]
-impl CommandDispatcher<PublicStatus> for GetPutblicStatus {
+impl CommandDispatcher for GetPutblicStatus {
+    type Output = PublicStatus;
+
     fn key(&self) -> String {
         public_status_key()
     }

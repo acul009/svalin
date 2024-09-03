@@ -1,5 +1,4 @@
 use anyhow::Result;
-use svalin_macros::rpc_dispatch;
 use svalin_pki::{Certificate, CertificateRequest, Keypair, PermCredentials};
 
 use async_trait::async_trait;
@@ -61,12 +60,14 @@ impl CommandHandler for InitHandler {
 pub struct Init;
 
 #[async_trait]
-impl CommandDispatcher<(PermCredentials, Certificate)> for Init {
+impl CommandDispatcher for Init {
+    type Output = (PermCredentials, Certificate);
+
     fn key(&self) -> String {
         init_key()
     }
 
-    async fn dispatch(self, session: &mut Session) -> Result<(PermCredentials, Certificate)> {
+    async fn dispatch(self, session: &mut Session) -> Result<Self::Output> {
         debug!("sending init request");
         let root = Keypair::generate()?.to_self_signed_cert()?;
         session.write_object(root.get_certificate()).await?;

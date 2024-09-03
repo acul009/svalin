@@ -1,10 +1,10 @@
-use crate::shared::join_agent::{accept_handler::accept_joinDispatcher, PublicAgentData};
+use crate::shared::join_agent::{accept_handler::AcceptJoin, add_agent::AddAgent, PublicAgentData};
 
 use super::Client;
 
 use anyhow::Result;
 use svalin_pki::{signed_object::SignedObject, Certificate, PermCredentials};
-use svalin_rpc::rpc::connection::direct_connection::DirectConnection;
+use svalin_rpc::rpc::connection::{direct_connection::DirectConnection, Connection};
 use tokio::sync::oneshot;
 use tracing::debug;
 
@@ -24,14 +24,14 @@ impl Client {
 
         tokio::spawn(async move {
             let result = connection
-                .accept_join(
+                .dispatch(AcceptJoin {
                     join_code,
-                    wait_for_confirm_send,
-                    confirm_code_recv,
-                    &credentials,
-                    &root,
-                    &upstream,
-                )
+                    waiting_for_confirm: wait_for_confirm_send,
+                    confirm_code_channel: confirm_code_recv,
+                    credentials: &credentials,
+                    root: &root,
+                    upstream: &upstream,
+                })
                 .await;
 
             result_send.send(result).unwrap();
@@ -70,7 +70,7 @@ impl WaitingForConfirmCode {
             &self.credentials,
         )?;
 
-        self.connection.add_agent(&agent).await?;
+        self.connection.dispatch(AddAgent { agent: &agent }).await?;
 
         debug!("agent is registered on server");
 

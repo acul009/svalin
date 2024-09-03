@@ -1,15 +1,14 @@
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
-use svalin_rpc::rpc::client::RpcClient;
+use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tokio::sync::oneshot;
 use tracing::debug;
 
-use crate::shared::{
-    commands::public_server_status::get_public_statusDispatcher,
-    join_agent::{request_handler::request_joinDispatcher, AgentInitPayload},
-};
+use crate::shared::commands::public_server_status::GetPutblicStatus;
+use crate::shared::join_agent::request_handler::RequestJoin;
+use crate::shared::join_agent::AgentInitPayload;
 
 use super::Agent;
 
@@ -25,7 +24,7 @@ impl Agent {
 
         debug!("requesting public status");
 
-        let server_status = conn.get_public_status().await?;
+        let server_status = conn.dispatch(GetPutblicStatus).await?;
 
         debug!("public status: {server_status:?}");
 
@@ -49,7 +48,11 @@ impl Agent {
 
                 tokio::spawn(async move {
                     match conn2
-                        .request_join(address, join_code_send, confirm_code_send)
+                        .dispatch(RequestJoin {
+                            address,
+                            join_code_channel: join_code_send,
+                            confirm_code_channel: confirm_code_send,
+                        })
                         .await
                     {
                         Ok(init_payload) => {

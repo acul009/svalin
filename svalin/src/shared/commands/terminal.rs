@@ -3,7 +3,6 @@ use std::{future::Future, pin::pin, task::Poll};
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::{future::poll_fn, select, FutureExt};
-use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
 use svalin_rpc::rpc::{command::handler::CommandHandler, session::Session};
 use svalin_sysctl::pty::{PtyProcess, TerminalSize};

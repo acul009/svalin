@@ -53,7 +53,7 @@ pub enum SessionAction {
 }
 
 impl Session {
-    pub(crate) fn new(
+    pub fn new(
         read: Box<dyn SessionTransportReader>,
         write: Box<dyn SessionTransportWriter>,
         peer: Peer,

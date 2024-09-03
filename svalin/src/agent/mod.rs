@@ -4,6 +4,7 @@ use anyhow::{anyhow, Result};
 use marmelade::Scope;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
+use svalin_rpc::commands::e2e::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::command::handler::HandlerCollection;
@@ -128,7 +129,7 @@ impl Agent {
 
         #[cfg(not(test))]
         {
-            let mut path = Self::get_general_config_dir_path()?;
+            let path = Self::get_general_config_dir_path()?;
 
             // check if config dir exists
             if !path.exists() {

@@ -5,15 +5,15 @@ use std::{
 
 use anyhow::Result;
 use svalin_rpc::{
-    commands::{forward::ForwardConnection, ping::pingDispatcher},
-    rpc::connection::DirectConnection,
+    commands::{forward::ForwardConnection, ping::Ping},
+    rpc::connection::{direct_connection::DirectConnection, Connection},
 };
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::{oneshot, watch};
 use tracing::{debug, error};
 
 use crate::shared::{
-    commands::{agent_list::AgentListItem, realtime_status::subscribe_realtime_statusDispatcher},
+    commands::{agent_list::AgentListItem, realtime_status::SubscribeRealtimeStatus},
     lazy_watch::{self, LazyWatch},
 };
 
@@ -96,7 +96,7 @@ impl Device {
     }
 
     pub async fn ping(&self) -> Result<Duration> {
-        self.data.connection.ping().await
+        self.data.connection.dispatch(Ping).await
     }
 
     pub async fn item(&self) -> AgentListItem {
@@ -137,7 +137,14 @@ impl lazy_watch::Handler for RealtimeStatusWatchHandler {
             if stop_recv.try_recv().is_ok() {
                 return;
             }
-            if let Err(err) = connection.subscribe_realtime_status(&send, stop_recv).await {
+
+            if let Err(err) = connection
+                .dispatch(SubscribeRealtimeStatus {
+                    send: send.clone(),
+                    stop: stop_recv,
+                })
+                .await
+            {
                 let _ = send.send(RemoteLiveData::Unavailable);
                 error!("error while receiving RealtimeStatus: {err}");
             };

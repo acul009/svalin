@@ -3,7 +3,6 @@ use std::{pin::pin, time::Duration};
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::{select, FutureExt};
-use svalin_macros::rpc_dispatch;
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::Session,
@@ -51,10 +50,13 @@ pub struct SubscribeRealtimeStatus {
 }
 
 #[async_trait]
-impl CommandDispatcher<()> for SubscribeRealtimeStatus {
+impl CommandDispatcher for SubscribeRealtimeStatus {
+    type Output = ();
+
     fn key(&self) -> String {
         realtime_status_key()
     }
+
     async fn dispatch(self, session: &mut Session) -> Result<()> {
         let mut stop = pin!(self.stop.fuse());
         loop {

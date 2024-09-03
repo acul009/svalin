@@ -3,7 +3,6 @@ use std::{fmt::Display, sync::Arc};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_macros::rpc_dispatch;
 use svalin_pki::{ArgonParams, Certificate, PermCredentials};
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
@@ -119,7 +118,8 @@ pub struct AddUser<'a> {
 }
 
 #[async_trait]
-impl<'a> CommandDispatcher<()> for AddUser<'a> {
+impl<'a> CommandDispatcher for AddUser<'a> {
+    type Output = ();
     fn key(&self) -> String {
         add_user_key()
     }

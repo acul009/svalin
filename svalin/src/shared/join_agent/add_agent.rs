@@ -5,7 +5,10 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_macros::rpc_dispatch;
 use svalin_pki::signed_object::SignedObject;
-use svalin_rpc::rpc::{command::handler::CommandHandler, session::Session};
+use svalin_rpc::rpc::{
+    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    session::Session,
+};
 
 use crate::server::agent_store::AgentStore;
 
@@ -65,11 +68,23 @@ impl CommandHandler for AddAgentHandler {
     }
 }
 
-#[rpc_dispatch(add_agent_key())]
-pub async fn add_agent(session: &mut Session, agent: &SignedObject<PublicAgentData>) -> Result<()> {
-    session.write_object(&agent.to_bytes()).await?;
+pub struct AddAgent<'a> {
+    pub agent: &'a SignedObject<PublicAgentData>,
+}
 
-    session.read_object::<Result<(), AddAgentError>>().await??;
+#[async_trait]
+impl<'a> CommandDispatcher for AddAgent<'a> {
+    type Output = ();
 
-    Ok(())
+    fn key(&self) -> String {
+        add_agent_key()
+    }
+
+    async fn dispatch(self, session: &mut Session) -> Result<Self::Output> {
+        session.write_object(&self.agent.to_bytes()).await?;
+
+        session.read_object::<Result<(), AddAgentError>>().await??;
+
+        Ok(())
+    }
 }

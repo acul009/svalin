@@ -3,13 +3,15 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_macros::rpc_dispatch;
 use svalin_pki::{signed_object::SignedObject, Certificate, PermCredentials};
-use svalin_rpc::rpc::{
-    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
-    connection::direct_connection::DirectConnection,
-    server::RpcServer,
-    session::Session,
+use svalin_rpc::{
+    commands::forward::ForwardConnection,
+    rpc::{
+        command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+        connection::direct_connection::DirectConnection,
+        server::RpcServer,
+        session::Session,
+    },
 };
 use tokio::{select, sync::RwLock};
 use tracing::debug;
@@ -124,7 +126,8 @@ pub struct UpdateAgentList {
 }
 
 #[async_trait]
-impl CommandDispatcher<()> for UpdateAgentList {
+impl CommandDispatcher for UpdateAgentList {
+    type Output = ();
     fn key(&self) -> String {
         agent_list_key()
     }

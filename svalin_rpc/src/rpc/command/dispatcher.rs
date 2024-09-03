@@ -6,14 +6,18 @@ use crate::rpc::session::Session;
 #[async_trait]
 pub trait CommandDispatcher: Send + Sync {
     type Output: Send;
+
     fn key(&self) -> String;
+
     async fn dispatch(self, session: &mut Session) -> Result<Self::Output>;
 }
 
 #[async_trait]
 pub trait TakeableCommandDispatcher: Send + Sync {
     type Output: Send;
+
     fn key(&self) -> String;
+
     async fn dispatch(self, session: &mut Option<Session>) -> Result<Self::Output>;
 }
 

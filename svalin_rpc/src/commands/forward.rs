@@ -1,11 +1,12 @@
 use std::error::Error;
 use std::fmt::{Debug, Display};
 
+use crate::commands::e2e::E2EDispatcher;
 use crate::rpc::command::dispatcher::{CommandDispatcher, TakeableCommandDispatcher};
 use crate::rpc::connection::Connection;
 use crate::rpc::{command::handler::CommandHandler, server::RpcServer, session::Session};
 use crate::transport::combined_transport::CombinedTransport;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
@@ -89,31 +90,35 @@ impl CommandHandler for ForwardHandler {
     }
 }
 
-pub struct ForwardDispatcher<T> {
-    pub target: Certificate,
+pub struct ForwardDispatcher<'a, T> {
+    pub target: &'a Certificate,
     pub nested_dispatch: T,
 }
 
 #[async_trait]
-impl<T, Out> CommandDispatcher for ForwardDispatcher<T>
+impl<'a, D> TakeableCommandDispatcher for ForwardDispatcher<'a, D>
 where
-    T: CommandDispatcher<Output = Out>,
-    Out: Send,
+    D: TakeableCommandDispatcher,
 {
-    type Output = Out;
+    type Output = D::Output;
     fn key(&self) -> String {
         forward_key()
     }
-    async fn dispatch(self, session: &mut Session) -> Result<Out> {
-        session.write_object(&self.target).await?;
+    async fn dispatch(self, session: &mut Option<Session>) -> Result<Self::Output> {
+        if let Some(mut session) = session.take() {
+            session.write_object(&self.target).await?;
 
-        session
-            .read_object::<Result<(), ForwardError>>()
-            .await
-            .context("error during forward return signal")?
-            .context("server sent error during forward request")?;
+            session
+                .read_object::<Result<(), ForwardError>>()
+                .await
+                .context("error during forward return signal")?
+                .context("server sent error during forward request")?;
 
-        self.nested_dispatch.dispatch(session).await
+            session.dispatch(self.nested_dispatch).await
+        } else {
+            Err(anyhow!("tried dispatching command with None"))
+        }
+        // self.nested_dispatch.dispatch(session).await
     }
 }
 
@@ -140,50 +145,15 @@ where
     T: Connection + Send,
 {
     async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output> {
-        // let dispatch = ForwardDispatcher {
-        //     target: self.target,
-        //     nested_dispatch: E2EDispatcher {
+        let dispatcher = ForwardDispatcher {
+            target: &self.target,
+            nested_dispatch: E2EDispatcher {
+                peer: self.target.clone(),
+                credentials: &self.credentials,
+                nested_dispatch: dispatcher,
+            },
+        };
 
-        //     },
-        // };
-        todo!()
+        self.connection.dispatch(dispatcher).await
     }
 }
-// async fn open_raw_session(&self) -> Result<Box<dyn SessionTransport>> {
-//     debug!("opening base session");
-
-//     let (read, write) = self.connection.open_raw_session().await?;
-
-//     debug!("requesting forward by server");
-
-//     base_session.write_object(&self.target).await?;
-
-//     base_session
-//         .read_object::<Result<(), ForwardError>>()
-//         .await
-//         .context("error during forward return signal")?
-//         .context("server sent error during forward request")?;
-
-//     base_session.request_session(e2e_key()).await?;
-
-//     let tls_transport = TlsTransport::client(
-//         base_session.extract_transport(),
-//         ExactServerVerification::new(&self.target),
-//         &self.credentials,
-//     )
-//     .await
-//     .map_err(|err| err.0)?;
-
-//     Ok(Box::new(tls_transport))
-// }
-
-// For the ForwardConnection we always return anonymous, since there is no
-// E2E tunnel yet, we can't guarantee, that the server didn't intercept the
-// session.
-// fn peer(&self) -> &Peer {
-//     &Peer::Anonymous
-// }
-
-// async fn closed(&self) {
-//     self.connection.closed().await
-// }
