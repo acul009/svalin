@@ -28,7 +28,7 @@ pub mod direct_connection;
 #[async_trait]
 pub trait Connection: Sync {
     // async fn open_session(&self, command_key: String) -> Result<Session>;
-    async fn dispatch<T: Send, D: TakeableCommandDispatcher<T>>(&self, dispatcher: D) -> Result<T>;
+    async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>;
 }
 
 #[async_trait]
@@ -54,7 +54,7 @@ where
     //     Ok(session)
     // }
 
-    async fn dispatch<U: Send, D: TakeableCommandDispatcher<U>>(&self, dispatcher: D) -> Result<U> {
+    async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output> {
         let (read, write) = self.open_raw_session().await?;
 
         let session = Session::new(read, write, Peer::Anonymous);

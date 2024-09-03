@@ -2,21 +2,15 @@ use std::error::Error;
 use std::fmt::{Debug, Display};
 
 use crate::rpc::command::dispatcher::{CommandDispatcher, TakeableCommandDispatcher};
-use crate::rpc::command::handler::{HandlerCollection, TakeableCommandHandler};
-use crate::rpc::connection::{Connection, ConnectionBase};
-use crate::rpc::peer::Peer;
+use crate::rpc::connection::Connection;
 use crate::rpc::{command::handler::CommandHandler, server::RpcServer, session::Session};
 use crate::transport::combined_transport::CombinedTransport;
-use crate::transport::session_transport::SessionTransport;
-use crate::transport::tls_transport::TlsTransport;
-use crate::verifiers::exact::ExactServerVerification;
-use crate::verifiers::skip_verify::SkipClientVerification;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
 use tokio::io::AsyncWriteExt;
-use tracing::{debug, error};
+use tracing::debug;
 
 fn forward_key() -> String {
     "forward".to_owned()
@@ -101,11 +95,12 @@ pub struct ForwardDispatcher<T> {
 }
 
 #[async_trait]
-impl<T, Out> CommandDispatcher<Out> for ForwardDispatcher<T>
+impl<T, Out> CommandDispatcher for ForwardDispatcher<T>
 where
-    T: CommandDispatcher<Out>,
+    T: CommandDispatcher<Output = Out>,
     Out: Send,
 {
+    type Output = Out;
     fn key(&self) -> String {
         forward_key()
     }
@@ -144,10 +139,7 @@ impl<T> Connection for ForwardConnection<T>
 where
     T: Connection + Send,
 {
-    async fn dispatch<Out: Send, D: TakeableCommandDispatcher<Out>>(
-        &self,
-        dispatcher: D,
-    ) -> Result<Out> {
+    async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output> {
         // let dispatch = ForwardDispatcher {
         //     target: self.target,
         //     nested_dispatch: E2EDispatcher {

@@ -5,7 +5,7 @@ use svalin_pki::{Certificate, PermCredentials};
 use crate::{
     rpc::{
         command::{
-            dispatcher::{CommandDispatcher, TakeableCommandDispatcher},
+            dispatcher::TakeableCommandDispatcher,
             handler::{CommandHandler, HandlerCollection, TakeableCommandHandler},
         },
         peer::Peer,
@@ -70,15 +70,16 @@ pub struct E2EDispatcher<'b, T> {
 }
 
 #[async_trait]
-impl<'b, T, Out> TakeableCommandDispatcher<Out> for E2EDispatcher<'b, T>
+impl<'b, D> TakeableCommandDispatcher for E2EDispatcher<'b, D>
 where
-    T: CommandDispatcher<Out>,
-    Out: Send,
+    D: TakeableCommandDispatcher,
 {
+    type Output = D::Output;
+
     fn key(&self) -> String {
         e2e_key()
     }
-    async fn dispatch(self, session: &mut Option<Session>) -> Result<Out> {
+    async fn dispatch(self, session: &mut Option<Session>) -> Result<Self::Output> {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure();
             let tls_transport = TlsTransport::client(

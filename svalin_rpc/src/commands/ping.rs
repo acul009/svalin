@@ -1,15 +1,11 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::{
-    self as svalin_rpc,
-    rpc::{
-        command::{dispatcher::CommandDispatcher, handler::CommandHandler},
-        session::Session,
-    },
+use crate::rpc::{
+    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    session::Session,
 };
 use anyhow::Result;
 use async_trait::async_trait;
-use svalin_macros::rpc_dispatch;
 use tracing::debug;
 
 pub struct PingHandler;
@@ -47,7 +43,9 @@ impl CommandHandler for PingHandler {
 pub struct Ping;
 
 #[async_trait]
-impl CommandDispatcher<Duration> for Ping {
+impl CommandDispatcher for Ping {
+    type Output = Duration;
+
     fn key(&self) -> String {
         ping_key()
     }

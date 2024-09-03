@@ -67,7 +67,8 @@ impl TakeableCommandHandler for TlsTestCommandHandler {
 pub struct TlsTest;
 
 #[async_trait]
-impl TakeableCommandDispatcher<()> for TlsTest {
+impl TakeableCommandDispatcher for TlsTest {
+    type Output = ();
     fn key(&self) -> String {
         tls_test_key()
     }

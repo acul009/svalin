@@ -97,10 +97,10 @@ impl Session {
         Ok(())
     }
 
-    pub async fn dispatch<T: Send, D: TakeableCommandDispatcher<T>>(
+    pub async fn dispatch<D: TakeableCommandDispatcher>(
         mut self,
         dispatcher: D,
-    ) -> Result<T> {
+    ) -> Result<D::Output> {
         let command_key = dispatcher.key();
 
         self.request_session(command_key).await?;
