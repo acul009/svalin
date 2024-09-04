@@ -1,10 +1,13 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
-use svalin_rpc::rpc::session::{Session};
-use tokio::{sync::Mutex, task::AbortHandle};
+use svalin_rpc::rpc::session::Session;
+use tokio::task::AbortHandle;
 use tracing::field::debug;
 
 use self::{accept_handler::JoinAcceptHandler, request_handler::JoinRequestHandler};
@@ -66,33 +69,35 @@ impl ServerJoinManager {
         join_code: String,
         mut session: Session,
     ) -> Result<(), Session> {
-        let mut data = self.data.lock().await;
+        {
+            session.write_object(&join_code).await.unwrap();
 
-        if data.session_map.contains_key(&join_code) {
-            return Err(session);
-        }
+            let mut data = self.data.lock().unwrap();
 
-        session.write_object(&join_code).await.unwrap();
-
-        let join_code_clone = join_code.clone();
-        let data_clone = Arc::downgrade(&self.data);
-
-        let abort_handle = data.joinset.spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_secs(60 * 5)).await;
-            debug("timeout for agent join request on server reached");
-            if let Some(data) = data_clone.upgrade() {
-                let mut data = data.lock().await;
-                data.session_map.remove(&join_code_clone);
+            if data.session_map.contains_key(&join_code) {
+                return Err(session);
             }
-        });
 
-        data.session_map.insert(join_code, (session, abort_handle));
+            let join_code_clone = join_code.clone();
+            let data_clone = Arc::downgrade(&self.data);
+
+            let abort_handle = data.joinset.spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(60 * 5)).await;
+                debug("timeout for agent join request on server reached");
+                if let Some(data) = data_clone.upgrade() {
+                    let mut data = data.lock().unwrap();
+                    data.session_map.remove(&join_code_clone);
+                }
+            });
+
+            data.session_map.insert(join_code, (session, abort_handle));
+        }
 
         Ok(())
     }
 
-    pub async fn get_session(&self, join_code: &str) -> Option<Session> {
-        let mut data = self.data.lock().await;
+    pub fn get_session(&self, join_code: &str) -> Option<Session> {
+        let mut data = self.data.lock().unwrap();
 
         if let Some((session, abort_handle)) = data.session_map.remove(join_code) {
             abort_handle.abort();

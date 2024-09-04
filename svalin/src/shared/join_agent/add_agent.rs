@@ -3,7 +3,6 @@ use std::{error::Error, fmt::Display, sync::Arc};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_macros::rpc_dispatch;
 use svalin_pki::signed_object::SignedObject;
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},

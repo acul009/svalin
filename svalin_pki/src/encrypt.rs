@@ -5,6 +5,7 @@ use ring::aead::{
     CHACHA20_POLY1305, NONCE_LEN,
 };
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use crate::hash::ArgonParams;
 
@@ -94,7 +95,10 @@ impl EncryptedData {
     pub async fn decrypt_with_password(cipherdata: &[u8], password: Vec<u8>) -> Result<Vec<u8>> {
         let mut encrypted_data: EncryptedData = postcard::from_bytes(cipherdata)?;
 
+        debug!("deriving key");
         let encryption_key = encrypted_data.parameters.derive_key(password).await?;
+
+        debug!("key derived");
 
         let ring_alg = encrypted_data.alg.into();
 

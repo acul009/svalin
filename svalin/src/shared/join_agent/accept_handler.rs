@@ -1,26 +1,17 @@
-use std::mem;
-
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use svalin_macros::rpc_dispatch;
 use svalin_pki::{ArgonParams, Certificate, CertificateRequest, PermCredentials};
 use svalin_rpc::{
     rpc::{
-        command::{
-            dispatcher::{CommandDispatcher, TakeableCommandDispatcher},
-            handler::CommandHandler,
-        },
+        command::{dispatcher::TakeableCommandDispatcher, handler::CommandHandler},
         peer::Peer,
         session::Session,
     },
-    transport::{
-        combined_transport::CombinedTransport,
-        tls_transport::{self, TlsTransport},
-    },
+    transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
     verifiers::skip_verify::SkipServerVerification,
 };
 use tokio::io::copy_bidirectional;
-use tracing::{debug, error, instrument};
+use tracing::{debug, instrument};
 
 use super::ServerJoinManager;
 
@@ -47,7 +38,7 @@ impl CommandHandler for JoinAcceptHandler {
     async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
         let join_code: String = session.read_object().await?;
 
-        let agent_session = self.manager.get_session(&join_code).await;
+        let agent_session = self.manager.get_session(&join_code);
 
         match agent_session {
             Some(mut agent_session) => {

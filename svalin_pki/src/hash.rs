@@ -41,11 +41,10 @@ impl ArgonParams {
         let params = self.get_params().map_err(|err| anyhow!(err))?;
         let argon = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x10, params);
 
-        let (send, recv) = tokio::sync::oneshot::channel::<Result<[u8; 32]>>();
         let salt_bytes = self.salt.as_bytes().to_owned();
-        // debug!("spawning blocking task");
+        debug!("spawning blocking task");
 
-        tokio::task::spawn_blocking(move || {
+        let result = tokio::task::spawn_blocking(move || {
             // debug!("running blocking task");
             let mut hash = [0u8; 32];
             let result = argon
@@ -53,20 +52,13 @@ impl ArgonParams {
                 .map(move |_| hash)
                 .map_err(|err| anyhow!(err));
 
-            // debug!("blocking computation ready");
+            debug!("blocking computation ready");
 
-            if send.send(result).is_err() {
-                // error!("send to oneshot channel failed");
-            } else {
-                // debug!("send to oneshot channel succeeded");
-            };
-        });
+            result
+        })
+        .await?;
 
-        // debug!("waiting for blocking task to complete");
-
-        let result = recv.await?;
-
-        // debug!("blocking task completed");
+        debug!("blocking task completed");
 
         result
     }

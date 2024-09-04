@@ -11,7 +11,7 @@ use crate::{agent::Agent, client::Client};
 mod prepare_server;
 // mod test_init;
 
-#[test(tokio::test(flavor = "multi_thread"))]
+#[test(tokio::test())]
 async fn integration_tests() {
     let server_handle = tokio::spawn(async move {
         let mut server = prepare_server().await.unwrap();

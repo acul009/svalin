@@ -4,6 +4,7 @@ use anyhow::{anyhow, Context, Result};
 
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
@@ -101,10 +102,14 @@ impl PermCredentials {
         let certificate =
             Certificate::from_der(on_disk.raw_cert).context("failed to decode certificate")?;
 
+        debug!("decrypting credentials");
+
         let decrypted_keypair =
             EncryptedData::decrypt_with_password(&on_disk.encrypted_keypair, password)
                 .await
                 .context("failed to decrypt keypair")?;
+
+        debug!("credentials decrypted");
 
         Self::new(decrypted_keypair, certificate)
     }

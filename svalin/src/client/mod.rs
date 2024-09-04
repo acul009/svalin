@@ -1,7 +1,7 @@
 use std::time::Duration;
-use std::{collections::BTreeMap, ops::Deref, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::Result;
 
 pub mod device;
 mod first_connect;

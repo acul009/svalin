@@ -1,21 +1,17 @@
-use std::{mem, time::Duration};
+use std::time::Duration;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use rand::Rng;
-use svalin_macros::rpc_dispatch;
 use svalin_pki::{Certificate, Keypair};
 use svalin_rpc::{
     rpc::{
-        command::{
-            dispatcher::TakeableCommandDispatcher,
-            handler::{CommandHandler, TakeableCommandHandler},
-        },
+        command::{dispatcher::TakeableCommandDispatcher, handler::TakeableCommandHandler},
         peer::Peer,
         session::Session,
     },
     transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
-    verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
+    verifiers::skip_verify::SkipClientVerification,
 };
 use tokio::sync::oneshot;
 use tracing::debug;
