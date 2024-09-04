@@ -94,5 +94,7 @@ async fn integration_tests() {
 
     agent_handle.abort();
 
+    // TODO: actually program this so you can shutdown the programm in a controlled
+    // manner again
     process::exit(0);
 }
