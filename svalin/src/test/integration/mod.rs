@@ -93,4 +93,6 @@ async fn integration_tests() {
     server_handle.abort();
 
     agent_handle.abort();
+
+    process::exit(0);
 }
