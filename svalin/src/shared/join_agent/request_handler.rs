@@ -112,9 +112,9 @@ impl TakeableCommandDispatcher for RequestJoin {
 
             let temp_credentials = Keypair::generate().unwrap().to_self_signed_cert()?;
 
-            let tls_transport = TlsTransport::client(
+            let tls_transport = TlsTransport::server(
                 CombinedTransport::new(read, write),
-                SkipServerVerification::new(),
+                SkipClientVerification::new(),
                 &temp_credentials,
             )
             .await?;
