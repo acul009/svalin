@@ -148,7 +148,7 @@ impl Session {
         }
     }
 
-    pub fn destructure(
+    pub fn destructure_transport(
         self,
     ) -> (
         Box<dyn SessionTransportReader>,
@@ -156,6 +156,10 @@ impl Session {
         Peer,
     ) {
         (self.read.get_reader(), self.write.get_writer(), self.peer)
+    }
+
+    pub fn destructure(self) -> (ObjectReader, ObjectWriter, Peer) {
+        (self.read, self.write, self.peer)
     }
 
     pub fn borrow_transport(

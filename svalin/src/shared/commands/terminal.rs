@@ -1,10 +1,16 @@
 use std::{future::Future, pin::pin, task::Poll};
 
-use anyhow::Result;
+use anyhow::{anyhow, Ok, Result};
 use async_trait::async_trait;
-use futures::{future::poll_fn, select, FutureExt};
+use futures::{channel::oneshot, future::poll_fn, select, FutureExt};
 use serde::{Deserialize, Serialize};
-use svalin_rpc::rpc::{command::handler::CommandHandler, session::Session};
+use svalin_rpc::rpc::{
+    command::{
+        dispatcher::CommandDispatcher,
+        handler::{CommandHandler, TakeableCommandHandler},
+    },
+    session::Session,
+};
 use svalin_sysctl::pty::{PtyProcess, TerminalSize};
 use tokio::sync::mpsc;
 
@@ -29,117 +35,63 @@ pub struct RemoteTerminalHandler {}
 impl RemoteTerminalHandler {}
 
 #[async_trait]
-impl CommandHandler for RemoteTerminalHandler {
+impl TakeableCommandHandler for RemoteTerminalHandler {
     fn key(&self) -> String {
         remote_terminal_key()
     }
 
-    async fn handle(&self, session: &mut Session) -> Result<()> {
-        let size: TerminalSize = session.read_object().await?;
-        let pty = PtyProcess::shell(size)?;
+    async fn handle(&self, session: &mut Option<Session>) -> Result<()> {
+        if let Some(mut session) = session.take() {
+            let size: TerminalSize = session.read_object().await?;
+            let (pty, mut pty_reader) = PtyProcess::shell(size)?;
 
-        let mut copy_from_pty = CopyState::Continue;
-        let mut output_helper = Vec::new();
+            let (mut read, mut write, _) = session.destructure();
 
-        poll_fn(|cx| -> Poll<()> {
-            loop {
-                match &mut copy_from_pty {
-                    CopyState::Continue => {
-                        copy_from_pty = CopyState::WaitOnRead(pty.read());
-                    }
-                    CopyState::WaitOnRead(read_future) => match read_future.poll_unpin(cx) {
-                        Poll::Ready(Some(output)) => {
-                            output_helper = output;
-                            copy_from_pty =
-                                CopyState::WaitOnWrite(session.write_object(&output_helper));
-                        }
-                        Poll::Ready(None) => todo!(),
-                        Poll::Pending => break,
-                    },
-                    CopyState::WaitOnWrite(write_future) => match write_future.poll(cx) {
-                        Poll::Ready(Ok(_)) => {
-                            copy_from_pty = CopyState::Continue;
-                        }
-                        Poll::Ready(Err(err)) => todo!(),
-                        Poll::Pending => break,
-                    },
-                    CopyState::Finished => break,
-                }
-            }
-
-            let read_pty = pin!(pty.read()).poll_unpin(cx);
-            let read_session = pin!(session.read_object::<TerminalPacket>()).poll_unpin(cx);
-
-            let mut pending = false;
-
-            match read_pty {
-                Poll::Ready(output) => {
+            tokio::spawn(async move {
+                loop {
+                    let output = pty_reader.recv().await;
                     match output {
-                        Some(output) => match pin!(session.write_object(&output)).poll_unpin(cx) {
-                            Poll::Ready(_) => (),
-                            Poll::Pending => todo!(),
-                        },
-                        None => todo!(),
+                        Some(output) => {
+                            write.write_object(&output).await;
+                        }
+                        None => {
+                            write.shutdown().await;
+                            return;
+                        }
                     }
-
-                    todo!();
                 }
-                Poll::Pending => pending = true,
-            };
+            });
 
-            match read_session {
-                Poll::Ready(packet) => match packet {
-                    Ok(TerminalPacket::Input(input)) => {
-                        todo!();
+            loop {
+                let packet: TerminalPacket = read.read_object().await?;
+                match packet {
+                    TerminalPacket::Close => {
+                        pty.close();
+                        return Ok(());
                     }
-                    Ok(TerminalPacket::Resize(size)) => {
-                        todo!();
+                    TerminalPacket::Input(input) => {
+                        pty.write(input).await;
                     }
-                    Ok(TerminalPacket::Close) => {
-                        todo!();
-                    }
-                    Err(err) => todo!(),
-                },
-                Poll::Pending => pending = true,
-            };
-
-            if pending {
-                Poll::Pending
-            } else {
-                Poll::Ready(())
+                    TerminalPacket::Resize(size) => pty.resize(size).unwrap(),
+                };
             }
-        })
-        .await;
+        } else {
+            Err(anyhow!("tried executing commandhandler with None"))
+        }
+    }
+}
 
+struct RemoteTerminalDispatcher;
+
+#[async_trait]
+impl CommandDispatcher for RemoteTerminalDispatcher {
+    type Output = ();
+
+    fn key(&self) -> String {
+        remote_terminal_key()
+    }
+
+    async fn dispatch(self, session: &mut Session) -> Result<Self::Output> {
         todo!()
-        // loop {
-        //     let mut output_future = pin!(pty.read().fuse());
-        //     let mut input_future =
-        // pin!(session.read_object::<TerminalPacket>().fuse());
-        //     select! {
-        //         output = output_future => {
-        //             match output {
-        //                 Some(output) => {
-        //                     session.write_object(&output).await?;
-        //                 },
-        //                 None => {return Ok(())}
-        //             }
-        //         },
-        //         input = input_future => {
-        //             match input {
-        //                 Ok(TerminalPacket::Input(input)) => {
-        //                     pty.write(input).await;
-        //                 },
-        //                 Ok(TerminalPacket::Resize(size)) => {
-        //                     pty.resize(size);
-        //                 },
-        //                 Ok(TerminalPacket::Close) => {
-        //                     return Ok(());
-        //                 },
-        //                 Err(err) => return Err(err),
-        //             }
-        //         },
-        //     }
-        // }
     }
 }

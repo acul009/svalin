@@ -4,7 +4,7 @@ use argon2::{
     Argon2, Params,
 };
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error};
+use tracing::debug;
 
 #[derive(Serialize, Deserialize)]
 pub struct ArgonParams {

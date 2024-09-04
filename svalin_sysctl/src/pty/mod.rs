@@ -1,16 +1,16 @@
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock, Mutex};
 
 use anyhow::Result;
-use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 
 static SHELL: LazyLock<String> = LazyLock::new(|| CommandBuilder::new_default_prog().get_shell());
 
 pub struct PtyProcess {
     master: Mutex<Box<dyn MasterPty + Send>>,
+    child: Mutex<Box<dyn Child + Send + Sync>>,
     write: mpsc::Sender<Vec<u8>>,
-    read: Mutex<mpsc::Receiver<Vec<u8>>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -30,7 +30,7 @@ impl From<TerminalSize> for PtySize {
 }
 
 impl PtyProcess {
-    pub fn shell(size: TerminalSize) -> Result<Self> {
+    pub fn shell(size: TerminalSize) -> Result<(Self, mpsc::Receiver<Vec<u8>>)> {
         let pty_system = native_pty_system();
 
         let pair = pty_system.openpty(size.into())?;
@@ -67,15 +67,18 @@ impl PtyProcess {
             }
         });
 
-        Ok(Self {
-            master: Mutex::new(master),
-            read: Mutex::new(reader_recv),
-            write: writer_send,
-        })
+        Ok((
+            Self {
+                master: Mutex::new(master),
+                child: Mutex::new(child),
+                write: writer_send,
+            },
+            reader_recv,
+        ))
     }
 
-    pub async fn resize(&self, size: TerminalSize) -> Result<()> {
-        self.master.lock().await.resize(size.into())
+    pub fn resize(&self, size: TerminalSize) -> Result<()> {
+        self.master.lock().unwrap().resize(size.into())
     }
 
     pub async fn write(&self, content: Vec<u8>) -> Result<()> {
@@ -84,7 +87,7 @@ impl PtyProcess {
         Ok(())
     }
 
-    pub async fn read(&self) -> Option<Vec<u8>> {
-        self.read.lock().await.recv().await
+    pub fn close(self) {
+        self.child.lock().unwrap().kill().unwrap()
     }
 }

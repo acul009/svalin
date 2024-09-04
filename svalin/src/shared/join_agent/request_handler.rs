@@ -104,7 +104,7 @@ impl TakeableCommandDispatcher for RequestJoin {
 
             debug!("trying to establish tls connection");
 
-            let (read, write, _) = session.destructure();
+            let (read, write, _) = session.destructure_transport();
 
             let temp_credentials = Keypair::generate().unwrap().to_self_signed_cert()?;
 

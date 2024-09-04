@@ -37,7 +37,7 @@ impl TakeableCommandHandler for TlsTestCommandHandler {
 
     async fn handle(&self, session: &mut Option<Session>) -> anyhow::Result<()> {
         if let Some(session_ready) = session.take() {
-            let (read, write, _) = session_ready.destructure();
+            let (read, write, _) = session_ready.destructure_transport();
 
             let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
 
@@ -74,7 +74,7 @@ impl TakeableCommandDispatcher for TlsTest {
     }
     async fn dispatch(self, session: &mut Option<Session>) -> Result<()> {
         if let Some(session_ready) = session.take() {
-            let (read, write, _) = session_ready.destructure();
+            let (read, write, _) = session_ready.destructure_transport();
 
             let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
 

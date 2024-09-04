@@ -6,11 +6,11 @@ use super::{
     session_transport::{SessionTransportReader, SessionTransportWriter},
 };
 
-pub(crate) struct ObjectReader {
+pub struct ObjectReader {
     read: ChunkReader,
 }
 
-pub(crate) struct ObjectWriter {
+pub struct ObjectWriter {
     write: ChunkWriter,
 }
 

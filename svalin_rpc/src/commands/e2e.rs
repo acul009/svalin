@@ -41,7 +41,7 @@ impl TakeableCommandHandler for E2EHandler {
 
     async fn handle(&self, session: &mut Option<Session>) -> anyhow::Result<()> {
         if let Some(session_ready) = session.take() {
-            let (read, write, _) = session_ready.destructure();
+            let (read, write, _) = session_ready.destructure_transport();
 
             let tls_transport = TlsTransport::server(
                 CombinedTransport::new(read, write),
@@ -81,7 +81,7 @@ where
     }
     async fn dispatch(self, session: &mut Option<Session>) -> Result<Self::Output> {
         if let Some(session_ready) = session.take() {
-            let (read, write, _) = session_ready.destructure();
+            let (read, write, _) = session_ready.destructure_transport();
             let tls_transport = TlsTransport::client(
                 CombinedTransport::new(read, write),
                 ExactServerVerification::new(&self.peer),

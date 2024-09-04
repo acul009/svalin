@@ -3,4 +3,4 @@ pub mod agent_list;
 pub mod init;
 pub mod public_server_status;
 pub mod realtime_status;
-// pub mod terminal;
+pub mod terminal;

@@ -164,7 +164,7 @@ async fn prepare_agent_enroll(
 
     debug!("trying to establish tls connection");
 
-    let (read, write, _) = session.destructure();
+    let (read, write, _) = session.destructure_transport();
 
     let tls_transport = TlsTransport::client(
         CombinedTransport::new(read, write),
