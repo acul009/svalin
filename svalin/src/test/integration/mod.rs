@@ -1,4 +1,4 @@
-use std::{process, time::Duration};
+use std::{panic, process, time::Duration};
 
 use prepare_server::prepare_server;
 use test_log::test;
@@ -11,8 +11,14 @@ use crate::{agent::Agent, client::Client};
 mod prepare_server;
 // mod test_init;
 
-#[test(tokio::test())]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn integration_tests() {
+    let hook = panic::take_hook();
+    panic::set_hook(Box::new(move |panic_info| {
+        hook(panic_info);
+        process::exit(1);
+    }));
+
     let server_handle = tokio::spawn(async move {
         let mut server = prepare_server().await.unwrap();
         server.run().await.unwrap();
@@ -87,8 +93,4 @@ async fn integration_tests() {
     server_handle.abort();
 
     agent_handle.abort();
-
-    error!("Make this test actually fail when something goes wrong");
-
-    process::exit(1);
 }
