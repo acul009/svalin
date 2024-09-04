@@ -66,8 +66,8 @@ impl CommandHandler for ForwardHandler {
 
                 let (read1, write1) = session.borrow_transport();
 
-                let mut transport1 = CombinedTransport::new(read1, write2);
-                let mut transport2 = CombinedTransport::new(read2, write1);
+                let mut transport1 = CombinedTransport::new(read1, write1);
+                let mut transport2 = CombinedTransport::new(read2, write2);
 
                 tokio::io::copy_bidirectional(&mut transport1, &mut transport2).await?;
 

@@ -59,10 +59,10 @@ impl CommandHandler for JoinAcceptHandler {
                 let (read1, write1) = session.borrow_transport();
                 let (read2, write2) = agent_session.borrow_transport();
 
-                let mut transport1 = CombinedTransport::new(read1, write2);
-                let mut transport2 = CombinedTransport::new(read2, write1);
+                let mut transport1 = CombinedTransport::new(read1, write1);
+                let mut transport2 = CombinedTransport::new(read2, write2);
 
-                copy_bidirectional(&mut transport1, &mut transport2).await;
+                copy_bidirectional(&mut transport1, &mut transport2).await?;
 
                 debug!("finished forwarding session");
 
@@ -98,12 +98,13 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
     async fn dispatch(self, session: &mut Option<Session>) -> Result<Self::Output> {
         if let Some(session) = session.take() {
             let confirm_code_result =
-                prepare_agent_enroll(session, self.join_code, self.credentials).await;
+                prepare_agent_enroll(session, self.join_code, self.credentials)
+                    .await
+                    .context("error during enrollment preparation");
 
             match confirm_code_result {
                 Err(err) => {
                     let err_copy = anyhow!("{}", err);
-                    let err = err.context("error during enroll");
                     self.waiting_for_confirm.send(Err(err)).unwrap();
 
                     Err(err_copy)
@@ -153,10 +154,12 @@ async fn prepare_agent_enroll(
         return Err(anyhow!("Agent not found"));
     }
 
-    debug!("connected to agent");
+    debug!("connected to agent, sending join code for confirmation");
 
     // confirm join code with agent
     session.write_object(&join_code).await?;
+
+    debug!("waiting for agent to confirm join code");
 
     let ready: std::result::Result<(), ()> = session.read_object().await?;
 

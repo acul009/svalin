@@ -17,8 +17,8 @@ use svalin_rpc::{
     transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
     verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
 };
-use tokio::{io::AsyncWriteExt, sync::oneshot};
-use tracing::{debug, error};
+use tokio::sync::oneshot;
+use tracing::debug;
 
 use super::{AgentInitPayload, ServerJoinManager};
 
