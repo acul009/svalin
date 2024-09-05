@@ -36,22 +36,24 @@ class DeviceView extends StatelessWidget {
           },
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            LiveInfo(device: device),
-            const SizedBox(height: 20),
-            ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TerminalWidget(device: device),
-                      ));
-                },
-                child: const Text("Terminal"))
-          ],
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              LiveInfo(device: device),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TerminalWidget(device: device),
+                        ));
+                  },
+                  child: const Text("Terminal"))
+            ],
+          ),
         ),
       ),
     );

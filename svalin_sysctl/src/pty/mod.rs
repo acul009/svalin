@@ -15,8 +15,8 @@ pub struct PtyProcess {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TerminalSize {
-    cols: u16,
-    rows: u16,
+    pub cols: u16,
+    pub rows: u16,
 }
 
 impl From<TerminalSize> for PtySize {

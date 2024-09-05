@@ -54,6 +54,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteLiveDataRealtimeStatus;
 
   CrossPlatformFinalizerArg
+      get rust_arc_decrement_strong_count_RemoteTerminalPtr => wire
+          .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal;
+
+  CrossPlatformFinalizerArg
       get rust_arc_decrement_strong_count_SystemTimeErrorPtr => wire
           .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSystemTimeError;
 
@@ -113,6 +117,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           dynamic raw);
 
   @protected
+  RemoteTerminal
+      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+          dynamic raw);
+
+  @protected
   SystemTimeError
       dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSystemTimeError(
           dynamic raw);
@@ -155,6 +164,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   RemoteLiveDataRealtimeStatus
       dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteLiveDataRealtimeStatus(
+          dynamic raw);
+
+  @protected
+  RemoteTerminal
+      dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
           dynamic raw);
 
   @protected
@@ -208,6 +222,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           dynamic raw);
 
   @protected
+  RemoteTerminal
+      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+          dynamic raw);
+
+  @protected
   SystemTimeError
       dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSystemTimeError(
           dynamic raw);
@@ -236,6 +255,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RealtimeStatus dco_decode_box_autoadd_realtime_status(dynamic raw);
+
+  @protected
+  TerminalSize dco_decode_box_autoadd_terminal_size(dynamic raw);
 
   @protected
   CoreStatus dco_decode_core_status(dynamic raw);
@@ -267,6 +289,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MemoryStatus dco_decode_memory_status(dynamic raw);
 
   @protected
+  String? dco_decode_opt_String(dynamic raw);
+
+  @protected
   RealtimeStatus? dco_decode_opt_box_autoadd_realtime_status(dynamic raw);
 
   @protected
@@ -279,7 +304,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SwapStatus dco_decode_swap_status(dynamic raw);
 
   @protected
+  TerminalSize dco_decode_terminal_size(dynamic raw);
+
+  @protected
   Test dco_decode_test(dynamic raw);
+
+  @protected
+  int dco_decode_u_16(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -345,6 +376,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           SseDeserializer deserializer);
 
   @protected
+  RemoteTerminal
+      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+          SseDeserializer deserializer);
+
+  @protected
   SystemTimeError
       sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSystemTimeError(
           SseDeserializer deserializer);
@@ -387,6 +423,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   RemoteLiveDataRealtimeStatus
       sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteLiveDataRealtimeStatus(
+          SseDeserializer deserializer);
+
+  @protected
+  RemoteTerminal
+      sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
           SseDeserializer deserializer);
 
   @protected
@@ -440,6 +481,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
           SseDeserializer deserializer);
 
   @protected
+  RemoteTerminal
+      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+          SseDeserializer deserializer);
+
+  @protected
   SystemTimeError
       sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSystemTimeError(
           SseDeserializer deserializer);
@@ -472,6 +518,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  TerminalSize sse_decode_box_autoadd_terminal_size(
+      SseDeserializer deserializer);
+
+  @protected
   CoreStatus sse_decode_core_status(SseDeserializer deserializer);
 
   @protected
@@ -501,6 +551,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MemoryStatus sse_decode_memory_status(SseDeserializer deserializer);
 
   @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
   RealtimeStatus? sse_decode_opt_box_autoadd_realtime_status(
       SseDeserializer deserializer);
 
@@ -514,7 +567,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SwapStatus sse_decode_swap_status(SseDeserializer deserializer);
 
   @protected
+  TerminalSize sse_decode_terminal_size(SseDeserializer deserializer);
+
+  @protected
   Test sse_decode_test(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_u_16(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -585,6 +644,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+          RemoteTerminal self, SseSerializer serializer);
+
+  @protected
+  void
       sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSystemTimeError(
           SystemTimeError self, SseSerializer serializer);
 
@@ -627,6 +691,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
       sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteLiveDataRealtimeStatus(
           RemoteLiveDataRealtimeStatus self, SseSerializer serializer);
+
+  @protected
+  void
+      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+          RemoteTerminal self, SseSerializer serializer);
 
   @protected
   void
@@ -680,6 +749,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+          RemoteTerminal self, SseSerializer serializer);
+
+  @protected
+  void
       sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSystemTimeError(
           SystemTimeError self, SseSerializer serializer);
 
@@ -709,6 +783,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_realtime_status(
       RealtimeStatus self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_terminal_size(
+      TerminalSize self, SseSerializer serializer);
 
   @protected
   void sse_encode_core_status(CoreStatus self, SseSerializer serializer);
@@ -742,6 +820,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_memory_status(MemoryStatus self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_realtime_status(
       RealtimeStatus? self, SseSerializer serializer);
 
@@ -757,7 +838,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_swap_status(SwapStatus self, SseSerializer serializer);
 
   @protected
+  void sse_encode_terminal_size(TerminalSize self, SseSerializer serializer);
+
+  @protected
   void sse_encode_test(Test self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_16(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);
@@ -891,6 +978,18 @@ class RustLibWire implements BaseWire {
           .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteLiveDataRealtimeStatus(
               ptr);
 
+  void rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+          int ptr) =>
+      wasmModule
+          .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+              ptr);
+
+  void rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+          int ptr) =>
+      wasmModule
+          .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+              ptr);
+
   void rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSystemTimeError(
           int ptr) =>
       wasmModule
@@ -1004,6 +1103,14 @@ extension type RustLibWasmModule._(JSObject _) implements JSObject {
 
   external void
       rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteLiveDataRealtimeStatus(
+          int ptr);
+
+  external void
+      rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+          int ptr);
+
+  external void
+      rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
           int ptr);
 
   external void

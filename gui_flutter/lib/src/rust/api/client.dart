@@ -36,6 +36,8 @@ abstract class Client implements RustOpaqueInterface {
 abstract class Device implements RustOpaqueInterface {
   Future<AgentListItem> item();
 
+  Future<RemoteTerminal> openTerminal();
+
   Future<RealtimeStatusReceiver> subscribeRealtime();
 }
 

@@ -41,7 +41,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.3.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -406933939;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -39453775;
 
 // Section: executor
 
@@ -363,6 +363,62 @@ fn wire__crate__api__client__Device_item_impl(
                         let output_ok = Result::<_, ()>::Ok(
                             crate::api::client::Device::item(&*api_that_guard).await,
                         )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__client__Device_open_terminal_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "Device_open_terminal",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Device>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok =
+                            crate::api::client::Device::open_terminal(&*api_that_guard).await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -965,6 +1021,188 @@ fn wire__crate__api__client__device__RemoteLiveDataRealtimeStatus_is_unavailable
         },
     )
 }
+fn wire__crate__api__client__device__RemoteTerminal_read_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "RemoteTerminal_read",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok =
+                            crate::api::client::device::RemoteTerminal::read(&*api_that_guard)
+                                .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__client__device__RemoteTerminal_resize_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "RemoteTerminal_resize",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>,
+            >>::sse_decode(&mut deserializer);
+            let api_size =
+                <crate::api::client::device::TerminalSize>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = Result::<_, ()>::Ok({
+                            crate::api::client::device::RemoteTerminal::resize(
+                                &*api_that_guard,
+                                api_size,
+                            )
+                            .await;
+                        })?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__client__device__RemoteTerminal_write_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "RemoteTerminal_write",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>,
+            >>::sse_decode(&mut deserializer);
+            let api_content = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = Result::<_, ()>::Ok({
+                            crate::api::client::device::RemoteTerminal::write(
+                                &*api_that_guard,
+                                api_content,
+                            )
+                            .await;
+                        })?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__simple__greet_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -1188,6 +1426,11 @@ const _: fn() = || {
         let _: u64 = SwapStatus.free;
         let _: u64 = SwapStatus.used;
     }
+    {
+        let TerminalSize = None::<crate::api::client::device::TerminalSize>.unwrap();
+        let _: u16 = TerminalSize.cols;
+        let _: u16 = TerminalSize.rows;
+    }
 };
 
 // Section: related_funcs
@@ -1218,6 +1461,9 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>
+);
+flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
+    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SystemTimeError>
@@ -1324,6 +1570,16 @@ impl SseDecode for RemoteLiveData<RealtimeStatus> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <RustOpaqueMoi<
             flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
+        >>::sse_decode(deserializer);
+        return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
+    }
+}
+
+impl SseDecode for RemoteTerminal {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <RustOpaqueMoi<
+            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>,
         >>::sse_decode(deserializer);
         return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
     }
@@ -1437,6 +1693,16 @@ impl SseDecode
     for RustOpaqueMoi<
         flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
     >
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <usize>::sse_decode(deserializer);
+        return decode_rust_opaque_moi(inner);
+    }
+}
+
+impl SseDecode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1624,6 +1890,17 @@ impl SseDecode for crate::api::client::device::MemoryStatus {
     }
 }
 
+impl SseDecode for Option<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<String>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::api::client::device::RealtimeStatus> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1677,6 +1954,18 @@ impl SseDecode for crate::api::client::device::SwapStatus {
     }
 }
 
+impl SseDecode for crate::api::client::device::TerminalSize {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_cols = <u16>::sse_decode(deserializer);
+        let mut var_rows = <u16>::sse_decode(deserializer);
+        return crate::api::client::device::TerminalSize {
+            cols: var_cols,
+            rows: var_rows,
+        };
+    }
+}
+
 impl SseDecode for crate::api::simple::Test {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1705,6 +1994,13 @@ impl SseDecode for crate::api::simple::Test {
                 unimplemented!("");
             }
         }
+    }
+}
+
+impl SseDecode for u16 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u16::<NativeEndian>().unwrap()
     }
 }
 
@@ -1776,39 +2072,58 @@ fn pde_ffi_dispatcher_primary_impl(
             wire__crate__api__client__Client_remove_profile_impl(port, ptr, rust_vec_len, data_len)
         }
         7 => wire__crate__api__client__Device_item_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__client__Device_subscribe_realtime_impl(
+        8 => wire__crate__api__client__Device_open_terminal_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__client__Device_subscribe_realtime_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        9 => wire__crate__api__client__Init_init_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__client__Login_login_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__client__Totp_check_current_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__client__Totp_get_qr_png_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__client__Totp_get_url_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__client__WaitingForConfirmCode_confirm_impl(
+        10 => wire__crate__api__client__Init_init_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__client__Login_login_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__client__Totp_check_current_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__client__Totp_get_qr_png_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__client__Totp_get_url_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__client__WaitingForConfirmCode_confirm_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        15 => wire__crate__api__client__device__RealtimeStatusReceiver_changed_impl(
+        16 => wire__crate__api__client__device__RealtimeStatusReceiver_changed_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        16 => wire__crate__api__client__device__RealtimeStatusReceiver_current_owned_impl(
+        17 => wire__crate__api__client__device__RealtimeStatusReceiver_current_owned_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        21 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__simple__stream_time_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__simple__test_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__totp__new_totp_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__client__device__RemoteTerminal_read_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        22 => wire__crate__api__client__device__RemoteTerminal_resize_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        23 => wire__crate__api__client__device__RemoteTerminal_write_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        25 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__simple__stream_time_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__simple__test_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__totp__new_totp_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1821,22 +2136,22 @@ fn pde_ffi_dispatcher_sync_impl(
 ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        17 => wire__crate__api__client__device__RemoteLiveDataRealtimeStatus_get_ready_impl(
+        18 => wire__crate__api__client__device__RemoteLiveDataRealtimeStatus_get_ready_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        18 => wire__crate__api__client__device__RemoteLiveDataRealtimeStatus_is_pending_impl(
+        19 => wire__crate__api__client__device__RemoteLiveDataRealtimeStatus_is_pending_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        19 => wire__crate__api__client__device__RemoteLiveDataRealtimeStatus_is_unavailable_impl(
+        20 => wire__crate__api__client__device__RemoteLiveDataRealtimeStatus_is_unavailable_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        20 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1984,6 +2299,21 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<RemoteLiveData<RealtimeStatus>
     for RemoteLiveData<RealtimeStatus>
 {
     fn into_into_dart(self) -> FrbWrapper<RemoteLiveData<RealtimeStatus>> {
+        self.into()
+    }
+}
+
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<RemoteTerminal> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<RemoteTerminal> {}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<RemoteTerminal>> for RemoteTerminal {
+    fn into_into_dart(self) -> FrbWrapper<RemoteTerminal> {
         self.into()
     }
 }
@@ -2213,6 +2543,27 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::client::device::Sw
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::client::device::TerminalSize> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.0.cols.into_into_dart().into_dart(),
+            self.0.rows.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::client::device::TerminalSize>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::client::device::TerminalSize>>
+    for crate::api::client::device::TerminalSize
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::client::device::TerminalSize> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::simple::Test {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
@@ -2325,6 +2676,13 @@ impl SseEncode for RemoteLiveData<RealtimeStatus> {
             flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self),
             serializer,
         );
+    }
+}
+
+impl SseEncode for RemoteTerminal {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
     }
 }
 
@@ -2443,6 +2801,17 @@ impl SseEncode
     for RustOpaqueMoi<
         flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
     >
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        let (ptr, size) = self.sse_encode_raw();
+        <usize>::sse_encode(ptr, serializer);
+        <i32>::sse_encode(size, serializer);
+    }
+}
+
+impl SseEncode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2605,6 +2974,16 @@ impl SseEncode for crate::api::client::device::MemoryStatus {
     }
 }
 
+impl SseEncode for Option<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::api::client::device::RealtimeStatus> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2641,6 +3020,14 @@ impl SseEncode for crate::api::client::device::SwapStatus {
     }
 }
 
+impl SseEncode for crate::api::client::device::TerminalSize {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u16>::sse_encode(self.cols, serializer);
+        <u16>::sse_encode(self.rows, serializer);
+    }
+}
+
 impl SseEncode for crate::api::simple::Test {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2665,6 +3052,13 @@ impl SseEncode for crate::api::simple::Test {
                 unimplemented!("");
             }
         }
+    }
+}
+
+impl SseEncode for u16 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u16::<NativeEndian>(self).unwrap();
     }
 }
 
@@ -2861,6 +3255,20 @@ mod io {
         MoiArc::<
             flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
         >::decrement_strong_count(ptr as _);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn frbgen_gui_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>>::increment_strong_count(ptr as _);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn frbgen_gui_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>>::decrement_strong_count(ptr as _);
     }
 
     #[no_mangle]
@@ -3061,6 +3469,20 @@ mod web {
         MoiArc::<
             flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteLiveData<RealtimeStatus>>,
         >::decrement_strong_count(ptr as _);
+    }
+
+    #[wasm_bindgen]
+    pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>>::increment_strong_count(ptr as _);
+    }
+
+    #[wasm_bindgen]
+    pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRemoteTerminal(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>>::decrement_strong_count(ptr as _);
     }
 
     #[wasm_bindgen]

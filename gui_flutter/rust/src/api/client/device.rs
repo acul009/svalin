@@ -3,8 +3,10 @@ pub use svalin::client::device::Device;
 pub use svalin::client::device::RealtimeStatusReceiver;
 pub use svalin::client::device::RemoteLiveData;
 pub use svalin::shared::commands::agent_list::AgentListItem;
+pub use svalin::shared::commands::terminal::RemoteTerminal;
 pub use svalin::shared::join_agent::PublicAgentData;
 pub use svalin_pki::Certificate;
+pub use svalin_sysctl::pty::TerminalSize;
 pub use svalin_sysctl::realtime::CoreStatus;
 pub use svalin_sysctl::realtime::CpuStatus;
 pub use svalin_sysctl::realtime::MemoryStatus;
@@ -16,6 +18,7 @@ pub use tokio::sync::watch::error::RecvError;
 impl Device {
     pub async fn item(&self) -> AgentListItem {}
     pub async fn subscribe_realtime(&self) -> RealtimeStatusReceiver {}
+    pub async fn open_terminal(&self) -> anyhow::Result<RemoteTerminal> {}
 }
 
 #[frb(non_opaque, mirror(AgentListItem))]
@@ -101,4 +104,17 @@ pub struct _SwapStatus {
     pub total: u64,
     pub free: u64,
     pub used: u64,
+}
+
+#[frb(external)]
+impl RemoteTerminal {
+    pub async fn write(&self, content: String) {}
+    pub async fn resize(&self, size: TerminalSize) {}
+    pub async fn read(&self) -> anyhow::Result<Option<String>> {}
+}
+
+#[frb(non_opaque, mirror(TerminalSize))]
+pub struct _TerminalSize {
+    pub cols: u16,
+    pub rows: u16,
 }

@@ -13,7 +13,11 @@ use tokio::sync::{oneshot, watch};
 use tracing::{debug, error};
 
 use crate::shared::{
-    commands::{agent_list::AgentListItem, realtime_status::SubscribeRealtimeStatus},
+    commands::{
+        agent_list::AgentListItem,
+        realtime_status::SubscribeRealtimeStatus,
+        terminal::{RemoteTerminal, RemoteTerminalDispatcher},
+    },
     lazy_watch::{self, LazyWatch},
 };
 
@@ -105,6 +109,13 @@ impl Device {
 
     pub async fn subscribe_realtime(&self) -> RealtimeStatusReceiver {
         self.data.realtime.subscribe()
+    }
+
+    pub async fn open_terminal(&self) -> Result<RemoteTerminal> {
+        self.data
+            .connection
+            .dispatch(RemoteTerminalDispatcher)
+            .await
     }
 }
 

@@ -14,6 +14,7 @@ mod init;
 
 use crate::client::verifiers;
 use crate::shared::commands::realtime_status::RealtimeStatusHandler;
+use crate::shared::commands::terminal::RemoteTerminalHandler;
 use crate::shared::join_agent::AgentInitPayload;
 
 pub struct Agent {
@@ -74,7 +75,8 @@ impl Agent {
             .chain()
             .await
             .add(PingHandler::new())
-            .add(RealtimeStatusHandler::new());
+            .add(RealtimeStatusHandler::new())
+            .add(RemoteTerminalHandler);
 
         let public_commands = HandlerCollection::new();
 
@@ -153,7 +155,7 @@ impl Agent {
 
         #[cfg(target_os = "linux")]
         {
-            Ok(PathBuf::from("/var/svalin/agent"))
+            Ok(PathBuf::from("/var/lib/svalin/agent"))
         }
     }
 

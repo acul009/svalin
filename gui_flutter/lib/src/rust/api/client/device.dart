@@ -28,6 +28,15 @@ abstract class RemoteLiveDataRealtimeStatus implements RustOpaqueInterface {
   bool isUnavailable();
 }
 
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RemoteTerminal>>
+abstract class RemoteTerminal implements RustOpaqueInterface {
+  Future<String?> read();
+
+  Future<void> resize({required TerminalSize size});
+
+  Future<void> write({required String content});
+}
+
 class AgentListItem {
   final PublicAgentData publicData;
   final bool onlineStatus;
@@ -183,4 +192,25 @@ class SwapStatus {
           total == other.total &&
           free == other.free &&
           used == other.used;
+}
+
+class TerminalSize {
+  final int cols;
+  final int rows;
+
+  const TerminalSize({
+    required this.cols,
+    required this.rows,
+  });
+
+  @override
+  int get hashCode => cols.hashCode ^ rows.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TerminalSize &&
+          runtimeType == other.runtimeType &&
+          cols == other.cols &&
+          rows == other.rows;
 }

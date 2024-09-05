@@ -173,7 +173,6 @@ class WaitForAgentInitComplete extends StatelessWidget {
     waiting.then((value) {
       Navigator.pop(context);
       Navigator.pop(context);
-      Navigator.pop(context);
     });
     return Scaffold(
       appBar: AppBar(title: const Text("Add device")),

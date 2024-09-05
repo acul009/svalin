@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gui_flutter/src/app/main_menu.dart';
 import 'package:gui_flutter/src/rust/api/client.dart';
 import 'package:gui_flutter/src/rust/api/totp.dart';
 
@@ -68,7 +69,8 @@ class ConnectingDialog extends StatelessWidget {
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(
-                builder: (context) => RegisterRootDialog(connection: init)),
+                builder: (context) => RegisterRootDialog(
+                    connection: init, serverAddress: address)),
             (Route<dynamic> route) => false,
           );
         case FirstConnect_Login():
@@ -90,9 +92,11 @@ class ConnectingDialog extends StatelessWidget {
 }
 
 class RegisterRootDialog extends StatefulWidget {
-  const RegisterRootDialog({super.key, required this.connection});
+  const RegisterRootDialog(
+      {super.key, required this.connection, required this.serverAddress});
 
   final Init connection;
+  final String serverAddress;
 
   @override
   State<StatefulWidget> createState() {
@@ -112,9 +116,11 @@ class _RegisterRootDialogState extends State<RegisterRootDialog> {
           context,
           MaterialPageRoute(
             builder: (context) => CreateTotpDialog(
-                connection: widget.connection,
-                username: _username,
-                password: _password),
+              connection: widget.connection,
+              username: _username,
+              password: _password,
+              serverAddress: widget.serverAddress,
+            ),
           ));
     }
   }
@@ -187,11 +193,13 @@ class CreateTotpDialog extends StatefulWidget {
       {super.key,
       required this.connection,
       required this.username,
-      required this.password});
+      required this.password,
+      required this.serverAddress});
 
   final Init connection;
   final String username;
   final String password;
+  final String serverAddress;
 
   @override
   State<StatefulWidget> createState() {
@@ -231,6 +239,7 @@ class _CreateTotpDialogState extends State<CreateTotpDialog> {
                 connection: widget.connection,
                 username: widget.username,
                 password: widget.password,
+                serverAddress: widget.serverAddress,
                 totp: totp,
               ),
             ),
@@ -334,12 +343,14 @@ class InitDialog extends StatelessWidget {
       required this.connection,
       required this.username,
       required this.password,
-      required this.totp});
+      required this.totp,
+      required this.serverAddress});
 
   final Init connection;
   final String username;
   final String password;
   final Totp totp;
+  final String serverAddress;
 
   @override
   Widget build(BuildContext context) {
@@ -359,8 +370,15 @@ class InitDialog extends StatelessWidget {
                     const Text(
                         "The Server has been initialized and saved under your profiles. When restarting Svalin, you will be prompted to unlock the profile using your password."),
                     ElevatedButton(
-                        onPressed: () {
-                          // TODO
+                        onPressed: () async {
+                          var client = await Client.openProfileString(
+                              profileKey: "$username@$serverAddress",
+                              password: password);
+                          Navigator.pushReplacement(context, MaterialPageRoute(
+                            builder: (context) {
+                              return MainMenu(client: client);
+                            },
+                          ));
                         },
                         child: const Text("Continue to main view")),
                   ],
