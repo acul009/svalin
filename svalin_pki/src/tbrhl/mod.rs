@@ -6,11 +6,18 @@ use serde::{Deserialize, Serialize};
 
 mod block;
 
-const BLOCK_HASH_SIZE: usize = 32;
-type BlockHash = [u8; BLOCK_HASH_SIZE];
+pub const BLOCK_HASH_SIZE: usize = 32;
+pub type BlockHash = [u8; BLOCK_HASH_SIZE];
 
 pub trait Transaction: Serialize + for<'a> Deserialize<'a> {
-    fn hash(&self) -> BlockHash;
+    fn hash(&self) -> Result<BlockHash> {
+        let serialized = postcard::to_extend(self, Vec::new())?;
+
+        let hash = ring::digest::digest(&ring::digest::SHA256, &serialized);
+        let hash: BlockHash = hash.as_ref()[0..BLOCK_HASH_SIZE].try_into()?;
+
+        Ok(hash)
+    }
 }
 
 pub trait BlockStore {
@@ -100,7 +107,7 @@ where
             .await
             .ok_or_else(|| anyhow!("no blocks found"))?;
 
-        let new_block = latest_block.successor(transaction);
+        let new_block = latest_block.successor(transaction)?;
 
         self.handler
             .apply(&mut self.state, new_block.transaction())
