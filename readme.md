@@ -183,9 +183,37 @@ The underlying RPC system doesn't know or care about the encryption.
 
 This crate contains the code for certificate generation and encryption.
 
-You'll also find the TBRHL here (Transaction Based Rolling Hash Ledger).
-A very simple transaction store inspired by Blockchain traceability.
-(Don't worry, it's not a real Blockchain)
+## TBRHL (Transaction Based Rolling Hash Ledger)
+
+This primitive (yet to be completed) is the base for svalin's permission system.
+
+It's a log of transactions where each transaction contains the hash of the last one and is then signed by the entity creating the transaction.
+Once available on more than one device, the log cannot be modified locally without leaving a trace as each device checks the plausability of each transaction.
+
+The simplest example is the transaction log which contains information about who may access an agent.
+By comparing the hash of the latest transactions between an agent and a server, a client may detect malicous manipulation.
+Every device working with this log will verify it's integrity and plausability by itself, making manipulation extremely difficult.
+
+Each Transaction contains the following data:
+- incremental transaction id
+- Hash of previous transaction
+- Timestamp
+- Fingerprint of certificate used to sign
+- data
+
+For this to work, the log must conform to these standarts:
+- [ ] Each transaction is signed
+- [ ] Transactions are synchronized (easy with only one server)
+- [ ] Transactions are serializeable
+
+There are some challenges left though:
+- [ ] How are old transactions treated when a certificate used to sign them runs out?
+- [ ] How are old transactions treated when a certificate used to sign them gets revoked?
+- [ ] When should an entity other than agent and server get access? Becauses that might leak the certificates.
+
+One thing I'm still not clear about is how to distribute the certificates.
+I could just put them all in a large THRBL together with revocations and distribute them that way.
+The problem is, that this would leak all active and old certificates.
 
 ## svalin_macros
 
