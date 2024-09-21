@@ -44,9 +44,9 @@ impl<T> Deref for SignedObject<T> {
 
 struct SignedObjectVisitor<T>(std::marker::PhantomData<T>);
 
-impl<'de, 'de2, T> Visitor<'de> for SignedObjectVisitor<T>
+impl<'de, T> Visitor<'de> for SignedObjectVisitor<T>
 where
-    T: Deserialize<'de2>,
+    T: for<'de2> Deserialize<'de2>,
 {
     type Value = SignedObject<T>;
 
@@ -62,9 +62,9 @@ where
     }
 }
 
-impl<'de, 'de2, T> SignedObject<T>
+impl<T> SignedObject<T>
 where
-    T: Deserialize<'de2>,
+    T: for<'de> Deserialize<'de>,
 {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<SignedObject<T>> {
         let signed_blob: SignedBlob =
