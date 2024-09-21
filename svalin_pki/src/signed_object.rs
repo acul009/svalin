@@ -1,7 +1,10 @@
 use std::ops::Deref;
 
 use anyhow::{Context, Result};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{
+    de::{DeserializeOwned, Visitor},
+    Deserialize, Serialize,
+};
 
 use crate::{
     signed_message::{Sign, Verify},
@@ -39,9 +42,29 @@ impl<T> Deref for SignedObject<T> {
     }
 }
 
-impl<T> SignedObject<T>
+struct SignedObjectVisitor<T>(std::marker::PhantomData<T>);
+
+impl<'de, 'de2, T> Visitor<'de> for SignedObjectVisitor<T>
 where
-    T: DeserializeOwned,
+    T: Deserialize<'de2>,
+{
+    type Value = SignedObject<T>;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a variable length blob of data")
+    }
+
+    fn visit_byte_buf<E>(self, v: Vec<u8>) -> std::result::Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        SignedObject::from_bytes(v).map_err(serde::de::Error::custom)
+    }
+}
+
+impl<'de, 'de2, T> SignedObject<T>
+where
+    T: Deserialize<'de2>,
 {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<SignedObject<T>> {
         let signed_blob: SignedBlob =
@@ -113,8 +136,7 @@ where
     where
         D: serde::Deserializer<'de>,
     {
-        let bytes = Vec::deserialize(deserializer)?;
-        Self::from_bytes(bytes).map_err(serde::de::Error::custom)
+        deserializer.deserialize_byte_buf(SignedObjectVisitor(std::marker::PhantomData))
     }
 }
 
