@@ -29,6 +29,8 @@ impl<T> SignedObject<T> {
         &self.signed_by
     }
 
+    // TODO: make accessing object impossible without verifying first - probably
+    // need to implement verifier
     pub fn unpack(self) -> T {
         self.object
     }
@@ -46,7 +48,7 @@ struct SignedObjectVisitor<T>(std::marker::PhantomData<T>);
 
 impl<'de, T> Visitor<'de> for SignedObjectVisitor<T>
 where
-    T: for<'de2> Deserialize<'de2>,
+    T: DeserializeOwned,
 {
     type Value = SignedObject<T>;
 
@@ -64,7 +66,7 @@ where
 
 impl<T> SignedObject<T>
 where
-    T: for<'de> Deserialize<'de>,
+    T: DeserializeOwned,
 {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<SignedObject<T>> {
         let signed_blob: SignedBlob =

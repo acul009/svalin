@@ -1,14 +1,23 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::tbrhl::BLOCK_HASH_SIZE;
+use crate::{signed_object::SignedObject, tbrhl::BLOCK_HASH_SIZE, Certificate, PermCredentials};
 
 use super::{BlockHash, Transaction};
 
 #[derive(Serialize, Deserialize)]
-pub struct Block<T> {
+#[serde(bound = "")]
+pub struct Block<T>
+where
+    T: Transaction,
+{
+    data: SignedObject<BlockData<T>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BlockData<T> {
     index: u64,
     timestamp: u128,
     transaction: T,
@@ -20,41 +29,54 @@ impl<T> Block<T>
 where
     T: Transaction,
 {
-    pub fn first(transaction: T) -> Block<T> {
-        Block {
-            index: 0,
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis(),
-            transaction,
-            previous_hash: [0; BLOCK_HASH_SIZE],
-            hash: [0; BLOCK_HASH_SIZE],
-        }
-    }
-
-    pub fn successor(&self, transaction: T) -> Result<Block<T>> {
-        let index = self.index + 1;
+    fn first(transaction: T, credentials: &PermCredentials) -> Result<Block<T>> {
+        let index = 0;
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis();
-        let previous_hash = self.hash;
+        let previous_hash = [0; BLOCK_HASH_SIZE];
+        let hash = Self::create_hash(index, timestamp, &transaction, &previous_hash)?;
 
-        let hash = Self::create_hash(&index, &timestamp, &transaction, &previous_hash)?;
-
-        Ok(Self {
+        let data = BlockData {
             index,
             timestamp,
             transaction,
             previous_hash,
             hash,
-        })
+        };
+
+        let signed = SignedObject::new(data, credentials)?;
+
+        Ok(Block { data: signed })
+    }
+
+    pub fn successor(&self, transaction: T, credentials: &PermCredentials) -> Result<Block<T>> {
+        let index = self.data.index + 1;
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let previous_hash = self.data.hash;
+
+        let hash = Self::create_hash(index, timestamp, &transaction, &previous_hash)?;
+
+        let data = BlockData {
+            index,
+            timestamp,
+            previous_hash,
+            hash,
+            transaction,
+        };
+
+        let signed = SignedObject::new(data, credentials)?;
+
+        Ok(Block { data: signed })
     }
 
     fn create_hash(
-        index: &u64,
-        timestamp: &u128,
+        index: u64,
+        timestamp: u128,
         transaction: &T,
         previous_hash: &BlockHash,
     ) -> Result<BlockHash> {
@@ -71,26 +93,58 @@ where
     }
 
     pub fn transaction(&self) -> &T {
-        &self.transaction
+        &self.data.transaction
     }
 
-    pub fn hash(&self) -> &BlockHash {
-        &self.hash
+    pub fn signer(&self) -> &Certificate {
+        self.data.signed_by()
     }
 
-    pub fn verify(&self, previous_hash: &BlockHash) -> Result<()> {
-        if previous_hash != &self.previous_hash {
+    pub fn verify_as_successor(&self, previous: &Block<T>) -> Result<()> {
+        if self.data.index != previous.data.index + 1 {
+            return Err(anyhow::anyhow!("index mismatch"));
+        }
+
+        if self.data.timestamp <= previous.data.timestamp {
+            return Err(anyhow!("timestamp mismatch"));
+        }
+
+        if self.data.previous_hash != previous.data.hash {
             return Err(anyhow::anyhow!("previous hash mismatch"));
         }
 
         let hash = Self::create_hash(
-            &self.index,
-            &self.timestamp,
-            &self.transaction,
-            &self.previous_hash,
+            self.data.index,
+            self.data.timestamp,
+            &self.data.transaction,
+            &self.data.previous_hash,
         )?;
 
-        if hash != self.hash {
+        if hash != self.data.hash {
+            return Err(anyhow::anyhow!("hash mismatch"));
+        }
+
+        Ok(())
+    }
+
+    /// TODO: verify signature and signer
+    pub fn verify_as_first(&self) -> Result<()> {
+        if self.data.index != 0 {
+            return Err(anyhow!("index of first block not 0"));
+        }
+
+        if self.data.previous_hash != [0; BLOCK_HASH_SIZE] {
+            return Err(anyhow!("previous hash of first block not 0"));
+        }
+
+        let hash = Self::create_hash(
+            self.data.index,
+            self.data.timestamp,
+            &self.data.transaction,
+            &self.data.previous_hash,
+        )?;
+
+        if hash != self.data.hash {
             return Err(anyhow::anyhow!("hash mismatch"));
         }
 

@@ -1,94 +1,76 @@
-use std::future::Future;
-
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use block::Block;
-use serde::{Deserialize, Serialize};
+use blockstore::BlockStore;
+use handler::TransactionHandler;
+use transaction::Transaction;
+
+use crate::PermCredentials;
 
 mod block;
+mod blockstore;
+pub mod handler;
+pub mod transaction;
 
 pub const BLOCK_HASH_SIZE: usize = 32;
 pub type BlockHash = [u8; BLOCK_HASH_SIZE];
-
-pub trait Transaction: Serialize + for<'a> Deserialize<'a> {
-    fn hash(&self) -> Result<BlockHash> {
-        let serialized = postcard::to_extend(self, Vec::new())?;
-
-        let hash = ring::digest::digest(&ring::digest::SHA256, &serialized);
-        let hash: BlockHash = hash.as_ref()[0..BLOCK_HASH_SIZE].try_into()?;
-
-        Ok(hash)
-    }
-}
-
-pub trait BlockStore {
-    type T: Transaction;
-
-    fn len(&self) -> u64;
-
-    fn get(&self, index: u64) -> impl Future<Output = Option<Block<Self::T>>>;
-    fn add(&mut self, block: Block<Self::T>);
-}
-
-pub trait TransactionHandler {
-    type T: Transaction;
-    type State;
-
-    fn verify(&self, state: &Self::State, transaction: &Self::T) -> Result<()>;
-
-    fn apply(
-        &self,
-        state: &mut Self::State,
-        transaction: &Self::T,
-    ) -> impl Future<Output = Result<()>>;
-
-    fn initial_state(&self) -> Self::State;
-}
 
 /// **Transaction Based Rolling Hash Ledger**
 ///
 /// This system is derived from the Blockchain system.
 /// It maintains a state that is updated by applying transactions.
 /// Unwanted changes can be detected by verifying the
-pub struct TBRHL<Store, Handler, State> {
+pub struct TBRHL<Store, Handler>
+where
+    Handler: TransactionHandler,
+{
     store: Store,
     handler: Handler,
-    state: State,
-    current_hash: BlockHash,
+    state: Handler::State,
 }
 
-impl<T, Store, Handler, State> TBRHL<Store, Handler, State>
+impl<T, Store, Handler> TBRHL<Store, Handler>
 where
     T: Transaction,
     Store: BlockStore<T = T>,
-    Handler: TransactionHandler<T = T, State = State>,
+    Handler: TransactionHandler<T = T>,
 {
     pub async fn open(store: Store, handler: Handler) -> Result<Self> {
-        let mut state = handler.initial_state();
-        let mut previous_hash = [0u8; BLOCK_HASH_SIZE];
+        let first_block = store
+            .get(0)
+            .await
+            .ok_or_else(|| anyhow!("missing first block"))?;
+
+        first_block
+            .verify_as_first()
+            .context("failed to verify first block")?;
+
+        let mut state = handler.init(first_block.transaction(), first_block.signer())?;
+
+        let mut previous_block = first_block;
+
         for i in 0..store.len() {
             let block = store
                 .get(i)
                 .await
                 .ok_or_else(|| anyhow::anyhow!("block {i} not found"))?;
 
-            if let Err(err) = block.verify(&previous_hash) {
+            if let Err(err) = block.verify_as_successor(&previous_block) {
                 return Err(err.context(format!("failed to verify block {i}")));
             }
 
-            if let Err(err) = handler.verify(&state, block.transaction()) {
+            if let Err(err) = handler.verify(&state, block.transaction(), block.signer()) {
                 return Err(err.context(format!("failed to verify transaction of block {i}")));
             }
 
-            previous_hash = *block.hash();
+            handler.apply(&mut state, block.transaction())?;
 
-            handler.apply(&mut state, block.transaction()).await?;
+            previous_block = block;
         }
 
         Ok(Self {
             store,
             handler,
             state,
-            current_hash: previous_hash,
         })
     }
 
@@ -96,8 +78,15 @@ where
         self.store.len()
     }
 
-    pub async fn add_transaction(&mut self, transaction: T) -> Result<()> {
-        if let Err(err) = self.handler.verify(&self.state, &transaction) {
+    pub async fn add_transaction(
+        &mut self,
+        transaction: T,
+        signer: &PermCredentials,
+    ) -> Result<()> {
+        if let Err(err) = self
+            .handler
+            .verify(&self.state, &transaction, signer.get_certificate())
+        {
             return Err(err.context("failed to verify transaction"));
         }
 
@@ -107,24 +96,17 @@ where
             .await
             .ok_or_else(|| anyhow!("no blocks found"))?;
 
-        let new_block = latest_block.successor(transaction)?;
+        let new_block = latest_block.successor(transaction, signer)?;
 
         self.handler
-            .apply(&mut self.state, new_block.transaction())
-            .await?;
-
-        self.current_hash.clone_from(new_block.hash());
+            .apply(&mut self.state, new_block.transaction())?;
 
         self.store.add(new_block);
 
         Ok(())
     }
 
-    pub fn state(&self) -> &State {
+    pub fn state(&self) -> &Handler::State {
         &self.state
-    }
-
-    pub fn current_hash(&self) -> BlockHash {
-        self.current_hash
     }
 }
