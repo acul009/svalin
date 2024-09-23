@@ -19,6 +19,8 @@ pub struct Certificate {
     data: Arc<CertificateData>,
 }
 
+pub type CertificateHash = [u8; 32];
+
 impl Certificate {
     pub fn from_der(der: Vec<u8>) -> Result<Certificate> {
         let (_, cert) = X509Certificate::from_der(der.as_bytes())?;
@@ -36,6 +38,12 @@ impl Certificate {
 
     pub fn to_der(&self) -> &[u8] {
         &self.data.der
+    }
+
+    pub fn get_hash(&self) -> CertificateHash {
+        let hash = ring::digest::digest(&ring::digest::SHA512_256, &self.data.der);
+
+        hash.as_ref()[0..32].try_into().unwrap()
     }
 }
 

@@ -9,6 +9,7 @@ mod public_key;
 mod signed_message;
 pub mod signed_object;
 pub mod tbrhl;
+pub mod verifier;
 
 use anyhow::{anyhow, Result};
 pub use certificate::Certificate;

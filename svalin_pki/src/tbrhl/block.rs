@@ -86,7 +86,7 @@ where
         to_hash.extend_from_slice(transaction.hash()?.as_ref());
         to_hash.extend_from_slice(previous_hash.as_ref());
 
-        let hash = ring::digest::digest(&ring::digest::SHA256, &to_hash);
+        let hash = ring::digest::digest(&ring::digest::SHA512_256, &to_hash);
         let hash: BlockHash = hash.as_ref()[0..BLOCK_HASH_SIZE].try_into()?;
 
         Ok(hash)
