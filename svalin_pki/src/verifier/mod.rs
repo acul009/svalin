@@ -9,13 +9,14 @@ enum VerificationError {
     UnknownCertificate,
 }
 
-// pub trait Verifier {
-//     fn verify(
-//         &self,
-//         cert_hash: CertificateHash,
-//     ) -> impl Future<Output = Result<Certificate, VerificationError>>;
-// }
+pub trait Verifier {
+    fn verify_hash(
+        &self,
+        cert_hash: CertificateHash,
+    ) -> impl Future<Output = Result<Certificate, VerificationError>>;
 
-// pub trait Verifier {
-//     fn verify(&self, cert: &Certificate) -> impl Future<Output = Result<(),
-// VerificationError>>; }
+    fn verify_cert(
+        &self,
+        cert: &Certificate,
+    ) -> impl Future<Output = Result<(), VerificationError>>;
+}
