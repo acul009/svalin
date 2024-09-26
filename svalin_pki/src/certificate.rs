@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Display};
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -7,6 +8,28 @@ use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
 use zeroize::ZeroizeOnDrop;
 
 use crate::signed_message::CanVerify;
+
+#[derive(Clone, Copy)]
+pub struct CertificateFingerprint(pub [u8; 32]);
+
+impl Debug for CertificateFingerprint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:x?}", self.0)
+    }
+}
+
+impl Display for CertificateFingerprint {
+    /// should return Hex encoded
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:x?}", self.0)
+    }
+}
+
+impl From<[u8; 32]> for CertificateFingerprint {
+    fn from(value: [u8; 32]) -> Self {
+        CertificateFingerprint(value)
+    }
+}
 
 #[derive(Debug, ZeroizeOnDrop)]
 struct CertificateData {
@@ -18,8 +41,6 @@ struct CertificateData {
 pub struct Certificate {
     data: Arc<CertificateData>,
 }
-
-pub type CertificateHash = [u8; 32];
 
 impl Certificate {
     pub fn from_der(der: Vec<u8>) -> Result<Certificate> {
@@ -40,10 +61,12 @@ impl Certificate {
         &self.data.der
     }
 
-    pub fn get_hash(&self) -> CertificateHash {
+    pub fn get_fingerprint(&self) -> CertificateFingerprint {
         let hash = ring::digest::digest(&ring::digest::SHA512_256, &self.data.der);
 
-        hash.as_ref()[0..32].try_into().unwrap()
+        let array: [u8; 32] = hash.as_ref()[0..32].try_into().unwrap();
+
+        array.into()
     }
 }
 

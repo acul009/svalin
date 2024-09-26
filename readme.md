@@ -196,8 +196,8 @@ Every device working with this log will verify it's integrity and plausability b
 
 Each Transaction contains the following data:
 - incremental transaction id
-- Hash of previous transaction
 - Timestamp
+- Hash of previous transaction
 - Fingerprint of certificate used to sign
 - data
 
