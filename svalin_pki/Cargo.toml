@@ -3,7 +3,8 @@ name = "svalin_pki"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+rustls = ["dep:rustls"]
 
 [dependencies]
 anyhow = "1.0.86"
@@ -11,7 +12,9 @@ argon2 = { version = "0.5.3", features = ["simple", "std"] }
 postcard = "1.0.8"
 rcgen = { version = "0.12.1", features = ["pem", "ring", "x509-parser"] }
 ring = "0.17.8"
+rustls = { version = "0.23.13", optional = true }
 serde = "1.0.204"
+spki = { version = "0.7.3", features = ["alloc", "fingerprint", "sha2", "std"] }
 time = "0.3.36"
 tokio = { version = "1.39.3", features = ["full", "test-util"] }
 tracing = "0.1.40"
