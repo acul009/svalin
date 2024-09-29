@@ -2,7 +2,9 @@ use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
 
 use crate::rustls;
 use anyhow::{anyhow, Ok, Result};
-use quinn::{crypto::rustls::QuicClientConfig, TransportConfig, VarInt};
+use quinn::{
+    crypto::rustls::QuicClientConfig, rustls::crypto::CryptoProvider, TransportConfig, VarInt,
+};
 use svalin_pki::PermCredentials;
 
 use super::{
@@ -20,6 +22,10 @@ impl RpcClient {
         identity: Option<&PermCredentials>,
         verifier: Arc<dyn rustls::client::danger::ServerCertVerifier>,
     ) -> Result<RpcClient> {
+        if CryptoProvider::get_default().is_none() {
+            let _ = quinn::rustls::crypto::ring::default_provider().install_default();
+        }
+
         let mut endpoint = quinn::Endpoint::client("0.0.0.0:0".parse()?)?;
 
         let builder = rustls::ClientConfig::builder()

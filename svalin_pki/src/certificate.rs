@@ -5,6 +5,7 @@ use anyhow::Result;
 use serde::{de, Deserialize, Serialize};
 use spki::FingerprintBytes;
 use x509_parser::nom::AsBytes;
+use x509_parser::prelude::Validity;
 use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
 
 use crate::signed_message::CanVerify;
@@ -13,6 +14,7 @@ use crate::signed_message::CanVerify;
 struct CertificateData {
     der: Vec<u8>,
     public_key: Vec<u8>,
+    validity: Validity,
 }
 
 #[derive(Debug, Clone)]
@@ -26,8 +28,14 @@ impl Certificate {
 
         let public_key = cert.public_key().subject_public_key.data.to_vec();
 
+        let validity = cert.validity().clone();
+
         Ok(Certificate {
-            data: Arc::new(CertificateData { der, public_key }),
+            data: Arc::new(CertificateData {
+                der,
+                public_key,
+                validity,
+            }),
         })
     }
 
@@ -44,6 +52,32 @@ impl Certificate {
 
         hash.as_ref()[0..32].try_into().unwrap()
     }
+
+    pub fn check_validity_at(&self, time: u64) -> Result<(), ValidityError> {
+        // Todo: maybe not try to panic here or at least verify that this conversion
+        // always works
+        if time
+            < self
+                .data
+                .validity
+                .not_before
+                .timestamp()
+                .try_into()
+                .unwrap()
+        {
+            return Err(ValidityError::NotYetValid);
+        } else if time > self.data.validity.not_after.timestamp().try_into().unwrap() {
+            return Err(ValidityError::Expired);
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub enum ValidityError {
+    NotYetValid,
+    Expired,
 }
 
 impl PartialEq for Certificate {

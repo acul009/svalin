@@ -3,6 +3,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 use quinn::crypto::rustls::QuicServerConfig;
+use quinn::rustls::crypto::{ring, CryptoProvider};
 use svalin_pki::{Certificate, PermCredentials};
 use tokio::sync::{broadcast, Mutex};
 use tokio::task::JoinSet;
@@ -42,6 +43,10 @@ impl RpcServer {
         credentials: &PermCredentials,
         client_cert_verifier: Arc<dyn ClientCertVerifier>,
     ) -> Result<Self> {
+        if CryptoProvider::get_default().is_none() {
+            let _ = quinn::rustls::crypto::ring::default_provider().install_default();
+        }
+
         let endpoint = RpcServer::create_endpoint(addr, credentials, client_cert_verifier)
             .context("failed to create rpc endpoint")?;
 

@@ -1,6 +1,9 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use svalin_pki::{Certificate, PermCredentials};
+use svalin_pki::{
+    verifier::{exact::ExactVerififier, KnownCertificateVerifier},
+    Certificate, PermCredentials,
+};
 
 use crate::{
     rpc::{
@@ -84,6 +87,7 @@ where
             let (read, write, _) = session_ready.destructure_transport();
             let tls_transport = TlsTransport::client(
                 CombinedTransport::new(read, write),
+                // ExactVerififier::new(self.peer.clone()).to_tls_verifier(),
                 ExactServerVerification::new(&self.peer),
                 self.credentials,
             )

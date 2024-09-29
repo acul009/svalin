@@ -1,15 +1,22 @@
-use std::{error::Error, fmt::Display, future::Future};
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+    future::Future,
+};
 
 use spki::FingerprintBytes;
-use time::Time;
 
-use crate::Certificate;
+use crate::{certificate::ValidityError, Certificate};
+
+pub mod exact;
 
 #[derive(Debug)]
 pub enum VerificationError {
     CertificateRevoked,
     CertificateInvalid,
     UnknownCertificate,
+    CertificateMismatch,
+    TimerangeError(ValidityError),
     FingerprintCollission {
         fingerprint: FingerprintBytes,
         given_cert: Certificate,
@@ -23,6 +30,8 @@ impl Display for VerificationError {
             VerificationError::CertificateRevoked => write!(f, "The certificate of the given fingerprint was revoked"),
             VerificationError::CertificateInvalid => write!(f, "The certificate of the given fingerprint is invalid"),
             VerificationError::UnknownCertificate => write!(f, "The certificate corresponding to the given fingerprint is unknown"),
+            VerificationError::CertificateMismatch => write!(f, "The fingerprint did not match the expected certificate"),
+            VerificationError::TimerangeError(_err) => write!(f, "The certificate is not valid at the given time"),
             VerificationError::FingerprintCollission { fingerprint, given_cert, loaded_cert } => write!(f, "The given fingerprint {:x?} is shared between these two certificates: {:?} (given) vs {:?} (loaded)", fingerprint, given_cert, loaded_cert),
         }
     }
@@ -30,7 +39,7 @@ impl Display for VerificationError {
 
 impl Error for VerificationError {}
 
-pub trait Verifier: Send + Sync {
+pub trait Verifier: Send + Sync + Debug {
     /// TODO: include time for revocation/expiration checking
     fn verify_fingerprint(
         &self,
@@ -41,7 +50,7 @@ pub trait Verifier: Send + Sync {
 
 impl<T: Verifier> KnownCertificateVerifier for T {}
 
-pub trait KnownCertificateVerifier: Verifier {
+pub trait KnownCertificateVerifier: Verifier + Sized {
     fn verify_known_certificate(
         &self,
         cert: &Certificate,
@@ -63,13 +72,22 @@ pub trait KnownCertificateVerifier: Verifier {
             }
         }
     }
+
+    #[cfg(feature = "rustls")]
+    fn to_tls_verifier(self) -> std::sync::Arc<rustls_feat::RustlsVerifier<Self>> {
+        use std::sync::Arc;
+
+        use rustls_feat::RustlsVerifier;
+
+        Arc::new(RustlsVerifier::new(self))
+    }
 }
 
-#[cfg(feature = "rustls")]
-pub use rustls::*;
+// #[cfg(feature = "rustls")]
+// pub use rustls_feat::*;
 
 #[cfg(feature = "rustls")]
-mod rustls {
+pub mod rustls_feat {
 
     use std::{
         fmt::Debug,
@@ -86,19 +104,19 @@ mod rustls {
         Certificate,
     };
 
-    use super::KnownCertificateVerifier;
-
-    static CRYPTO_PROVIDER: LazyLock<Arc<rustls::crypto::CryptoProvider>> =
-        LazyLock::new(|| Arc::new(rustls::crypto::ring::default_provider()));
-
-    pub fn crypto_provider() -> Arc<rustls::crypto::CryptoProvider> {
-        CRYPTO_PROVIDER.clone()
-    }
+    use super::{KnownCertificateVerifier, Verifier};
 
     #[derive(Debug)]
     pub struct RustlsVerifier<T> {
         verifier: Arc<T>,
-        cryptoprovider: Arc<CryptoProvider>,
+    }
+
+    impl<T> RustlsVerifier<T> {
+        pub fn new(verifier: T) -> Self {
+            Self {
+                verifier: Arc::new(verifier),
+            }
+        }
     }
 
     impl<T> RustlsVerifier<T>
@@ -139,6 +157,10 @@ mod rustls {
             }
             .map_err(|err| rustls::Error::InvalidCertificate(err))
         }
+
+        fn cryptoprovider() -> &'static Arc<CryptoProvider> {
+            CryptoProvider::get_default().expect("no CryptoProvider for Rustls installed yet. Please install a default crypto provider: https://docs.rs/rustls/latest/rustls/crypto/struct.CryptoProvider.html")
+        }
     }
 
     impl<T> rustls::client::danger::ServerCertVerifier for RustlsVerifier<T>
@@ -148,9 +170,9 @@ mod rustls {
         fn verify_server_cert(
             &self,
             end_entity: &rustls::pki_types::CertificateDer<'_>,
-            intermediates: &[rustls::pki_types::CertificateDer<'_>],
-            server_name: &rustls::pki_types::ServerName<'_>,
-            ocsp_response: &[u8],
+            _intermediates: &[rustls::pki_types::CertificateDer<'_>],
+            _server_name: &rustls::pki_types::ServerName<'_>,
+            _ocsp_response: &[u8],
             now: rustls::pki_types::UnixTime,
         ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
             self.verify_cert(end_entity, now)
@@ -159,9 +181,9 @@ mod rustls {
 
         fn verify_tls12_signature(
             &self,
-            message: &[u8],
-            cert: &rustls::pki_types::CertificateDer<'_>,
-            dss: &rustls::DigitallySignedStruct,
+            _message: &[u8],
+            _cert: &rustls::pki_types::CertificateDer<'_>,
+            _dss: &rustls::DigitallySignedStruct,
         ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
             Err(rustls::Error::PeerIncompatible(
                 rustls::PeerIncompatible::ServerTlsVersionIsDisabledByOurConfig,
@@ -178,12 +200,12 @@ mod rustls {
                 message,
                 cert,
                 dss,
-                &self.cryptoprovider.signature_verification_algorithms,
+                &Self::cryptoprovider().signature_verification_algorithms,
             )
         }
 
         fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-            self.cryptoprovider
+            Self::cryptoprovider()
                 .signature_verification_algorithms
                 .supported_schemes()
         }
@@ -200,7 +222,7 @@ mod rustls {
         fn verify_client_cert(
             &self,
             end_entity: &rustls::pki_types::CertificateDer<'_>,
-            intermediates: &[rustls::pki_types::CertificateDer<'_>],
+            _intermediates: &[rustls::pki_types::CertificateDer<'_>],
             now: rustls::pki_types::UnixTime,
         ) -> Result<rustls::server::danger::ClientCertVerified, rustls::Error> {
             self.verify_cert(end_entity, now)
@@ -209,9 +231,9 @@ mod rustls {
 
         fn verify_tls12_signature(
             &self,
-            message: &[u8],
-            cert: &rustls::pki_types::CertificateDer<'_>,
-            dss: &rustls::DigitallySignedStruct,
+            _message: &[u8],
+            _cert: &rustls::pki_types::CertificateDer<'_>,
+            _dss: &rustls::DigitallySignedStruct,
         ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
             Err(rustls::Error::PeerIncompatible(
                 rustls::PeerIncompatible::ServerTlsVersionIsDisabledByOurConfig,
@@ -228,12 +250,12 @@ mod rustls {
                 message,
                 cert,
                 dss,
-                &self.cryptoprovider.signature_verification_algorithms,
+                &Self::cryptoprovider().signature_verification_algorithms,
             )
         }
 
         fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-            self.cryptoprovider
+            Self::cryptoprovider()
                 .signature_verification_algorithms
                 .supported_schemes()
         }
