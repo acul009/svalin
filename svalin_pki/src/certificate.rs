@@ -2,6 +2,7 @@ use std::fmt::{Debug, Display};
 use std::sync::Arc;
 
 use anyhow::Result;
+use serde::de::Visitor;
 use serde::{de, Deserialize, Serialize};
 use spki::FingerprintBytes;
 use x509_parser::nom::AsBytes;
@@ -106,8 +107,35 @@ impl<'de> Deserialize<'de> for Certificate {
     where
         D: serde::Deserializer<'de>,
     {
-        let der = Vec::<u8>::deserialize(deserializer)?;
-        Certificate::from_der(der).map_err(de::Error::custom)
+        deserializer.deserialize_byte_buf(CertificateVisitor)
+    }
+}
+
+struct CertificateVisitor;
+
+impl<'de> Visitor<'de> for CertificateVisitor {
+    type Value = Certificate;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a der encoded certificate")
+    }
+
+    fn visit_byte_buf<E>(self, v: Vec<u8>) -> std::result::Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Certificate::from_der(v).map_err(|err| {
+            panic!("Fuck you");
+            tracing::error!("Failed to deserialize certificate: {}", err);
+            de::Error::custom(err)
+        })
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        self.visit_byte_buf(v.to_vec())
     }
 }
 
@@ -124,54 +152,3 @@ impl PartialOrd for Certificate {
 }
 
 impl Eq for Certificate {}
-
-#[cfg(test)]
-mod test {
-    use ring::rand::{SecureRandom, SystemRandom};
-
-    use crate::{
-        signed_message::{Sign, Verify},
-        Certificate, Keypair,
-    };
-
-    #[test]
-    pub fn cert_verify_message() {
-        let credentials = Keypair::generate().unwrap();
-        let rand = SystemRandom::new();
-
-        let mut msg = [0u8; 1024];
-        rand.fill(&mut msg).unwrap();
-
-        let signed = credentials.sign(&msg).unwrap();
-
-        let cert = credentials.to_self_signed_cert().unwrap();
-        let msg2 = cert.verify(&signed).unwrap();
-        let msg3 = cert.get_certificate().verify(&signed).unwrap();
-
-        assert_eq!(msg, msg2.as_ref());
-        assert_eq!(msg, msg3.as_ref());
-    }
-
-    #[test]
-    pub fn serialization() {
-        let credentials = Keypair::generate().unwrap();
-        let perm_creds = credentials.to_self_signed_cert().unwrap();
-        let cert = perm_creds.get_certificate();
-
-        let seriaized = cert.to_der().to_owned();
-        let cert2 = Certificate::from_der(seriaized).unwrap();
-        assert_eq!(cert, &cert2)
-    }
-
-    #[test]
-    pub fn serde_serialization() {
-        let credentials = Keypair::generate().unwrap();
-        let perm_creds = credentials.to_self_signed_cert().unwrap();
-        let cert = perm_creds.get_certificate();
-
-        let serialized = postcard::to_extend(cert, Vec::new()).unwrap();
-
-        let cert2: Certificate = postcard::from_bytes(&serialized).unwrap();
-        assert_eq!(cert, &cert2)
-    }
-}

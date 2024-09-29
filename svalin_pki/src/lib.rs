@@ -20,6 +20,9 @@ pub use keypair::Keypair;
 pub use perm_credentials::PermCredentials;
 use ring::rand::{SecureRandom, SystemRandom};
 
+#[cfg(test)]
+mod test;
+
 pub fn generate_key() -> Result<[u8; 32]> {
     let rand = SystemRandom::new();
 

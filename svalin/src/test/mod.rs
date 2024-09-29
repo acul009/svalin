@@ -1,1 +1,2 @@
+mod debug;
 mod integration;

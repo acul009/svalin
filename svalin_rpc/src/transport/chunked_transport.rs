@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Ok, Result};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tracing::debug;
 
 use super::session_transport::{SessionTransportReader, SessionTransportWriter};
 
@@ -37,7 +38,7 @@ impl ChunkReader {
 
         self.read.read_exact(&mut chunk).await?;
 
-        // println!("read chunk: {:?}", &chunk);
+        // debug!("read chunk: {:x?}", &chunk);
 
         Ok(chunk)
     }
@@ -62,7 +63,7 @@ impl ChunkWriter {
             // error
             return Err(anyhow!("The given data chunk is to big"));
         }
-        // println!("original chunk: {:?}", chunk);
+        // debug!("original chunk: {:x?}", chunk);
         let len: u32 = len.try_into().unwrap();
         if len < 0b1000_0000 {
             let lenbytes = len.to_be_bytes();

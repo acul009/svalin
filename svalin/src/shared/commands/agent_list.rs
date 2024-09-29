@@ -91,7 +91,7 @@ impl CommandHandler for AgentListHandler {
                             online_status: online_update.online,
                         };
 
-                        debug!("sending update to client: {}: {}", item.public_data.name, if item.online_status { "online"} else { "offline"});
+                        // debug!("sending update to client: {}: {}", item.public_data.name, if item.online_status { "online"} else { "offline"});
 
                         session.write_object(&item).await?;
                     }
@@ -107,7 +107,7 @@ impl CommandHandler for AgentListHandler {
                                 online_status,
                             };
 
-                            debug!("sending update to client: {:?}", item);
+                            // debug!("sending update to client: {:?}", item);
 
                             session.write_object(&item).await?;
                         },
@@ -137,7 +137,7 @@ impl CommandDispatcher for UpdateAgentList {
             let list_item_update: AgentListItemTransport = session
                 .read_object()
                 .await
-                .context("failed to receive ItemTransport")?;
+                .context("failed to receive AgentListItemTransport")?;
 
             let item = AgentListItem {
                 online_status: list_item_update.online_status,
