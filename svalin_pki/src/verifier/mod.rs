@@ -4,8 +4,6 @@ use std::{
     future::Future,
 };
 
-use spki::FingerprintBytes;
-
 use crate::{certificate::ValidityError, Certificate};
 
 pub mod exact;
@@ -18,7 +16,7 @@ pub enum VerificationError {
     CertificateMismatch,
     TimerangeError(ValidityError),
     FingerprintCollission {
-        fingerprint: FingerprintBytes,
+        fingerprint: [u8; 32],
         given_cert: Certificate,
         loaded_cert: Certificate,
     },
@@ -43,7 +41,7 @@ pub trait Verifier: Send + Sync + Debug {
     /// TODO: include time for revocation/expiration checking
     fn verify_fingerprint(
         &self,
-        fingerprint: FingerprintBytes,
+        fingerprint: [u8; 32],
         time: u64,
     ) -> impl Future<Output = Result<Certificate, VerificationError>> + Send;
 }

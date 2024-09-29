@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use anyhow::{Context, Ok, Result};
+use svalin_pki::verifier::KnownCertificateVerifier;
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tracing::{debug, instrument};
@@ -72,7 +73,8 @@ impl Init {
 
         tokio::time::sleep(Duration::from_secs(3)).await;
 
-        let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert.clone());
+        let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert.clone())
+            .to_tls_verifier();
 
         let client = RpcClient::connect(&self.address, Some(&root), verifier)
             .await

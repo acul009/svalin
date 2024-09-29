@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use marmelade::Scope;
 use serde::{Deserialize, Serialize};
+use svalin_pki::verifier::KnownCertificateVerifier;
 use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::commands::e2e::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
@@ -46,7 +47,8 @@ impl Agent {
         let verifier = verifiers::upstream_verifier::UpstreamVerifier::new(
             config.root_certificate.clone(),
             config.upstream_certificate.clone(),
-        );
+        )
+        .to_tls_verifier();
 
         debug!("trying to connect to server");
 

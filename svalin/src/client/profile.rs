@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, PermCredentials};
+use svalin_pki::{verifier::KnownCertificateVerifier, Certificate, PermCredentials};
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::{sync::RwLock, task::JoinSet};
 use tracing::{debug, error};
@@ -194,7 +194,8 @@ impl Client {
             let verifier = verifiers::upstream_verifier::UpstreamVerifier::new(
                 profile.root_certificate.clone(),
                 profile.upstream_certificate.clone(),
-            );
+            )
+            .to_tls_verifier();
 
             debug!("connecting to server");
             let rpc =
