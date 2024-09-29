@@ -3,7 +3,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 use quinn::crypto::rustls::QuicServerConfig;
-use quinn::rustls::crypto::{ring, CryptoProvider};
+use quinn::rustls::crypto::CryptoProvider;
 use svalin_pki::{Certificate, PermCredentials};
 use tokio::sync::{broadcast, Mutex};
 use tokio::task::JoinSet;

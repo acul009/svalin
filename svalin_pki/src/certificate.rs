@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -124,11 +124,7 @@ impl<'de> Visitor<'de> for CertificateVisitor {
     where
         E: de::Error,
     {
-        Certificate::from_der(v).map_err(|err| {
-            panic!("Fuck you");
-            tracing::error!("Failed to deserialize certificate: {}", err);
-            de::Error::custom(err)
-        })
+        Certificate::from_der(v).map_err(|err| de::Error::custom(err))
     }
 
     fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>

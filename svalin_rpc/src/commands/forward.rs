@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fmt::{Debug, Display};
 
 use crate::commands::e2e::E2EDispatcher;
-use crate::rpc::command::dispatcher::{CommandDispatcher, TakeableCommandDispatcher};
+use crate::rpc::command::dispatcher::TakeableCommandDispatcher;
 use crate::rpc::connection::Connection;
 use crate::rpc::{command::handler::CommandHandler, server::RpcServer, session::Session};
 use crate::transport::combined_transport::CombinedTransport;
@@ -71,8 +71,8 @@ impl CommandHandler for ForwardHandler {
 
                 tokio::io::copy_bidirectional(&mut transport1, &mut transport2).await?;
 
-                transport1.shutdown().await;
-                transport2.shutdown().await;
+                let _ = transport1.shutdown().await;
+                let _ = transport2.shutdown().await;
 
                 Ok(())
             }

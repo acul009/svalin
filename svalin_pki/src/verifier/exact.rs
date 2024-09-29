@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::Certificate;
 
 use super::{VerificationError, Verifier};

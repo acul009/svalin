@@ -1,15 +1,12 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use svalin_pki::{
-    verifier::{exact::ExactVerififier, KnownCertificateVerifier},
-    Certificate, PermCredentials,
-};
+use svalin_pki::{Certificate, PermCredentials};
 
 use crate::{
     rpc::{
         command::{
             dispatcher::TakeableCommandDispatcher,
-            handler::{CommandHandler, HandlerCollection, TakeableCommandHandler},
+            handler::{HandlerCollection, TakeableCommandHandler},
         },
         peer::Peer,
         session::Session,

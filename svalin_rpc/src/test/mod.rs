@@ -61,7 +61,7 @@ async fn tls_test() {
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
-    let mut server = RpcServer::new(
+    let server = RpcServer::new(
         address.to_socket_addrs().unwrap().next().unwrap(),
         &credentials,
         SkipClientVerification::new(),
@@ -85,7 +85,7 @@ async fn tls_test() {
 
     debug!("client connected");
 
-    let mut connection = client.upstream_connection();
+    let connection = client.upstream_connection();
 
     connection.dispatch(TlsTest).await.unwrap();
 

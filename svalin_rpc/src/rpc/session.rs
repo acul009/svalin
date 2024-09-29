@@ -81,7 +81,7 @@ impl Session {
             command.handle(&mut session).await?;
 
             if let Some(session) = session {
-                session.shutdown();
+                session.shutdown().await;
             }
 
             // todo

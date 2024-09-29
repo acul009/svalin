@@ -9,19 +9,15 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use svalin_pki::{Keypair, PermCredentials};
+use svalin_pki::Keypair;
 
 use crate::rpc::session::Session;
 
-pub struct TlsTestCommandHandler {
-    credentials: PermCredentials,
-}
+pub struct TlsTestCommandHandler {}
 
 impl TlsTestCommandHandler {
     pub fn new() -> Result<Self> {
-        let credentials = Keypair::generate()?.to_self_signed_cert()?;
-
-        Ok(Self { credentials })
+        Ok(Self {})
     }
 }
 

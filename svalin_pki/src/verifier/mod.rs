@@ -87,22 +87,16 @@ pub trait KnownCertificateVerifier: Verifier + Sized {
 #[cfg(feature = "rustls")]
 pub mod rustls_feat {
 
-    use std::{
-        fmt::Debug,
-        sync::{Arc, LazyLock},
-    };
+    use std::{fmt::Debug, sync::Arc};
 
     use rustls::{
         client::danger::ServerCertVerified, crypto::CryptoProvider, CertificateError, OtherError,
     };
     use tokio::task::block_in_place;
 
-    use crate::{
-        verifier::{self, VerificationError},
-        Certificate,
-    };
+    use crate::{verifier::VerificationError, Certificate};
 
-    use super::{KnownCertificateVerifier, Verifier};
+    use super::KnownCertificateVerifier;
 
     #[derive(Debug)]
     pub struct RustlsVerifier<T> {
@@ -128,7 +122,8 @@ pub mod rustls_feat {
         ) -> Result<(), rustls::Error> {
             // TODO: better error handling
             let cert = Certificate::from_der(end_entity.as_ref().to_vec())
-                .map_err(|err| rustls::Error::InvalidCertificate(CertificateError::BadEncoding))?;
+                // TODO: wrap error
+                .map_err(|_err| rustls::Error::InvalidCertificate(CertificateError::BadEncoding))?;
 
             let verifier = self.verifier.clone();
 
