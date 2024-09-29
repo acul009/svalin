@@ -62,6 +62,13 @@ where
     {
         SignedObject::from_bytes(v).map_err(serde::de::Error::custom)
     }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        self.visit_byte_buf(v.to_vec())
+    }
 }
 
 impl<T> SignedObject<T>
