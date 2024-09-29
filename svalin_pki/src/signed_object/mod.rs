@@ -8,6 +8,7 @@ use serde::{
 
 use crate::{
     signed_message::{Sign, Verify},
+    verifier::Verifier,
     Certificate, PermCredentials,
 };
 
@@ -31,7 +32,8 @@ impl<T> SignedObject<T> {
 
     // TODO: make accessing object impossible without verifying first - probably
     // need to implement verifier
-    pub fn unpack(self) -> T {
+    pub fn unpack<V: Verifier>(self, verifier: V) -> T {
+        todo!();
         self.object
     }
 }
