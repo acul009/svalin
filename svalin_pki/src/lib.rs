@@ -8,8 +8,10 @@ mod perm_credentials;
 mod public_key;
 mod signed_message;
 pub mod signed_object;
-pub mod tbrhl;
+// pub mod tbrhl;
 pub mod verifier;
+
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Result};
 pub use certificate::Certificate;
@@ -30,4 +32,11 @@ pub fn generate_key() -> Result<[u8; 32]> {
     rand.fill(&mut msg).map_err(|err| anyhow!(err))?;
 
     Ok(msg)
+}
+
+pub fn get_current_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }

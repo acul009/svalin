@@ -49,7 +49,7 @@ impl CommandHandler for AddAgentHandler {
     }
 
     async fn handle(&self, session: &mut Session) -> Result<()> {
-        let agent = SignedObject::<PublicAgentData>::from_bytes(session.read_object().await?)?;
+        let agent = session.read_object().await?;
 
         if let Err(err) = self.store.add_agent(agent) {
             session

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 
 use ring::signature::{Ed25519KeyPair, VerificationAlgorithm, ED25519};
 use serde::{Deserialize, Serialize};
@@ -58,16 +58,14 @@ impl SignedMessage<'_> {
         let (message, signature) = SignedMessage::decode(signed_message)?;
         ED25519
             .verify(public_key.into(), message.into(), signature.into())
-            .map_err(|err| anyhow!(err))?;
+            .map_err(|err| anyhow!(err))
+            .context("signature verification failed")?;
 
         Ok(message.to_owned())
     }
 
     fn encode(message: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
-        let signed = SignedMessage {
-            message,
-            signature,
-        };
+        let signed = SignedMessage { message, signature };
 
         let vec = postcard::to_extend(&signed, Vec::<u8>::new())?;
 
