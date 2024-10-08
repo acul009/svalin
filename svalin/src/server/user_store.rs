@@ -26,12 +26,12 @@ impl UserStore {
         Arc::new(Self { scope })
     }
 
-    fn get_user(&self, public_key: &[u8]) -> Result<Option<StoredUser>> {
+    fn get_user(&self, fingerprint: &[u8; 32]) -> Result<Option<StoredUser>> {
         let mut user: Option<StoredUser> = None;
 
         self.scope.view(|b| {
             let b = b.get_bucket("userdata")?;
-            user = b.get_object(public_key)?;
+            user = b.get_object(fingerprint)?;
 
             Ok(())
         })?;
@@ -82,7 +82,7 @@ impl UserStore {
         debug!("requesting user update transaction");
 
         self.scope.update(move |b| {
-            let public_key = user.certificate.public_key();
+            let fingerprint = user.certificate.get_fingerprint().to_vec();
 
             let usernames = b.get_or_create_bucket("usernames")?;
 
@@ -91,13 +91,13 @@ impl UserStore {
             }
 
             let b = b.get_or_create_bucket("userdata")?;
-            if b.get_kv(public_key).is_some() {
+            if b.get_kv(&fingerprint).is_some() {
                 return Err(anyhow!("User with uuid already exists"));
             }
 
-            b.put_object(public_key.to_owned(), &user)?;
+            b.put_object(fingerprint.to_owned(), &user)?;
 
-            usernames.put(user.username.clone(), public_key.to_owned())?;
+            usernames.put(user.username.clone(), fingerprint)?;
 
             Ok(())
         })?;

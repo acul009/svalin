@@ -50,14 +50,11 @@ impl<'b, 'tx, S> Bucket<'b, 'tx, S> {
 }
 
 impl<'b, 'tx> Bucket<'b, 'tx, RwTransaction> {
-    pub fn put_object<U>(
+    pub fn put_object(
         &self,
         key: impl ToBytes<'tx>,
-        value: &U,
-    ) -> Result<(), MarmeladeObjectError>
-    where
-        U: Serialize + ?Sized,
-    {
+        value: &(impl Serialize + ?Sized),
+    ) -> Result<(), MarmeladeObjectError> {
         let raw = postcard::to_extend(&value, Vec::new())?;
 
         self.bucket.put(key, raw)?;

@@ -20,11 +20,11 @@ impl<'b, 'tx, S> Bucket<'b, 'tx, S> {
         })
     }
 
-    pub fn get<'a, T: AsRef<[u8]>>(&'a self, key: T) -> Option<Data<'b, 'tx>> {
+    pub fn get<'a>(&'a self, key: impl AsRef<[u8]>) -> Option<Data<'b, 'tx>> {
         self.bucket.get(key)
     }
 
-    pub fn get_kv<'a, T: AsRef<[u8]>>(&'a self, key: T) -> Option<KVPair<'b, 'tx>> {
+    pub fn get_kv<'a>(&'a self, key: impl AsRef<[u8]>) -> Option<KVPair<'b, 'tx>> {
         self.bucket.get_kv(key)
     }
 
@@ -38,10 +38,10 @@ impl<'b, 'tx, S> Bucket<'b, 'tx, S> {
 }
 
 impl<'b, 'tx> Bucket<'b, 'tx, RwTransaction> {
-    pub fn put<'a, T: ToBytes<'tx>, S: ToBytes<'tx>>(
+    pub fn put<'a>(
         &'a self,
-        key: T,
-        value: S,
+        key: impl ToBytes<'tx>,
+        value: impl ToBytes<'tx>,
     ) -> Result<Option<KVPair<'b, 'tx>>, jammdb::Error> {
         self.bucket.put(key, value)
     }
