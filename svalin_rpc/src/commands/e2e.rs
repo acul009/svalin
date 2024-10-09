@@ -1,6 +1,11 @@
+use std::sync::Arc;
+
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use svalin_pki::{Certificate, PermCredentials};
+use svalin_pki::{
+    verifier::{exact::ExactVerififier, KnownCertificateVerifier},
+    Certificate, PermCredentials,
+};
 
 use crate::{
     rpc::{
@@ -12,7 +17,6 @@ use crate::{
         session::Session,
     },
     transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
-    verifiers::exact::ExactServerVerification,
 };
 
 fn e2e_key() -> String {
@@ -85,7 +89,7 @@ where
             let tls_transport = TlsTransport::client(
                 CombinedTransport::new(read, write),
                 // ExactVerififier::new(self.peer.clone()).to_tls_verifier(),
-                ExactServerVerification::new(&self.peer),
+                ExactVerififier::new(self.peer.clone()).to_tls_verifier(),
                 self.credentials,
             )
             .await?;
