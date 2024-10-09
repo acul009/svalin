@@ -2,15 +2,18 @@
 
 ## ⚠️WARNING⚠️
 
-**This repository is not yet ready for production use.**
-
-A lot of this code is still being heavily worked and, is missing security checks and has not been reviewed.
-
-The current focus is getting this behemoth of a project working in any state.
-
-One the programm is usable, it's going to be time to slowly but surely improve everything.
-
-Feel free to browse the codebase and create issues for all problems you see.
+> [!WARNING]
+> **This repository is not yet ready for production use.**
+> 
+> A lot of this code is still being heavily worked and, is missing security checks and has not been reviewed.
+> 
+> The current focus is getting this behemoth of a project working in any state.
+> 
+> Once the programm is usable, it's going to be time to slowly but surely improve everything.
+> 
+> Feel free to browse the codebase and create issues for all problems you see.
+>
+> If you have questions or want to cheer me on, you are also welcome to create an issue :)
 
 ## What is this ?
 
@@ -252,8 +255,8 @@ This crate contains code used by the agent for monitoring and managing a system.
 - [X] Connection forwarding
 - [X] E2E Encryption
 - [X] List all agents with connection status
-- [ ] Show realtime performance ingo
-- [ ] Remote Terminal
+- [X] Show realtime performance ingo
+- [ ] Remote Terminal (still to unstable to mark as working)
 
 ## Architecture
 - [X] crate for local system managment and package management (WIP)
