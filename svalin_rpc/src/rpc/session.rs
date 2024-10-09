@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, instrument};
 
 use crate::{
+    permissions::{PermissionCheckError, PermissionHandler},
     rpc::command::handler::HandlerCollection,
     transport::{
         object_transport::{ObjectReader, ObjectWriter},
@@ -97,6 +98,11 @@ impl Session {
         Ok(())
     }
 
+    /// Used to send a command via this session.
+    ///
+    /// For this to work, the other side of the data stream needs to call
+    /// `handle`. This is only meant for cascading command dispatches - in
+    /// most cases you should instead use `Connection::dispatch`.
     pub async fn dispatch<D: TakeableCommandDispatcher>(
         mut self,
         dispatcher: D,
@@ -170,29 +176,61 @@ impl Session {
     ) {
         (self.read.borrow_reader(), self.write.borrow_writer())
     }
+}
 
-    // pub async fn forward_session(&mut self, partner: &mut Self) -> Result<()> {
-    //     self.forward_transport(partner.transport.borrow_transport())
-    //         .await?;
+pub struct SessionAuthorization<'a> {
+    session: &'a mut UnauthorizedSession,
+}
 
-    //     Ok(())
-    // }
+pub struct UnauthorizedSession {
+    session: Session,
+}
 
-    // pub(crate) async fn forward_transport(
-    //     &mut self,
-    //     transport: &mut Box<dyn SessionTransport>,
-    // ) -> Result<()> {
-    //     debug!("starting bidirectional copy");
+impl UnauthorizedSession {
+    pub async fn authorize<'a, H: PermissionHandler>(
+        &'a mut self,
+        permission_handler: &H,
+        permission: &H::Permission,
+    ) -> Result<SessionAuthorization<'a>, PermissionCheckError> {
+        permission_handler
+            .may(&self.session.peer, permission)
+            .await?;
 
-    //     tokio::io::copy_bidirectional(self.transport.borrow_transport(),
-    // transport).await?;
+        Ok(SessionAuthorization { session: self })
+    }
 
-    //     debug!("finished bidirectional copy");
+    pub async fn read_object<W: serde::de::DeserializeOwned>(&mut self) -> Result<W> {
+        // debug!("Reading: {}", std::any::type_name::<W>());
+        self.session.read_object().await
+    }
+}
 
-    //     Ok(())
-    // }
+impl SessionAuthorization<'_> {
+    pub async fn write_object<W: Serialize>(&mut self, object: &W) -> Result<()> {
+        self.session.session.write_object(object).await
+    }
+}
 
-    // pub fn extract_transport(self) -> Box<dyn SessionTransport> {
-    //     self.transport.extract_transport()
-    // }
+pub struct PendingSession {
+    session: Session,
+}
+
+impl PendingSession {
+    pub async fn check_authorization<'a>(&'a mut self) -> Result<ReadySession<'a>, ()> {
+        Ok(ReadySession { session: self })
+    }
+
+    pub async fn write_object<W: Serialize>(&mut self, object: &W) -> Result<()> {
+        self.session.write_object(object).await
+    }
+}
+
+pub struct ReadySession<'a> {
+    session: &'a mut PendingSession,
+}
+
+impl<'a> ReadySession<'a> {
+    pub async fn read_object<W: serde::de::DeserializeOwned>(&mut self) -> Result<W> {
+        self.session.session.read_object().await
+    }
 }
