@@ -113,11 +113,13 @@ The client does not yet have an official installation method.
 When starting the client without any existing profiles, you will be asked to create one.
 enter the server address with port (e.g. `svalin.example.com:1234`) and follow the stept to create your root user.
 
-**MAKE SURE YOU WRITE DOWN YOUR ROOT PASSWORD - YOU CANNOT RECOVER IT**
+> [!CAUTION]
+> **MAKE SURE YOU WRITE DOWN YOUR ROOT PASSWORD - YOU CANNOT RECOVER IT**
 
 On each new start you can select a profile to use or you can create a new one.
 
-**To open a profile you need the corresponding password to decrypt your certificate**
+> [!Note]
+> **To open a profile you need the corresponding password to decrypt your certificate**
 
 ### Setting up the agent
 
