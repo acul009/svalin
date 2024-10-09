@@ -63,7 +63,7 @@ impl WaitingForConfirmCode {
         debug!("agent certificate successfully created and sent");
 
         let agent = SignedObject::new(
-            PublicAgentData {
+            &PublicAgentData {
                 cert: certificate,
                 name: agent_name,
             },

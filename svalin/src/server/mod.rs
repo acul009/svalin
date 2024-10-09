@@ -53,9 +53,7 @@ impl Server {
         let mut base_config: Option<BaseConfig> = None;
 
         scope.view(|b| {
-            if let Some(raw) = b.get_kv("base_config") {
-                base_config = Some(serde_json::from_slice(raw.value())?);
-            }
+            base_config = b.get_object("base_config")?;
 
             Ok(())
         })?;
@@ -82,8 +80,7 @@ impl Server {
             };
 
             scope.update(|b| {
-                let vec = serde_json::to_vec(&conf)?;
-                b.put("base_config", vec)?;
+                b.put_object("base_config", &conf)?;
 
                 Ok(())
             })?;
@@ -122,7 +119,8 @@ impl Server {
     pub async fn run(&mut self) -> Result<()> {
         let userstore = UserStore::open(self.scope.subscope("users".into())?);
 
-        let agent_store = AgentStore::open(self.scope.subscope("agents".into())?);
+        let agent_store =
+            AgentStore::open(self.scope.subscope("agents".into())?, self.root.clone());
 
         let commands = HandlerCollection::new();
 

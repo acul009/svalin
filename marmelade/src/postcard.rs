@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use jammdb::ToBytes;
+use jammdb::{Data, ToBytes};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{transaction_type::RwTransaction, Bucket};
@@ -35,9 +35,9 @@ impl Display for MarmeladeObjectError {
 }
 
 impl<'b, 'tx, S> Bucket<'b, 'tx, S> {
-    pub fn get_object<T: DeserializeOwned, U: AsRef<[u8]>>(
+    pub fn get_object<T: DeserializeOwned>(
         &self,
-        key: U,
+        key: impl AsRef<[u8]>,
     ) -> Result<Option<T>, postcard::Error> {
         if let Some(raw) = self.get_kv(key) {
             let decoded: T = postcard::from_bytes(raw.value())?;
@@ -46,6 +46,18 @@ impl<'b, 'tx, S> Bucket<'b, 'tx, S> {
         } else {
             Ok(None)
         }
+    }
+
+    pub fn list_objects<T: DeserializeOwned>(&self) -> Result<Vec<T>, postcard::Error> {
+        self.cursor()
+            .filter_map(|v| {
+                if let Data::KeyValue(v) = v {
+                    Some(postcard::from_bytes(v.value()))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 

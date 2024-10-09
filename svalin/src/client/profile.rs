@@ -2,7 +2,10 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use svalin_pki::{verifier::KnownCertificateVerifier, Certificate, PermCredentials};
+use svalin_pki::{
+    verifier::{exact::ExactVerififier, KnownCertificateVerifier},
+    Certificate, PermCredentials,
+};
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::{sync::RwLock, task::JoinSet};
 use tracing::{debug, error};
@@ -207,7 +210,7 @@ impl Client {
                 rpc,
                 upstream_address: profile.upstream_address,
                 upstream_certificate: profile.upstream_certificate,
-                root_certificate: profile.root_certificate,
+                root_certificate: profile.root_certificate.clone(),
                 credentials: identity.clone(),
                 device_list: Arc::new(RwLock::new(BTreeMap::new())),
                 background_tasks: JoinSet::new(),
@@ -223,6 +226,7 @@ impl Client {
                         base_connection: sync_connection.clone(),
                         credentials: identity,
                         list: list_clone,
+                        verifier: ExactVerififier::new(profile.root_certificate),
                     })
                     .await
                 {

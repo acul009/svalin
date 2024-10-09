@@ -51,7 +51,7 @@ impl CommandHandler for AddAgentHandler {
     async fn handle(&self, session: &mut Session) -> Result<()> {
         let agent = session.read_object().await?;
 
-        if let Err(err) = self.store.add_agent(agent) {
+        if let Err(err) = self.store.add_agent(agent).await {
             session
                 .write_object::<Result<(), AddAgentError>>(&Err(AddAgentError::StoreError))
                 .await?;
@@ -80,7 +80,7 @@ impl<'a> CommandDispatcher for AddAgent<'a> {
     }
 
     async fn dispatch(self, session: &mut Session) -> Result<Self::Output> {
-        session.write_object(&self.agent.to_bytes()).await?;
+        session.write_object(&self.agent).await?;
 
         session.read_object::<Result<(), AddAgentError>>().await??;
 

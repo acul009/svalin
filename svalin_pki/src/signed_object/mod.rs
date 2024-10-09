@@ -60,6 +60,7 @@ where
     }
 }
 
+// This explicitly shouldn't be serializable
 #[derive(Debug)]
 pub struct VerifiedObject<T> {
     signed_object: SignedObject<T>,
@@ -78,6 +79,10 @@ impl<T> VerifiedObject<T> {
 
     pub fn pack(&self) -> &SignedObject<T> {
         &self.signed_object
+    }
+
+    pub fn pack_owned(self) -> SignedObject<T> {
+        self.signed_object
     }
 }
 

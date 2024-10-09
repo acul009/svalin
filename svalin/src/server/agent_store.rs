@@ -1,8 +1,14 @@
 use std::sync::Arc;
 
 use anyhow::{Ok, Result};
+use futures::{future::try_join_all, stream, StreamExt};
 use marmelade::{Data, Scope};
-use svalin_pki::{signed_object::SignedObject, Certificate};
+use svalin_pki::{
+    get_current_timestamp,
+    signed_object::{SignedObject, VerifiedObject},
+    verifier::exact::ExactVerififier,
+    Certificate,
+};
 use tokio::sync::broadcast;
 
 use crate::shared::join_agent::PublicAgentData;
@@ -10,67 +16,81 @@ use crate::shared::join_agent::PublicAgentData;
 pub struct AgentStore {
     scope: Scope,
     broadcast: broadcast::Sender<AgentUpdate>,
+    verifier: ExactVerififier,
 }
 
 #[derive(Clone, Debug)]
 pub enum AgentUpdate {
-    Add(SignedObject<PublicAgentData>),
+    Add(Arc<VerifiedObject<PublicAgentData>>),
 }
 
 impl AgentStore {
-    pub fn open(scope: Scope) -> Arc<Self> {
+    pub fn open(scope: Scope, root: Certificate) -> Arc<Self> {
         let (broadcast, _) = broadcast::channel(10);
-        Arc::new(Self { scope, broadcast })
-    }
-
-    pub fn get_agent(&self, public_key: &[u8]) -> Result<Option<SignedObject<PublicAgentData>>> {
-        let mut raw: Option<Vec<u8>> = None;
-        self.scope.view(|b| {
-            if let Some(data) = b.get_kv(public_key) {
-                raw = Some(data.value().to_vec());
-            }
-
-            Ok(())
-        })?;
-
-        Ok(match raw {
-            Some(bytes) => Some(SignedObject::<PublicAgentData>::from_bytes(bytes)?),
-            None => None,
+        Arc::new(Self {
+            scope,
+            broadcast,
+            verifier: ExactVerififier::new(root),
         })
     }
 
-    pub fn add_agent(&self, agent: SignedObject<PublicAgentData>) -> Result<()> {
-        self.scope.update(|b| {
-            let key = agent.cert.public_key().to_owned();
-            b.put(key, agent.to_bytes().to_owned())?;
+    pub async fn get_agent(
+        &self,
+        fingerprint: &[u8; 32],
+    ) -> Result<Option<SignedObject<PublicAgentData>>> {
+        let mut agent: Option<SignedObject<PublicAgentData>> = None;
+        self.scope.view(|b| {
+            agent = b.get_object(&fingerprint[..])?;
 
             Ok(())
         })?;
 
-        self.broadcast.send(AgentUpdate::Add(agent))?;
+        if let Some(agent) = agent {
+            Ok(Some(
+                // TODO: if the agent is invalid it should probably be removed and the a security
+                // alert should be raised
+                agent
+                    .verify(&self.verifier, get_current_timestamp())
+                    .await?
+                    .pack_owned(),
+            ))
+        } else {
+            Ok(agent)
+        }
+    }
+
+    pub async fn add_agent(&self, agent: SignedObject<PublicAgentData>) -> Result<()> {
+        let agent = agent
+            .verify(&self.verifier, get_current_timestamp())
+            .await?;
+
+        self.scope.update(|b| {
+            let key = agent.cert.get_fingerprint().to_vec();
+            b.put_object(key, agent.pack())?;
+
+            Ok(())
+        })?;
+
+        self.broadcast.send(AgentUpdate::Add(Arc::new(agent)))?;
 
         Ok(())
     }
 
-    pub fn list_agents(&self) -> Result<Vec<SignedObject<PublicAgentData>>> {
-        let mut raw = Vec::<Vec<u8>>::new();
+    pub async fn list_agents(&self) -> Result<Vec<VerifiedObject<PublicAgentData>>> {
+        let mut agents: Vec<SignedObject<PublicAgentData>> = Vec::new();
+
         self.scope.view(|b| {
-            for v in b.cursor() {
-                if let Data::KeyValue(v) = v {
-                    raw.push(v.value().to_vec())
-                }
-            }
+            agents = b.list_objects()?;
 
             Ok(())
         })?;
 
-        let mut agents = Vec::<SignedObject<PublicAgentData>>::new();
-
-        for v in raw {
-            agents.push(SignedObject::from_bytes(v)?);
-        }
-
-        Ok(agents)
+        try_join_all(
+            agents
+                .into_iter()
+                .map(|v| v.verify(&self.verifier, get_current_timestamp())),
+        )
+        .await
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<AgentUpdate> {

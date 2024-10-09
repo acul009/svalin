@@ -3,7 +3,10 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{signed_object::SignedObject, Certificate, PermCredentials};
+use svalin_pki::{
+    get_current_timestamp, signed_object::SignedObject, verifier::exact::ExactVerififier,
+    Certificate, PermCredentials,
+};
 use svalin_rpc::{
     commands::forward::ForwardConnection,
     rpc::{
@@ -14,7 +17,7 @@ use svalin_rpc::{
     },
 };
 use tokio::{select, sync::RwLock};
-use tracing::debug;
+use tracing::{debug, dispatcher::get_default};
 
 use crate::{
     client::device::Device,
@@ -62,12 +65,12 @@ impl CommandHandler for AgentListHandler {
         let mut receiver = self.server.subscribe_to_connection_status();
         let currently_online = self.server.get_current_connected_clients().await;
 
-        let agents = self.agent_store.list_agents()?;
+        let agents = self.agent_store.list_agents().await?;
 
         for agent in agents {
             let online_status = currently_online.contains(&agent.cert);
             let item = AgentListItemTransport {
-                public_data: agent,
+                public_data: agent.pack_owned(),
                 online_status,
             };
 
@@ -83,7 +86,7 @@ impl CommandHandler for AgentListHandler {
 
                     let agent = self
                         .agent_store
-                        .get_agent(online_update.client.public_key())?;
+                        .get_agent(&online_update.client.get_fingerprint()).await?;
 
                     if let Some(agent) = agent {
                         let item = AgentListItemTransport {
@@ -103,7 +106,7 @@ impl CommandHandler for AgentListHandler {
                         AgentUpdate::Add(public_data) => {
                             let online_status = self.server.is_client_connected(&public_data.cert).await;
                             let item = AgentListItemTransport {
-                                public_data,
+                                public_data: public_data.pack().clone(),
                                 online_status,
                             };
 
@@ -123,6 +126,7 @@ pub struct UpdateAgentList {
     pub base_connection: DirectConnection,
     pub credentials: PermCredentials,
     pub list: Arc<RwLock<BTreeMap<Certificate, Device>>>,
+    pub verifier: ExactVerififier,
 }
 
 #[async_trait]
@@ -139,9 +143,14 @@ impl CommandDispatcher for UpdateAgentList {
                 .await
                 .context("failed to receive AgentListItemTransport")?;
 
+            let public_data = list_item_update
+                .public_data
+                .verify(&self.verifier, get_current_timestamp())
+                .await?;
+
             let item = AgentListItem {
                 online_status: list_item_update.online_status,
-                public_data: list_item_update.public_data.unpack(),
+                public_data: public_data.unpack(),
             };
 
             {
