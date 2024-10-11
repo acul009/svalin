@@ -1,12 +1,8 @@
 use proc_macro::TokenStream as ProcTokenStream;
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::{quote, ToTokens};
 use syn::{
-    parse_macro_input, parse_quote,
-    punctuated::Punctuated,
-    spanned::Spanned,
-    token::{Comma, SelfValue},
-    Error, FnArg, ItemFn, Meta, Pat, PatType, Receiver, Signature,
+    parse_macro_input, parse_quote, punctuated::Punctuated, token::Comma, Error, FnArg, ItemFn,
+    Meta, Pat, Signature,
 };
 
 #[proc_macro_attribute]

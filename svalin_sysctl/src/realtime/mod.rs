@@ -1,7 +1,4 @@
-use std::{
-    sync::{atomic::AtomicU64, LazyLock},
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};

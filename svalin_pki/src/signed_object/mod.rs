@@ -1,10 +1,7 @@
 use std::{marker::PhantomData, ops::Deref};
 
 use anyhow::{Context, Result};
-use serde::{
-    de::{DeserializeOwned, Visitor},
-    Deserialize, Serialize,
-};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     signed_message::{Sign, Verify},
