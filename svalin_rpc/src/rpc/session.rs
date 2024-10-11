@@ -188,11 +188,20 @@ impl UnauthorizedSession {
         permission_handler: &H,
         permission: &H::Permission,
     ) -> Result<&'a mut Session, PermissionCheckError> {
-        permission_handler
-            .may(&self.session.peer, permission)
-            .await?;
+        let perm_check = permission_handler.may(&self.session.peer, permission).await;
 
-        Ok(&mut self.session)
+        match perm_check {
+            Ok(_) => {
+                self.session.write_object::<Result<(), ()>>(&Ok(())).await?;
+                Ok(&mut self.session)
+            }
+            Err(err) => {
+                // Todo: handle error somehow?
+                let _err = self.session.write_object::<Result<(), ()>>(&Err(())).await;
+
+                Err(err)
+            }
+        }
     }
 
     pub async fn read_object<W: serde::de::DeserializeOwned>(&mut self) -> Result<W> {
@@ -206,8 +215,13 @@ pub struct PendingSession {
 }
 
 impl PendingSession {
-    pub async fn check_authorization<'a>(&'a mut self) -> Result<&'a mut Session, ()> {
-        Ok(&mut self.session)
+    pub async fn check_authorization<'a>(&'a mut self) -> Result<&'a mut Session> {
+        let perm_result: Result<(), ()> = self.session.read_object().await?;
+
+        match perm_result {
+            Ok(_) => Ok(&mut self.session),
+            Err(_) => Err(anyhow!("Rpc-Error: Permission denied")),
+        }
     }
 
     pub async fn write_object<W: Serialize>(&mut self, object: &W) -> Result<()> {

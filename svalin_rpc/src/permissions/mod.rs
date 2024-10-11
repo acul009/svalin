@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::rpc::peer::Peer;
 
-pub mod root_permission_handler;
+pub mod whitelist_permission_handler;
 
 pub trait PermissionHandler {
     type Permission;

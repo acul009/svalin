@@ -96,12 +96,9 @@ mod tests {
 
     use serde::{Deserialize, Serialize};
     use tokio::test;
-    use tracing::debug;
 
     use crate::{
-        get_current_timestamp,
-        signed_object::SignedObject,
-        verifier::{self, exact::ExactVerififier},
+        get_current_timestamp, signed_object::SignedObject, verifier::exact::ExactVerififier,
         Keypair,
     };
 
@@ -160,7 +157,7 @@ mod tests {
 
         signed.raw[0..data.len()].copy_from_slice(&data);
 
-        let verified_err = signed
+        let _verified_err = signed
             .verify(&verifier, get_current_timestamp())
             .await
             .unwrap_err();
@@ -180,7 +177,7 @@ mod tests {
         let signed = super::SignedObject::new(&object, &credentials).unwrap();
         let verifier = ExactVerififier::new(credentials2.get_certificate().clone());
 
-        let verified_err = signed
+        let _verified_err = signed
             .verify(&verifier, get_current_timestamp())
             .await
             .unwrap_err();
