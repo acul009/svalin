@@ -178,10 +178,6 @@ impl Session {
     }
 }
 
-pub struct SessionAuthorization<'a> {
-    session: &'a mut UnauthorizedSession,
-}
-
 pub struct UnauthorizedSession {
     session: Session,
 }
@@ -191,12 +187,12 @@ impl UnauthorizedSession {
         &'a mut self,
         permission_handler: &H,
         permission: &H::Permission,
-    ) -> Result<SessionAuthorization<'a>, PermissionCheckError> {
+    ) -> Result<&'a mut Session, PermissionCheckError> {
         permission_handler
             .may(&self.session.peer, permission)
             .await?;
 
-        Ok(SessionAuthorization { session: self })
+        Ok(&mut self.session)
     }
 
     pub async fn read_object<W: serde::de::DeserializeOwned>(&mut self) -> Result<W> {
@@ -205,32 +201,16 @@ impl UnauthorizedSession {
     }
 }
 
-impl SessionAuthorization<'_> {
-    pub async fn write_object<W: Serialize>(&mut self, object: &W) -> Result<()> {
-        self.session.session.write_object(object).await
-    }
-}
-
 pub struct PendingSession {
     session: Session,
 }
 
 impl PendingSession {
-    pub async fn check_authorization<'a>(&'a mut self) -> Result<ReadySession<'a>, ()> {
-        Ok(ReadySession { session: self })
+    pub async fn check_authorization<'a>(&'a mut self) -> Result<&'a mut Session, ()> {
+        Ok(&mut self.session)
     }
 
     pub async fn write_object<W: Serialize>(&mut self, object: &W) -> Result<()> {
         self.session.write_object(object).await
-    }
-}
-
-pub struct ReadySession<'a> {
-    session: &'a mut PendingSession,
-}
-
-impl<'a> ReadySession<'a> {
-    pub async fn read_object<W: serde::de::DeserializeOwned>(&mut self) -> Result<W> {
-        self.session.session.read_object().await
     }
 }
