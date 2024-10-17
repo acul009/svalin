@@ -2,18 +2,17 @@ use std::{error::Error, fmt::Display, future::Future};
 
 use anyhow::Result;
 
-use crate::rpc::peer::Peer;
+use crate::rpc::{command::handler::PermissionPrecursor, peer::Peer};
 
-pub mod whitelist_permission_handler;
+pub mod anonymous_permission_handler;
+pub mod whitelist;
 
-pub trait PermissionHandler {
-    type Permission;
-
+pub trait PermissionHandler<Permission>: Send + Sync + Clone + 'static {
     fn may(
         &self,
         peer: &Peer,
-        permission: &Self::Permission,
-    ) -> impl Future<Output = Result<(), PermissionCheckError>>;
+        permission: &Permission,
+    ) -> impl Future<Output = Result<(), PermissionCheckError>> + Send + Sync;
 }
 
 #[derive(Debug)]
@@ -40,3 +39,11 @@ impl From<anyhow::Error> for PermissionCheckError {
 }
 
 impl Error for PermissionCheckError {}
+
+pub struct DummyPermission;
+
+impl<R, H> From<&PermissionPrecursor<R, H>> for DummyPermission {
+    fn from(_value: &PermissionPrecursor<R, H>) -> Self {
+        Self
+    }
+}

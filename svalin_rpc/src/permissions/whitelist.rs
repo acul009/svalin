@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, marker::PhantomData};
+use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use svalin_pki::Certificate;
@@ -7,12 +7,19 @@ use crate::rpc::peer::Peer;
 
 use super::{PermissionCheckError, PermissionHandler};
 
-pub struct WhitelistPermissionHandler<P> {
-    whitelist: BTreeMap<[u8; 32], Certificate>,
-    permission: PhantomData<P>,
+pub struct WhitelistPermissionHandler {
+    whitelist: Arc<BTreeMap<[u8; 32], Certificate>>,
 }
 
-impl<P> WhitelistPermissionHandler<P> {
+impl Clone for WhitelistPermissionHandler {
+    fn clone(&self) -> Self {
+        Self {
+            whitelist: self.whitelist.clone(),
+        }
+    }
+}
+
+impl WhitelistPermissionHandler {
     pub fn new(whitelist: Vec<Certificate>) -> Self {
         let whitelist = whitelist
             .into_iter()
@@ -20,20 +27,16 @@ impl<P> WhitelistPermissionHandler<P> {
             .collect();
 
         Self {
-            whitelist: whitelist,
-            permission: PhantomData,
+            whitelist: Arc::new(whitelist),
         }
     }
 }
 
-impl<P> PermissionHandler for WhitelistPermissionHandler<P> {
-    type Permission = P;
-
-    async fn may(
-        &self,
-        peer: &Peer,
-        _permission: &Self::Permission,
-    ) -> Result<(), PermissionCheckError> {
+impl<Permission> PermissionHandler<Permission> for WhitelistPermissionHandler
+where
+    Permission: Send + Sync,
+{
+    async fn may(&self, peer: &Peer, _permission: &Permission) -> Result<(), PermissionCheckError> {
         if let Peer::Certificate(cert) = peer {
             if let Some(known_cert) = self.whitelist.get(&cert.get_fingerprint()) {
                 if known_cert == cert {

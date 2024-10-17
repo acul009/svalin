@@ -27,11 +27,13 @@ fn tls_test_key() -> String {
 
 #[async_trait]
 impl TakeableCommandHandler for TlsTestCommandHandler {
-    fn key(&self) -> String {
+    type Request = ();
+
+    fn key() -> String {
         tls_test_key()
     }
 
-    async fn handle(&self, session: &mut Option<Session>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Option<Session>, _: Self::Request) -> anyhow::Result<()> {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure_transport();
 
@@ -65,10 +67,18 @@ pub struct TlsTest;
 #[async_trait]
 impl TakeableCommandDispatcher for TlsTest {
     type Output = ();
-    fn key(&self) -> String {
+
+    type Request = ();
+
+    fn key() -> String {
         tls_test_key()
     }
-    async fn dispatch(self, session: &mut Option<Session>) -> Result<()> {
+
+    fn get_request(&self) -> Self::Request {
+        ()
+    }
+
+    async fn dispatch(self, session: &mut Option<Session>, _: Self::Request) -> Result<()> {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure_transport();
 

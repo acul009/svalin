@@ -1,6 +1,6 @@
 use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
 
-use crate::rustls;
+use crate::{permissions::PermissionHandler, rustls};
 use anyhow::{anyhow, Ok, Result};
 use quinn::{
     crypto::rustls::QuicClientConfig, rustls::crypto::CryptoProvider, TransportConfig, VarInt,
@@ -87,7 +87,14 @@ impl RpcClient {
         self.connection.close(0u32.into(), b"");
     }
 
-    pub async fn serve(&self, commands: HandlerCollection) -> Result<()> {
+    pub async fn serve<P, Permission>(
+        &self,
+        commands: HandlerCollection<P, Permission>,
+    ) -> Result<()>
+    where
+        P: PermissionHandler<Permission>,
+        Permission: 'static,
+    {
         self.upstream_connection().serve(commands).await
     }
 }

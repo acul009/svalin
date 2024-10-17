@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use tokio::task::JoinSet;
 use tracing::{debug, error};
 
+use crate::permissions::PermissionHandler;
 use crate::rpc::{command::handler::HandlerCollection, session::Session};
 use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
 
@@ -74,16 +75,21 @@ pub trait ServeableConnectionBase: ConnectionBase {
 }
 
 #[async_trait]
-pub trait ServeableConnection {
-    async fn serve(&self, commands: HandlerCollection) -> Result<()>;
+pub trait ServeableConnection<P, Permission>
+where
+    P: PermissionHandler<Permission>,
+{
+    async fn serve(&self, commands: HandlerCollection<P, Permission>) -> Result<()>;
 }
 
 #[async_trait]
-impl<T> ServeableConnection for T
+impl<T, P, Permission> ServeableConnection<P, Permission> for T
 where
     T: ServeableConnectionBase,
+    P: PermissionHandler<Permission>,
+    Permission: 'static,
 {
-    async fn serve(&self, commands: HandlerCollection) -> Result<()> {
+    async fn serve(&self, commands: HandlerCollection<P, Permission>) -> Result<()> {
         debug!("waiting for incoming data stream");
         let mut open_sessions = JoinSet::<()>::new();
 

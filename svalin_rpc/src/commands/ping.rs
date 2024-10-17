@@ -28,11 +28,13 @@ fn ping_key() -> String {
 
 #[async_trait]
 impl CommandHandler for PingHandler {
-    fn key(&self) -> String {
+    type Request = ();
+
+    fn key() -> String {
         ping_key()
     }
 
-    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session, _: Self::Request) -> anyhow::Result<()> {
         let ping: u64 = session.read_object().await?;
         session.write_object(&ping).await?;
 
@@ -46,11 +48,17 @@ pub struct Ping;
 impl CommandDispatcher for Ping {
     type Output = Duration;
 
-    fn key(&self) -> String {
+    type Request = ();
+
+    fn key() -> String {
         ping_key()
     }
 
-    async fn dispatch(self, session: &mut Session) -> Result<Duration> {
+    fn get_request(&self) -> Self::Request {
+        ()
+    }
+
+    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<Duration> {
         let ping = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")

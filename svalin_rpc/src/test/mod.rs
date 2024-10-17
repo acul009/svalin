@@ -8,6 +8,7 @@ mod tls_test_command;
 
 use crate::{
     commands::ping::{Ping, PingHandler},
+    permissions::{anonymous_permission_handler::AnonymousPermissionHandler, DummyPermission},
     rpc::{
         client::RpcClient, command::handler::HandlerCollection, connection::Connection,
         server::RpcServer,
@@ -30,7 +31,10 @@ async fn ping_test() {
         SkipClientVerification::new(),
     )
     .unwrap();
-    let commands = HandlerCollection::new();
+
+    let permission_handler = AnonymousPermissionHandler;
+
+    let commands = HandlerCollection::<_, DummyPermission>::new(permission_handler);
     commands.chain().await.add(PingHandler::new());
 
     let server_handle = tokio::spawn(async move {
@@ -67,7 +71,10 @@ async fn tls_test() {
         SkipClientVerification::new(),
     )
     .unwrap();
-    let commands = HandlerCollection::new();
+
+    let permission_handler = AnonymousPermissionHandler;
+
+    let commands = HandlerCollection::<_, DummyPermission>::new(permission_handler);
     commands
         .chain()
         .await

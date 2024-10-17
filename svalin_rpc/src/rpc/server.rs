@@ -9,6 +9,7 @@ use tokio::sync::{broadcast, Mutex};
 use tokio::task::JoinSet;
 use tracing::debug;
 
+use crate::permissions::PermissionHandler;
 use crate::rpc::connection::{ConnectionBase, ServeableConnection};
 use crate::rpc::peer::Peer;
 use crate::rustls::{self, server::danger::ClientCertVerifier};
@@ -89,7 +90,11 @@ impl RpcServer {
         Ok(endpoint)
     }
 
-    pub async fn run(&self, commands: HandlerCollection) -> Result<()> {
+    pub async fn run<P, Permission>(&self, commands: HandlerCollection<P, Permission>) -> Result<()>
+    where
+        P: PermissionHandler<Permission>,
+        Permission: 'static,
+    {
         debug!("starting server");
         while let Some(conn) = self.endpoint.accept().await {
             debug!("connection incoming");
@@ -113,12 +118,16 @@ impl RpcServer {
         todo!()
     }
 
-    async fn handle_connection(
+    async fn handle_connection<P, Permission>(
         conn: quinn::Connecting,
-        commands: HandlerCollection,
+        commands: HandlerCollection<P, Permission>,
         data: Arc<Mutex<ServerData>>,
         broadcast: broadcast::Sender<ClientConnectionStatus>,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        P: PermissionHandler<Permission>,
+        Permission: 'static,
+    {
         debug!("waiting for connection to get ready...");
 
         let conn = conn

@@ -46,15 +46,15 @@ impl ForwardHandler {
 
 #[async_trait]
 impl CommandHandler for ForwardHandler {
-    fn key(&self) -> String {
+    type Request = Certificate;
+
+    fn key() -> String {
         forward_key()
     }
 
     #[must_use]
-    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session, target: Self::Request) -> anyhow::Result<()> {
         debug!("client requesting forward");
-
-        let target: Certificate = session.read_object().await?;
 
         debug!("received forward request to {:?}", target);
 
@@ -101,10 +101,22 @@ where
     D: TakeableCommandDispatcher,
 {
     type Output = D::Output;
-    fn key(&self) -> String {
+
+    type Request = &'a Certificate;
+
+    fn key() -> String {
         forward_key()
     }
-    async fn dispatch(self, session: &mut Option<Session>) -> Result<Self::Output> {
+
+    fn get_request(&self) -> Self::Request {
+        self.target
+    }
+
+    async fn dispatch(
+        self,
+        session: &mut Option<Session>,
+        _target: Self::Request,
+    ) -> Result<Self::Output> {
         if let Some(mut session) = session.take() {
             session.write_object(&self.target).await?;
 

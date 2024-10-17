@@ -6,6 +6,7 @@ use svalin_pki::{
 };
 
 use crate::{
+    permissions::PermissionHandler,
     rpc::{
         command::{
             dispatcher::TakeableCommandDispatcher,
@@ -21,13 +22,22 @@ fn e2e_key() -> String {
     "e2e".into()
 }
 
-pub struct E2EHandler {
+pub struct E2EHandler<P, Permission>
+where
+    P: PermissionHandler<Permission>,
+{
     credentials: PermCredentials,
-    handler_collection: HandlerCollection,
+    handler_collection: HandlerCollection<P, Permission>,
 }
 
-impl E2EHandler {
-    pub fn new(credentials: PermCredentials, handler_collection: HandlerCollection) -> Self {
+impl<P, Permission> E2EHandler<P, Permission>
+where
+    P: PermissionHandler<Permission>,
+{
+    pub fn new(
+        credentials: PermCredentials,
+        handler_collection: HandlerCollection<P, Permission>,
+    ) -> Self {
         Self {
             credentials,
             handler_collection,
@@ -36,12 +46,17 @@ impl E2EHandler {
 }
 
 #[async_trait]
-impl TakeableCommandHandler for E2EHandler {
-    fn key(&self) -> String {
+impl<P, Permission> TakeableCommandHandler for E2EHandler<P, Permission>
+where
+    P: PermissionHandler<Permission>,
+{
+    type Request = ();
+
+    fn key() -> String {
         e2e_key()
     }
 
-    async fn handle(&self, session: &mut Option<Session>) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Option<Session>, _: Self::Request) -> anyhow::Result<()> {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure_transport();
 
@@ -78,10 +93,21 @@ where
 {
     type Output = D::Output;
 
-    fn key(&self) -> String {
+    type Request = ();
+
+    fn key() -> String {
         e2e_key()
     }
-    async fn dispatch(self, session: &mut Option<Session>) -> Result<Self::Output> {
+
+    fn get_request(&self) -> Self::Request {
+        ()
+    }
+
+    async fn dispatch(
+        self,
+        session: &mut Option<Session>,
+        _: Self::Request,
+    ) -> Result<Self::Output> {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure_transport();
             let tls_transport = TlsTransport::client(
