@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, instrument};
 
 use crate::{
-    permissions::{PermissionCheckError, PermissionHandler},
+    permissions::PermissionHandler,
     rpc::command::handler::HandlerCollection,
     transport::{
         object_transport::{ObjectReader, ObjectWriter},

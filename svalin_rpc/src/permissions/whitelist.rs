@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use svalin_pki::Certificate;

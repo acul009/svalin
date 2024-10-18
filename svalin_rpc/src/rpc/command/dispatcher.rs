@@ -1,9 +1,11 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 
 use crate::rpc::session::Session;
 
+/// This is the default trait meant to be used to control the client side logic
+/// of a command After executing the command, the session is properly closed
 #[async_trait]
 pub trait CommandDispatcher: Send + Sync {
     type Output: Send;
@@ -17,6 +19,9 @@ pub trait CommandDispatcher: Send + Sync {
     async fn dispatch(self, session: &mut Session, request: Self::Request) -> Result<Self::Output>;
 }
 
+/// Some dispatchers may require taking ownership of the session.
+/// This trait is meant to enable that.
+/// If the session isn't taken, it will be properly closed
 #[async_trait]
 pub trait TakeableCommandDispatcher: Send + Sync {
     type Output: Send;

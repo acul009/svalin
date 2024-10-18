@@ -5,6 +5,7 @@ pub mod client;
 pub mod server;
 pub mod shared;
 
+pub mod permissions;
 pub mod verifier;
 
 #[cfg(test)]
