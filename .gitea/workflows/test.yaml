@@ -29,7 +29,7 @@ jobs:
       with:
         components: rustfmt
     - name: Set Up Java
-      uses: actions/setup-java@v4.2.1
+      uses: actions/setup-java@v4.5.0
       with:
         distribution: 'oracle'
         java-version: '17'
