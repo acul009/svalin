@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use tokio::task::JoinSet;
 use tracing::{debug, error};
 
-use crate::permissions::PermissionHandler;
+use crate::permissions::{PermissionCheckError, PermissionHandler};
 use crate::rpc::{command::handler::HandlerCollection, session::Session};
 use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
 
@@ -110,6 +110,19 @@ where
                             error!("{:?}", e);
                             #[cfg(test)]
                             {
+                                let mut chain = e.chain();
+                                chain.next(); // error handling session
+                                chain.next(); // error handling session with key
+                                if let Some(err) = chain.next() {
+                                    if let Some(err) = err.downcast_ref::<PermissionCheckError>() {
+                                        if let PermissionCheckError::PermissionDenied(_) = err {
+                                            return; // permission errors should
+                                                    // not crash during tests
+                                                    // since the client will be
+                                                    // notified anyway
+                                        }
+                                    }
+                                }
                                 panic!("{:?}", e);
                             }
                         }

@@ -41,8 +41,10 @@ impl From<&PermissionPrecursor<Certificate, ForwardHandler>> for Permission {
     }
 }
 
-impl<Nested: PermissionHandler> From<&PermissionPrecursor<(), E2EHandler<Nested>>> for Permission {
-    fn from(_value: &PermissionPrecursor<(), E2EHandler<Nested>>) -> Self {
+impl<Nested: PermissionHandler, Verifier>
+    From<&PermissionPrecursor<(), E2EHandler<Nested, Verifier>>> for Permission
+{
+    fn from(_value: &PermissionPrecursor<(), E2EHandler<Nested, Verifier>>) -> Self {
         Permission::AnonymousOnly
     }
 }

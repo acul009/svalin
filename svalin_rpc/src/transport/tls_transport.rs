@@ -1,9 +1,10 @@
 use std::{pin::Pin, sync::Arc};
 
+use crate::rpc::peer::Peer;
 use crate::rustls;
 use crate::rustls::{client::danger::ServerCertVerifier, server::danger::ClientCertVerifier};
 use anyhow::{anyhow, Result};
-use svalin_pki::PermCredentials;
+use svalin_pki::{Certificate, PermCredentials};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::{TlsAcceptor, TlsStream};
 
@@ -14,6 +15,7 @@ where
     T: SessionTransport,
 {
     tls_stream: TlsStream<T>,
+    peer: Peer,
 }
 
 impl<T> TlsTransport<T>
@@ -45,9 +47,22 @@ where
 
         let client = connector.connect(hostname, base_transport).await?;
 
+        let der = client
+            .get_ref()
+            .1
+            .peer_certificates()
+            .ok_or(anyhow!("peer didn't provide a certificate"))?
+            .first()
+            .ok_or(anyhow!("peer didn't provide a certificate"))?;
+
+        let cert = Certificate::from_der(der.to_vec())?;
+
         let tls_stream = TlsStream::Client(client);
 
-        Ok(Self { tls_stream })
+        Ok(Self {
+            tls_stream,
+            peer: Peer::Certificate(cert),
+        })
     }
 
     pub async fn server(
@@ -71,9 +86,22 @@ where
 
         let server = acceptor.accept(base_transport).await?;
 
+        let der = server
+            .get_ref()
+            .1
+            .peer_certificates()
+            .ok_or(anyhow!("peer didn't provide a certificate"))?
+            .first()
+            .ok_or(anyhow!("peer didn't provide a certificate"))?;
+
+        let cert = Certificate::from_der(der.to_vec())?;
+
         let tls_stream = TlsStream::Server(server);
 
-        Ok(Self { tls_stream })
+        Ok(Self {
+            tls_stream,
+            peer: Peer::Certificate(cert),
+        })
     }
 
     pub fn derive_key<B>(&self, buffer: B, label: &[u8], context: &[u8]) -> Result<B>
@@ -90,6 +118,10 @@ where
                 Ok(connection.export_keying_material(buffer, label, Some(context))?)
             }
         }
+    }
+
+    pub fn peer(&self) -> &Peer {
+        &self.peer
     }
 }
 

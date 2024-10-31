@@ -1,4 +1,4 @@
-use std::net::ToSocketAddrs;
+use std::{net::ToSocketAddrs, panic, process};
 
 use test_log::test;
 use tls_test_command::{TlsTest, TlsTestCommandHandler};
@@ -61,6 +61,12 @@ async fn ping_test() {
 
 #[test(tokio::test)]
 async fn tls_test() {
+    let hook = panic::take_hook();
+    panic::set_hook(Box::new(move |panic_info| {
+        hook(panic_info);
+        process::exit(1);
+    }));
+
     println!("starting tls test");
 
     let address = "127.0.0.1:1235";
@@ -102,7 +108,7 @@ async fn tls_test() {
     server_handle.abort();
 }
 
-#[test(tokio::test)]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn perm_test() {
     println!("starting permission test");
 

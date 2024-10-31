@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use marmelade::Scope;
 use serde::{Deserialize, Serialize};
+use svalin_pki::verifier::exact::ExactVerififier;
 use svalin_pki::verifier::KnownCertificateVerifier;
 use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::commands::deauthenticate::DeauthenticateHandler;
@@ -86,10 +87,13 @@ impl Agent {
 
         let public_commands = HandlerCollection::new(permission_handler.clone());
 
-        public_commands
-            .chain()
-            .await
-            .add(E2EHandler::new(self.credentials.clone(), e2e_commands));
+        let verifier = ExactVerififier::new(self.root_certificate.clone());
+
+        public_commands.chain().await.add(E2EHandler::new(
+            self.credentials.clone(),
+            e2e_commands,
+            verifier.to_tls_verifier(),
+        ));
 
         let server_commands = HandlerCollection::new(permission_handler);
 

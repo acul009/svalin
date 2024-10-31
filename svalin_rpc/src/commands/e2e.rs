@@ -70,16 +70,17 @@ where
 
             let tls_transport = TlsTransport::server(
                 CombinedTransport::new(read, write),
-                // TODO: actually fucking verify the connecting peer
                 self.verifier.clone(),
                 &self.credentials,
             )
             .await?;
 
+            let peer = tls_transport.peer().clone();
+
             let (read, write) = tokio::io::split(tls_transport);
 
             // TODO: after verifying this, set the correct peer
-            let session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+            let session = Session::new(Box::new(read), Box::new(write), peer);
 
             session.handle(&self.handler_collection).await
         } else {
