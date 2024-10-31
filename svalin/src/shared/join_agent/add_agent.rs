@@ -5,11 +5,14 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::signed_object::SignedObject;
 use svalin_rpc::rpc::{
-    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    command::{
+        dispatcher::CommandDispatcher,
+        handler::{CommandHandler, PermissionPrecursor},
+    },
     session::Session,
 };
 
-use crate::server::agent_store::AgentStore;
+use crate::{permissions::Permission, server::agent_store::AgentStore};
 
 use super::PublicAgentData;
 
@@ -32,24 +35,28 @@ pub struct AddAgentHandler {
     store: Arc<AgentStore>,
 }
 
+impl From<&PermissionPrecursor<SignedObject<PublicAgentData>, AddAgentHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<SignedObject<PublicAgentData>, AddAgentHandler>) -> Self {
+        Permission::RootOnlyPlaceholder
+    }
+}
+
 impl AddAgentHandler {
     pub fn new(store: Arc<AgentStore>) -> Result<Self> {
         Ok(Self { store })
     }
 }
 
-fn add_agent_key() -> String {
-    "add_agent".to_owned()
-}
-
 #[async_trait]
 impl CommandHandler for AddAgentHandler {
-    fn key(&self) -> String {
-        add_agent_key()
+    type Request = SignedObject<PublicAgentData>;
+
+    fn key() -> String {
+        "add_agent".to_owned()
     }
 
-    async fn handle(&self, session: &mut Session) -> Result<()> {
-        let agent = session.read_object().await?;
+    async fn handle(&self, session: &mut Session, request: Self::Request) -> Result<()> {
+        let agent = request;
 
         if let Err(err) = self.store.add_agent(agent).await {
             session
@@ -75,13 +82,17 @@ pub struct AddAgent<'a> {
 impl<'a> CommandDispatcher for AddAgent<'a> {
     type Output = ();
 
-    fn key(&self) -> String {
-        add_agent_key()
+    type Request = &'a SignedObject<PublicAgentData>;
+
+    fn get_request(&self) -> Self::Request {
+        self.agent
     }
 
-    async fn dispatch(self, session: &mut Session) -> Result<Self::Output> {
-        session.write_object(&self.agent).await?;
+    fn key() -> String {
+        AddAgentHandler::key()
+    }
 
+    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<Self::Output> {
         session.read_object::<Result<(), AddAgentError>>().await??;
 
         Ok(())

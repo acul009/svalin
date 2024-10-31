@@ -5,16 +5,19 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{ArgonParams, Certificate, PermCredentials};
 use svalin_rpc::rpc::{
-    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    command::{
+        dispatcher::CommandDispatcher,
+        handler::{CommandHandler, PermissionPrecursor},
+    },
     session::Session,
 };
 use totp_rs::TOTP;
-use tracing::{debug, error, instrument, span, Instrument, Level};
+use tracing::{debug, error, instrument};
 
-use crate::server::user_store::UserStore;
+use crate::{permissions::Permission, server::user_store::UserStore};
 
-#[derive(Serialize, Deserialize)]
-struct AddUserRequest {
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AddUserRequest {
     certificate: Certificate,
     username: String,
     encrypted_credentials: Vec<u8>,
@@ -22,6 +25,12 @@ struct AddUserRequest {
     client_hash_options: ArgonParams,
     totp_secret: TOTP,
     current_totp: String,
+}
+
+impl From<&PermissionPrecursor<AddUserRequest, AddUserHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<AddUserRequest, AddUserHandler>) -> Self {
+        Permission::RootOnlyPlaceholder
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -52,22 +61,17 @@ impl AddUserHandler {
     }
 }
 
-fn add_user_key() -> String {
-    "add_user".to_owned()
-}
-
 #[async_trait]
 impl CommandHandler for AddUserHandler {
-    fn key(&self) -> String {
-        add_user_key()
+    type Request = AddUserRequest;
+
+    fn key() -> String {
+        "add_user".to_owned()
     }
 
     #[must_use]
     #[instrument(skip_all)]
-    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
-        debug!("reading request to add user");
-        let request: AddUserRequest = session.read_object().await?;
-
+    async fn handle(&self, session: &mut Session, request: Self::Request) -> anyhow::Result<()> {
         debug!("request received, performing checks");
 
         let actual_current_totp = request.totp_secret.generate_current()?;
@@ -111,50 +115,63 @@ impl CommandHandler for AddUserHandler {
 }
 
 pub struct AddUser<'a> {
-    pub credentials: &'a PermCredentials,
-    pub username: String,
-    pub password: Vec<u8>,
-    pub totp_secret: TOTP,
+    credentials: &'a PermCredentials,
+    password: Vec<u8>,
+    request: AddUserRequest,
+}
+
+impl<'a> AddUser<'a> {
+    pub async fn new(
+        credentials: &'a PermCredentials,
+        username: String,
+        password: Vec<u8>,
+        totp_secret: TOTP,
+    ) -> Result<Self> {
+        let client_hash_options = ArgonParams::strong();
+
+        debug!("requesting user to be added");
+
+        let certificate = credentials.get_certificate().to_owned();
+        debug!("certificate extracted");
+
+        let encrypted_credentials = credentials.to_bytes(password.clone()).await?;
+        debug!("credentials encrypted");
+
+        let client_hash = client_hash_options.derive_key(password.clone()).await?;
+        debug!("password hash created");
+
+        let request = AddUserRequest {
+            certificate,
+            username: username,
+            encrypted_credentials,
+            client_hash,
+            client_hash_options,
+            current_totp: totp_secret.generate_current()?,
+            totp_secret: totp_secret,
+        };
+
+        Ok(Self {
+            credentials,
+            password,
+            request,
+        })
+    }
 }
 
 #[async_trait]
 impl<'a> CommandDispatcher for AddUser<'a> {
     type Output = ();
-    fn key(&self) -> String {
-        add_user_key()
+    type Request = AddUserRequest;
+
+    fn key() -> String {
+        AddUserHandler::key()
     }
 
-    async fn dispatch(self, session: &mut Session) -> Result<()> {
-        let client_hash_options = ArgonParams::strong();
+    fn get_request(&self) -> Self::Request {
+        self.request.clone()
+    }
 
-        debug!("requesting user to be added");
-
-        let certificate = self.credentials.get_certificate().to_owned();
-        debug!("certificate extracted");
-
-        let encrypted_credentials = self.credentials.to_bytes(self.password.clone()).await?;
-        debug!("credentials encrypted");
-
-        let client_hash = client_hash_options.derive_key(self.password).await?;
-        debug!("password hash created");
-
-        let request = AddUserRequest {
-            certificate,
-            username: self.username,
-            encrypted_credentials,
-            client_hash,
-            client_hash_options,
-            current_totp: self.totp_secret.generate_current()?,
-            totp_secret: self.totp_secret,
-        };
-
-        debug!("user request ready to be added");
-
-        session
-            .write_object(&request)
-            .instrument(span!(Level::TRACE, "write add user request"))
-            .await?;
-
+    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<()> {
         debug!("waiting on confirmation for new user");
 
         let success: Result<(), AddUserError> = session.read_object().await?;

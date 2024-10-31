@@ -87,13 +87,9 @@ impl RpcClient {
         self.connection.close(0u32.into(), b"");
     }
 
-    pub async fn serve<P, Permission>(
-        &self,
-        commands: HandlerCollection<P, Permission>,
-    ) -> Result<()>
+    pub async fn serve<P>(&self, commands: HandlerCollection<P>) -> Result<()>
     where
-        P: PermissionHandler<Permission>,
-        Permission: 'static,
+        P: PermissionHandler,
     {
         self.upstream_connection().serve(commands).await
     }

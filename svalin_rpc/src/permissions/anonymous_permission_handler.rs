@@ -1,14 +1,20 @@
+use std::marker::PhantomData;
+
 use crate::rpc::peer::Peer;
 
 use super::PermissionHandler;
 
 #[derive(Default, Clone)]
-pub struct AnonymousPermissionHandler;
+pub struct AnonymousPermissionHandler<Permission> {
+    permission: PhantomData<Permission>,
+}
 
-impl<Permission> PermissionHandler<Permission> for AnonymousPermissionHandler
+impl<Permission> PermissionHandler for AnonymousPermissionHandler<Permission>
 where
-    Permission: Send + Sync,
+    Permission: Send + Sync + Clone + 'static,
 {
+    type Permission = Permission;
+
     async fn may(
         &self,
         peer: &crate::rpc::peer::Peer,

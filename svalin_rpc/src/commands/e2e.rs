@@ -1,9 +1,13 @@
+use std::sync::Arc;
+
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use quinn::rustls::server::danger::ClientCertVerifier;
 use svalin_pki::{
-    verifier::{exact::ExactVerififier, KnownCertificateVerifier},
+    verifier::{exact::ExactVerififier, KnownCertificateVerifier, Verifier},
     Certificate, PermCredentials,
 };
+use tracing::debug;
 
 use crate::{
     permissions::PermissionHandler,
@@ -22,33 +26,37 @@ fn e2e_key() -> String {
     "e2e".into()
 }
 
-pub struct E2EHandler<P, Permission>
+pub struct E2EHandler<P, V>
 where
-    P: PermissionHandler<Permission>,
+    P: PermissionHandler,
 {
     credentials: PermCredentials,
-    handler_collection: HandlerCollection<P, Permission>,
+    handler_collection: HandlerCollection<P>,
+    verifier: Arc<V>,
 }
 
-impl<P, Permission> E2EHandler<P, Permission>
+impl<P, V> E2EHandler<P, V>
 where
-    P: PermissionHandler<Permission>,
+    P: PermissionHandler,
 {
     pub fn new(
         credentials: PermCredentials,
-        handler_collection: HandlerCollection<P, Permission>,
+        handler_collection: HandlerCollection<P>,
+        verifier: Arc<V>,
     ) -> Self {
         Self {
             credentials,
             handler_collection,
+            verifier,
         }
     }
 }
 
 #[async_trait]
-impl<P, Permission> TakeableCommandHandler for E2EHandler<P, Permission>
+impl<P, V> TakeableCommandHandler for E2EHandler<P, V>
 where
-    P: PermissionHandler<Permission>,
+    P: PermissionHandler,
+    V: ClientCertVerifier + 'static,
 {
     type Request = ();
 
@@ -63,7 +71,7 @@ where
             let tls_transport = TlsTransport::server(
                 CombinedTransport::new(read, write),
                 // TODO: actually fucking verify the connecting peer
-                crate::verifiers::skip_verify::SkipClientVerification::new(),
+                self.verifier.clone(),
                 &self.credentials,
             )
             .await?;
@@ -71,9 +79,9 @@ where
             let (read, write) = tokio::io::split(tls_transport);
 
             // TODO: after verifying this, set the correct peer
-            let session_ready = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+            let session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
 
-            session_ready.handle(&self.handler_collection).await
+            session.handle(&self.handler_collection).await
         } else {
             Err(anyhow!("no session given"))
         }
@@ -109,6 +117,8 @@ where
         _: Self::Request,
     ) -> Result<Self::Output> {
         if let Some(session_ready) = session.take() {
+            debug!("encrypting session");
+
             let (read, write, _) = session_ready.destructure_transport();
             let tls_transport = TlsTransport::client(
                 CombinedTransport::new(read, write),

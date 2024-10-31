@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, instrument};
 
@@ -57,20 +57,25 @@ impl Session {
         Self { read, write, peer }
     }
 
-    pub(crate) async fn handle<P, Permission>(
-        mut self,
-        commands: &HandlerCollection<P, Permission>,
-    ) -> Result<()>
+    pub(crate) async fn handle<P>(mut self, commands: &HandlerCollection<P>) -> Result<()>
     where
-        P: PermissionHandler<Permission>,
+        P: PermissionHandler,
     {
         debug!("waiting for request header");
 
-        let header: SessionRequestHeader = self.read_object().await?;
+        let header: SessionRequestHeader = self
+            .read_object()
+            .await
+            .context("error reading request header")?;
 
-        debug!("requested command: {}", header.command_key);
+        let key = header.command_key.clone();
 
-        commands.handle_session(self, header).await
+        debug!("requested command: {key}");
+
+        commands
+            .handle_session(self, header)
+            .await
+            .context(format!("error handling session with key {key}"))
     }
 
     /// Used to send a command via this session.
@@ -95,7 +100,9 @@ impl Session {
             SessionResponseHeader::Decline { code, message } => {
                 return Err(anyhow!(format!("Error Code {}: {}", code, message)));
             }
-            SessionResponseHeader::Accept => {}
+            SessionResponseHeader::Accept => {
+                debug!("Peer accepted command: {}", D::key());
+            }
         };
 
         let mut opt = Some(self);
@@ -125,6 +132,7 @@ impl Session {
     }
 
     pub(crate) async fn shutdown(mut self) {
+        debug!("Shutting down session");
         if let Err(err) = self.write.shutdown().await {
             error!("error shuting down session: {err}");
         }

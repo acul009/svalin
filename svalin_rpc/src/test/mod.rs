@@ -35,9 +35,9 @@ async fn ping_test() {
     )
     .unwrap();
 
-    let permission_handler = AnonymousPermissionHandler;
+    let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
 
-    let commands = HandlerCollection::<_, DummyPermission>::new(permission_handler);
+    let commands = HandlerCollection::new(permission_handler);
     commands.chain().await.add(PingHandler::new());
 
     let server_handle = tokio::spawn(async move {
@@ -75,9 +75,9 @@ async fn tls_test() {
     )
     .unwrap();
 
-    let permission_handler = AnonymousPermissionHandler;
+    let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
 
-    let commands = HandlerCollection::<_, DummyPermission>::new(permission_handler);
+    let commands = HandlerCollection::new(permission_handler);
     commands
         .chain()
         .await
@@ -118,9 +118,9 @@ async fn perm_test() {
     )
     .unwrap();
 
-    let permission_handler = WhitelistPermissionHandler::new(vec![]);
+    let permission_handler = WhitelistPermissionHandler::<DummyPermission>::new(vec![]);
 
-    let commands = HandlerCollection::<_, DummyPermission>::new(permission_handler);
+    let commands = HandlerCollection::new(permission_handler);
     commands
         .chain()
         .await

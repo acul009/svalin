@@ -37,7 +37,7 @@ impl Display for VerificationError {
 
 impl Error for VerificationError {}
 
-pub trait Verifier: Send + Sync + Debug {
+pub trait Verifier: Send + Sync + Debug + 'static {
     /// TODO: include time for revocation/expiration checking
     fn verify_fingerprint(
         &self,
@@ -48,7 +48,7 @@ pub trait Verifier: Send + Sync + Debug {
 
 impl<T: Verifier> KnownCertificateVerifier for T {}
 
-pub trait KnownCertificateVerifier: Verifier + Sized {
+pub trait KnownCertificateVerifier: Verifier + Sized + 'static {
     fn verify_known_certificate(
         &self,
         cert: &Certificate,

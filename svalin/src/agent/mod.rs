@@ -5,6 +5,7 @@ use marmelade::Scope;
 use serde::{Deserialize, Serialize};
 use svalin_pki::verifier::KnownCertificateVerifier;
 use svalin_pki::{Certificate, PermCredentials};
+use svalin_rpc::commands::deauthenticate::DeauthenticateHandler;
 use svalin_rpc::commands::e2e::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
 use svalin_rpc::rpc::client::RpcClient;
@@ -14,6 +15,7 @@ use tracing::{debug, instrument};
 mod init;
 
 use crate::client::verifiers;
+use crate::permissions::agent_permission_handler::AgentPermissionHandler;
 use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::commands::terminal::RemoteTerminalHandler;
 use crate::shared::join_agent::AgentInitPayload;
@@ -71,7 +73,9 @@ impl Agent {
     }
 
     pub async fn run(&self) -> Result<()> {
-        let e2e_commands = HandlerCollection::new();
+        let permission_handler = AgentPermissionHandler::new(self.root_certificate.clone());
+
+        let e2e_commands = HandlerCollection::new(permission_handler.clone());
 
         e2e_commands
             .chain()
@@ -80,14 +84,21 @@ impl Agent {
             .add(RealtimeStatusHandler::new())
             .add(RemoteTerminalHandler);
 
-        let public_commands = HandlerCollection::new();
+        let public_commands = HandlerCollection::new(permission_handler.clone());
 
         public_commands
             .chain()
             .await
             .add(E2EHandler::new(self.credentials.clone(), e2e_commands));
 
-        self.rpc.serve(public_commands).await
+        let server_commands = HandlerCollection::new(permission_handler);
+
+        server_commands
+            .chain()
+            .await
+            .add(DeauthenticateHandler::new(public_commands));
+
+        self.rpc.serve(server_commands).await
     }
 
     pub async fn init_with(data: AgentInitPayload) -> Result<()> {

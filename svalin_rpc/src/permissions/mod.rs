@@ -7,11 +7,13 @@ use crate::rpc::{command::handler::PermissionPrecursor, peer::Peer};
 pub mod anonymous_permission_handler;
 pub mod whitelist;
 
-pub trait PermissionHandler<Permission>: Send + Sync + Clone + 'static {
+pub trait PermissionHandler: Send + Sync + Clone + 'static {
+    type Permission: Send + Sync + Clone + 'static;
+
     fn may(
         &self,
         peer: &Peer,
-        permission: &Permission,
+        permission: &Self::Permission,
     ) -> impl Future<Output = Result<(), PermissionCheckError>> + Send + Sync;
 }
 
@@ -40,6 +42,7 @@ impl From<anyhow::Error> for PermissionCheckError {
 
 impl Error for PermissionCheckError {}
 
+#[derive(Default, Clone)]
 pub struct DummyPermission;
 
 impl<R, H> From<&PermissionPrecursor<R, H>> for DummyPermission {

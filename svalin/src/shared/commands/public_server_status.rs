@@ -6,10 +6,6 @@ use svalin_rpc::rpc::{
     session::Session,
 };
 
-fn public_status_key() -> String {
-    "public_status".to_owned()
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub enum PublicStatus {
     WaitingForInit,
@@ -28,12 +24,14 @@ impl PublicStatusHandler {
 
 #[async_trait]
 impl CommandHandler for PublicStatusHandler {
-    fn key(&self) -> String {
-        public_status_key()
+    type Request = ();
+
+    fn key() -> String {
+        "public_status".to_owned()
     }
 
     #[must_use]
-    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session, _: Self::Request) -> anyhow::Result<()> {
         session.write_object(&self.current_status).await?;
         Ok(())
     }
@@ -44,12 +42,17 @@ pub struct GetPutblicStatus;
 #[async_trait]
 impl CommandDispatcher for GetPutblicStatus {
     type Output = PublicStatus;
+    type Request = ();
 
-    fn key(&self) -> String {
-        public_status_key()
+    fn key() -> String {
+        PublicStatusHandler::key()
     }
 
-    async fn dispatch(self, session: &mut Session) -> Result<PublicStatus> {
+    fn get_request(&self) -> Self::Request {
+        ()
+    }
+
+    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<PublicStatus> {
         let status = session.read_object().await?;
 
         Ok(status)

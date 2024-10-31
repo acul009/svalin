@@ -6,7 +6,7 @@ use argon2::{
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ArgonParams {
     m_cost: u32,
     t_cost: u32,

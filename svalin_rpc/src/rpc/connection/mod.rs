@@ -58,7 +58,7 @@ where
     async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output> {
         let (read, write) = self.open_raw_session().await?;
 
-        let session = Session::new(read, write, Peer::Anonymous);
+        let session = Session::new(read, write, self.peer().clone());
 
         session.dispatch(dispatcher).await
     }
@@ -75,28 +75,28 @@ pub trait ServeableConnectionBase: ConnectionBase {
 }
 
 #[async_trait]
-pub trait ServeableConnection<P, Permission>
+pub trait ServeableConnection<P>
 where
-    P: PermissionHandler<Permission>,
+    P: PermissionHandler,
 {
-    async fn serve(&self, commands: HandlerCollection<P, Permission>) -> Result<()>;
+    async fn serve(&self, commands: HandlerCollection<P>) -> Result<()>;
 }
 
 #[async_trait]
-impl<T, P, Permission> ServeableConnection<P, Permission> for T
+impl<T, P> ServeableConnection<P> for T
 where
     T: ServeableConnectionBase,
-    P: PermissionHandler<Permission>,
-    Permission: 'static,
+    P: PermissionHandler,
+    P::Permission: 'static,
 {
-    async fn serve(&self, commands: HandlerCollection<P, Permission>) -> Result<()> {
+    async fn serve(&self, commands: HandlerCollection<P>) -> Result<()> {
         debug!("waiting for incoming data stream");
         let mut open_sessions = JoinSet::<()>::new();
 
         loop {
             match self.accept_raw_session().await {
                 Ok((read, write)) => {
-                    let session = Session::new(read, write, Peer::Anonymous);
+                    let session = Session::new(read, write, self.peer().clone());
 
                     let commands2 = commands.clone();
                     open_sessions.spawn(async move {

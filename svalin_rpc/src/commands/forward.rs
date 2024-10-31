@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt::{Debug, Display};
 
-use crate::commands::e2e::E2EDispatcher;
+use crate::commands::{deauthenticate::Deauthenticate, e2e::E2EDispatcher};
 use crate::rpc::command::dispatcher::TakeableCommandDispatcher;
 use crate::rpc::connection::Connection;
 use crate::rpc::{command::handler::CommandHandler, server::RpcServer, session::Session};
@@ -20,6 +20,7 @@ fn forward_key() -> String {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ForwardError {
     TargetNotConnected,
+    DeauthFailure,
 }
 
 impl Display for ForwardError {
@@ -28,6 +29,7 @@ impl Display for ForwardError {
             ForwardError::TargetNotConnected => {
                 write!(f, "Requested Target is not currently available")
             }
+            ForwardError::DeauthFailure => write!(f, "Deauthentication failed"),
         }
     }
 }
@@ -58,24 +60,36 @@ impl CommandHandler for ForwardHandler {
 
         debug!("received forward request to {:?}", target);
 
-        match self.server.open_raw_session_with(target).await {
-            Ok((read2, write2)) => {
-                session
-                    .write_object::<Result<(), ForwardError>>(&Ok(()))
-                    .await?;
+        match self.server.open_session_with(target).await {
+            Ok(forward_session) => match forward_session.dispatch(Deauthenticate).await {
+                Ok(forward_session) => {
+                    debug!("deauth successful, forwarding session");
 
-                let (read1, write1) = session.borrow_transport();
+                    session
+                        .write_object::<Result<(), ForwardError>>(&Ok(()))
+                        .await?;
 
-                let mut transport1 = CombinedTransport::new(read1, write1);
-                let mut transport2 = CombinedTransport::new(read2, write2);
+                    let (read1, write1) = session.borrow_transport();
+                    let (read2, write2, _) = forward_session.destructure_transport();
 
-                tokio::io::copy_bidirectional(&mut transport1, &mut transport2).await?;
+                    let mut transport1 = CombinedTransport::new(read1, write1);
+                    let mut transport2 = CombinedTransport::new(read2, write2);
 
-                let _ = transport1.shutdown().await;
-                let _ = transport2.shutdown().await;
+                    tokio::io::copy_bidirectional(&mut transport1, &mut transport2).await?;
 
-                Ok(())
-            }
+                    let _ = transport1.shutdown().await;
+                    let _ = transport2.shutdown().await;
+
+                    Ok(())
+                }
+                Err(err) => {
+                    session
+                        .write_object::<Result<(), ForwardError>>(&Err(ForwardError::DeauthFailure))
+                        .await?;
+
+                    Err(err)
+                }
+            },
             // TODO: check and return the actual error
             Err(err) => {
                 tracing::error!("error during session forwarding: {err}");
@@ -118,8 +132,6 @@ where
         _target: Self::Request,
     ) -> Result<Self::Output> {
         if let Some(mut session) = session.take() {
-            session.write_object(&self.target).await?;
-
             session
                 .read_object::<Result<(), ForwardError>>()
                 .await

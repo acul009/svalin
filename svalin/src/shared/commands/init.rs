@@ -19,20 +19,18 @@ impl InitHandler {
     }
 }
 
-fn init_key() -> String {
-    "init".to_owned()
-}
-
 #[async_trait]
 impl CommandHandler for InitHandler {
-    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
+    type Request = Certificate;
+
+    async fn handle(&self, session: &mut Session, request: Self::Request) -> anyhow::Result<()> {
         debug!("incoming init request");
 
         if self.channel.is_closed() {
             return Ok(());
         }
 
-        let root: Certificate = session.read_object().await?;
+        let root = request;
 
         let keypair = Keypair::generate()?;
         let request = keypair.generate_request()?;
@@ -52,29 +50,42 @@ impl CommandHandler for InitHandler {
         Ok(())
     }
 
-    fn key(&self) -> String {
-        init_key()
+    fn key() -> String {
+        "init".to_owned()
     }
 }
 
-pub struct Init;
+pub struct Init {
+    root: PermCredentials,
+}
+
+impl Init {
+    pub fn new() -> Result<Self> {
+        let root = Keypair::generate()?.to_self_signed_cert()?;
+
+        Ok(Self { root })
+    }
+}
 
 #[async_trait]
 impl CommandDispatcher for Init {
     type Output = (PermCredentials, Certificate);
+    type Request = Certificate;
 
-    fn key(&self) -> String {
-        init_key()
+    fn key() -> String {
+        InitHandler::key()
     }
 
-    async fn dispatch(self, session: &mut Session) -> Result<Self::Output> {
+    fn get_request(&self) -> Self::Request {
+        self.root.get_certificate().clone()
+    }
+
+    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<Self::Output> {
         debug!("sending init request");
-        let root = Keypair::generate()?.to_self_signed_cert()?;
-        session.write_object(root.get_certificate()).await?;
 
         let raw_request: String = session.read_object().await?;
         let request = CertificateRequest::from_string(raw_request)?;
-        let server_cert: Certificate = root.approve_request(request)?;
+        let server_cert: Certificate = self.root.approve_request(request)?;
 
         session.write_object(&server_cert).await?;
 
@@ -82,6 +93,6 @@ impl CommandDispatcher for Init {
 
         debug!("init completed");
 
-        Ok((root, server_cert))
+        Ok((self.root, server_cert))
     }
 }

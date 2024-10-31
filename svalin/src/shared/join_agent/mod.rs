@@ -6,9 +6,11 @@ use std::{
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
-use svalin_rpc::rpc::session::Session;
+use svalin_rpc::rpc::{command::handler::PermissionPrecursor, session::Session};
 use tokio::task::AbortHandle;
 use tracing::field::debug;
+
+use crate::permissions::Permission;
 
 use self::{accept_handler::JoinAcceptHandler, request_handler::JoinRequestHandler};
 
@@ -113,6 +115,18 @@ impl ServerJoinManager {
 
     pub fn create_accept_handler(&self) -> JoinAcceptHandler {
         JoinAcceptHandler::new(self.clone())
+    }
+}
+
+impl From<&PermissionPrecursor<(), JoinRequestHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<(), JoinRequestHandler>) -> Self {
+        Permission::AnonymousOnly
+    }
+}
+
+impl From<&PermissionPrecursor<(), JoinAcceptHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<(), JoinAcceptHandler>) -> Self {
+        Permission::RootOnlyPlaceholder
     }
 }
 

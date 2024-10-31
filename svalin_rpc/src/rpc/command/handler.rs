@@ -54,9 +54,9 @@ where
 /// This wrapper allows to attach the additional information needed for a
 /// permission check to a handler
 #[async_trait]
-pub trait HandlerPermissionWrapper<P, Permission>: Send + Sync
+pub trait HandlerPermissionWrapper<P>: Send + Sync
 where
-    P: PermissionHandler<Permission>,
+    P: PermissionHandler,
 {
     async fn handle_with_permission(&self, session: Session, permission_handler: &P) -> Result<()>;
 }
@@ -76,12 +76,12 @@ pub struct PermissionPrecursor<R, H> {
 /// PermissionHandler as well as the Permission and it's conversion from a
 /// precursor have to be provided by the caller
 #[async_trait]
-impl<H, P, Permission> HandlerPermissionWrapper<P, Permission> for H
+impl<H, P> HandlerPermissionWrapper<P> for H
 where
     H: TakeableCommandHandler,
     H::Request: DeserializeOwned,
-    P: PermissionHandler<Permission>,
-    Permission: for<'a> From<&'a PermissionPrecursor<H::Request, Self>> + Send + Sync,
+    P: PermissionHandler,
+    P::Permission: for<'a> From<&'a PermissionPrecursor<H::Request, Self>> + Send + Sync,
 {
     async fn handle_with_permission(
         &self,
@@ -95,7 +95,7 @@ where
             handler: PhantomData::<Self>,
         };
 
-        let permission: Permission = (&precursor).into();
+        let permission: P::Permission = (&precursor).into();
 
         let request = precursor.request;
 
@@ -106,7 +106,6 @@ where
                     message: "Permission denied".into(),
                 })
                 .await?;
-            // Todo: inform client about permission error
             return Err(err.into());
         }
 
@@ -127,17 +126,17 @@ where
 
 /// This struct collects possible handlers and combines them with a
 /// PermissionHandler
-pub struct HandlerCollection<P, Permission>
+pub struct HandlerCollection<P>
 where
-    P: PermissionHandler<Permission>,
+    P: PermissionHandler,
 {
-    commands: Arc<RwLock<HashMap<String, Arc<dyn HandlerPermissionWrapper<P, Permission>>>>>,
+    commands: Arc<RwLock<HashMap<String, Arc<dyn HandlerPermissionWrapper<P>>>>>,
     permission_handler: P,
 }
 
-impl<P, Permission> Clone for HandlerCollection<P, Permission>
+impl<P> Clone for HandlerCollection<P>
 where
-    P: PermissionHandler<Permission>,
+    P: PermissionHandler,
 {
     fn clone(&self) -> Self {
         Self {
@@ -147,9 +146,9 @@ where
     }
 }
 
-impl<P, Permission> HandlerCollection<P, Permission>
+impl<P> HandlerCollection<P>
 where
-    P: PermissionHandler<Permission>,
+    P: PermissionHandler,
 {
     pub fn new(permission_handler: P) -> Self {
         Self {
@@ -158,7 +157,7 @@ where
         }
     }
 
-    pub async fn chain(&self) -> ChainCommandAdder<P, Permission> {
+    pub async fn chain(&self) -> ChainCommandAdder<P> {
         let lock = self.commands.write().await;
         ChainCommandAdder { lock }
     }
@@ -187,16 +186,16 @@ where
 
 /// This is just a helper struct to enable adding multiple handlers using method
 /// chaining
-pub struct ChainCommandAdder<'a, P, Permission> {
-    lock: RwLockWriteGuard<'a, HashMap<String, Arc<dyn HandlerPermissionWrapper<P, Permission>>>>,
+pub struct ChainCommandAdder<'a, P> {
+    lock: RwLockWriteGuard<'a, HashMap<String, Arc<dyn HandlerPermissionWrapper<P>>>>,
 }
 
-impl<'a, P, Permission> ChainCommandAdder<'a, P, Permission> {
+impl<'a, P> ChainCommandAdder<'a, P> {
     pub fn add<T>(&mut self, command: T) -> &mut Self
     where
-        P: PermissionHandler<Permission>,
+        P: PermissionHandler,
         T: TakeableCommandHandler + 'static,
-        Permission: for<'b> From<&'b PermissionPrecursor<T::Request, T>> + Send + Sync,
+        P::Permission: for<'b> From<&'b PermissionPrecursor<T::Request, T>> + Send + Sync,
     {
         self.lock.insert(T::key(), Arc::new(command));
         self

@@ -65,7 +65,7 @@ impl Init {
         let (root, server_cert) = self
             .client
             .upstream_connection()
-            .dispatch(init::Init)
+            .dispatch(init::Init::new()?)
             .await
             .context("failed to initialize server certificate")?;
 
@@ -84,23 +84,17 @@ impl Init {
         debug!("connected to server with certificate");
 
         connection
-            .dispatch(AddUser {
-                credentials: &root,
-                username: username.clone(),
-                password: password.clone().into(),
-                totp_secret: totp_secret,
-            })
+            .dispatch(
+                AddUser::new(
+                    &root,
+                    username.clone(),
+                    password.clone().into(),
+                    totp_secret,
+                )
+                .await?,
+            )
             .await
             .context("failed to add root user")?;
-        // connection
-        //     .add_user(
-        //         &root,
-        //         username.clone(),
-        //         password.clone().into(),
-        //         totp_secret,
-        //     )
-        //     .await
-        //     .context("failed to add root user")?;
 
         Client::add_profile(
             username,

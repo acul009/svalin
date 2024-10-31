@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use quinn::{rustls::pki_types::CertificateDer, VarInt};
 use svalin_pki::Certificate;
+use tracing::debug;
 
 use crate::{
     rpc::peer::Peer,
@@ -78,6 +79,8 @@ impl DirectConnection {
                 Peer::Certificate(cert)
             }
         };
+
+        debug!("connection with peer: {peer:?}");
 
         Ok(DirectConnection { conn, peer })
     }

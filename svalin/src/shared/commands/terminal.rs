@@ -2,12 +2,17 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_rpc::rpc::{
-    command::{dispatcher::TakeableCommandDispatcher, handler::TakeableCommandHandler},
+    command::{
+        dispatcher::TakeableCommandDispatcher,
+        handler::{PermissionPrecursor, TakeableCommandHandler},
+    },
     session::Session,
 };
 use svalin_sysctl::pty::{PtyProcess, TerminalSize};
 use tokio::{sync::mpsc, task::JoinSet};
 use tracing::debug;
+
+use crate::permissions::Permission;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum TerminalPacket {
@@ -16,19 +21,23 @@ pub enum TerminalPacket {
     Resize(TerminalSize),
 }
 
-fn remote_terminal_key() -> String {
-    "remote-terminal".into()
-}
-
 pub struct RemoteTerminalHandler;
+
+impl From<&PermissionPrecursor<(), RemoteTerminalHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<(), RemoteTerminalHandler>) -> Self {
+        Permission::RootOnlyPlaceholder
+    }
+}
 
 #[async_trait]
 impl TakeableCommandHandler for RemoteTerminalHandler {
-    fn key(&self) -> String {
-        remote_terminal_key()
+    type Request = ();
+
+    fn key() -> String {
+        "remote-terminal".into()
     }
 
-    async fn handle(&self, session: &mut Option<Session>) -> Result<()> {
+    async fn handle(&self, session: &mut Option<Session>, _: Self::Request) -> Result<()> {
         if let Some(mut session) = session.take() {
             let size: TerminalSize = session.read_object().await?;
             let (pty, mut pty_reader) = PtyProcess::shell(size)?;
@@ -122,12 +131,21 @@ pub struct RemoteTerminalDispatcher;
 #[async_trait]
 impl TakeableCommandDispatcher for RemoteTerminalDispatcher {
     type Output = RemoteTerminal;
+    type Request = ();
 
-    fn key(&self) -> String {
-        remote_terminal_key()
+    fn key() -> String {
+        RemoteTerminalHandler::key()
     }
 
-    async fn dispatch(mut self, session: &mut Option<Session>) -> Result<Self::Output> {
+    fn get_request(&self) -> Self::Request {
+        ()
+    }
+
+    async fn dispatch(
+        mut self,
+        session: &mut Option<Session>,
+        _: Self::Request,
+    ) -> Result<Self::Output> {
         if let Some(session) = session.take() {
             debug!("starting remote terminal");
 

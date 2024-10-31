@@ -18,6 +18,7 @@ use crate::rpc::command::handler::HandlerCollection;
 use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
 
 use super::connection::direct_connection::DirectConnection;
+use super::session::Session;
 
 #[derive(Debug, Clone)]
 pub struct ClientConnectionStatus {
@@ -90,10 +91,10 @@ impl RpcServer {
         Ok(endpoint)
     }
 
-    pub async fn run<P, Permission>(&self, commands: HandlerCollection<P, Permission>) -> Result<()>
+    pub async fn run<P>(&self, commands: HandlerCollection<P>) -> Result<()>
     where
-        P: PermissionHandler<Permission>,
-        Permission: 'static,
+        P: PermissionHandler,
+        P::Permission: 'static,
     {
         debug!("starting server");
         while let Some(conn) = self.endpoint.accept().await {
@@ -118,15 +119,14 @@ impl RpcServer {
         todo!()
     }
 
-    async fn handle_connection<P, Permission>(
+    async fn handle_connection<P>(
         conn: quinn::Connecting,
-        commands: HandlerCollection<P, Permission>,
+        commands: HandlerCollection<P>,
         data: Arc<Mutex<ServerData>>,
         broadcast: broadcast::Sender<ClientConnectionStatus>,
     ) -> Result<()>
     where
-        P: PermissionHandler<Permission>,
-        Permission: 'static,
+        P: PermissionHandler,
     {
         debug!("waiting for connection to get ready...");
 
@@ -141,6 +141,7 @@ impl RpcServer {
         let conn = DirectConnection::new(conn)?;
 
         if let Peer::Certificate(cert) = conn.peer() {
+            debug!("noting down connection for peer");
             let mut lock = data.lock().await;
             lock.latest_connections.insert(cert.clone(), conn.clone());
             let _ = broadcast.send(ClientConnectionStatus {
@@ -178,13 +179,7 @@ impl RpcServer {
         self.endpoint.close(0u32.into(), b"");
     }
 
-    pub async fn open_raw_session_with(
-        &self,
-        peer: Certificate,
-    ) -> Result<(
-        Box<dyn SessionTransportReader>,
-        Box<dyn SessionTransportWriter>,
-    )> {
+    pub async fn open_session_with(&self, peer: Certificate) -> Result<Session> {
         let lock = self.data.lock().await;
 
         let conn = lock
@@ -192,7 +187,11 @@ impl RpcServer {
             .get(&peer)
             .ok_or_else(|| anyhow!("no connection to requested peer"))?;
 
-        conn.open_raw_session().await
+        let (read, write) = conn.open_raw_session().await?;
+
+        let session = Session::new(read, write, conn.peer().clone());
+
+        Ok(session)
     }
 
     pub fn subscribe_to_connection_status(&self) -> broadcast::Receiver<ClientConnectionStatus> {

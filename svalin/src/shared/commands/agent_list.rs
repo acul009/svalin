@@ -10,7 +10,10 @@ use svalin_pki::{
 use svalin_rpc::{
     commands::forward::ForwardConnection,
     rpc::{
-        command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+        command::{
+            dispatcher::CommandDispatcher,
+            handler::{CommandHandler, PermissionPrecursor},
+        },
         connection::direct_connection::DirectConnection,
         server::RpcServer,
         session::Session,
@@ -21,6 +24,7 @@ use tracing::{debug, dispatcher::get_default};
 
 use crate::{
     client::device::Device,
+    permissions::Permission,
     server::agent_store::{AgentStore, AgentUpdate},
     shared::join_agent::PublicAgentData,
 };
@@ -42,6 +46,12 @@ pub struct AgentListHandler {
     server: RpcServer,
 }
 
+impl From<&PermissionPrecursor<(), AgentListHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<(), AgentListHandler>) -> Self {
+        Permission::RootOnlyPlaceholder
+    }
+}
+
 impl AgentListHandler {
     pub fn new(agent_store: Arc<AgentStore>, server: RpcServer) -> Self {
         Self {
@@ -51,17 +61,15 @@ impl AgentListHandler {
     }
 }
 
-fn agent_list_key() -> String {
-    "agent_list".into()
-}
-
 #[async_trait]
 impl CommandHandler for AgentListHandler {
-    fn key(&self) -> String {
-        agent_list_key()
+    type Request = ();
+
+    fn key() -> String {
+        "agent_list".into()
     }
 
-    async fn handle(&self, session: &mut Session) -> Result<()> {
+    async fn handle(&self, session: &mut Session, _: Self::Request) -> Result<()> {
         let mut receiver = self.server.subscribe_to_connection_status();
         let currently_online = self.server.get_current_connected_clients().await;
 
@@ -132,11 +140,18 @@ pub struct UpdateAgentList {
 #[async_trait]
 impl CommandDispatcher for UpdateAgentList {
     type Output = ();
-    fn key(&self) -> String {
-        agent_list_key()
+
+    type Request = ();
+
+    fn key() -> String {
+        AgentListHandler::key()
     }
 
-    async fn dispatch(self, session: &mut Session) -> Result<()> {
+    fn get_request(&self) -> Self::Request {
+        ()
+    }
+
+    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<()> {
         loop {
             let list_item_update: AgentListItemTransport = session
                 .read_object()

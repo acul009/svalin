@@ -11,20 +11,24 @@ use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, Keypair, PermCredentials};
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
+    permissions::{anonymous_permission_handler::AnonymousPermissionHandler, DummyPermission},
     rpc::command::handler::HandlerCollection,
     verifiers::skip_verify::SkipClientVerification,
 };
 use tokio::sync::mpsc;
 use tracing::{debug, error};
 
-use crate::shared::{
-    commands::{
-        add_user::AddUserHandler,
-        agent_list::AgentListHandler,
-        init::InitHandler,
-        public_server_status::{PublicStatus, PublicStatusHandler},
+use crate::{
+    permissions::server_permission_handler::ServerPermissionHandler,
+    shared::{
+        commands::{
+            add_user::AddUserHandler,
+            agent_list::AgentListHandler,
+            init::InitHandler,
+            public_server_status::{PublicStatus, PublicStatusHandler},
+        },
+        join_agent::add_agent::AddAgentHandler,
     },
-    join_agent::add_agent::AddAgentHandler,
 };
 
 use svalin_rpc::rpc::server::RpcServer;
@@ -117,12 +121,15 @@ impl Server {
     }
 
     pub async fn run(&mut self) -> Result<()> {
+        let permission_handler: ServerPermissionHandler =
+            ServerPermissionHandler::new(self.root.clone());
+
         let userstore = UserStore::open(self.scope.subscope("users".into())?);
 
         let agent_store =
             AgentStore::open(self.scope.subscope("agents".into())?, self.root.clone());
 
-        let commands = HandlerCollection::new();
+        let commands = HandlerCollection::new(permission_handler);
 
         let join_manager = crate::shared::join_agent::ServerJoinManager::new();
 
@@ -181,7 +188,9 @@ impl Server {
 
         let (send, mut receive) = mpsc::channel::<(Certificate, PermCredentials)>(1);
 
-        let commands = HandlerCollection::new();
+        let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
+
+        let commands = HandlerCollection::new(permission_handler);
         commands
             .chain()
             .await

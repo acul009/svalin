@@ -32,17 +32,15 @@ fn create_join_code() -> String {
     rand::thread_rng().gen_range(0..999999).to_string()
 }
 
-fn join_request_key() -> String {
-    "join_request".to_string()
-}
-
 #[async_trait]
 impl TakeableCommandHandler for JoinRequestHandler {
-    fn key(&self) -> String {
-        join_request_key()
+    type Request = ();
+
+    fn key() -> String {
+        "join_request".to_string()
     }
 
-    async fn handle(&self, session: &mut Option<Session>) -> Result<()> {
+    async fn handle(&self, session: &mut Option<Session>, _: Self::Request) -> Result<()> {
         if let Some(mut session) = session.take() {
             let mut join_code = create_join_code();
             while let Err(sess) = self.manager.add_session(join_code, session).await {
@@ -71,11 +69,21 @@ pub struct RequestJoin {
 impl TakeableCommandDispatcher for RequestJoin {
     type Output = AgentInitPayload;
 
-    fn key(&self) -> String {
-        join_request_key()
+    type Request = ();
+
+    fn key() -> String {
+        JoinRequestHandler::key()
     }
 
-    async fn dispatch(self, session: &mut Option<Session>) -> Result<Self::Output> {
+    fn get_request(&self) -> Self::Request {
+        ()
+    }
+
+    async fn dispatch(
+        self,
+        session: &mut Option<Session>,
+        _: Self::Request,
+    ) -> Result<Self::Output> {
         if let Some(mut session) = session.take() {
             let join_code: String = session.read_object().await?;
 

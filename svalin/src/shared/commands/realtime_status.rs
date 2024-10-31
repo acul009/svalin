@@ -4,18 +4,17 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::{select, FutureExt};
 use svalin_rpc::rpc::{
-    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    command::{
+        dispatcher::CommandDispatcher,
+        handler::{CommandHandler, PermissionPrecursor},
+    },
     session::Session,
 };
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::{oneshot, watch};
 use tracing::debug;
 
-use crate::client::device::RemoteLiveData;
-
-fn realtime_status_key() -> String {
-    "realtime-status".into()
-}
+use crate::{client::device::RemoteLiveData, permissions::Permission};
 
 pub struct RealtimeStatusHandler {}
 
@@ -25,13 +24,21 @@ impl RealtimeStatusHandler {
     }
 }
 
+impl From<&PermissionPrecursor<(), RealtimeStatusHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<(), RealtimeStatusHandler>) -> Self {
+        Permission::RootOnlyPlaceholder
+    }
+}
+
 #[async_trait]
 impl CommandHandler for RealtimeStatusHandler {
-    fn key(&self) -> String {
-        realtime_status_key()
+    type Request = ();
+
+    fn key() -> String {
+        "realtime-status".into()
     }
 
-    async fn handle(&self, session: &mut Session) -> Result<()> {
+    async fn handle(&self, session: &mut Session, _: Self::Request) -> Result<()> {
         debug!("realtime status requested");
         loop {
             let status = RealtimeStatus::get().await;
@@ -52,12 +59,17 @@ pub struct SubscribeRealtimeStatus {
 #[async_trait]
 impl CommandDispatcher for SubscribeRealtimeStatus {
     type Output = ();
+    type Request = ();
 
-    fn key(&self) -> String {
-        realtime_status_key()
+    fn key() -> String {
+        RealtimeStatusHandler::key()
     }
 
-    async fn dispatch(self, session: &mut Session) -> Result<()> {
+    fn get_request(&self) -> Self::Request {
+        ()
+    }
+
+    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<()> {
         let mut stop = pin!(self.stop.fuse());
         loop {
             select! {

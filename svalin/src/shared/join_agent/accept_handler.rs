@@ -19,10 +19,6 @@ pub struct JoinAcceptHandler {
     manager: ServerJoinManager,
 }
 
-fn accept_join_code() -> String {
-    "accept_join".to_string()
-}
-
 impl JoinAcceptHandler {
     pub(super) fn new(manager: ServerJoinManager) -> Self {
         Self { manager }
@@ -31,11 +27,13 @@ impl JoinAcceptHandler {
 
 #[async_trait]
 impl CommandHandler for JoinAcceptHandler {
-    fn key(&self) -> String {
-        accept_join_code()
+    type Request = ();
+
+    fn key() -> String {
+        "accept_join".to_string()
     }
 
-    async fn handle(&self, session: &mut Session) -> anyhow::Result<()> {
+    async fn handle(&self, session: &mut Session, _: Self::Request) -> anyhow::Result<()> {
         let join_code: String = session.read_object().await?;
 
         let agent_session = self.manager.get_session(&join_code);
@@ -82,11 +80,21 @@ pub struct AcceptJoin<'a> {
 impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
     type Output = Certificate;
 
-    fn key(&self) -> String {
-        accept_join_code()
+    type Request = ();
+
+    fn key() -> String {
+        JoinAcceptHandler::key()
     }
 
-    async fn dispatch(self, session: &mut Option<Session>) -> Result<Self::Output> {
+    fn get_request(&self) -> Self::Request {
+        ()
+    }
+
+    async fn dispatch(
+        self,
+        session: &mut Option<Session>,
+        _: Self::Request,
+    ) -> Result<Self::Output> {
         if let Some(session) = session.take() {
             let confirm_code_result =
                 prepare_agent_enroll(session, self.join_code, self.credentials)
