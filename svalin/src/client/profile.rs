@@ -10,7 +10,9 @@ use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::{sync::RwLock, task::JoinSet};
 use tracing::{debug, error};
 
-use crate::{client::verifiers, shared::commands::agent_list::UpdateAgentList};
+use crate::{
+    shared::commands::agent_list::UpdateAgentList, verifier::upstream_verifier::UpstreamVerifier,
+};
 
 use super::Client;
 
@@ -194,7 +196,7 @@ impl Client {
             let identity = PermCredentials::from_bytes(&profile.raw_credentials, password).await?;
 
             debug!("creating verifier");
-            let verifier = verifiers::upstream_verifier::UpstreamVerifier::new(
+            let verifier = UpstreamVerifier::new(
                 profile.root_certificate.clone(),
                 profile.upstream_certificate.clone(),
             )

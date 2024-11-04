@@ -5,6 +5,7 @@ use anyhow::Result;
 use serde::de::Visitor;
 use serde::{de, Deserialize, Serialize};
 use spki::FingerprintBytes;
+use thiserror::Error;
 use x509_parser::nom::AsBytes;
 use x509_parser::prelude::Validity;
 use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
@@ -30,6 +31,8 @@ impl Certificate {
         let public_key = cert.public_key().subject_public_key.data.to_vec();
 
         let validity = cert.validity().clone();
+
+        let issuer = cert.issuer();
 
         Ok(Certificate {
             data: Arc::new(CertificateData {
@@ -75,9 +78,11 @@ impl Certificate {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ValidityError {
+    #[error("The certificate is not yet valid")]
     NotYetValid,
+    #[error("The certificate is expired")]
     Expired,
 }
 

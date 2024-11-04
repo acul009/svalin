@@ -13,6 +13,7 @@ use tokio::sync::broadcast;
 
 use crate::shared::join_agent::PublicAgentData;
 
+#[derive(Debug)]
 pub struct AgentStore {
     scope: Scope,
     broadcast: broadcast::Sender<AgentUpdate>,

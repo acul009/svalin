@@ -5,7 +5,6 @@ use anyhow::Result;
 
 pub mod device;
 mod first_connect;
-pub mod verifiers;
 
 pub mod add_agent;
 mod profile;

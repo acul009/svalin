@@ -3,39 +3,33 @@ use std::{
     fmt::{Debug, Display},
     future::Future,
 };
+use thiserror::Error;
 
 use crate::{certificate::ValidityError, Certificate};
 
 pub mod exact;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum VerificationError {
+    #[error("The certificate of the given fingerprint was revoked")]
     CertificateRevoked,
+    #[error("The certificate of the given fingerprint is invalid")]
     CertificateInvalid,
+    #[error("The certificate corresponding to the given fingerprint is unknown")]
     UnknownCertificate,
+    #[error("The fingerprint did not match the expected certificate")]
     CertificateMismatch,
-    TimerangeError(ValidityError),
+    #[error("The certificate is not valid at the given time: {0}")]
+    TimerangeError(#[from] ValidityError),
+    #[error("The given fingerprint {fingerprint:x?} is shared between these two certificates: {given_cert:?} (given) vs {loaded_cert:?} (loaded)")]
     FingerprintCollission {
         fingerprint: [u8; 32],
         given_cert: Certificate,
         loaded_cert: Certificate,
     },
+    #[error("Internal Error: {0}")]
+    InternalError(#[from] anyhow::Error),
 }
-
-impl Display for VerificationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            VerificationError::CertificateRevoked => write!(f, "The certificate of the given fingerprint was revoked"),
-            VerificationError::CertificateInvalid => write!(f, "The certificate of the given fingerprint is invalid"),
-            VerificationError::UnknownCertificate => write!(f, "The certificate corresponding to the given fingerprint is unknown"),
-            VerificationError::CertificateMismatch => write!(f, "The fingerprint did not match the expected certificate"),
-            VerificationError::TimerangeError(_err) => write!(f, "The certificate is not valid at the given time"),
-            VerificationError::FingerprintCollission { fingerprint, given_cert, loaded_cert } => write!(f, "The given fingerprint {:x?} is shared between these two certificates: {:?} (given) vs {:?} (loaded)", fingerprint, given_cert, loaded_cert),
-        }
-    }
-}
-
-impl Error for VerificationError {}
 
 pub trait Verifier: Send + Sync + Debug + 'static {
     /// TODO: include time for revocation/expiration checking

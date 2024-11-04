@@ -9,10 +9,8 @@ use tracing::{debug, instrument};
 use crate::shared::commands::add_user::AddUser;
 use crate::shared::commands::init;
 use crate::shared::commands::public_server_status::GetPutblicStatus;
-use crate::{
-    client::verifiers::upstream_verifier::UpstreamVerifier,
-    shared::commands::public_server_status::PublicStatus,
-};
+use crate::shared::commands::public_server_status::PublicStatus;
+use crate::verifier::upstream_verifier::UpstreamVerifier;
 
 use super::Client;
 

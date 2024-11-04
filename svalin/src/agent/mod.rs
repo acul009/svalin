@@ -15,11 +15,11 @@ use tracing::{debug, instrument};
 
 mod init;
 
-use crate::client::verifiers;
 use crate::permissions::agent_permission_handler::AgentPermissionHandler;
 use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::commands::terminal::RemoteTerminalHandler;
 use crate::shared::join_agent::AgentInitPayload;
+use crate::verifier::upstream_verifier::UpstreamVerifier;
 
 pub struct Agent {
     rpc: RpcClient,
@@ -47,7 +47,7 @@ impl Agent {
         let credentials =
             Self::decrypt_credentials(config.encrypted_credentials, scope.clone()).await?;
 
-        let verifier = verifiers::upstream_verifier::UpstreamVerifier::new(
+        let verifier = UpstreamVerifier::new(
             config.root_certificate.clone(),
             config.upstream_certificate.clone(),
         )

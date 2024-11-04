@@ -8,7 +8,10 @@ use rand::{
     thread_rng, Rng,
 };
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, Keypair, PermCredentials};
+use svalin_pki::{
+    verifier::{self, KnownCertificateVerifier},
+    Certificate, Keypair, PermCredentials,
+};
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
     permissions::{anonymous_permission_handler::AnonymousPermissionHandler, DummyPermission},
@@ -29,6 +32,10 @@ use crate::{
         },
         join_agent::add_agent::AddAgentHandler,
     },
+    verifier::{
+        server_storage_verifier::ServerStorageVerifier, tls_optional_wrapper::TlsOptionalWrapper,
+        verification_helper::VerificationHelper,
+    },
 };
 
 use svalin_rpc::rpc::server::RpcServer;
@@ -44,6 +51,8 @@ pub struct Server {
     scope: marmelade::Scope,
     root: Certificate,
     credentials: PermCredentials,
+    user_store: Arc<UserStore>,
+    agent_store: Arc<AgentStore>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -108,26 +117,39 @@ impl Server {
         )
         .await?;
 
+        let user_store = UserStore::open(scope.subscope("users".into())?);
+
+        let agent_store = AgentStore::open(scope.subscope("agents".into())?, root.clone());
+
+        let helper = VerificationHelper::new(root.clone());
+
+        let verifier = ServerStorageVerifier::new(
+            helper,
+            root.clone(),
+            user_store.clone(),
+            agent_store.clone(),
+        )
+        .to_tls_verifier();
+
+        let verifier = TlsOptionalWrapper::new(verifier);
+
         // TODO: proper client verification
-        let rpc = RpcServer::new(addr, &credentials, SkipClientVerification::new())
-            .context("failed to create rpc server")?;
+        let rpc =
+            RpcServer::new(addr, &credentials, verifier).context("failed to create rpc server")?;
 
         Ok(Self {
             rpc,
             scope,
             root,
             credentials,
+            user_store,
+            agent_store,
         })
     }
 
     pub async fn run(&mut self) -> Result<()> {
         let permission_handler: ServerPermissionHandler =
             ServerPermissionHandler::new(self.root.clone());
-
-        let userstore = UserStore::open(self.scope.subscope("users".into())?);
-
-        let agent_store =
-            AgentStore::open(self.scope.subscope("agents".into())?, self.root.clone());
 
         let commands = HandlerCollection::new(permission_handler);
 
@@ -138,12 +160,15 @@ impl Server {
             .await
             .add(PingHandler::new())
             .add(PublicStatusHandler::new(PublicStatus::Ready))
-            .add(AddUserHandler::new(userstore))
+            .add(AddUserHandler::new(self.user_store.clone()))
             .add(join_manager.create_request_handler())
             .add(join_manager.create_accept_handler())
             .add(ForwardHandler::new(self.rpc.clone()))
-            .add(AddAgentHandler::new(agent_store.clone())?)
-            .add(AgentListHandler::new(agent_store, self.rpc.clone()));
+            .add(AddAgentHandler::new(self.agent_store.clone())?)
+            .add(AgentListHandler::new(
+                self.agent_store.clone(),
+                self.rpc.clone(),
+            ));
 
         self.rpc.run(commands).await
     }

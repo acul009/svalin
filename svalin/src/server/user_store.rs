@@ -8,7 +8,7 @@ use tracing::{debug, instrument};
 
 #[derive(Serialize, Deserialize)]
 pub struct StoredUser {
-    certificate: Certificate,
+    pub certificate: Certificate,
     username: String,
     encrypted_credentials: Vec<u8>,
     client_hash_options: ArgonParams,
@@ -26,7 +26,7 @@ impl UserStore {
         Arc::new(Self { scope })
     }
 
-    fn get_user(&self, fingerprint: &[u8; 32]) -> Result<Option<StoredUser>> {
+    pub fn get_user(&self, fingerprint: &[u8; 32]) -> Result<Option<StoredUser>> {
         let mut user: Option<StoredUser> = None;
 
         self.scope.view(|b| {
