@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::time::Duration;
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -28,6 +29,12 @@ pub struct Client {
     device_list: Arc<RwLock<BTreeMap<Certificate, Device>>>,
     // TODO: These should not be required here, but should be created and canceled as needed
     background_tasks: JoinSet<()>,
+}
+
+impl Debug for Client {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Client").finish()
+    }
 }
 
 impl Client {
