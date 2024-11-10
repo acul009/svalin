@@ -2,9 +2,8 @@
 
 mod app;
 mod config;
-mod counter;
 mod i18n;
-mod profile_picker;
+mod ui;
 
 fn main() -> cosmic::iced::Result {
     // Get the system's preferred languages.
@@ -18,4 +17,10 @@ fn main() -> cosmic::iced::Result {
 
     // Starts the application's event loop with `()` as the application's flags.
     cosmic::app::run::<app::AppModel>(settings, ())
+}
+
+trait Screen {
+    type Message;
+
+    fn update(&mut self, message: Self::Message) -> cosmic::Task<Self::Message>;
 }

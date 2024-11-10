@@ -1,7 +1,6 @@
 use crate::config::Config;
-use crate::counter::Counter;
-use crate::profile_picker::ProfilePicker;
-use crate::{counter, fl, profile_picker};
+use crate::ui::profile_picker::ProfilePicker;
+use crate::{fl, ui::profile_picker};
 use cosmic::app::{Core, Task};
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::Horizontal;
@@ -20,32 +19,21 @@ pub enum Screen {
     Success,
 }
 
+/// Messages emitted by the application and its widgets.
+#[derive(Debug, Clone)]
+pub enum Message {
+    ProfilePicker(profile_picker::Message),
+}
+
 /// The application model stores app-specific state used to describe its
 /// interface and drive its logic.
 pub struct AppModel {
     /// Application state which is managed by the COSMIC runtime.
     core: Core,
-    /// Display a context drawer with the designated page if defined.
-    context_page: ContextPage,
-    /// Contains items assigned to the nav bar panel.
-    nav: nav_bar::Model,
-    /// Key bindings for the application's menu bar.
-    key_binds: HashMap<menu::KeyBind, MenuAction>,
     // Configuration data that persists between application runs.
     config: Config,
 
     screen: Screen,
-}
-
-/// Messages emitted by the application and its widgets.
-#[derive(Debug, Clone)]
-pub enum Message {
-    OpenRepositoryUrl,
-    SubscriptionChannel,
-    ToggleContextPage(ContextPage),
-    UpdateConfig(Config),
-    Counter(counter::Message),
-    ProfilePicker(profile_picker::Message),
 }
 
 /// Create a COSMIC application from the app model
@@ -60,7 +48,7 @@ impl Application for AppModel {
     type Message = Message;
 
     /// Unique identifier in RDNN (reverse domain name notation) format.
-    const APP_ID: &'static str = "com.example.CosmicAppTemplate";
+    const APP_ID: &'static str = "de.it-woelfchen.svalin";
 
     fn core(&self) -> &Core {
         &self.core
@@ -71,38 +59,10 @@ impl Application for AppModel {
     }
 
     /// Initializes the application with any given flags and startup commands.
-    fn init(core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
-        // Create a nav bar with three page items.
-        let mut nav = nav_bar::Model::default();
-
-        nav.insert()
-            .text(fl!("page-id", num = 1))
-            .data::<Page>(Page::Page1)
-            .icon(icon::from_name("applications-science-symbolic"))
-            .activate();
-
-        nav.insert()
-            .text(fl!("page-id", num = 2))
-            .data::<Page>(Page::Page2)
-            .icon(icon::from_name("applications-system-symbolic"));
-
-        nav.insert()
-            .text(fl!("page-id", num = 3))
-            .data::<Page>(Page::Page3)
-            .icon(icon::from_name("applications-games-symbolic"));
-
-        nav.insert()
-            .text(fl!("page-id", num = 4))
-            .data::<Page>(Page::Counter(Counter::new()))
-            .icon(icon::from_name("applications-games-symbolic"))
-            .closable();
-
+    fn init(mut core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
         // Construct the app model with the runtime's core.
         let mut app = AppModel {
             core,
-            context_page: ContextPage::default(),
-            nav,
-            key_binds: HashMap::new(),
             // Optional configuration file for an application.
             config: cosmic_config::Config::new(Self::APP_ID, Config::VERSION)
                 .map(|context| match Config::get_entry(&context) {
@@ -119,28 +79,26 @@ impl Application for AppModel {
             screen: Screen::ProfilePicker(ProfilePicker::new()),
         };
 
-        // Create a startup command that sets the window title.
-        let command = app.update_title();
+        let mut tasks = Vec::<Task<Self::Message>>::new();
 
-        (app, command)
+        let window_title = fl!("app-title");
+        if let Some(id) = app.core.main_window_id() {
+            tasks.push(app.set_window_title(window_title, id));
+        }
+
+        (app, Task::none())
     }
 
     /// Elements to pack at the start of the header bar.
     fn header_start(&self) -> Vec<Element<Self::Message>> {
-        let menu_bar = menu::bar(vec![menu::Tree::with_children(
-            menu::root(fl!("view")),
-            menu::items(
-                &self.key_binds,
-                vec![menu::Item::Button(fl!("about"), MenuAction::About)],
-            ),
-        )]);
+        let menu_bar = menu::bar(vec![]);
 
         vec![menu_bar.into()]
     }
 
     /// Enables the COSMIC application to create a nav bar with this model.
     fn nav_model(&self) -> Option<&nav_bar::Model> {
-        Some(&self.nav)
+        None
     }
 
     /// Display a context drawer if the context page is requested.
@@ -149,9 +107,10 @@ impl Application for AppModel {
             return None;
         }
 
-        Some(match self.context_page {
-            ContextPage::About => self.about(),
-        })
+        match &self.screen {
+            Screen::ProfilePicker(_profile_picker) => None,
+            Screen::Success => None,
+        }
     }
 
     /// Describes the interface based on the current state of the application
@@ -173,34 +132,17 @@ impl Application for AppModel {
                     .into()
             }
         }
+    }
 
-        let page = self.nav.active_data::<Page>();
-
-        match page {
-            Some(Page::Counter(counter)) => {
-                return counter.view().map(|message| Message::Counter(message));
-            }
-            _ => (),
-        }
-
-        let page_text = match page {
-            None | Some(Page::Page1) => "Home",
-            Some(Page::Page2) => "Page 2",
-            Some(Page::Page3) => "Page 3",
-            Some(Page::Counter(_)) => unreachable!(),
+    fn dialog(&self) -> Option<Element<Self::Message>> {
+        let dialog_element = match &self.screen {
+            Screen::ProfilePicker(profile_picker) => profile_picker
+                .dialog()
+                .map(|element| element.map(|msg| Message::ProfilePicker(msg))),
+            Screen::Success => None,
         };
 
-        Column::new()
-            .push(
-                widget::text::title1(fl!("welcome"))
-                    .apply(widget::container)
-                    .width(Length::Fill)
-                    .align_x(Horizontal::Center),
-            )
-            .push(text(page_text))
-            .height(Length::Fill)
-            .align_x(Horizontal::Center)
-            .into()
+        dialog_element
     }
 
     /// Register subscriptions for this application.
@@ -210,29 +152,7 @@ impl Application for AppModel {
     /// started at the beginning of the application, and persist through its
     /// lifetime.
     fn subscription(&self) -> Subscription<Self::Message> {
-        struct MySubscription;
-
-        Subscription::batch(vec![
-            // Create a subscription which emits updates through a channel.
-            Subscription::run_with_id(
-                std::any::TypeId::of::<MySubscription>(),
-                cosmic::iced::stream::channel(4, move |mut channel| async move {
-                    _ = channel.send(Message::SubscriptionChannel).await;
-
-                    futures_util::future::pending().await
-                }),
-            ),
-            // Watch for application configuration changes.
-            self.core()
-                .watch_config::<Config>(Self::APP_ID)
-                .map(|update| {
-                    // for why in update.errors {
-                    //     tracing::error!(?why, "app config error");
-                    // }
-
-                    Message::UpdateConfig(update.config)
-                }),
-        ])
+        Subscription::none()
     }
 
     /// Handles messages emitted by the application and its widgets.
@@ -241,36 +161,6 @@ impl Application for AppModel {
     /// background on the application's async runtime.
     fn update(&mut self, message: Self::Message) -> Task<Self::Message> {
         match message {
-            Message::OpenRepositoryUrl => {
-                _ = open::that_detached(REPOSITORY);
-            }
-
-            Message::SubscriptionChannel => {
-                // For example purposes only.
-            }
-
-            Message::ToggleContextPage(context_page) => {
-                if self.context_page == context_page {
-                    // Close the context drawer if the toggled context page is the same.
-                    self.core.window.show_context = !self.core.window.show_context;
-                } else {
-                    // Open the context drawer to display the requested context page.
-                    self.context_page = context_page;
-                    self.core.window.show_context = true;
-                }
-
-                // Set the title of the context drawer.
-                self.set_context_title(context_page.title());
-            }
-
-            Message::UpdateConfig(config) => {
-                self.config = config;
-            }
-
-            Message::Counter(message) => match self.nav.active_data_mut::<Page>() {
-                Some(Page::Counter(counter)) => counter.update(message),
-                None | Some(_) => (),
-            },
             Message::ProfilePicker(message) => {
                 if let profile_picker::Message::Profile(client) = message {
                     self.screen = Screen::Success;
@@ -289,88 +179,7 @@ impl Application for AppModel {
         Task::none()
     }
 
-    /// Called when a nav item is selected.
     fn on_nav_select(&mut self, id: nav_bar::Id) -> Task<Self::Message> {
-        // Activate the page in the model.
-        self.nav.activate(id);
-
-        self.update_title()
-    }
-}
-
-impl AppModel {
-    /// The about page for this app.
-    pub fn about(&self) -> Element<Message> {
-        let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
-
-        let icon = widget::svg(widget::svg::Handle::from_memory(APP_ICON));
-
-        let title = widget::text::title3(fl!("app-title"));
-
-        let link = widget::button::link(REPOSITORY)
-            .on_press(Message::OpenRepositoryUrl)
-            .padding(0);
-
-        widget::column()
-            .push(icon)
-            .push(title)
-            .push(link)
-            .align_x(Alignment::Center)
-            .spacing(space_xxs)
-            .into()
-    }
-
-    /// Updates the header and window titles.
-    pub fn update_title(&mut self) -> Task<Message> {
-        let mut window_title = fl!("app-title");
-
-        if let Some(page) = self.nav.text(self.nav.active()) {
-            window_title.push_str(" — ");
-            window_title.push_str(page);
-        }
-
-        if let Some(id) = self.core.main_window_id() {
-            self.set_window_title(window_title, id)
-        } else {
-            Task::none()
-        }
-    }
-}
-
-/// The page to display in the application.
-pub enum Page {
-    Page1,
-    Page2,
-    Page3,
-    Counter(Counter),
-}
-
-/// The context page to display in the context drawer.
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub enum ContextPage {
-    #[default]
-    About,
-}
-
-impl ContextPage {
-    fn title(&self) -> String {
-        match self {
-            Self::About => fl!("about"),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MenuAction {
-    About,
-}
-
-impl menu::action::MenuAction for MenuAction {
-    type Message = Message;
-
-    fn message(&self) -> Self::Message {
-        match self {
-            MenuAction::About => Message::ToggleContextPage(ContextPage::About),
-        }
+        Task::none()
     }
 }
