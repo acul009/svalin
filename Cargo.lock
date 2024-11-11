@@ -5860,6 +5860,7 @@ dependencies = [
  "i18n-embed",
  "i18n-embed-fl",
  "libcosmic",
+ "lyon_algorithms",
  "open",
  "rust-embed",
  "svalin",
@@ -5868,6 +5869,7 @@ dependencies = [
  "svalin_rpc",
  "svalin_sysctl",
  "tokio",
+ "totp-rs",
 ]
 
 [[package]]

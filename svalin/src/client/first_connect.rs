@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::time::Duration;
 
 use anyhow::{Context, Ok, Result};
@@ -50,6 +51,12 @@ pub enum FirstConnect {
 pub struct Init {
     client: RpcClient,
     address: String,
+}
+
+impl Debug for Init {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Init").finish()
+    }
 }
 
 impl Init {
@@ -107,10 +114,20 @@ impl Init {
 
         Ok(())
     }
+
+    pub fn address(&self) -> &str {
+        &self.address
+    }
 }
 
 pub struct Login {
     client: RpcClient,
+}
+
+impl Debug for Login {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Login").finish()
+    }
 }
 
 impl Login {
