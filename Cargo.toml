@@ -10,5 +10,5 @@ members = [
     "svalin_rpc",
     "gui_flutter/rust",
     "svalin_sysctl",
-    "svalin_libcosmic",
+    "svalin_libcosmic", "svalin_iced",
 ]

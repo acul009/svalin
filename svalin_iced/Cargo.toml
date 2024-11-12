@@ -1,0 +1,26 @@
+[package]
+name = "svalin_iced"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+svalin = { path = "../svalin" }
+svalin_pki = { path = "../svalin_pki" }
+svalin_rpc = { path = "../svalin_rpc" }
+svalin_sysctl = { path = "../svalin_sysctl" }
+svalin_macros = { path = "../svalin_macros" }
+
+anyhow = "1.0.93"
+futures-util = "0.3.31"
+i18n-embed-fl = "0.9.2"
+open = "5.3.0"
+rust-embed = "8.5.0"
+tokio = { version = "1.41.1", features = ["full"] }
+totp-rs = { version = "5.6.0", features = ["qr", "gen_secret"] }
+lyon_algorithms = "1.0.4"
+iced = { version = "0.13.1", features = ["tokio", "advanced", "multi-window", "svg", "image", "canvas"] }
+
+[dependencies.i18n-embed]
+version = "0.15"
+features = ["fluent-system", "desktop-requester"]
