@@ -10,7 +10,7 @@ rustls = ["dep:rustls"]
 anyhow = "1.0.93"
 argon2 = { version = "0.5.3", features = ["simple", "std"] }
 postcard = "1.0.10"
-rcgen = { version = "0.12.1", features = ["pem", "ring", "x509-parser"] }
+rcgen = { version = "0.13.0", features = ["pem", "ring", "x509-parser"] }
 ring = "0.17.8"
 rustls = { version = "0.23.16", optional = true, default-features = false }
 serde = "1.0.215"
