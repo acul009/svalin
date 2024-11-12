@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use crate::fl;
+use crate::{fl, Element};
 use anyhow::Result;
 use iced::{
     widget::{button, column, container, image, image::Handle, row, stack, text, text_input},
-    Element, Length, Task,
+    Length, Task,
 };
 use svalin::client::{Client, FirstConnect, Init, Login};
 

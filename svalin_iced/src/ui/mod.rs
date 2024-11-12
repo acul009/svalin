@@ -5,6 +5,8 @@ use iced::{
 };
 use profile_picker::ProfilePicker;
 
+use crate::Element;
+
 mod profile_picker;
 pub mod widgets;
 
@@ -48,7 +50,7 @@ impl UI {
         Task::none()
     }
 
-    pub fn view(&self) -> iced::Element<Message> {
+    pub fn view(&self) -> Element<Message> {
         match &self.screen {
             Screen::ProfilePicker(profile_picker) => profile_picker
                 .view()
