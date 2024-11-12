@@ -83,7 +83,7 @@ impl Server {
             debug!("Initialisation complete, waiting for init server shutdown");
 
             // Sleep until the init server has shut down and released the Port
-            tokio::time::sleep(time::Duration::from_secs(1)).await;
+            tokio::time::sleep(time::Duration::from_secs(3)).await;
 
             let key = Server::get_encryption_key(&scope)?;
 

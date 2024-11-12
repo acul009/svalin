@@ -8,11 +8,11 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 flutter_rust_bridge = "=2.3.0"
-tokio = { version = "1.39.3", features = ["time"] }
+tokio = { version = "1.41.1", features = ["time"] }
 svalin = { path = "../../svalin" }
 svalin_pki  = { path = "../../svalin_pki" }
 svalin_sysctl = { path = "../../svalin_sysctl" }
-anyhow = "1.0.86"
-totp-rs = { version = "5.5.1", features = ["qr", "serde_support"] }
+anyhow = "1.0.93"
+totp-rs = { version = "5.6.0", features = ["qr", "serde_support"] }
 tracing-subscriber = "0.3.18"
 paste = "1.0.15"

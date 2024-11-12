@@ -7,17 +7,17 @@ edition = "2021"
 rustls = ["dep:rustls"]
 
 [dependencies]
-anyhow = "1.0.86"
+anyhow = "1.0.93"
 argon2 = { version = "0.5.3", features = ["simple", "std"] }
-postcard = "1.0.8"
+postcard = "1.0.10"
 rcgen = { version = "0.12.1", features = ["pem", "ring", "x509-parser"] }
 ring = "0.17.8"
-rustls = { version = "0.23.13", optional = true }
-serde = "1.0.204"
+rustls = { version = "0.23.16", optional = true, default-features = false }
+serde = "1.0.215"
 spki = { version = "0.7.3", features = ["alloc", "fingerprint", "sha2", "std"] }
-thiserror = "1.0.66"
+thiserror = "2.0.3"
 time = "0.3.36"
-tokio = { version = "1.39.3", features = ["full", "test-util"] }
+tokio = { version = "1.41.1", features = ["full", "test-util"] }
 tracing = "0.1.40"
-x509-parser = { version = "0.15.1", features = ["ring", "validate", "verify"] }
+x509-parser = { version = "0.16.0", features = ["ring", "validate", "verify"] }
 zeroize = { version = "1.8.1", features = ["aarch64", "derive", "std"] }
