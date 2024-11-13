@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use iced::{
     widget::{center, container, text},
-    Background, Border, Color, Length, Shadow,
+    Background, Border, Color, Shadow,
 };
 
 use crate::Element;
@@ -63,7 +63,7 @@ impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Mes
                     value.form.control_maybe(
                         value
                             .body
-                            .map(|body| text(body).width(10).wrapping(text::Wrapping::WordOrGlyph)),
+                            .map(|body| text(body).wrapping(text::Wrapping::WordOrGlyph)),
                     ),
                     |form, control| form.control(control),
                 ),
@@ -74,7 +74,7 @@ impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Mes
                 border: Border::default(),
                 shadow: Shadow::default(),
             })
-            .max_width(400)
+            .max_width(500)
             .max_height(300),
         )
         .style(|_| container::Style {

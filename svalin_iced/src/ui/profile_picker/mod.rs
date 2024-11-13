@@ -376,7 +376,7 @@ impl SubScreen for ProfilePicker {
         if let Some(profile) = &self.confirm_delete {
             return Some(
                 dialog()
-                    .control(text(fl!("confirm-delete", name = profile)))
+                    .body(fl!("confirm-delete", name = profile))
                     // .body(format!("Are you sure you want to delete {}", profile))
                     .primary_action(button(text("Cancel")).on_press(Message::CalcelDelete))
                     .secondary_action(
