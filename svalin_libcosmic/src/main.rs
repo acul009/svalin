@@ -13,14 +13,10 @@ fn main() -> cosmic::iced::Result {
     i18n::init(&requested_languages);
 
     // Settings for configuring the application window and iced runtime.
-    let settings = cosmic::app::Settings::default();
+    let settings = cosmic::app::Settings::default()
+        .client_decorations(false)
+        .antialiasing(true);
 
     // Starts the application's event loop with `()` as the application's flags.
     cosmic::app::run::<app::AppModel>(settings, ())
-}
-
-trait Screen {
-    type Message;
-
-    fn update(&mut self, message: Self::Message) -> cosmic::Task<Self::Message>;
 }

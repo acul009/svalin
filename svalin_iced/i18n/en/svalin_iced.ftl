@@ -23,6 +23,7 @@ connect-to-server = Connecting to Server...
 connect-to-server-error = Error while connecting to server
 register-totp-error = Error while creating TOTP secret
 copy-totp = Copy TOTP secret instead
+confirm-delete = Are you sure you want to delete { $name }
 
 username = Username
 password = Password

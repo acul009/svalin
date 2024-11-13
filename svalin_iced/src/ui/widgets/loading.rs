@@ -13,7 +13,7 @@ pub struct Loading<'a> {
 }
 
 impl<'a> Loading<'a> {
-    pub fn new(context: impl Into<Cow<'a, str>>) -> Self {
+    pub(super) fn new(context: impl Into<Cow<'a, str>>) -> Self {
         Self {
             message: context.into(),
             height: None,

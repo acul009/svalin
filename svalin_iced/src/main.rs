@@ -1,3 +1,4 @@
+use iced::application;
 use ui::UI;
 
 mod i18n;
@@ -13,12 +14,18 @@ fn main() {
     // Enable localizations to be applied.
     i18n::init(&requested_languages);
 
-    let title = fl!("app-title");
-
-    iced::application("Fuck you", UI::update, UI::view)
+    iced::application(Title, UI::update, UI::view)
         .theme(|_| iced::Theme::Dark)
         .antialiasing(true)
         .centered()
         .run()
         .unwrap();
+}
+
+struct Title;
+
+impl application::Title<UI> for Title {
+    fn title(&self, _state: &UI) -> String {
+        fl!("app-title")
+    }
 }

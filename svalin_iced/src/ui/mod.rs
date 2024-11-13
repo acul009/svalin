@@ -1,13 +1,15 @@
 use iced::{
     alignment::Horizontal,
-    widget::{column, text},
+    widget::{column, stack, text},
     Length, Task,
 };
 use profile_picker::ProfilePicker;
+use screen::SubScreen;
 
 use crate::Element;
 
 mod profile_picker;
+pub mod screen;
 pub mod widgets;
 
 pub enum Screen {
@@ -40,9 +42,7 @@ impl UI {
                 profile_picker::Message::Profile(client) => self.screen = Screen::Success,
                 _ => {
                     if let Screen::ProfilePicker(profile_picker) = &mut self.screen {
-                        profile_picker
-                            .update(message)
-                            .map(|msg: profile_picker::Message| Message::ProfilePicker(msg));
+                        return profile_picker.update(message).map(Message::ProfilePicker);
                     }
                 }
             },
@@ -51,7 +51,7 @@ impl UI {
     }
 
     pub fn view(&self) -> Element<Message> {
-        match &self.screen {
+        let screen: Element<Message> = match &self.screen {
             Screen::ProfilePicker(profile_picker) => profile_picker
                 .view()
                 .map(|msg| Message::ProfilePicker(msg))
@@ -60,6 +60,15 @@ impl UI {
                 .height(Length::Fill)
                 .align_x(Horizontal::Center),]
             .into(),
-        }
+        };
+
+        let dialog = match &self.screen {
+            Screen::ProfilePicker(profile_picker) => profile_picker
+                .dialog()
+                .map(|element| element.map(Message::ProfilePicker)),
+            Screen::Success => None,
+        };
+
+        stack![screen].push_maybe(dialog).into()
     }
 }

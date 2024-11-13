@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+pub mod dialog;
 pub mod error_display;
 pub mod form;
 pub mod loading;
@@ -16,4 +17,8 @@ pub fn error_display<'a, Message>(
 
 pub fn loading<'a>(message: impl Into<Cow<'a, str>>) -> loading::Loading<'a> {
     loading::Loading::new(message)
+}
+
+pub fn dialog<'a, Message>() -> dialog::Dialog<'a, Message> {
+    dialog::Dialog::new()
 }

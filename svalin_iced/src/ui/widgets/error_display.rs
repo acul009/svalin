@@ -16,7 +16,7 @@ pub struct ErrorDisplay<'a, Message> {
 }
 
 impl<'a, Message> ErrorDisplay<'a, Message> {
-    pub fn new(error: &'a anyhow::Error) -> Self {
+    pub(super) fn new(error: &'a anyhow::Error) -> Self {
         Self {
             error,
             on_close: None,

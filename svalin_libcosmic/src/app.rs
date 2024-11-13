@@ -4,15 +4,10 @@ use crate::{fl, ui::profile_picker};
 use cosmic::app::{Core, Task};
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::Horizontal;
-use cosmic::iced::{Alignment, Length, Subscription};
-use cosmic::iced_widget::{button, Column};
-use cosmic::widget::{self, icon, menu, nav_bar, row, text};
-use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
-use futures_util::SinkExt;
-use std::collections::HashMap;
-
-const REPOSITORY: &str = "https://github.com/pop-os/cosmic-app-template";
-const APP_ICON: &[u8] = include_bytes!("../res/icons/hicolor/scalable/apps/icon.svg");
+use cosmic::iced::{Length, Subscription};
+use cosmic::iced_widget::Column;
+use cosmic::widget::{menu, nav_bar, text};
+use cosmic::{Application, ApplicationExt, Element};
 
 pub enum Screen {
     ProfilePicker(ProfilePicker),
@@ -60,6 +55,8 @@ impl Application for AppModel {
 
     /// Initializes the application with any given flags and startup commands.
     fn init(mut core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
+        core.window.show_headerbar = false;
+
         // Construct the app model with the runtime's core.
         let mut app = AppModel {
             core,
