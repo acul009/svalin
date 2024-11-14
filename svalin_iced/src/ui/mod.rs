@@ -10,6 +10,7 @@ use crate::Element;
 
 mod profile_picker;
 pub mod screen;
+pub mod types;
 pub mod widgets;
 
 pub enum Screen {

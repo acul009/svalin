@@ -87,6 +87,7 @@ impl Agent {
 
         let public_commands = HandlerCollection::new(permission_handler.clone());
 
+        // Todo: proper upstream verifier
         let verifier = ExactVerififier::new(self.root_certificate.clone());
 
         public_commands.chain().await.add(E2EHandler::new(

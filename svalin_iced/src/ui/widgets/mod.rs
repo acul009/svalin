@@ -9,9 +9,9 @@ pub fn form<'a, Message>() -> form::Form<'a, Message> {
     form::Form::new()
 }
 
-pub fn error_display<'a, Message>(
-    error: &'a anyhow::Error,
-) -> error_display::ErrorDisplay<'a, Message> {
+pub fn error_display<'a, Error, Message>(
+    error: &'a Error,
+) -> error_display::ErrorDisplay<'a, Error, Message> {
     error_display::ErrorDisplay::new(error)
 }
 

@@ -9,14 +9,14 @@ use crate::fl;
 
 use super::form;
 
-pub struct ErrorDisplay<'a, Message> {
+pub struct ErrorDisplay<'a, Error, Message> {
     title: Cow<'a, str>,
-    error: &'a anyhow::Error,
+    error: &'a Error,
     on_close: Option<Message>,
 }
 
-impl<'a, Message> ErrorDisplay<'a, Message> {
-    pub(super) fn new(error: &'a anyhow::Error) -> Self {
+impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
+    pub(super) fn new(error: &'a Error) -> Self {
         Self {
             error,
             on_close: None,
@@ -29,7 +29,7 @@ impl<'a, Message> ErrorDisplay<'a, Message> {
         self
     }
 
-    pub fn error(mut self, error: &'a anyhow::Error) -> Self {
+    pub fn error(mut self, error: &'a Error) -> Self {
         self.error = error;
         self
     }
@@ -40,8 +40,12 @@ impl<'a, Message> ErrorDisplay<'a, Message> {
     }
 }
 
-impl<'a, Message: Clone + 'static> From<ErrorDisplay<'a, Message>> for Element<'a, Message> {
-    fn from(display: ErrorDisplay<'a, Message>) -> Self {
+impl<'a, Error, Message: Clone + 'static> From<ErrorDisplay<'a, Error, Message>>
+    for Element<'a, Message>
+where
+    Error: std::fmt::Display,
+{
+    fn from(display: ErrorDisplay<'a, Error, Message>) -> Self {
         let mut close_button = button(text(fl!("close")));
         if let Some(on_close) = display.on_close {
             close_button = close_button.on_press(on_close);

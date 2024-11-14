@@ -2978,7 +2978,7 @@ impl SseEncode for Option<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
+        if let Some(value) = self.state {
             <String>::sse_encode(value, serializer);
         }
     }
@@ -2988,7 +2988,7 @@ impl SseEncode for Option<crate::api::client::device::RealtimeStatus> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
+        if let Some(value) = self.state {
             <crate::api::client::device::RealtimeStatus>::sse_encode(value, serializer);
         }
     }
