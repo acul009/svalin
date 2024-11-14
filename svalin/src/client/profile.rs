@@ -125,7 +125,7 @@ impl Client {
         root_certificate: Certificate,
         credentials: PermCredentials,
         password: Vec<u8>,
-    ) -> Result<()> {
+    ) -> Result<String> {
         let raw_credentials = credentials.to_bytes(password).await?;
 
         let scope = format!("{username}@{upstream_address}");
@@ -140,7 +140,7 @@ impl Client {
 
         let db = Self::open_marmelade().context("Failed to open marmelade")?;
 
-        db.scope(scope)
+        db.scope(scope.clone())
             .context("Failed to create profile scope")?
             .update(|b| {
                 let current = b.get_kv("profile");
@@ -153,7 +153,7 @@ impl Client {
                 Ok(())
             })?;
 
-        Ok(())
+        Ok(scope)
     }
 
     pub fn remove_profile(profile_key: &str) -> Result<()> {

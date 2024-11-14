@@ -39,7 +39,7 @@ pub enum Message {
     SelectProfile(String),
     DeleteProfile(String),
     ConfirmDelete(String),
-    CalcelDelete,
+    CancelDelete,
     UnlockProfile,
     AddProfile(Option<String>),
     Connect(String),
@@ -77,10 +77,19 @@ impl Input {
 impl ProfilePicker {
     pub fn new() -> Self {
         match Client::get_profiles() {
-            Ok(profiles) => Self {
-                state: State::SelectProfile(profiles),
-                confirm_delete: None,
-            },
+            Ok(profiles) => {
+                let state = if profiles.is_empty() {
+                    State::AddProfile {
+                        host: String::new(),
+                    }
+                } else {
+                    State::SelectProfile(profiles)
+                };
+                Self {
+                    state,
+                    confirm_delete: None,
+                }
+            }
             Err(err) => Self {
                 state: State::Error(ErrorDisplayInfo::new(
                     Arc::new(err),
@@ -110,7 +119,13 @@ impl SubScreen for ProfilePicker {
             Message::Reset => {
                 let profiles = Client::get_profiles().unwrap_or_else(|_| Vec::new());
 
-                self.state = State::SelectProfile(profiles);
+                if profiles.is_empty() {
+                    self.state = State::AddProfile {
+                        host: String::new(),
+                    };
+                } else {
+                    self.state = State::SelectProfile(profiles);
+                }
             }
             Message::SelectProfile(profile) => {
                 self.state = State::UnlockProfile {
@@ -130,8 +145,10 @@ impl SubScreen for ProfilePicker {
                         fl!("profile-delete-error"),
                     ));
                 }
+
+                return Task::done(Message::Reset);
             }
-            Message::CalcelDelete => {
+            Message::CancelDelete => {
                 self.confirm_delete = None;
             }
             Message::UnlockProfile => {
@@ -186,7 +203,7 @@ impl SubScreen for ProfilePicker {
 
     fn view(&self) -> Element<Message> {
         match &self.state {
-            State::InitServer(init_server) => init_server.view().map(Message::InitServer),
+            State::InitServer(init_server) => init_server.view().map(Into::into),
             State::Error(display_info) => display_info.view().on_close(Message::Reset).into(),
             State::Loading(message) => loading(message).expand().into(),
             State::SelectProfile(profiles) => {
@@ -254,7 +271,7 @@ impl SubScreen for ProfilePicker {
                 dialog()
                     .body(fl!("confirm-delete", name = profile))
                     // .body(format!("Are you sure you want to delete {}", profile))
-                    .primary_action(button(text("Cancel")).on_press(Message::CalcelDelete))
+                    .primary_action(button(text("Cancel")).on_press(Message::CancelDelete))
                     .secondary_action(
                         button(text("Delete")).on_press(Message::ConfirmDelete(profile.clone())),
                     )

@@ -5,21 +5,25 @@ use iced::{
     widget::{button, image, text, text_input},
     Task,
 };
-use svalin::client::Init;
+use svalin::client::{Client, Init};
 use totp_rs::TOTP;
 
 use crate::{
     fl,
-    ui::{types::error_display_info::ErrorDisplayInfo, widgets::form},
+    ui::{
+        types::error_display_info::ErrorDisplayInfo,
+        widgets::{form, loading},
+    },
 };
 
 pub struct InitServer {
     state: State,
-    init: Arc<Init>,
+    init: Option<Arc<Init>>,
 }
 
 enum State {
     Error(ErrorDisplayInfo<Arc<anyhow::Error>>),
+    Loading(String),
     User {
         username: String,
         password: String,
@@ -42,6 +46,17 @@ pub enum Message {
     CopyTOTP,
     Continue,
     Back,
+    Client(Arc<Client>),
+}
+
+impl From<Message> for super::Message {
+    fn from(value: Message) -> Self {
+        if let Message::Client(client) = value {
+            return Self::Profile(client);
+        }
+
+        Self::InitServer(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -83,7 +98,7 @@ impl Input {
 impl InitServer {
     pub fn new(init: Arc<Init>) -> Self {
         Self {
-            init,
+            init: Some(init),
             state: State::User {
                 username: String::new(),
                 password: String::new(),
@@ -106,6 +121,7 @@ impl crate::ui::screen::SubScreen for InitServer {
                 }
             }
             Message::Back => match &self.state {
+                State::Loading(_) => (),
                 State::TOTP {
                     username, password, ..
                 } => {
@@ -116,11 +132,17 @@ impl crate::ui::screen::SubScreen for InitServer {
                     }
                 }
                 State::Error(_) | State::User { .. } => {
-                    return Task::done(Message::Exit(self.init.address().to_string()));
+                    return Task::done(Message::Exit(
+                        self.init
+                            .as_ref()
+                            .map_or("".to_string(), |init| init.address().to_string()),
+                    ));
                 }
             },
             Message::Continue => {
                 match &self.state {
+                    State::Loading(_) => (),
+                    State::Error(_) => (),
                     State::User {
                         username,
                         password,
@@ -152,11 +174,53 @@ impl crate::ui::screen::SubScreen for InitServer {
                             }
                         }
                     }
+                    State::TOTP {
+                        username,
+                        password,
+                        totp,
+                        qr,
+                        totp_input,
+                    } => match self.init.take() {
+                        None => (),
+                        Some(init) => match totp.check_current(&totp_input) {
+                            Err(err) => {
+                                return Task::done(Message::Error(ErrorDisplayInfo::new(
+                                    Arc::new(err.into()),
+                                    fl!("totp-verify-error"),
+                                )))
+                            }
 
-                    _ => (),
+                            Ok(correct) => {
+                                let init = match Arc::into_inner(init) {
+                                    None => return Task::none(),
+                                    Some(init) => init,
+                                };
+                                let username = username.clone();
+                                let password = password.clone();
+                                let totp = totp.clone();
+
+                                if correct {
+                                    self.state = State::Loading(fl!("server-init-loading"));
+                                    return Task::future(async move {
+                                        match init.init(username, password, totp).await {
+                                            Err(err) => {
+                                                return Message::Error(ErrorDisplayInfo::new(
+                                                    Arc::new(err),
+                                                    fl!("server-init-error"),
+                                                ))
+                                            }
+                                            Ok(profile) => {}
+                                        }
+
+                                        todo!()
+                                    });
+                                }
+                            }
+                        },
+                    },
                 }
             }
-            Message::Exit(_) => unreachable!(),
+            Message::Exit(_) | Message::Client(_) => unreachable!(),
         }
         Task::none()
     }
@@ -164,6 +228,7 @@ impl crate::ui::screen::SubScreen for InitServer {
     fn view(&self) -> crate::Element<Self::Message> {
         match &self.state {
             State::Error(display_info) => display_info.view().into(),
+            State::Loading(message) => loading(message).expand().into(),
             State::User {
                 username,
                 password,
@@ -194,7 +259,8 @@ impl crate::ui::screen::SubScreen for InitServer {
                 .control(button(text(fl!("copy-totp"))).on_press(Message::CopyTOTP))
                 .control(
                     text_input(&fl!("totp"), totp_input)
-                        .on_input(|input| Message::Input(Input::Totp(input))),
+                        .on_input(|input| Message::Input(Input::Totp(input)))
+                        .on_submit(Message::Continue),
                 )
                 .primary_action(button(text(fl!("continue"))).on_press(Message::Continue))
                 .secondary_action(button(text(fl!("back"))).on_press(Message::Back))

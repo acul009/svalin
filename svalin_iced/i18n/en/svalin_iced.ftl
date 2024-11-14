@@ -24,7 +24,11 @@ connect-to-server = Connecting to Server...
 connect-to-server-error = Error while connecting to server
 register-totp-error = Error while creating TOTP secret
 copy-totp = Copy TOTP secret instead
+totp-verify-error = Error while verifying TOTP code
+server-init-error = Error while initializing server
 confirm-delete = Are you sure you want to delete { $name }
+server-init-loading = initializing Server...
+
 
 username = Username
 password = Password
