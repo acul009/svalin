@@ -27,7 +27,7 @@ where
 
         Ok(Self {
             raw,
-            singer_fingerprint: credentials.get_certificate().get_fingerprint(),
+            singer_fingerprint: credentials.get_certificate().fingerprint(),
             phantom: PhantomData,
         })
     }

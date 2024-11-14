@@ -26,7 +26,7 @@ impl<Permission> WhitelistPermissionHandler<Permission> {
     pub fn new(whitelist: Vec<Certificate>) -> Self {
         let whitelist = whitelist
             .into_iter()
-            .map(|c| (c.get_fingerprint(), c))
+            .map(|c| (c.fingerprint(), c))
             .collect();
 
         Self {
@@ -43,7 +43,7 @@ where
     type Permission = Permission;
     async fn may(&self, peer: &Peer, _permission: &Permission) -> Result<(), PermissionCheckError> {
         if let Peer::Certificate(cert) = peer {
-            if let Some(known_cert) = self.whitelist.get(&cert.get_fingerprint()) {
+            if let Some(known_cert) = self.whitelist.get(&cert.fingerprint()) {
                 if known_cert == cert {
                     return Ok(());
                 } else {

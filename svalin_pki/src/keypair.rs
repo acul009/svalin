@@ -1,14 +1,18 @@
+use std::hash::Hash;
+
 use crate::{
     signed_message::{CanSign, CanVerify},
     Certificate, PermCredentials,
 };
 use anyhow::Result;
-use rcgen::{ExtendedKeyUsagePurpose, KeyUsagePurpose, SignatureAlgorithm};
+use rcgen::{DnType, ExtendedKeyUsagePurpose, KeyUsagePurpose, SignatureAlgorithm};
 use ring::{
+    digest::SHA256,
     rand::SystemRandom,
     signature::{Ed25519KeyPair, KeyPair},
 };
 use time::{Duration, OffsetDateTime};
+use x509_parser::nom::HexDisplay;
 
 pub struct Keypair {
     keypair: Ed25519KeyPair,
@@ -41,11 +45,10 @@ impl Keypair {
         params
             .extended_key_usages
             .push(ExtendedKeyUsagePurpose::ServerAuth);
-        params.use_authority_key_identifier_extension = true;
 
-        // let id = self.public_key().to_hex(32);
-
-        // params.distinguished_name.push(DnType::CommonName, id);
+        params
+            .distinguished_name
+            .push(DnType::CommonName, self.spki_hash());
 
         let ca_cert = rcgen::Certificate::from_params(params)?;
         let ca_der = ca_cert.serialize_der()?;
@@ -61,12 +64,21 @@ impl Keypair {
         params.key_pair = Some(rc_keypair);
         params.alg = self.alg;
 
-        // let id = self.public_key().to_hex(32);
-
-        // params.distinguished_name.push(DnType::CommonName, id);
+        params
+            .distinguished_name
+            .push(DnType::CommonName, self.spki_hash());
 
         let temp_cert = rcgen::Certificate::from_params(params)?;
         Ok(temp_cert.serialize_request_pem()?)
+    }
+
+    /// This was recommended to me as a possible id by the rust crypto channel
+    /// on discord
+    pub fn spki_hash(&self) -> String {
+        let spki_hash = ring::digest::digest(&ring::digest::SHA512_256, &self.public_key())
+            .as_ref()
+            .to_hex(32);
+        spki_hash
     }
 
     pub fn upgrade(self, certificate: Certificate) -> Result<PermCredentials> {

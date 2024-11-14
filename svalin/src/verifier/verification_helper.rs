@@ -11,7 +11,7 @@ impl VerificationHelper {
     }
 
     pub fn try_root(&self, fingerprint: [u8; 32]) -> Option<Certificate> {
-        if fingerprint == self.root.get_fingerprint() {
+        if fingerprint == self.root.fingerprint() {
             return Some(self.root.clone());
         }
 

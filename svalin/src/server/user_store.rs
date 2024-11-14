@@ -82,7 +82,7 @@ impl UserStore {
         debug!("requesting user update transaction");
 
         self.scope.update(move |b| {
-            let fingerprint = user.certificate.get_fingerprint().to_vec();
+            let fingerprint = user.certificate.fingerprint().to_vec();
 
             let usernames = b.get_or_create_bucket("usernames")?;
 

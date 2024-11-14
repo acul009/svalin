@@ -21,7 +21,7 @@ impl Verifier for ExactVerififier {
     ) -> impl std::future::Future<Output = Result<crate::Certificate, VerificationError>> + Send
     {
         async move {
-            if fingerprint == self.expected.get_fingerprint() {
+            if fingerprint == self.expected.fingerprint() {
                 self.expected
                     .check_validity_at(time)
                     .map_err(|err| VerificationError::TimerangeError(err))?;

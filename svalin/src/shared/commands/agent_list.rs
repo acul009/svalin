@@ -94,7 +94,7 @@ impl CommandHandler for AgentListHandler {
 
                     let agent = self
                         .agent_store
-                        .get_agent(&online_update.client.get_fingerprint()).await?;
+                        .get_agent(&online_update.client.fingerprint()).await?;
 
                     if let Some(agent) = agent {
                         let item = AgentListItemTransport {

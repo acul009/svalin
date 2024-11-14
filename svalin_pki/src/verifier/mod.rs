@@ -49,7 +49,7 @@ pub trait KnownCertificateVerifier: Verifier + Sized + 'static {
         time: u64,
     ) -> impl Future<Output = Result<(), VerificationError>> + Send {
         async move {
-            let fingerprint = cert.get_fingerprint();
+            let fingerprint = cert.fingerprint();
 
             let loaded_cert = self.verify_fingerprint(fingerprint, time).await?;
 

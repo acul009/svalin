@@ -66,7 +66,7 @@ impl AgentStore {
             .await?;
 
         self.scope.update(|b| {
-            let key = agent.cert.get_fingerprint().to_vec();
+            let key = agent.cert.fingerprint().to_vec();
             b.put_object(key, agent.pack())?;
 
             Ok(())
