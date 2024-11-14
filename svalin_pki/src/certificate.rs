@@ -28,6 +28,14 @@ pub struct Certificate {
     data: Arc<CertificateData>,
 }
 
+#[derive(Debug, Error)]
+pub enum ValidityError {
+    #[error("The certificate is not yet valid")]
+    NotYetValid,
+    #[error("The certificate is expired")]
+    Expired,
+}
+
 #[derive(Error, Debug)]
 pub enum CertificateParseError {
     #[error("X509 Parser Error: {0}")]
@@ -40,6 +48,14 @@ pub enum CertificateParseError {
     IssuerMissingCommonName,
     #[error("SPKI Hash Mismatch - certificate is not following convention")]
     SpkiHashMismatch,
+}
+
+#[derive(Error, Debug)]
+pub enum SignatureVerificationError {
+    #[error("X509 Parser Error: {0}")]
+    X509ParserError(#[from] x509_parser::nom::Err<X509Error>),
+    #[error("Verification Error: {0}")]
+    X509VerificationError(#[from] X509Error),
 }
 
 impl Certificate {
@@ -92,12 +108,9 @@ impl Certificate {
         &self.data.der
     }
 
-    // pub fn get_fingerprint(&self) -> FingerprintBytes {
-    //     let hash = ring::digest::digest(&ring::digest::SHA512_256,
-    // &self.data.der);
-
-    //     hash.as_ref()[0..32].try_into().unwrap()
-    // }
+    pub fn issuer(&self) -> &str {
+        &self.data.issuer
+    }
 
     pub fn spki_hash(&self) -> &str {
         &self.data.spki_hash
@@ -128,14 +141,16 @@ impl Certificate {
 
         Ok(())
     }
-}
 
-#[derive(Debug, Error)]
-pub enum ValidityError {
-    #[error("The certificate is not yet valid")]
-    NotYetValid,
-    #[error("The certificate is expired")]
-    Expired,
+    pub fn verify_signature(&self, issuer: &Certificate) -> Result<(), SignatureVerificationError> {
+        let (_, cert) = X509Certificate::from_der(&self.data.der)?;
+
+        let (_, issuer_cert) = X509Certificate::from_der(&issuer.data.der)?;
+
+        cert.verify_signature(Some(issuer_cert.public_key()))?;
+
+        Ok(())
+    }
 }
 
 impl PartialEq for Certificate {

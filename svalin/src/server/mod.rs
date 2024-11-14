@@ -121,7 +121,7 @@ impl Server {
 
         let agent_store = AgentStore::open(scope.subscope("agents".into())?, root.clone());
 
-        let helper = VerificationHelper::new(root.clone());
+        let helper = VerificationHelper::new(root.clone(), user_store.clone());
 
         let verifier = ServerStorageVerifier::new(
             helper,

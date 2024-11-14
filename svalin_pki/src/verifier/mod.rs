@@ -4,13 +4,19 @@ use std::{
     future::Future,
 };
 use thiserror::Error;
+use x509_parser::error::X509Error;
 
-use crate::{certificate::ValidityError, Certificate};
+use crate::{
+    certificate::{SignatureVerificationError, ValidityError},
+    Certificate,
+};
 
 pub mod exact;
 
 #[derive(Debug, Error)]
 pub enum VerificationError {
+    #[error("The required logic to verify this certificate has not been written yet")]
+    NotYetImplemented,
     #[error("The certificate of the given fingerprint was revoked")]
     CertificateRevoked,
     #[error("The certificate of the given fingerprint is invalid")]
@@ -19,8 +25,10 @@ pub enum VerificationError {
     UnknownCertificate,
     #[error("The fingerprint did not match the expected certificate")]
     CertificateMismatch,
-    #[error("The certificate is not valid at the given time: {0}")]
+    #[error("The certificate is not valid: {0}")]
     TimerangeError(#[from] ValidityError),
+    #[error("The signature could not be verified: {0}")]
+    SignatureError(#[from] SignatureVerificationError),
     #[error("The given fingerprint {fingerprint:x?} is shared between these two certificates: {given_cert:?} (given) vs {loaded_cert:?} (loaded)")]
     FingerprintCollission {
         fingerprint: [u8; 32],
