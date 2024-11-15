@@ -1,9 +1,8 @@
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 
 use crate::{fl, Element};
-use anyhow::Result;
 use iced::{
-    widget::{button, column, container, image, image::Handle, row, stack, text, text_input},
+    widget::{button, column, container, row, stack, text, text_input},
     Length, Task,
 };
 use init_server::InitServer;
@@ -12,7 +11,7 @@ use svalin::client::{Client, FirstConnect, Init, Login};
 use super::{
     screen::SubScreen,
     types::error_display_info::ErrorDisplayInfo,
-    widgets::{dialog, error_display, form, loading},
+    widgets::{dialog, form, loading},
 };
 
 mod init_server;
@@ -41,12 +40,20 @@ pub enum Message {
     ConfirmDelete(String),
     CancelDelete,
     UnlockProfile,
-    AddProfile(Option<String>),
+    AddProfile(String),
     Connect(String),
     Init(Arc<Init>),
     InitServer(init_server::Message),
     Login(Arc<Login>),
     Profile(Arc<Client>),
+}
+
+impl From<Message> for super::Message {
+    fn from(value: Message) -> Self {
+        match value {
+            msg => Self::ProfilePicker(msg),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -63,7 +70,7 @@ impl Input {
                     *host = new_host;
                 }
             }
-            State::UnlockProfile { profile, password } => match self {
+            State::UnlockProfile { password, .. } => match self {
                 Self::Password(new_password) => {
                     *password = new_password;
                 }
@@ -75,29 +82,14 @@ impl Input {
 }
 
 impl ProfilePicker {
-    pub fn new() -> Self {
-        match Client::get_profiles() {
-            Ok(profiles) => {
-                let state = if profiles.is_empty() {
-                    State::AddProfile {
-                        host: String::new(),
-                    }
-                } else {
-                    State::SelectProfile(profiles)
-                };
-                Self {
-                    state,
-                    confirm_delete: None,
-                }
-            }
-            Err(err) => Self {
-                state: State::Error(ErrorDisplayInfo::new(
-                    Arc::new(err),
-                    fl!("profile-list-error"),
-                )),
+    pub fn start() -> (Self, Task<Message>) {
+        (
+            Self {
+                state: State::SelectProfile(Vec::new()),
                 confirm_delete: None,
             },
-        }
+            Task::done(Message::Reset),
+        )
     }
 }
 
@@ -106,12 +98,9 @@ impl SubScreen for ProfilePicker {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::InitServer(init_server::Message::Exit(host)) => {
-                self.state = State::AddProfile { host };
-            }
             Message::InitServer(message) => {
                 if let State::InitServer(init_server) = &mut self.state {
-                    return init_server.update(message).map(Message::InitServer);
+                    return init_server.update(message).map(Into::into);
                 }
             }
             Message::Error(display_info) => self.state = State::Error(display_info),
@@ -120,9 +109,7 @@ impl SubScreen for ProfilePicker {
                 let profiles = Client::get_profiles().unwrap_or_else(|_| Vec::new());
 
                 if profiles.is_empty() {
-                    self.state = State::AddProfile {
-                        host: String::new(),
-                    };
+                    return Task::done(Message::AddProfile(String::new()));
                 } else {
                     self.state = State::SelectProfile(profiles);
                 }
@@ -170,9 +157,9 @@ impl SubScreen for ProfilePicker {
                 }
             }
             Message::AddProfile(host) => {
-                self.state = State::AddProfile {
-                    host: host.unwrap_or_default(),
-                };
+                self.state = State::AddProfile { host: host };
+
+                return text_input::focus("host");
             }
             Message::Connect(host) => {
                 self.state = State::Loading(fl!("connect-to-server"));
@@ -190,7 +177,10 @@ impl SubScreen for ProfilePicker {
                 });
             }
             Message::Init(init) => {
-                self.state = State::InitServer(InitServer::new(init));
+                let (state, task) = InitServer::start(init);
+                self.state = State::InitServer(state);
+
+                return task.map(Into::into);
             }
             Message::Login(login) => {
                 todo!()
@@ -225,7 +215,7 @@ impl SubScreen for ProfilePicker {
                 let overlay = container(
                     button(text(fl!("profile-add")))
                         .padding(10)
-                        .on_press(Message::AddProfile(None)),
+                        .on_press(Message::AddProfile(String::new())),
                 )
                 .align_bottom(Length::Fill)
                 .align_right(Length::Fill)
@@ -254,6 +244,7 @@ impl SubScreen for ProfilePicker {
                 .title(fl!("profile-add"))
                 .control(
                     text_input("Host", host)
+                        .id("host")
                         .on_input(|input| Message::Input(Input::Host(input)))
                         .on_submit(Message::Connect(host.clone())),
                 )

@@ -8,6 +8,8 @@ type Theme = iced::Theme;
 type Element<'a, Message> = iced::Element<'a, Message, crate::Theme>;
 
 fn main() {
+    svalin::tracing_subscriber::fmt::init();
+
     // Get the system's preferred languages.
     let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();
 
@@ -18,7 +20,7 @@ fn main() {
         .theme(|_| iced::Theme::Dark)
         .antialiasing(true)
         .centered()
-        .run()
+        .run_with(UI::start)
         .unwrap();
 }
 

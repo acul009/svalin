@@ -51,11 +51,11 @@ pub enum Message {
 
 impl From<Message> for super::Message {
     fn from(value: Message) -> Self {
-        if let Message::Client(client) = value {
-            return Self::Profile(client);
+        match value {
+            Message::Client(client) => Self::Profile(client),
+            Message::Exit(address) => Self::AddProfile(address),
+            msg => Self::InitServer(msg),
         }
-
-        Self::InitServer(value)
     }
 }
 
@@ -80,13 +80,7 @@ impl Input {
                 Self::ConfirmPassword(new_password) => *confirm_password = new_password,
                 _ => (),
             },
-            State::TOTP {
-                username,
-                password,
-                totp,
-                qr,
-                totp_input,
-            } => match self {
+            State::TOTP { totp_input, .. } => match self {
                 Self::Totp(new_totp) => *totp_input = new_totp,
                 _ => (),
             },
@@ -96,15 +90,18 @@ impl Input {
 }
 
 impl InitServer {
-    pub fn new(init: Arc<Init>) -> Self {
-        Self {
-            init: Some(init),
-            state: State::User {
-                username: String::new(),
-                password: String::new(),
-                confirm_password: String::new(),
+    pub fn start(init: Arc<Init>) -> (Self, Task<Message>) {
+        (
+            Self {
+                init: Some(init),
+                state: State::User {
+                    username: String::new(),
+                    password: String::new(),
+                    confirm_password: String::new(),
+                },
             },
-        }
+            text_input::focus("username"),
+        )
     }
 }
 
@@ -171,6 +168,8 @@ impl crate::ui::screen::SubScreen for InitServer {
                                     qr: qr_code,
                                     totp_input: String::new(),
                                 };
+
+                                return text_input::focus("totp");
                             }
                         }
                     }
@@ -178,8 +177,8 @@ impl crate::ui::screen::SubScreen for InitServer {
                         username,
                         password,
                         totp,
-                        qr,
                         totp_input,
+                        ..
                     } => match self.init.take() {
                         None => (),
                         Some(init) => match totp.check_current(&totp_input) {
@@ -202,17 +201,34 @@ impl crate::ui::screen::SubScreen for InitServer {
                                 if correct {
                                     self.state = State::Loading(fl!("server-init-loading"));
                                     return Task::future(async move {
-                                        match init.init(username, password, totp).await {
+                                        match init.init(username, password.clone(), totp).await {
                                             Err(err) => {
                                                 return Message::Error(ErrorDisplayInfo::new(
                                                     Arc::new(err),
                                                     fl!("server-init-error"),
                                                 ))
                                             }
-                                            Ok(profile) => {}
-                                        }
+                                            Ok(profile) => {
+                                                let client = match Client::open_profile(
+                                                    profile,
+                                                    password.into(),
+                                                )
+                                                .await
+                                                {
+                                                    Err(err) => {
+                                                        return Message::Error(
+                                                            ErrorDisplayInfo::new(
+                                                                Arc::new(err),
+                                                                fl!("server-init-error"),
+                                                            ),
+                                                        )
+                                                    }
+                                                    Ok(client) => client,
+                                                };
 
-                                        todo!()
+                                                return Message::Client(Arc::new(client));
+                                            }
+                                        }
                                     });
                                 }
                             }
@@ -227,7 +243,7 @@ impl crate::ui::screen::SubScreen for InitServer {
 
     fn view(&self) -> crate::Element<Self::Message> {
         match &self.state {
-            State::Error(display_info) => display_info.view().into(),
+            State::Error(display_info) => display_info.view().on_close(Message::Back).into(),
             State::Loading(message) => loading(message).expand().into(),
             State::User {
                 username,
@@ -237,6 +253,7 @@ impl crate::ui::screen::SubScreen for InitServer {
                 .title(fl!("profile-add"))
                 .control(
                     text_input(&fl!("username"), username)
+                        .id("username")
                         .on_input(|input| Message::Input(Input::Username(input))),
                 )
                 .control(
@@ -259,6 +276,7 @@ impl crate::ui::screen::SubScreen for InitServer {
                 .control(button(text(fl!("copy-totp"))).on_press(Message::CopyTOTP))
                 .control(
                     text_input(&fl!("totp"), totp_input)
+                        .id("totp")
                         .on_input(|input| Message::Input(Input::Totp(input)))
                         .on_submit(Message::Continue),
                 )

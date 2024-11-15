@@ -106,7 +106,10 @@ impl Session {
         };
 
         let mut opt = Some(self);
-        let result = dispatcher.dispatch(&mut opt, request).await;
+        let result = dispatcher
+            .dispatch(&mut opt, request)
+            .await
+            .context("error while dispatcher was running");
 
         if let Some(session) = opt {
             session.shutdown().await;

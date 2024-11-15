@@ -28,22 +28,25 @@ pub struct UI {
     screen: Screen,
 }
 
-impl Default for UI {
-    fn default() -> Self {
-        Self {
-            screen: Screen::ProfilePicker(ProfilePicker::new()),
-        }
-    }
-}
-
 impl UI {
+    pub fn start() -> (Self, Task<Message>) {
+        let (screen, task) = ProfilePicker::start();
+
+        (
+            Self {
+                screen: Screen::ProfilePicker(screen),
+            },
+            task.map(Message::ProfilePicker),
+        )
+    }
+
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ProfilePicker(message) => match message {
-                profile_picker::Message::Profile(client) => self.screen = Screen::Success,
+                profile_picker::Message::Profile(_client) => self.screen = Screen::Success,
                 _ => {
                     if let Screen::ProfilePicker(profile_picker) = &mut self.screen {
-                        return profile_picker.update(message).map(Message::ProfilePicker);
+                        return profile_picker.update(message).map(Into::into);
                     }
                 }
             },
@@ -53,10 +56,7 @@ impl UI {
 
     pub fn view(&self) -> Element<Message> {
         let screen: Element<Message> = match &self.screen {
-            Screen::ProfilePicker(profile_picker) => profile_picker
-                .view()
-                .map(|msg| Message::ProfilePicker(msg))
-                .into(),
+            Screen::ProfilePicker(profile_picker) => profile_picker.view().map(Into::into),
             Screen::Success => column![text("success")
                 .height(Length::Fill)
                 .align_x(Horizontal::Center),]

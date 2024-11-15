@@ -1,3 +1,5 @@
+pub use tracing_subscriber;
+
 // The segregation I wanted to use here doesn't really make sense in practice.
 // TODO: refactor module locations
 pub mod agent;

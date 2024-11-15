@@ -66,7 +66,7 @@ impl Init {
         username: String,
         password: String,
         totp_secret: totp_rs::TOTP,
-    ) -> Result<()> {
+    ) -> Result<String> {
         let (root, server_cert) = self
             .client
             .upstream_connection()
@@ -110,9 +110,7 @@ impl Init {
             password.into(),
         )
         .await
-        .context("failed to save profile")?;
-
-        Ok(())
+        .context("failed to save profile")
     }
 
     pub fn address(&self) -> &str {
