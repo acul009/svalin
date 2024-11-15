@@ -1,8 +1,9 @@
 use iced::{
-    alignment::Horizontal,
-    widget::{column, stack, text},
-    Length, Task,
+    keyboard::{self, key::Named},
+    widget::{focus_next, stack},
+    Subscription, Task,
 };
+use mainview::MainView;
 use profile_picker::ProfilePicker;
 use screen::SubScreen;
 
@@ -16,13 +17,13 @@ pub mod widgets;
 
 pub enum Screen {
     ProfilePicker(ProfilePicker),
-
-    Success,
+    MainView(MainView),
 }
 
 /// Messages emitted by the application and its widgets.
 #[derive(Debug, Clone)]
 pub enum Message {
+    Tab,
     ProfilePicker(profile_picker::Message),
     MainView(mainview::Message),
 }
@@ -45,34 +46,46 @@ impl UI {
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::ProfilePicker(message) => match message {
-                profile_picker::Message::Profile(_client) => self.screen = Screen::Success,
-                _ => {
-                    if let Screen::ProfilePicker(profile_picker) = &mut self.screen {
-                        return profile_picker.update(message).map(Into::into);
-                    }
+            Message::Tab => focus_next(),
+            Message::ProfilePicker(profile_picker::Message::Profile(client)) => {
+                let (state, task) = MainView::start(client);
+
+                self.screen = Screen::MainView(state);
+                task.map(Into::into)
+            }
+            Message::ProfilePicker(message) => match &mut self.screen {
+                Screen::ProfilePicker(profile_picker) => {
+                    profile_picker.update(message).map(Into::into)
                 }
+                _ => Task::none(),
             },
         }
-        Task::none()
     }
 
     pub fn view(&self) -> Element<Message> {
         let screen: Element<Message> = match &self.screen {
             Screen::ProfilePicker(profile_picker) => profile_picker.view().map(Into::into),
-            Screen::Success => column![text("success")
-                .height(Length::Fill)
-                .align_x(Horizontal::Center),]
-            .into(),
+            Screen::MainView(mainview) => mainview.view().map(Into::into),
         };
 
         let dialog = match &self.screen {
             Screen::ProfilePicker(profile_picker) => profile_picker
                 .dialog()
-                .map(|element| element.map(Message::ProfilePicker)),
-            Screen::Success => None,
+                .map(|element| element.map(Into::into)),
+            Screen::MainView(mainview) => mainview.dialog().map(|element| element.map(Into::into)),
         };
 
         stack![screen].push_maybe(dialog).into()
+    }
+
+    pub fn subscription(&self) -> Subscription<Message> {
+        keyboard::on_key_press(|key, _modifiers| match key {
+            keyboard::Key::Named(named) => match named {
+                Named::Tab => Some(Message::Tab),
+                _ => None,
+            },
+            keyboard::Key::Character(_) => None,
+            keyboard::Key::Unidentified => None,
+        })
     }
 }

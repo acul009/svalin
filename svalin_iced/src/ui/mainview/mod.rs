@@ -23,7 +23,7 @@ enum State {
     Devices,
 }
 
-struct MainView {
+pub struct MainView {
     client: Arc<Client>,
     state: State,
     devices: Devices,

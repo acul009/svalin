@@ -83,7 +83,7 @@ impl Server {
             debug!("Initialisation complete, waiting for init server shutdown");
 
             // Sleep until the init server has shut down and released the Port
-            tokio::time::sleep(time::Duration::from_secs(3)).await;
+            tokio::time::sleep(time::Duration::from_secs(5)).await;
 
             let key = Server::get_encryption_key(&scope)?;
 
@@ -230,13 +230,13 @@ impl Server {
 
         if let Some(result) = receive.recv().await {
             debug!("successfully initialized server");
-            handle.abort();
             rpc_clone.close();
+            handle.abort();
             Ok(result)
         } else {
             error!("error when trying to initialize server");
-            handle.abort();
             rpc_clone.close();
+            handle.abort();
             Err(anyhow!("error initializing server"))
         }
     }

@@ -50,9 +50,7 @@ pub enum Message {
 
 impl From<Message> for super::Message {
     fn from(value: Message) -> Self {
-        match value {
-            msg => Self::ProfilePicker(msg),
-        }
+        Self::ProfilePicker(value)
     }
 }
 
@@ -63,21 +61,21 @@ pub enum Input {
 }
 
 impl Input {
-    fn update(self, state: &mut ProfilePicker) {
+    fn update(self, state: &mut ProfilePicker) -> Task<Message> {
         match &mut state.state {
             State::AddProfile { host } => {
                 if let Input::Host(new_host) = self {
                     *host = new_host;
                 }
             }
-            State::UnlockProfile { password, .. } => match self {
-                Self::Password(new_password) => {
+            State::UnlockProfile { password, .. } => {
+                if let Self::Password(new_password) = self {
                     *password = new_password;
                 }
-                _ => (),
-            },
+            }
             _ => (),
         }
+        Task::none()
     }
 }
 
@@ -102,8 +100,12 @@ impl SubScreen for ProfilePicker {
                 if let State::InitServer(init_server) = &mut self.state {
                     return init_server.update(message).map(Into::into);
                 }
+                Task::none()
             }
-            Message::Error(display_info) => self.state = State::Error(display_info),
+            Message::Error(display_info) => {
+                self.state = State::Error(display_info);
+                Task::none()
+            }
             Message::Input(input) => input.update(self),
             Message::Reset => {
                 let profiles = Client::get_profiles().unwrap_or_else(|_| Vec::new());
@@ -113,15 +115,18 @@ impl SubScreen for ProfilePicker {
                 } else {
                     self.state = State::SelectProfile(profiles);
                 }
+                Task::none()
             }
             Message::SelectProfile(profile) => {
                 self.state = State::UnlockProfile {
                     profile,
                     password: String::new(),
                 };
+                Task::none()
             }
             Message::DeleteProfile(profile) => {
                 self.confirm_delete = Some(profile.clone());
+                Task::none()
             }
             Message::ConfirmDelete(profile) => {
                 self.confirm_delete = None;
@@ -133,10 +138,11 @@ impl SubScreen for ProfilePicker {
                     ));
                 }
 
-                return Task::done(Message::Reset);
+                Task::done(Message::Reset)
             }
             Message::CancelDelete => {
                 self.confirm_delete = None;
+                Task::none()
             }
             Message::UnlockProfile => {
                 if let State::UnlockProfile { profile, password } = &self.state {
@@ -145,7 +151,7 @@ impl SubScreen for ProfilePicker {
 
                     self.state = State::Loading(fl!("profile-unlock"));
 
-                    return Task::future(async move {
+                    Task::future(async move {
                         match Client::open_profile_string(profile, password).await {
                             Ok(client) => Message::Profile(Arc::new(client)),
                             Err(err) => Message::Error(ErrorDisplayInfo::new(
@@ -153,17 +159,19 @@ impl SubScreen for ProfilePicker {
                                 fl!("profile-unlock-error"),
                             )),
                         }
-                    });
+                    })
+                } else {
+                    Task::none()
                 }
             }
             Message::AddProfile(host) => {
-                self.state = State::AddProfile { host: host };
+                self.state = State::AddProfile { host };
 
-                return text_input::focus("host");
+                text_input::focus("host")
             }
             Message::Connect(host) => {
                 self.state = State::Loading(fl!("connect-to-server"));
-                return Task::future(async move {
+                Task::future(async move {
                     let connected = Client::first_connect(host).await;
 
                     match connected {
@@ -174,21 +182,19 @@ impl SubScreen for ProfilePicker {
                             fl!("connect-to-server-error"),
                         )),
                     }
-                });
+                })
             }
             Message::Init(init) => {
                 let (state, task) = InitServer::start(init);
                 self.state = State::InitServer(state);
 
-                return task.map(Into::into);
+                task.map(Into::into)
             }
-            Message::Login(login) => {
+            Message::Login(_login) => {
                 todo!()
             }
             Message::Profile(_) => unreachable!(),
-        };
-
-        Task::none()
+        }
     }
 
     fn view(&self) -> Element<Message> {

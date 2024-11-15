@@ -55,7 +55,7 @@ impl SubScreen for Devices {
         let col = self.devices.iter().fold(column!(), |col, device| {
             let item = device.item();
 
-            col.push(button(text(item.public_data.cert.spki_hash())))
+            col.push(button(text(item.public_data.cert.spki_hash().to_string())))
         });
 
         stack![col].into()

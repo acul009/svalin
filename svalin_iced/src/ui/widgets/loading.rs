@@ -471,13 +471,13 @@ pub static EMPHASIZED: LazyLock<Easing> = LazyLock::new(|| {
         .build()
 });
 
-pub static EMPHASIZED_DECELERATE: LazyLock<Easing> = LazyLock::new(|| {
+pub static _EMPHASIZED_DECELERATE: LazyLock<Easing> = LazyLock::new(|| {
     Easing::builder()
         .cubic_bezier_to([0.05, 0.7], [0.1, 1.0], [1.0, 1.0])
         .build()
 });
 
-pub static EMPHASIZED_ACCELERATE: LazyLock<Easing> = LazyLock::new(|| {
+pub static _EMPHASIZED_ACCELERATE: LazyLock<Easing> = LazyLock::new(|| {
     Easing::builder()
         .cubic_bezier_to([0.3, 0.0], [0.8, 0.15], [1.0, 1.0])
         .build()
@@ -489,13 +489,13 @@ pub static STANDARD: LazyLock<Easing> = LazyLock::new(|| {
         .build()
 });
 
-pub static STANDARD_DECELERATE: LazyLock<Easing> = LazyLock::new(|| {
+pub static _STANDARD_DECELERATE: LazyLock<Easing> = LazyLock::new(|| {
     Easing::builder()
         .cubic_bezier_to([0.0, 0.0], [0.0, 1.0], [1.0, 1.0])
         .build()
 });
 
-pub static STANDARD_ACCELERATE: LazyLock<Easing> = LazyLock::new(|| {
+pub static _STANDARD_ACCELERATE: LazyLock<Easing> = LazyLock::new(|| {
     Easing::builder()
         .cubic_bezier_to([0.3, 0.0], [1.0, 1.0], [1.0, 1.0])
         .build()

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use iced::{
     widget::{button, image, text, text_input},
     Task,
@@ -29,7 +29,7 @@ enum State {
         password: String,
         confirm_password: String,
     },
-    TOTP {
+    Totp {
         username: String,
         password: String,
         totp: TOTP,
@@ -80,10 +80,11 @@ impl Input {
                 Self::ConfirmPassword(new_password) => *confirm_password = new_password,
                 _ => (),
             },
-            State::TOTP { totp_input, .. } => match self {
-                Self::Totp(new_totp) => *totp_input = new_totp,
-                _ => (),
-            },
+            State::Totp { totp_input, .. } => {
+                if let Self::Totp(new_totp) = self {
+                    *totp_input = new_totp
+                }
+            }
             _ => (),
         }
     }
@@ -113,13 +114,13 @@ impl crate::ui::screen::SubScreen for InitServer {
             Message::Error(display_info) => self.state = State::Error(display_info),
             Message::Input(input) => input.update(self),
             Message::CopyTOTP => {
-                if let State::TOTP { totp, .. } = &self.state {
+                if let State::Totp { totp, .. } = &self.state {
                     return iced::clipboard::write(totp.get_url());
                 }
             }
             Message::Back => match &self.state {
                 State::Loading(_) => (),
-                State::TOTP {
+                State::Totp {
                     username, password, ..
                 } => {
                     self.state = State::User {
@@ -161,7 +162,7 @@ impl crate::ui::screen::SubScreen for InitServer {
                             Ok(totp) => {
                                 let qr_code = image::Handle::from_bytes(totp.get_qr_png().unwrap());
 
-                                self.state = State::TOTP {
+                                self.state = State::Totp {
                                     username: username.clone(),
                                     password: password.clone(),
                                     totp,
@@ -173,23 +174,34 @@ impl crate::ui::screen::SubScreen for InitServer {
                             }
                         }
                     }
-                    State::TOTP {
+                    State::Totp {
                         username,
                         password,
                         totp,
                         totp_input,
                         ..
-                    } => match self.init.take() {
-                        None => (),
-                        Some(init) => match totp.check_current(&totp_input) {
-                            Err(err) => {
-                                return Task::done(Message::Error(ErrorDisplayInfo::new(
-                                    Arc::new(err.into()),
-                                    fl!("totp-verify-error"),
-                                )))
-                            }
+                    } => match totp.check_current(totp_input) {
+                        Err(err) => {
+                            return Task::done(Message::Error(ErrorDisplayInfo::new(
+                                Arc::new(err.into()),
+                                fl!("totp-verify-error"),
+                            )))
+                        }
+                        Ok(false) => {
+                            return Task::done(Message::Error(ErrorDisplayInfo::new(
+                                Arc::new(anyhow!("wrong totp")),
+                                fl!("totp-verify-error"),
+                            )))
+                        }
 
-                            Ok(correct) => {
+                        Ok(true) => match self.init.take() {
+                            None => {
+                                return Task::done(Message::Error(ErrorDisplayInfo::new(
+                                    Arc::new(anyhow!("init already used")),
+                                    "init already used",
+                                )));
+                            }
+                            Some(init) => {
                                 let init = match Arc::into_inner(init) {
                                     None => return Task::none(),
                                     Some(init) => init,
@@ -198,39 +210,33 @@ impl crate::ui::screen::SubScreen for InitServer {
                                 let password = password.clone();
                                 let totp = totp.clone();
 
-                                if correct {
-                                    self.state = State::Loading(fl!("server-init-loading"));
-                                    return Task::future(async move {
-                                        match init.init(username, password.clone(), totp).await {
-                                            Err(err) => {
-                                                return Message::Error(ErrorDisplayInfo::new(
-                                                    Arc::new(err),
-                                                    fl!("server-init-error"),
-                                                ))
-                                            }
-                                            Ok(profile) => {
-                                                let client = match Client::open_profile(
-                                                    profile,
-                                                    password.into(),
-                                                )
-                                                .await
-                                                {
-                                                    Err(err) => {
-                                                        return Message::Error(
-                                                            ErrorDisplayInfo::new(
-                                                                Arc::new(err),
-                                                                fl!("server-init-error"),
-                                                            ),
-                                                        )
-                                                    }
-                                                    Ok(client) => client,
-                                                };
+                                self.state = State::Loading(fl!("server-init-loading"));
+                                return Task::future(async move {
+                                    match init.init(username, password.clone(), totp).await {
+                                        Err(err) => Message::Error(ErrorDisplayInfo::new(
+                                            Arc::new(err),
+                                            fl!("server-init-error"),
+                                        )),
+                                        Ok(profile) => {
+                                            let client = match Client::open_profile(
+                                                profile,
+                                                password.into(),
+                                            )
+                                            .await
+                                            {
+                                                Err(err) => {
+                                                    return Message::Error(ErrorDisplayInfo::new(
+                                                        Arc::new(err),
+                                                        fl!("server-init-error"),
+                                                    ))
+                                                }
+                                                Ok(client) => client,
+                                            };
 
-                                                return Message::Client(Arc::new(client));
-                                            }
+                                            Message::Client(Arc::new(client))
                                         }
-                                    });
-                                }
+                                    }
+                                });
                             }
                         },
                     },
@@ -270,7 +276,7 @@ impl crate::ui::screen::SubScreen for InitServer {
                 .primary_action(button(text(fl!("continue"))).on_press(Message::Continue))
                 .secondary_action(button(text(fl!("back"))).on_press(Message::Back))
                 .into(),
-            State::TOTP { qr, totp_input, .. } => form()
+            State::Totp { qr, totp_input, .. } => form()
                 .title(fl!("profile-add"))
                 .control(image(qr))
                 .control(button(text(fl!("copy-totp"))).on_press(Message::CopyTOTP))

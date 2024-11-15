@@ -53,7 +53,7 @@ where
 
         form()
             .title(display.title)
-            .control(text("This\nis\na\nmultiline\nerror\nmessage"))
+            .control(text(display.error.to_string()))
             .primary_action(close_button)
             .into()
     }
