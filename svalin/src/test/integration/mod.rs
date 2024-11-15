@@ -80,7 +80,7 @@ async fn integration_tests() {
 
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    let agents = client.device_list().await;
+    let agents = client.device_list();
 
     let device = agents.first().unwrap();
 

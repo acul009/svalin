@@ -81,7 +81,7 @@ impl Device {
         };
     }
 
-    pub(crate) async fn update(&self, item: AgentListItem) {
+    pub(crate) fn update(&self, item: AgentListItem) {
         {
             let mut current = self.data.item.write().unwrap();
 
@@ -103,11 +103,11 @@ impl Device {
         self.data.connection.dispatch(Ping).await
     }
 
-    pub async fn item(&self) -> AgentListItem {
+    pub fn item(&self) -> AgentListItem {
         self.data.item.read().unwrap().clone()
     }
 
-    pub async fn subscribe_realtime(&self) -> RealtimeStatusReceiver {
+    pub fn subscribe_realtime(&self) -> RealtimeStatusReceiver {
         self.data.realtime.subscribe()
     }
 

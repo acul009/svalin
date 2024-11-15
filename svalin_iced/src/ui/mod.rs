@@ -8,6 +8,7 @@ use screen::SubScreen;
 
 use crate::Element;
 
+pub mod mainview;
 mod profile_picker;
 pub mod screen;
 pub mod types;
@@ -15,6 +16,7 @@ pub mod widgets;
 
 pub enum Screen {
     ProfilePicker(ProfilePicker),
+
     Success,
 }
 
@@ -22,6 +24,7 @@ pub enum Screen {
 #[derive(Debug, Clone)]
 pub enum Message {
     ProfilePicker(profile_picker::Message),
+    MainView(mainview::Message),
 }
 
 pub struct UI {

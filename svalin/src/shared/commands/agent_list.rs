@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, RwLock},
+};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -19,8 +22,7 @@ use svalin_rpc::{
         session::Session,
     },
 };
-use tokio::{select, sync::RwLock};
-use tracing::{debug, dispatcher::get_default};
+use tokio::select;
 
 use crate::{
     client::device::Device,
@@ -147,9 +149,7 @@ impl CommandDispatcher for UpdateAgentList {
         AgentListHandler::key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        ()
-    }
+    fn get_request(&self) -> Self::Request {}
 
     async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<()> {
         loop {
@@ -169,10 +169,10 @@ impl CommandDispatcher for UpdateAgentList {
             };
 
             {
-                if let Some(device) = self.list.read().await.get(&item.public_data.cert) {
+                if let Some(device) = self.list.read().unwrap().get(&item.public_data.cert) {
                     // Either we update the device...
 
-                    device.update(item).await;
+                    device.update(item);
                     continue;
                 }
             }
@@ -190,7 +190,7 @@ impl CommandDispatcher for UpdateAgentList {
 
                 let device = Device::new(device_connection, item);
 
-                self.list.write().await.insert(cert, device);
+                self.list.write().unwrap().insert(cert, device);
             }
         }
     }

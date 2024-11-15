@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, path::PathBuf, sync::Arc, sync::RwLock};
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ use svalin_pki::{
     Certificate, PermCredentials,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
-use tokio::{sync::RwLock, task::JoinSet};
+use tokio::task::JoinSet;
 use tracing::{debug, error};
 
 use crate::{
@@ -210,7 +210,7 @@ impl Client {
 
             let mut client = Self {
                 rpc,
-                upstream_address: profile.upstream_address,
+                _upstream_address: profile.upstream_address,
                 upstream_certificate: profile.upstream_certificate,
                 root_certificate: profile.root_certificate.clone(),
                 credentials: identity.clone(),
