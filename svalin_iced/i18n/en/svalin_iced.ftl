@@ -10,6 +10,7 @@ continue = Continue
 loading = loading...
 close = Close
 unlock = Unlock
+password = Password
 error-generic = An error has occured!
 required-field = required
 passwords-dont-match = Passwords must match

@@ -122,7 +122,8 @@ impl SubScreen for ProfilePicker {
                     profile,
                     password: String::new(),
                 };
-                Task::none()
+
+                text_input::focus("password")
             }
             Message::DeleteProfile(profile) => {
                 self.confirm_delete = Some(profile.clone());
@@ -238,7 +239,8 @@ impl SubScreen for ProfilePicker {
             } => form()
                 .title(fl!("profile-unlock"))
                 .control(
-                    text_input("Password", password)
+                    text_input(&fl!("password"), password)
+                        .id("password")
                         .secure(true)
                         .on_input(|input| Message::Input(Input::Password(input)))
                         .on_submit(Message::UnlockProfile),
