@@ -30,6 +30,14 @@ server-init-error = Error while initializing server
 confirm-delete = Are you sure you want to delete { $name }
 server-init-loading = initializing Server...
 
+device-add = Add Device
+
+input-join-code = Input Join Code
+join-code = Join Code
+join-code-error = Error while connecting to new agent
+input-confirm-code = Input Confirm Code
+confirm-code = Confirm Code
+
 
 username = Username
 password = Password

@@ -59,6 +59,10 @@ impl UI {
                 }
                 _ => Task::none(),
             },
+            Message::MainView(message) => match &mut self.screen {
+                Screen::MainView(main_view) => main_view.update(message).map(Into::into),
+                _ => Task::none(),
+            },
         }
     }
 

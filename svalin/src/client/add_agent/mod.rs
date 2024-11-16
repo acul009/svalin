@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::shared::join_agent::{accept_handler::AcceptJoin, add_agent::AddAgent, PublicAgentData};
 
 use super::Client;
@@ -53,6 +55,12 @@ pub struct WaitingForConfirmCode {
     confirm_code_send: oneshot::Sender<String>,
     result_revc: oneshot::Receiver<Result<Certificate>>,
     credentials: PermCredentials,
+}
+
+impl Debug for WaitingForConfirmCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WaitingForConfirmCode").finish()
+    }
 }
 
 impl WaitingForConfirmCode {
