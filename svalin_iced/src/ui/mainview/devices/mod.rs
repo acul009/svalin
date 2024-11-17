@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use add_device::AddDevice;
 use iced::{
-    widget::{button, column, container, stack, text},
-    Length, Task,
+    alignment::Vertical,
+    widget::{button, column, container, row, stack, text},
+    Color, Length, Task,
 };
 use svalin::client::Client;
 
@@ -75,7 +76,31 @@ impl SubScreen for Devices {
             .fold(column!(), |col, device| {
                 let item = device.item();
 
-                col.push(button(text(item.public_data.cert.spki_hash().to_string())))
+                col.push(
+                    button(
+                        row![
+                            text("X")
+                                .width(50)
+                                .height(Length::Fill)
+                                .style(move |_| {
+                                    text::Style {
+                                        color: Some(match item.online_status {
+                                            true => Color::from_rgb8(0, 255, 0),
+                                            false => Color::from_rgb8(255, 0, 0),
+                                        }),
+                                    }
+                                })
+                                .center(),
+                            text(item.public_data.name)
+                                .height(Length::Fill)
+                                .align_y(Vertical::Center)
+                        ]
+                        .width(Length::Fill)
+                        .height(Length::Fill),
+                    )
+                    .height(50)
+                    .width(Length::Fill),
+                )
             });
 
         let overlay = container(

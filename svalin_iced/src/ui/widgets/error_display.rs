@@ -53,7 +53,7 @@ where
 
         form()
             .title(display.title)
-            .control(text(display.error.to_string()))
+            .control(text!("{:#}", display.error))
             .primary_action(close_button)
             .into()
     }

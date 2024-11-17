@@ -11,6 +11,7 @@ loading = loading...
 close = Close
 unlock = Unlock
 password = Password
+success = Success
 error-generic = An error has occured!
 required-field = required
 passwords-dont-match = Passwords must match
@@ -36,7 +37,13 @@ input-join-code = Input Join Code
 join-code = Join Code
 join-code-error = Error while connecting to new agent
 input-confirm-code = Input Confirm Code
+device-name = Device Name
+input-device-name = Input Device Name
 confirm-code = Confirm Code
+confirm-code-error = Error while registering new agent
+success-join = Successfully added device
+connect-to-device = Connecting to Device
+enrolling-device = Enrolling Device
 
 
 username = Username
