@@ -1,4 +1,5 @@
 use std::{
+    fmt::Debug,
     sync::{Arc, RwLock},
     time::Duration,
 };
@@ -57,6 +58,12 @@ pub type RealtimeStatusReceiver =
 #[derive(Clone)]
 pub struct Device {
     data: Arc<DeviceData>,
+}
+
+impl Debug for Device {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Device").finish()
+    }
 }
 
 struct DeviceData {
