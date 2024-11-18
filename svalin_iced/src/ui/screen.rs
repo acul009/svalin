@@ -1,4 +1,4 @@
-use iced::Task;
+use iced::{Subscription, Task};
 
 use crate::Element;
 
@@ -15,5 +15,9 @@ pub trait SubScreen {
 
     fn context(&self) -> Option<Element<Self::Message>> {
         None
+    }
+
+    fn subscription(&self) -> Subscription<Self::Message> {
+        Subscription::none()
     }
 }

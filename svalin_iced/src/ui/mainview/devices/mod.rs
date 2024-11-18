@@ -5,7 +5,7 @@ use device_view::DeviceView;
 use iced::{
     alignment::Vertical,
     widget::{button, column, container, row, stack, text},
-    Color, Length, Task,
+    Color, Length, Subscription, Task,
 };
 use svalin::client::{device::Device, Client};
 
@@ -132,6 +132,14 @@ impl SubScreen for Devices {
                     })
             ]
             .into(),
+        }
+    }
+
+    fn subscription(&self) -> iced::Subscription<Self::Message> {
+        match &self.state {
+            State::AddDevice(add_device) => add_device.subscription().map(Into::into),
+            State::DeviceView(device_view) => device_view.subscription().map(Into::into),
+            State::List => Subscription::none(),
         }
     }
 }

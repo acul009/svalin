@@ -58,4 +58,10 @@ impl SubScreen for MainView {
             State::Devices => self.devices.view().map(Into::into),
         }
     }
+
+    fn subscription(&self) -> iced::Subscription<Self::Message> {
+        match &self.state {
+            State::Devices => self.devices.subscription().map(Into::into),
+        }
+    }
 }

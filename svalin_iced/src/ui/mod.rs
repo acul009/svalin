@@ -83,13 +83,22 @@ impl UI {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        keyboard::on_key_press(|key, _modifiers| match key {
+        let mut subscriptions = vec![keyboard::on_key_press(|key, _modifiers| match key {
             keyboard::Key::Named(named) => match named {
                 Named::Tab => Some(Message::Tab),
                 _ => None,
             },
             keyboard::Key::Character(_) => None,
             keyboard::Key::Unidentified => None,
-        })
+        })];
+
+        match &self.screen {
+            Screen::ProfilePicker(profile_picker) => (),
+            Screen::MainView(mainview) => {
+                subscriptions.push(mainview.subscription().map(Into::into));
+            }
+        };
+
+        Subscription::batch(subscriptions)
     }
 }

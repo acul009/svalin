@@ -22,7 +22,7 @@ use crate::shared::{
     lazy_watch::{self, LazyWatch},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum RemoteLiveData<T> {
     Unavailable,
     Pending,
