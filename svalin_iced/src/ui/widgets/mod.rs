@@ -7,6 +7,7 @@ pub mod dialog;
 pub mod error_display;
 pub mod form;
 pub mod loading;
+pub mod percent_display;
 pub mod progress_circle;
 pub mod realtime;
 
@@ -40,4 +41,11 @@ where
     Theme: progress_circle::StyleSheet + 'a,
 {
     progress_circle::ProgressCircle::new(range, value)
+}
+
+pub fn percent_display<'a>(
+    range: RangeInclusive<f32>,
+    value: f32,
+) -> percent_display::PercentDisplay<'a> {
+    percent_display::PercentDisplay::new(range, value)
 }

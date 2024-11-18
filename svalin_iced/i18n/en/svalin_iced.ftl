@@ -50,3 +50,6 @@ username = Username
 password = Password
 confirm-password = Confirm Password
 totp = 2FA Code
+
+cpu = CPU
+memory = Memory
