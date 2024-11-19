@@ -1,8 +1,8 @@
 use device_status::DeviceStatus;
-use iced::{widget::text, Task};
+use iced::{widget::text, Length, Task};
 use svalin::client::device::Device;
 
-use crate::ui::screen::SubScreen;
+use crate::ui::{screen::SubScreen, widgets::scaffold};
 
 mod device_status;
 
@@ -14,7 +14,10 @@ pub enum Message {
 
 impl From<Message> for super::Message {
     fn from(message: Message) -> Self {
-        Self::DeviceView(message)
+        match message {
+            Message::Back => Self::ShowList,
+            message => Self::DeviceView(message),
+        }
     }
 }
 
@@ -41,7 +44,15 @@ impl SubScreen for DeviceView {
     }
 
     fn view(&self) -> crate::Element<Self::Message> {
-        self.status.view().map(Into::into)
+        scaffold(self.status.view().map(Into::into))
+            .on_back(Message::Back)
+            .header(
+                text(self.device.item().public_data.name)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center(),
+            )
+            .into()
     }
 
     fn subscription(&self) -> iced::Subscription<Self::Message> {

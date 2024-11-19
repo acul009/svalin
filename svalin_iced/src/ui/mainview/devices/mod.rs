@@ -20,7 +20,7 @@ pub enum Message {
     NewDevice,
     DeviceView(device_view::Message),
     ShowDevice(Device),
-    Reset,
+    ShowList,
 }
 
 impl From<Message> for super::Message {
@@ -77,7 +77,7 @@ impl SubScreen for Devices {
                 self.state = State::DeviceView(device_view);
                 task.map(Into::into)
             }
-            Message::Reset => {
+            Message::ShowList => {
                 self.state = State::List;
                 Task::none()
             }

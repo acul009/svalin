@@ -1,15 +1,14 @@
 use iced::{
-    alignment,
-    widget::{column, container, progress_bar, row, text},
-    Padding,
+    widget::{column, container, row, text},
+    Length, Padding,
 };
-use iced_aw::{card, direction::Horizontal};
+use iced_aw::card;
 use svalin::client::device::RemoteLiveData;
 use svalin_sysctl::realtime::RealtimeStatus;
 
 use crate::{fl, Element};
 
-use super::{loading, percent_display, progress_circle};
+use super::{loading, percent_display};
 
 pub struct RealtimeDisplay<'a> {
     realtime: &'a RemoteLiveData<RealtimeStatus>,
@@ -24,7 +23,10 @@ impl<'a> RealtimeDisplay<'a> {
 impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Message> {
     fn from(value: RealtimeDisplay) -> Self {
         let content: Element<Message> = match value.realtime {
-            RemoteLiveData::Unavailable => text("unavailable").into(),
+            RemoteLiveData::Unavailable => text(fl!("live-unavailable"))
+                .width(Length::Fill)
+                .center()
+                .into(),
             RemoteLiveData::Pending => loading(fl!("connecting")).into(),
             RemoteLiveData::Ready(realtime) => column![
                 card(

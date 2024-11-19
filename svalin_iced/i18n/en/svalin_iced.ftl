@@ -48,6 +48,7 @@ confirm-password = Confirm Password
 totp = 2FA Code
 
 connecting = Connecting...
+live-unavailable = Live data is unavailable
 cpu = CPU
 core-id = Core { $core }
 memory = Memory

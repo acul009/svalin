@@ -29,7 +29,7 @@ pub enum Message {
 impl From<Message> for super::Message {
     fn from(value: Message) -> Self {
         match value {
-            Message::Exit => Self::Reset,
+            Message::Exit => Self::ShowList,
             msg => Self::AddDevice(msg),
         }
     }

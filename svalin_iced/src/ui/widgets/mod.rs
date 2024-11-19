@@ -3,6 +3,8 @@ use std::{borrow::Cow, ops::RangeInclusive};
 use svalin::client::device::RemoteLiveData;
 use svalin_sysctl::realtime::RealtimeStatus;
 
+use crate::Element;
+
 pub mod dialog;
 pub mod error_display;
 pub mod form;
@@ -10,6 +12,7 @@ pub mod loading;
 pub mod percent_display;
 pub mod progress_circle;
 pub mod realtime;
+pub mod scaffold;
 
 pub fn form<'a, Message>() -> form::Form<'a, Message> {
     form::Form::new()
@@ -48,4 +51,10 @@ pub fn percent_display<'a, Message>(
     value: f32,
 ) -> percent_display::PercentDisplay<'a, Message> {
     percent_display::PercentDisplay::new(range, value)
+}
+
+pub fn scaffold<'a, Message>(
+    content: impl Into<Element<'a, Message>>,
+) -> scaffold::Scaffold<'a, Message> {
+    scaffold::Scaffold::new(content)
 }
