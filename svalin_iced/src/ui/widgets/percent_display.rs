@@ -1,33 +1,37 @@
 use std::{borrow::Cow, ops::RangeInclusive};
 
 use iced::{
-    alignment,
-    widget::{column, text},
-    Padding,
+    alignment::{self, Vertical},
+    padding,
+    widget::{column, container, progress_bar, row, stack, text},
+    Length, Padding,
 };
 
 use crate::Element;
 
 use super::progress_circle;
 
-pub struct PercentDisplay<'a> {
+pub struct PercentDisplay<'a, Message> {
     range: RangeInclusive<f32>,
     value: f32,
     size: f32,
     label: Cow<'a, str>,
     display_type: DisplayType,
     padding: Padding,
+    subinfo: Option<Element<'a, Message>>,
 }
 
-impl<'a> PercentDisplay<'a> {
-    pub fn new(range: RangeInclusive<f32>, value: f32) -> Self {
+impl<'a, Message> PercentDisplay<'a, Message> {
+    pub fn new(range: impl Into<RangeInclusive<f32>>, value: impl Into<f32>) -> Self {
+        let range: RangeInclusive<f32> = range.into();
         Self {
-            value: value.clamp(*range.start(), *range.end()),
+            value: value.into().clamp(*range.start(), *range.end()),
             range,
-            size: 40.0,
+            size: 60.0,
             label: "".into(),
             display_type: DisplayType::Circle,
             padding: Padding::new(0.0),
+            subinfo: None,
         }
     }
 
@@ -65,26 +69,57 @@ impl<'a> PercentDisplay<'a> {
         self.padding = padding.into();
         self
     }
+
+    pub fn subinfo(mut self, subinfo: impl Into<Element<'a, Message>>) -> Self {
+        self.subinfo = Some(subinfo.into());
+        self
+    }
+
+    pub fn maybe_subinfo(self, subinfo: Option<impl Into<Element<'a, Message>>>) -> Self {
+        if let Some(subinfo) = subinfo {
+            return self.subinfo(subinfo);
+        };
+        self
+    }
 }
 
-impl<'a, Message: Clone + 'static> From<PercentDisplay<'a>> for Element<'a, Message> {
-    fn from(value: PercentDisplay<'a>) -> Self {
-        let range = value.range;
-        match value.display_type {
-            DisplayType::Circle => column![
-                progress_circle(range.clone(), value.value).size(value.size),
-                text!(
-                    "{:.0}%",
-                    (value.value - *range.start()) / (*range.end() - *range.start())
-                )
-                .center(),
-            ]
-            .padding(value.padding)
+impl<'a, Message: Clone + 'static> From<PercentDisplay<'a, Message>> for Element<'a, Message> {
+    fn from(percent_display: PercentDisplay<'a, Message>) -> Self {
+        let range = percent_display.range;
+        let percent =
+            (percent_display.value - *range.start()) / (*range.end() - *range.start()) * 100.0;
+        match percent_display.display_type {
+            DisplayType::Circle => column![stack![
+                progress_circle(range, percent_display.value).size(percent_display.size),
+                text!("{:.0}%", percent)
+                    .center()
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+            ]]
+            .push_maybe(if percent_display.label.len() > 0 {
+                Some(text(percent_display.label))
+            } else {
+                None
+            })
+            .push_maybe(percent_display.subinfo)
+            .padding(percent_display.padding)
             .align_x(alignment::Horizontal::Center)
             .into(),
-            DisplayType::Bar => {
-                todo!()
-            }
+
+            DisplayType::Bar => column![
+                container(text(percent_display.label)),
+                stack![
+                    progress_bar(range, percent_display.value),
+                    container(text!("{:.0}%", percent))
+                        .padding(padding::left(20))
+                        .align_y(Vertical::Center)
+                        .height(Length::Fill)
+                ]
+            ]
+            .push_maybe(percent_display.subinfo)
+            .spacing(10)
+            .padding(percent_display.padding)
+            .into(),
         }
     }
 }

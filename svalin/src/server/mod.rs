@@ -1,5 +1,5 @@
 use core::time;
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use agent_store::AgentStore;
 use anyhow::{anyhow, Context, Result};
@@ -45,6 +45,8 @@ use self::user_store::UserStore;
 pub mod agent_store;
 pub mod user_store;
 
+pub const INIT_SERVER_SHUTDOWN_COUNTDOWN: Duration = Duration::from_secs(20);
+
 #[derive(Debug)]
 pub struct Server {
     rpc: RpcServer,
@@ -83,7 +85,7 @@ impl Server {
             debug!("Initialisation complete, waiting for init server shutdown");
 
             // Sleep until the init server has shut down and released the Port
-            tokio::time::sleep(time::Duration::from_secs(5)).await;
+            tokio::time::sleep(INIT_SERVER_SHUTDOWN_COUNTDOWN).await;
 
             let key = Server::get_encryption_key(&scope)?;
 

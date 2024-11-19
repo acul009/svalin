@@ -15,9 +15,9 @@ pub fn form<'a, Message>() -> form::Form<'a, Message> {
     form::Form::new()
 }
 
-pub fn error_display<'a, Error, Message>(
-    error: &'a Error,
-) -> error_display::ErrorDisplay<'a, Error, Message> {
+pub fn error_display<Error, Message>(
+    error: &Error,
+) -> error_display::ErrorDisplay<'_, Error, Message> {
     error_display::ErrorDisplay::new(error)
 }
 
@@ -29,7 +29,7 @@ pub fn dialog<'a, Message>() -> dialog::Dialog<'a, Message> {
     dialog::Dialog::new()
 }
 
-pub fn realtime<'a>(realtime: &'a RemoteLiveData<RealtimeStatus>) -> realtime::RealtimeDisplay<'a> {
+pub fn realtime(realtime: &RemoteLiveData<RealtimeStatus>) -> realtime::RealtimeDisplay<'_> {
     realtime::RealtimeDisplay::new(realtime)
 }
 
@@ -43,9 +43,9 @@ where
     progress_circle::ProgressCircle::new(range, value)
 }
 
-pub fn percent_display<'a>(
+pub fn percent_display<'a, Message>(
     range: RangeInclusive<f32>,
     value: f32,
-) -> percent_display::PercentDisplay<'a> {
+) -> percent_display::PercentDisplay<'a, Message> {
     percent_display::PercentDisplay::new(range, value)
 }

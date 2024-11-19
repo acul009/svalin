@@ -1,8 +1,4 @@
-app-title = COSMIC App Template
-about = About
-view = View
-welcome = Welcome to COSMIC! ✨
-page-id = Page { $num }
+app-title = Svalin
 
 cancel = Cancel
 back = Back
@@ -51,5 +47,9 @@ password = Password
 confirm-password = Confirm Password
 totp = 2FA Code
 
+connecting = Connecting...
 cpu = CPU
+core-id = Core { $core }
 memory = Memory
+ram = RAM
+swap = Swap

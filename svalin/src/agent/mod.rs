@@ -149,7 +149,9 @@ impl Agent {
 
         #[cfg(not(test))]
         {
-            let path = Self::get_general_config_dir_path()?;
+            let mut path = Self::get_general_config_dir_path()?;
+
+            path.push("agent");
 
             // check if config dir exists
             if !path.exists() {
@@ -166,7 +168,9 @@ impl Agent {
             let appdata = std::env::var("PROGRAMDATA")
                 .context("Failed to retrieve PROGRAMMDATA environment variable")?;
 
-            let path = PathBuf::from(appdata);
+            let mut path = PathBuf::from(appdata);
+
+            path.push("svalin");
 
             Ok(path)
         }

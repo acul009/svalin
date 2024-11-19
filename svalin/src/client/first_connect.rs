@@ -7,6 +7,7 @@ use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tracing::{debug, instrument};
 
+use crate::server::INIT_SERVER_SHUTDOWN_COUNTDOWN;
 use crate::shared::commands::add_user::AddUser;
 use crate::shared::commands::init;
 use crate::shared::commands::public_server_status::GetPutblicStatus;
@@ -76,7 +77,7 @@ impl Init {
 
         self.client.close();
 
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        tokio::time::sleep(INIT_SERVER_SHUTDOWN_COUNTDOWN).await;
 
         let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert.clone())
             .to_tls_verifier();

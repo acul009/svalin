@@ -14,6 +14,19 @@ use super::Agent;
 
 impl Agent {
     pub async fn init(address: String) -> Result<WaitingForInit> {
+        let db = Self::open_marmelade()?;
+
+        let scope = db.scope("default".into())?;
+        scope.view(|b| {
+            let current = b.get_kv("base_config");
+
+            if current.is_some() {
+                return Err(anyhow!("Profile already exists"));
+            }
+
+            Ok(())
+        })?;
+
         debug!("try connecting to {address}");
 
         let client = RpcClient::connect(&address, None, SkipServerVerification::new()).await?;
