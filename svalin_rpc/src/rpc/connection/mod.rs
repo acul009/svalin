@@ -27,7 +27,7 @@ use super::peer::Peer;
 pub mod direct_connection;
 
 #[async_trait]
-pub trait Connection: Sync {
+pub trait Connection: Send + Sync {
     // async fn open_session(&self, command_key: String) -> Result<Session>;
     async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>;
 }

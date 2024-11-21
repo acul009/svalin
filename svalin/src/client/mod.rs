@@ -7,6 +7,7 @@ use anyhow::Result;
 
 pub mod device;
 mod first_connect;
+pub mod tunnel_manager;
 
 pub mod add_agent;
 mod profile;

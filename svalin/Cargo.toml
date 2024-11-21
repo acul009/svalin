@@ -30,3 +30,4 @@ futures = "0.3.31"
 pin-project = "1.1.7"
 thiserror = "2.0.3"
 iced_aw = "0.11.0"
+uuid = { version = "1.11.0", features = ["v4"] }
