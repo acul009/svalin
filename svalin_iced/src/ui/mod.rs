@@ -9,6 +9,7 @@ use screen::SubScreen;
 
 use crate::Element;
 
+pub mod components;
 pub mod mainview;
 mod profile_picker;
 pub mod screen;

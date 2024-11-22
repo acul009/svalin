@@ -5,6 +5,7 @@ use svalin::client::device::Device;
 use crate::ui::{screen::SubScreen, widgets::scaffold};
 
 mod device_status;
+mod remote_terminal;
 
 #[derive(Debug, Clone)]
 pub enum Message {
