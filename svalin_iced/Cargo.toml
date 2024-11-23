@@ -28,6 +28,7 @@ iced = { version = "0.13.1", features = [
     "canvas",
 ] }
 iced_aw = "0.11.0"
+thiserror = "2.0.3"
 
 [dependencies.i18n-embed]
 version = "0.15"

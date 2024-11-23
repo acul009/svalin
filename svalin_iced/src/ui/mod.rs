@@ -1,3 +1,4 @@
+use components::text_grid::AnsiGrid;
 use iced::{
     keyboard::{self, key::Named},
     widget::{focus_next, stack},
@@ -31,15 +32,19 @@ pub enum Message {
 
 pub struct UI {
     screen: Screen,
+    test: AnsiGrid,
 }
 
 impl UI {
     pub fn start() -> (Self, Task<Message>) {
         let (screen, task) = ProfilePicker::start();
+        let mut test = AnsiGrid::new(80, 25);
+        test.parse(&include_str!("test")).unwrap();
 
         (
             Self {
                 screen: Screen::ProfilePicker(screen),
+                test: test,
             },
             task.map(Message::ProfilePicker),
         )
@@ -68,6 +73,8 @@ impl UI {
     }
 
     pub fn view(&self) -> Element<Message> {
+        return self.test.view();
+
         let screen: Element<Message> = match &self.screen {
             Screen::ProfilePicker(profile_picker) => profile_picker.view().map(Into::into),
             Screen::MainView(mainview) => mainview.view().map(Into::into),
@@ -94,7 +101,7 @@ impl UI {
         })];
 
         match &self.screen {
-            Screen::ProfilePicker(profile_picker) => (),
+            Screen::ProfilePicker(_profile_picker) => (),
             Screen::MainView(mainview) => {
                 subscriptions.push(mainview.subscription().map(Into::into));
             }

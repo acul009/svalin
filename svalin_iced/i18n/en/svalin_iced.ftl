@@ -43,7 +43,6 @@ enrolling-device = Enrolling Device
 
 
 username = Username
-password = Password
 confirm-password = Confirm Password
 totp = 2FA Code
 
