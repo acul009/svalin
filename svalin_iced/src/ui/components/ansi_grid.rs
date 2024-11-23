@@ -147,6 +147,16 @@ impl AnsiGrid {
                                 Err(ParserError::InvalidNumberOfArguments('h', 0))
                             } else {
                                 // Todo: implement private modes
+                                self.state = ParserState::Write;
+                                Ok(())
+                            }
+                        }
+                        'l' => {
+                            if num.is_empty() {
+                                Err(ParserError::InvalidNumberOfArguments('l', 0))
+                            } else {
+                                // Todo: implement private modes
+                                self.state = ParserState::Write;
                                 Ok(())
                             }
                         }
@@ -356,11 +366,13 @@ impl AnsiGrid {
                     _ => return Err(ParserError::InvalidNumberOfArguments(c, stack.len())),
                 },
                 'J' => match stack.len() {
-                    0 => self.grid.fill(Symbol {
-                        c: ' ',
-                        foreground_color: String::new(),
-                        background_color: String::new(),
-                    }),
+                    0 => {
+                        self.grid[self.cursor_y * self.width + self.cursor_x..].fill(Symbol {
+                            c: ' ',
+                            foreground_color: String::new(),
+                            background_color: String::new(),
+                        });
+                    }
                     _ => return Err(ParserError::InvalidNumberOfArguments(c, stack.len())),
                 },
                 'K' => match stack.len() {
@@ -459,7 +471,10 @@ impl AnsiGrid {
                     }
                 }
                 '?' => match stack.len() {
-                    0 => self.state = ParserState::PrivateMode(String::new()),
+                    0 => {
+                        self.state = ParserState::PrivateMode(String::new());
+                        return Ok(());
+                    }
                     _ => return Err(ParserError::InvalidNumberOfArguments(c, stack.len())),
                 },
                 c => return Err(ParserError::Todo(c)),
