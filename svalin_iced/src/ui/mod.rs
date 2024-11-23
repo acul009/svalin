@@ -1,4 +1,4 @@
-use components::text_grid::AnsiGrid;
+use components::ansi_grid::AnsiGrid;
 use iced::{
     keyboard::{self, key::Named},
     widget::{focus_next, stack},
@@ -38,8 +38,8 @@ pub struct UI {
 impl UI {
     pub fn start() -> (Self, Task<Message>) {
         let (screen, task) = ProfilePicker::start();
-        let mut test = AnsiGrid::new(80, 25);
-        test.parse(&include_str!("test")).unwrap();
+        let mut test = AnsiGrid::new(150, 50);
+        test.parse(&include_str!("castle")).unwrap();
 
         (
             Self {
