@@ -1,11 +1,10 @@
-use std::{
-    borrow::Cow,
-    str::Chars,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
-use iced::widget::{column, row, shader::wgpu::naga::front::wgsl::ParseError, text};
+use iced::{
+    widget::{column, row, text},
+    Color,
+};
 
 use crate::Element;
 
@@ -15,8 +14,7 @@ pub struct AnsiGrid {
     width: usize,
     height: usize,
     grid: Vec<Symbol>,
-    foreground_color: String,
-    background_color: String,
+    cursor_format: Format,
     state: ParserState,
     characters_parsed: Arc<Mutex<usize>>,
 }
@@ -24,8 +22,38 @@ pub struct AnsiGrid {
 #[derive(Debug, Clone)]
 pub struct Symbol {
     c: char,
-    foreground_color: String,
-    background_color: String,
+    format: Format,
+}
+
+#[derive(Debug, Clone)]
+pub struct Format {
+    foreground: Option<Color>,
+    background: Option<Color>,
+    bold: bool,
+    faint: bool,
+    italic: bool,
+    underline: bool,
+    blinking: bool,
+    inverse: bool,
+    hidden: bool,
+    strikethrough: bool,
+}
+
+impl Default for Format {
+    fn default() -> Self {
+        Self {
+            foreground: None,
+            background: None,
+            bold: false,
+            faint: false,
+            italic: false,
+            underline: false,
+            blinking: false,
+            inverse: false,
+            hidden: false,
+            strikethrough: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -71,16 +99,14 @@ impl AnsiGrid {
             cursor_y: 0,
             width,
             height,
+            cursor_format: Default::default(),
             grid: vec![
                 Symbol {
                     c: ' ',
-                    foreground_color: String::new(),
-                    background_color: String::new()
+                    format: Default::default()
                 };
                 width * height
             ],
-            foreground_color: String::new(),
-            background_color: String::new(),
             state: ParserState::Write,
             characters_parsed: Arc::new(Mutex::new(0)),
         }
@@ -205,8 +231,7 @@ impl AnsiGrid {
                 if !c.is_control() {
                     self.grid[self.cursor_y * self.width + self.cursor_x] = Symbol {
                         c,
-                        foreground_color: self.foreground_color.clone(),
-                        background_color: self.background_color.clone(),
+                        format: self.cursor_format.clone(),
                     };
                     self.cursor_x += 1;
                     self.fix_cursor_bounds();
@@ -369,8 +394,7 @@ impl AnsiGrid {
                     0 => {
                         self.grid[self.cursor_y * self.width + self.cursor_x..].fill(Symbol {
                             c: ' ',
-                            foreground_color: String::new(),
-                            background_color: String::new(),
+                            format: self.cursor_format.clone(),
                         });
                     }
                     _ => return Err(ParserError::InvalidNumberOfArguments(c, stack.len())),
@@ -381,15 +405,14 @@ impl AnsiGrid {
                             ..(self.cursor_y + 1) * self.width - 1]
                             .fill(Symbol {
                                 c: ' ',
-                                foreground_color: String::new(),
-                                background_color: String::new(),
+                                format: self.cursor_format.clone(),
                             });
                     }
                     _ => return Err(ParserError::InvalidNumberOfArguments(c, stack.len())),
                 },
                 'm' => {
                     if stack.is_empty() {
-                        self.foreground_color = "Default color".into()
+                        self.cursor_format = Default::default();
                     } else {
                         let stack = stack
                             .iter()
@@ -428,12 +451,16 @@ impl AnsiGrid {
                                             )?;
                                             match style {
                                                 38 => {
-                                                    self.foreground_color =
-                                                        format!("{},{},{}", r, g, b)
+                                                    self.cursor_format.foreground =
+                                                        Some(Color::from_rgb8(
+                                                            *r as u8, *g as u8, *b as u8,
+                                                        ));
                                                 }
                                                 48 => {
-                                                    self.background_color =
-                                                        format!("{},{},{}", r, g, b)
+                                                    self.cursor_format.background =
+                                                        Some(Color::from_rgb8(
+                                                            *r as u8, *g as u8, *b as u8,
+                                                        ));
                                                 }
                                                 _ => unreachable!(),
                                             }
@@ -447,12 +474,12 @@ impl AnsiGrid {
                                             )?;
                                             match style {
                                                 38 => {
-                                                    self.foreground_color =
-                                                        Self::parse_ansi_color(*color)?
+                                                    self.cursor_format.foreground =
+                                                        Some(Self::parse_ansi_color(*color)?)
                                                 }
                                                 48 => {
-                                                    self.background_color =
-                                                        Self::parse_ansi_color(*color)?
+                                                    self.cursor_format.background =
+                                                        Some(Self::parse_ansi_color(*color)?)
                                                 }
                                                 _ => unreachable!(),
                                             }
@@ -491,59 +518,82 @@ impl AnsiGrid {
         match style {
             0 => {
                 // reset all modes
+                let new_format = Format {
+                    foreground: self.cursor_format.foreground,
+                    background: self.cursor_format.background,
+                    ..Default::default()
+                };
+
+                self.cursor_format = new_format;
             }
             1 => {
                 // Set bold mode
+                self.cursor_format.bold = true;
             }
             2 => {
                 // set fim/faint mode
+                self.cursor_format.faint = true;
             }
             22 => {
                 // reset bold and faint mode
+                self.cursor_format.bold = false;
+                self.cursor_format.faint = false;
             }
             3 => {
                 // set italic mode
+                self.cursor_format.italic = true;
             }
             23 => {
                 // reset italic mode
+                self.cursor_format.italic = false;
             }
             4 => {
                 // set underline mode
+                self.cursor_format.underline = true;
             }
             24 => {
                 // reset underline mode
+                self.cursor_format.underline = false;
             }
             5 => {
                 // set blinking mode
+                self.cursor_format.blinking = true;
             }
             25 => {
                 // reset blinking mode
+                self.cursor_format.blinking = false;
             }
             7 => {
                 // set inverse / reverse mode
+                self.cursor_format.inverse = true;
             }
             27 => {
                 // reset inverse mode
+                self.cursor_format.inverse = false;
             }
             8 => {
                 // set hidden / invisible mode
+                self.cursor_format.hidden = true;
             }
             28 => {
                 // unset hidden mode
+                self.cursor_format.hidden = false;
             }
             9 => {
                 // set strikethrough mode
+                self.cursor_format.strikethrough = true;
             }
             29 => {
                 // unset strikethrough mode
+                self.cursor_format.strikethrough = false;
             }
-            30..=37 => self.foreground_color = Self::parse_ansi_color(style - 30)?,
-            90..=97 => self.foreground_color = Self::parse_ansi_color(style - 90)?,
+            30..=37 => self.cursor_format.foreground = Some(Self::parse_ansi_color(style - 30)?),
+            90..=97 => self.cursor_format.foreground = Some(Self::parse_ansi_color(style - 90)?),
             39 => {
                 // default foreground color
             }
-            40..=47 => self.background_color = Self::parse_ansi_color(style - 40)?,
-            100..=107 => self.background_color = Self::parse_ansi_color(style - 100)?,
+            40..=47 => self.cursor_format.background = Some(Self::parse_ansi_color(style - 40)?),
+            100..=107 => self.cursor_format.background = Some(Self::parse_ansi_color(style - 100)?),
             49 => {
                 // default background color
             }
@@ -553,36 +603,28 @@ impl AnsiGrid {
         Ok(())
     }
 
-    fn parse_ansi_color(ansi: usize) -> Result<String, ParserError> {
+    fn parse_ansi_color(ansi: usize) -> Result<Color, ParserError> {
         Ok(match ansi {
-            0 => "0,0,0".into(),        // Black
-            1 => "255,0,0".into(),      // Red
-            2 => "0,255,0".into(),      // Green
-            3 => "255,255,0".into(),    // Yellow
-            4 => "0,0,255".into(),      // Blue
-            5 => "255,0,255".into(),    // Magenta
-            6 => "0,255,255".into(),    // Cyan
-            7 => "255,255,255".into(),  // White
-            8 => "128,128,128".into(),  // Bright black (gray)
-            9 => "255,0,0".into(),      // Bright red
-            10 => "0,255,0".into(),     // Bright green
-            11 => "255,255,0".into(),   // Bright yellow
-            12 => "0,0,255".into(),     // Bright blue
-            13 => "255,0,255".into(),   // Bright magenta
-            14 => "0,255,255".into(),   // Bright cyan
-            15 => "255,255,255".into(), // Bright white
+            0..=15 => {
+                let r = ansi & 0b1;
+                let g = (ansi >> 1) & 0b1;
+                let b = (ansi >> 2) & 0b1;
+
+                Color::from_rgb(r as f32, g as f32, b as f32)
+            }
             16..=231 => {
                 // Colors in the 216-color cube
                 let color = ansi - 16;
                 let r = (color / 36) * 51;
                 let g = ((color % 36) / 6) * 51;
                 let b = (color % 6) * 51;
-                format!("{},{},{}", r, g, b)
+
+                Color::from_rgb(r as f32, g as f32, b as f32)
             }
             232..=255 => {
                 // Grayscale colors (232-255)
-                let gray = (ansi - 232) * 11;
-                format!("{},{},{},", gray, gray, gray)
+                let gray = ((ansi - 232) * 11) as f32;
+                Color::from_rgb(gray, gray, gray)
             }
             invalid => return Err(ParserError::InvalidArgument(' ', invalid.to_string())),
         })
@@ -601,9 +643,13 @@ impl AnsiGrid {
         }
 
         column(self.rows().iter().map(|r| {
-            row(r
-                .iter()
-                .map(|symbol| text(symbol.c.to_string()).width(12).center().into()))
+            row(r.iter().map(|symbol| {
+                text(symbol.c.to_string())
+                    .color_maybe(symbol.format.foreground)
+                    .width(12)
+                    .center()
+                    .into()
+            }))
             .into()
         }))
         .into()

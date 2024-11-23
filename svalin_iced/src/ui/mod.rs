@@ -39,7 +39,7 @@ impl UI {
     pub fn start() -> (Self, Task<Message>) {
         let (screen, task) = ProfilePicker::start();
         let mut test = AnsiGrid::new(150, 50);
-        test.parse(&include_str!("test")).unwrap();
+        test.parse(&include_str!("castle")).unwrap();
 
         (
             Self {
