@@ -8,7 +8,7 @@ use crate::rpc::{command::handler::HandlerCollection, session::Session};
 use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
 
 #[async_trait]
-pub trait ConnectionBase: Send + Sync {
+pub trait ConnectionBase: Send + Sync + Clone {
     async fn open_raw_session(
         &self,
     ) -> Result<(
@@ -27,7 +27,7 @@ use super::peer::Peer;
 pub mod direct_connection;
 
 #[async_trait]
-pub trait Connection: Send + Sync {
+pub trait Connection: Send + Sync + Clone {
     // async fn open_session(&self, command_key: String) -> Result<Session>;
     async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>;
 }

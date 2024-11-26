@@ -3,15 +3,17 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use futures::FutureExt;
 use svalin_rpc::{
     commands::forward::ForwardConnection,
     rpc::connection::{direct_connection::DirectConnection, Connection},
 };
-use tcp::{
-    TcpTunnel, TcpTunnelCloseError, TcpTunnelConfig, TcpTunnelCreateError, TcpTunnelRunError,
-};
+use tcp::{TcpTunnelCloseError, TcpTunnelConfig, TcpTunnelCreateError, TcpTunnelRunError};
 use thiserror::Error;
-use tokio::task::JoinSet;
+use tokio::{
+    sync::{oneshot, watch},
+    task::JoinSet,
+};
 use uuid::Uuid;
 
 pub mod tcp;
@@ -22,7 +24,7 @@ pub struct TunnelManager {
 }
 
 pub struct TunnelManagerInner {
-    active_tunnels: HashMap<Uuid, Arc<Tunnel<TunnelConnection>>>,
+    active_tunnels: HashMap<Uuid, Arc<Tunnel>>,
     join_set: JoinSet<()>,
 }
 
@@ -67,13 +69,9 @@ impl TunnelManager {
     }
 }
 
-pub struct Tunnel<Connection> {
+pub struct Tunnel {
     id: Uuid,
-    tunnel: TunnelType<Connection>,
-}
-
-pub enum TunnelType<Connection> {
-    Tcp(TcpTunnel<Connection>),
+    config: TunnelConfig,
 }
 
 pub enum TunnelConfig {
@@ -92,43 +90,37 @@ pub enum TunnelRunError {
     Tcp(#[from] TcpTunnelRunError),
 }
 
-#[derive(Debug, Error)]
-pub enum TunnelCloseError {
-    #[error(transparent)]
-    Tcp(#[from] TcpTunnelCloseError),
+pub enum TunnelRunResult {
+    Tcp(
+        oneshot::Receiver<Result<(), TcpTunnelCloseError>>,
+        oneshot::Receiver<TcpTunnelRunError>,
+    ),
 }
 
-impl<C> Tunnel<C>
-where
-    C: Connection,
-{
-    pub fn open(connection: C, config: TunnelConfig) -> Result<Self, TunnelCreateError> {
-        let id = Uuid::new_v4();
-
-        let tunnel = match config {
-            TunnelConfig::Tcp(config) => TunnelType::Tcp(TcpTunnel::open(connection, config)?),
-        };
-
-        Ok(Tunnel { id, tunnel })
+impl Tunnel {
+    pub async fn open(
+        connection: impl Connection + 'static,
+        mut active_recv: watch::Receiver<bool>,
+    ) -> (Uuid, TunnelRunResult) {
+        (
+            self.id,
+            self.run_result(connection, running, active_recv).await,
+        )
     }
 
-    pub async fn run(&self) -> (Uuid, Result<(), TunnelRunError>) {
-        (self.id, self.run_result().await)
-    }
+    async fn run_result(
+        &self,
+        connection: impl Connection + 'static,
+        running: oneshot::Sender<Result<(), TunnelCreateError>>,
+        mut active_recv: watch::Receiver<bool>,
+    ) -> TunnelRunResult {
+        match &self.config {
+            TunnelConfig::Tcp(config) => {
+                let (create, run) = config.run(connection, active_recv);
 
-    async fn run_result(&self) -> Result<(), TunnelRunError> {
-        match &self.tunnel {
-            TunnelType::Tcp(tunnel) => tunnel.run().await?,
-        };
-
-        Ok(())
-    }
-
-    pub fn close(&self) -> Result<(), TunnelCloseError> {
-        match &self.tunnel {
-            TunnelType::Tcp(tunnel) => tunnel.close()?,
-        };
-
-        Ok(())
+                create.await
+                TunnelRunResult::Tcp(create, run)
+            }
+        }
     }
 }
