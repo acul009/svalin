@@ -4,6 +4,7 @@ use std::{net::SocketAddr, sync::Arc};
 use anyhow::{anyhow, Context, Result};
 use quinn::crypto::rustls::QuicServerConfig;
 use quinn::rustls::crypto::CryptoProvider;
+use quinn::EndpointConfig;
 use svalin_pki::{Certificate, PermCredentials};
 use tokio::sync::{broadcast, Mutex};
 use tokio::task::JoinSet;
@@ -15,7 +16,6 @@ use crate::rpc::peer::Peer;
 use crate::rustls::{self, server::danger::ClientCertVerifier};
 
 use crate::rpc::command::handler::HandlerCollection;
-use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
 
 use super::connection::direct_connection::DirectConnection;
 use super::session::Session;
@@ -39,9 +39,12 @@ struct ServerData {
     latest_connections: BTreeMap<Certificate, DirectConnection>,
 }
 
+#[derive(Debug, Clone)]
+pub struct Socket(Arc<dyn quinn::AsyncUdpSocket>);
+
 impl RpcServer {
     pub fn new(
-        addr: SocketAddr,
+        socket: Socket,
         credentials: &PermCredentials,
         client_cert_verifier: Arc<dyn ClientCertVerifier>,
     ) -> Result<Self> {
@@ -49,7 +52,7 @@ impl RpcServer {
             let _ = quinn::rustls::crypto::ring::default_provider().install_default();
         }
 
-        let endpoint = RpcServer::create_endpoint(addr, credentials, client_cert_verifier)
+        let endpoint = RpcServer::create_endpoint(socket, credentials, client_cert_verifier)
             .context("failed to create rpc endpoint")?;
 
         let (br_send, _) = broadcast::channel::<ClientConnectionStatus>(10);
@@ -64,8 +67,19 @@ impl RpcServer {
         })
     }
 
+    pub fn create_socket(addr: SocketAddr) -> std::io::Result<Socket> {
+        let std_socket = std::net::UdpSocket::bind(addr)?;
+        let runtime = quinn::default_runtime().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::Other, "no async runtime found")
+        })?;
+
+        let socket = runtime.wrap_udp_socket(std_socket)?;
+
+        Ok(Socket(socket))
+    }
+
     fn create_endpoint(
-        addr: SocketAddr,
+        socket: Socket,
         credentials: &PermCredentials,
         client_cert_verifier: Arc<dyn ClientCertVerifier>,
     ) -> Result<quinn::Endpoint> {
@@ -85,8 +99,16 @@ impl RpcServer {
             QuicServerConfig::try_from(crypto).map_err(|err| anyhow!(err))?,
         ));
 
-        let endpoint =
-            quinn::Endpoint::server(config, addr).context("failed to create quinn endpoint")?;
+        let runtime = quinn::default_runtime().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::Other, "no async runtime found")
+        })?;
+
+        let endpoint = quinn::Endpoint::new_with_abstract_socket(
+            EndpointConfig::default(),
+            Some(config),
+            socket.0,
+            runtime,
+        )?;
 
         Ok(endpoint)
     }

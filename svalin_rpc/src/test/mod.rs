@@ -28,12 +28,11 @@ async fn ping_test() {
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
-    let server = RpcServer::new(
-        address.to_socket_addrs().unwrap().next().unwrap(),
-        &credentials,
-        SkipClientVerification::new(),
-    )
-    .unwrap();
+
+    let socket =
+        RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
+
+    let server = RpcServer::new(socket, &credentials, SkipClientVerification::new()).unwrap();
 
     let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
 
@@ -74,12 +73,10 @@ async fn tls_test() {
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
-    let server = RpcServer::new(
-        address.to_socket_addrs().unwrap().next().unwrap(),
-        &credentials,
-        SkipClientVerification::new(),
-    )
-    .unwrap();
+    let socket =
+        RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
+
+    let server = RpcServer::new(socket, &credentials, SkipClientVerification::new()).unwrap();
 
     let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
 
@@ -117,12 +114,10 @@ async fn perm_test() {
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
-    let server = RpcServer::new(
-        address.to_socket_addrs().unwrap().next().unwrap(),
-        &credentials,
-        SkipClientVerification::new(),
-    )
-    .unwrap();
+    let socket =
+        RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
+
+    let server = RpcServer::new(socket, &credentials, SkipClientVerification::new()).unwrap();
 
     let permission_handler = WhitelistPermissionHandler::<DummyPermission>::new(vec![]);
 

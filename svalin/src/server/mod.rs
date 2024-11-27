@@ -7,14 +7,11 @@ use rand::{
     thread_rng, Rng,
 };
 use serde::{Deserialize, Serialize};
-use svalin_pki::{
-    verifier::{KnownCertificateVerifier},
-    Certificate, Keypair, PermCredentials,
-};
+use svalin_pki::{verifier::KnownCertificateVerifier, Certificate, Keypair, PermCredentials};
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
     permissions::{anonymous_permission_handler::AnonymousPermissionHandler, DummyPermission},
-    rpc::command::handler::HandlerCollection,
+    rpc::{command::handler::HandlerCollection, server::Socket},
     verifiers::skip_verify::SkipClientVerification,
 };
 use tokio::sync::mpsc;
@@ -44,7 +41,7 @@ use self::user_store::UserStore;
 pub mod agent_store;
 pub mod user_store;
 
-pub const INIT_SERVER_SHUTDOWN_COUNTDOWN: Duration = Duration::from_secs(20);
+pub const INIT_SERVER_SHUTDOWN_COUNTDOWN: Duration = Duration::from_secs(1);
 
 #[derive(Debug)]
 pub struct Server {
@@ -72,12 +69,14 @@ impl Server {
             Ok(())
         })?;
 
+        let socket = RpcServer::create_socket(addr).context("failed to create socket")?;
+
         if base_config.is_none() {
             // initialize
 
             debug!("Server is not yet initialized, starting initialization routine");
 
-            let (root, credentials) = Self::init_server(addr)
+            let (root, credentials) = Self::init_server(socket.clone())
                 .await
                 .context("failed to initialize server")?;
 
@@ -135,8 +134,8 @@ impl Server {
         let verifier = TlsOptionalWrapper::new(verifier);
 
         // TODO: proper client verification
-        let rpc =
-            RpcServer::new(addr, &credentials, verifier).context("failed to create rpc server")?;
+        let rpc = RpcServer::new(socket, &credentials, verifier)
+            .context("failed to create rpc server")?;
 
         Ok(Self {
             rpc,
@@ -202,11 +201,11 @@ impl Server {
         }
     }
 
-    async fn init_server(addr: SocketAddr) -> Result<(Certificate, PermCredentials)> {
+    async fn init_server(socket: Socket) -> Result<(Certificate, PermCredentials)> {
         let temp_credentials = Keypair::generate()?.to_self_signed_cert()?;
 
         let rpc = Arc::new(RpcServer::new(
-            addr,
+            socket,
             &temp_credentials,
             SkipClientVerification::new(),
         )?);
