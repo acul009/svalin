@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use svalin_pki::{verifier::VerificationError, Certificate};
 
-use crate::server::{agent_store::AgentStore, user_store::UserStore};
+use crate::server::user_store::UserStore;
 
 #[derive(Debug)]
 pub struct VerificationHelper {

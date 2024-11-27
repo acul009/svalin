@@ -1,7 +1,6 @@
 use std::{
     fmt::Debug,
-    ops::Deref,
-    sync::{Arc, RwLock},
+    sync::Arc,
     time::Duration,
 };
 
@@ -12,7 +11,7 @@ use svalin_rpc::{
 };
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::{oneshot, watch};
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::shared::{
     commands::{

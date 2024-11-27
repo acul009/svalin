@@ -1,4 +1,3 @@
-use core::time;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use agent_store::AgentStore;
@@ -9,7 +8,7 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    verifier::{self, KnownCertificateVerifier},
+    verifier::{KnownCertificateVerifier},
     Certificate, Keypair, PermCredentials,
 };
 use svalin_rpc::{

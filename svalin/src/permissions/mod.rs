@@ -8,9 +8,7 @@ use svalin_rpc::{
     rpc::command::handler::PermissionPrecursor,
 };
 
-use crate::shared::commands::{
-    add_user::AddUserHandler, public_server_status::PublicStatusHandler,
-};
+use crate::shared::commands::public_server_status::PublicStatusHandler;
 
 pub mod agent_permission_handler;
 pub mod server_permission_handler;

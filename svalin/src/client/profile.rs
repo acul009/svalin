@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::PathBuf, sync::Arc, sync::RwLock};
+use std::{collections::BTreeMap, path::PathBuf};
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use tokio::{sync::watch, task::JoinSet};
 use tracing::{debug, error};
 
 use crate::{
-    client::tunnel_manager::{self, TunnelManager},
+    client::tunnel_manager::{TunnelManager},
     shared::commands::agent_list::UpdateAgentList,
     verifier::upstream_verifier::UpstreamVerifier,
 };

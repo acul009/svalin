@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use anyhow::{Ok, Result};
-use futures::{future::try_join_all, stream, StreamExt};
-use marmelade::{Data, Scope};
+use futures::{future::try_join_all, StreamExt};
+use marmelade::Scope;
 use svalin_pki::{
     get_current_timestamp,
     signed_object::{SignedObject, VerifiedObject},

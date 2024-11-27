@@ -1,10 +1,10 @@
-use std::{borrow::Borrow, panic, process, time::Duration};
+use std::{panic, process, time::Duration};
 
 use prepare_server::prepare_server;
 use test_log::test;
 use tokio::sync::oneshot;
 use totp_rs::TOTP;
-use tracing::{debug, error};
+use tracing::debug;
 
 use crate::{agent::Agent, client::Client};
 

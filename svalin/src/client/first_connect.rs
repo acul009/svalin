@@ -1,5 +1,4 @@
 use std::fmt::Debug;
-use std::time::Duration;
 
 use anyhow::{Context, Ok, Result};
 use svalin_pki::verifier::KnownCertificateVerifier;

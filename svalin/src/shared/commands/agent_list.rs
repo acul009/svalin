@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeMap,
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 use anyhow::{Context, Result};

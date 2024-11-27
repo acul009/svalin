@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use marmelade::Scope;
 use serde::{Deserialize, Serialize};
 use svalin_pki::verifier::exact::ExactVerififier;
