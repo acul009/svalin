@@ -8,6 +8,7 @@ use crate::Element;
 pub mod dialog;
 pub mod error_display;
 pub mod form;
+pub mod header;
 pub mod loading;
 pub mod percent_display;
 pub mod progress_circle;
@@ -30,6 +31,12 @@ pub fn loading<'a>(message: impl Into<Cow<'a, str>>) -> loading::Loading<'a> {
 
 pub fn dialog<'a, Message>() -> dialog::Dialog<'a, Message> {
     dialog::Dialog::new()
+}
+
+pub fn header<'a, Message>(
+    content: impl Into<Element<'a, Message>>,
+) -> header::Header<'a, Message> {
+    header::Header::new(content)
 }
 
 pub fn realtime(realtime: &RemoteLiveData<RealtimeStatus>) -> realtime::RealtimeDisplay<'_> {

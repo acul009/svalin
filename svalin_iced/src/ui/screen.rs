@@ -9,6 +9,10 @@ pub trait SubScreen {
 
     fn view(&self) -> Element<Self::Message>;
 
+    fn header(&self) -> Option<Element<Self::Message>> {
+        None
+    }
+
     fn dialog(&self) -> Option<Element<Self::Message>> {
         None
     }

@@ -11,10 +11,14 @@ use iced::{
 use svalin::client::{device::Device, Client};
 use svalin_pki::Certificate;
 
-use crate::{fl, ui::screen::SubScreen, util::watch_recipe::WatchRecipe};
+use crate::{
+    fl,
+    ui::{screen::SubScreen, MapOpt},
+    util::watch_recipe::WatchRecipe,
+};
 
-pub mod add_device;
-pub mod device_view;
+mod add_device;
+mod device_view;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -138,6 +142,14 @@ impl SubScreen for Devices {
                     })
             ]
             .into(),
+        }
+    }
+
+    fn header(&self) -> Option<crate::Element<Self::Message>> {
+        match &self.state {
+            State::AddDevice(add_device) => add_device.header().mapopt(Into::into),
+            State::DeviceView(device_view) => device_view.header().mapopt(Into::into),
+            State::List => None,
         }
     }
 

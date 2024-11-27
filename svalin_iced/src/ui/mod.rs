@@ -6,11 +6,12 @@ use iced::{
 use mainview::MainView;
 use profile_picker::ProfilePicker;
 use screen::SubScreen;
+use widgets::scaffold;
 
 use crate::Element;
 
 pub mod components;
-pub mod mainview;
+mod mainview;
 mod profile_picker;
 pub mod screen;
 pub mod types;
@@ -73,14 +74,26 @@ impl UI {
             Screen::MainView(mainview) => mainview.view().map(Into::into),
         };
 
-        let dialog = match &self.screen {
-            Screen::ProfilePicker(profile_picker) => profile_picker
-                .dialog()
-                .map(|element| element.map(Into::into)),
-            Screen::MainView(mainview) => mainview.dialog().map(|element| element.map(Into::into)),
+        let header = match &self.screen {
+            Screen::ProfilePicker(profile_picker) => profile_picker.header().mapopt(Into::into),
+            Screen::MainView(mainview) => mainview.header().mapopt(Into::into),
         };
 
-        stack![screen].push_maybe(dialog).into()
+        let dialog = match &self.screen {
+            Screen::ProfilePicker(profile_picker) => profile_picker.dialog().mapopt(Into::into),
+            Screen::MainView(mainview) => mainview.dialog().mapopt(Into::into),
+        };
+
+        let context = match &self.screen {
+            Screen::ProfilePicker(profile_picker) => profile_picker.context().mapopt(Into::into),
+            Screen::MainView(mainview) => mainview.context().mapopt(Into::into),
+        };
+
+        scaffold(screen)
+            .header_maybe(header)
+            .dialog_maybe(dialog)
+            .context_maybe(context)
+            .into()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
@@ -101,5 +114,26 @@ impl UI {
         };
 
         Subscription::batch(subscriptions)
+    }
+}
+
+pub trait MapOpt<'a, From, To> {
+    fn mapopt<F>(self, f: F) -> Option<Element<'a, To>>
+    where
+        F: Fn(From) -> To,
+        F: 'a;
+}
+
+impl<'a, From, To> MapOpt<'a, From, To> for Option<Element<'a, From>>
+where
+    From: 'a,
+    To: 'a,
+{
+    fn mapopt<F>(self, f: F) -> Option<Element<'a, To>>
+    where
+        F: Fn(From) -> To,
+        F: 'a,
+    {
+        self.map(|element| element.map(f))
     }
 }

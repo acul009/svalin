@@ -13,7 +13,10 @@ use tokio::sync::watch;
 use tokio_stream::wrappers::{ReceiverStream, WatchStream};
 
 use crate::{
-    ui::{screen::SubScreen, widgets::scaffold},
+    ui::{
+        screen::SubScreen,
+        widgets::{header, scaffold},
+    },
     util::watch_recipe::WatchRecipe,
 };
 
@@ -81,15 +84,20 @@ impl SubScreen for DeviceView {
     }
 
     fn view(&self) -> crate::Element<Self::Message> {
-        scaffold(self.status.view().map(Into::into))
-            .on_back(Message::Back)
-            .header(
+        self.status.view().map(Into::into)
+    }
+
+    fn header(&self) -> Option<crate::Element<Self::Message>> {
+        Some(
+            header(
                 text(&self.item.public_data.name)
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .center(),
             )
-            .into()
+            .on_back(Message::Back)
+            .into(),
+        )
     }
 
     fn subscription(&self) -> iced::Subscription<Self::Message> {

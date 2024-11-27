@@ -2,7 +2,7 @@ use iced::application;
 use ui::UI;
 
 mod i18n;
-mod ui;
+pub mod ui;
 pub mod util;
 
 type Theme = iced::Theme;
