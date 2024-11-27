@@ -29,6 +29,9 @@ iced = { version = "0.13.1", features = [
 ] }
 iced_aw = "0.11.0"
 thiserror = "2.0.3"
+tokio-stream = { version = "0.1.16", features = ["full"] }
+tokio-util = "0.7.12"
+futures = "0.3.31"
 
 [dependencies.i18n-embed]
 version = "0.15"

@@ -1,5 +1,6 @@
 use std::{
     fmt::Debug,
+    ops::Deref,
     sync::{Arc, RwLock},
     time::Duration,
 };
@@ -21,6 +22,8 @@ use crate::shared::{
     },
     lazy_watch::{self, LazyWatch},
 };
+
+use super::tunnel_manager::{TunnelConfig, TunnelCreateError, TunnelManager};
 
 #[derive(Clone, Debug)]
 pub enum RemoteLiveData<T> {
@@ -68,18 +71,22 @@ impl Debug for Device {
 
 struct DeviceData {
     connection: ForwardConnection<DirectConnection>,
-    item: RwLock<AgentListItem>,
+    tunnel_manager: TunnelManager,
+    item: watch::Sender<AgentListItem>,
     realtime: LazyWatch<RemoteLiveData<RealtimeStatus>, RealtimeStatusWatchHandler>,
 }
 
 impl Device {
-    pub fn new(connection: ForwardConnection<DirectConnection>, item: AgentListItem) -> Self {
-        let item = RwLock::new(item);
-
+    pub fn new(
+        connection: ForwardConnection<DirectConnection>,
+        item: AgentListItem,
+        tunnel_manager: TunnelManager,
+    ) -> Self {
         return Self {
             data: Arc::new(DeviceData {
                 connection: connection.clone(),
-                item,
+                tunnel_manager,
+                item: watch::channel(item).0,
                 realtime: LazyWatch::new(
                     RemoteLiveData::Unavailable,
                     RealtimeStatusWatchHandler::new(connection),
@@ -88,34 +95,31 @@ impl Device {
         };
     }
 
-    pub(crate) fn update(&self, item: AgentListItem) {
-        {
-            let mut current = self.data.item.write().unwrap();
-
-            debug!(
-                "updating device status: {}: {}",
-                item.public_data.name,
-                if item.online_status {
-                    "online"
-                } else {
-                    "offline"
-                }
-            );
-
-            *current = item;
-        }
+    pub(crate) fn update(&self, new_item: AgentListItem) {
+        self.data.item.send_replace(new_item);
     }
 
     pub async fn ping(&self) -> Result<Duration> {
         self.data.connection.dispatch(Ping).await
     }
 
-    pub fn item(&self) -> AgentListItem {
-        self.data.item.read().unwrap().clone()
+    pub fn item(&self) -> watch::Ref<'_, AgentListItem> {
+        self.data.item.borrow()
+    }
+
+    pub fn watch_item(&self) -> watch::Receiver<AgentListItem> {
+        self.data.item.subscribe()
     }
 
     pub fn subscribe_realtime(&self) -> RealtimeStatusReceiver {
         self.data.realtime.subscribe()
+    }
+
+    pub async fn open_tunnel(&self, config: TunnelConfig) -> Result<(), TunnelCreateError> {
+        self.data
+            .tunnel_manager
+            .open(self.data.connection.clone(), config)
+            .await
     }
 
     pub async fn open_terminal(&self) -> Result<RemoteTerminal> {

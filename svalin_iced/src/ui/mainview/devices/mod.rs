@@ -1,15 +1,17 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use add_device::AddDevice;
 use device_view::DeviceView;
 use iced::{
+    advanced::subscription::from_recipe,
     alignment::Vertical,
     widget::{button, column, container, row, stack, text},
     Color, Length, Subscription, Task,
 };
 use svalin::client::{device::Device, Client};
+use svalin_pki::Certificate;
 
-use crate::{fl, ui::screen::SubScreen};
+use crate::{fl, ui::screen::SubScreen, util::watch_recipe::WatchRecipe};
 
 pub mod add_device;
 pub mod device_view;
@@ -38,14 +40,22 @@ pub enum State {
 pub struct Devices {
     client: Arc<Client>,
     state: State,
+    recipe: WatchRecipe<String, BTreeMap<Certificate, Device>, Message>,
 }
 
 impl Devices {
     pub fn start(client: Arc<Client>) -> (Self, Task<Message>) {
+        let recipe = WatchRecipe::new(
+            String::from("devices"),
+            client.watch_device_list(),
+            Message::ShowList,
+        );
+
         (
             Self {
                 client,
                 state: State::List,
+                recipe,
             },
             Task::none(),
         )
@@ -101,7 +111,12 @@ impl SubScreen for Devices {
                     .device_list()
                     .iter()
                     .fold(column!(), |col, device| {
-                        let item = device.item();
+                        let device = device.1.clone();
+                        let name = device.item().public_data.name.clone();
+                        let color = match device.item().online_status {
+                            true => Color::from_rgb8(0, 255, 0),
+                            false => Color::from_rgb8(255, 0, 0),
+                        };
 
                         col.push(
                             button(
@@ -109,23 +124,14 @@ impl SubScreen for Devices {
                                     text("X")
                                         .width(50)
                                         .height(Length::Fill)
-                                        .style(move |_| {
-                                            text::Style {
-                                                color: Some(match item.online_status {
-                                                    true => Color::from_rgb8(0, 255, 0),
-                                                    false => Color::from_rgb8(255, 0, 0),
-                                                }),
-                                            }
-                                        })
+                                        .style(move |_| { text::Style { color: Some(color) } })
                                         .center(),
-                                    text(item.public_data.name)
-                                        .height(Length::Fill)
-                                        .align_y(Vertical::Center)
+                                    text(name).height(Length::Fill).align_y(Vertical::Center)
                                 ]
                                 .width(Length::Fill)
                                 .height(Length::Fill),
                             )
-                            .on_press(Message::ShowDevice(device.clone()))
+                            .on_press(Message::ShowDevice(device))
                             .height(50)
                             .width(Length::Fill),
                         )
@@ -139,7 +145,7 @@ impl SubScreen for Devices {
         match &self.state {
             State::AddDevice(add_device) => add_device.subscription().map(Into::into),
             State::DeviceView(device_view) => device_view.subscription().map(Into::into),
-            State::List => Subscription::none(),
+            State::List => from_recipe(self.recipe.clone()),
         }
     }
 }

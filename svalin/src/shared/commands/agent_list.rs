@@ -22,10 +22,10 @@ use svalin_rpc::{
         session::Session,
     },
 };
-use tokio::select;
+use tokio::{select, sync::watch};
 
 use crate::{
-    client::device::Device,
+    client::{device::Device, tunnel_manager::TunnelManager},
     permissions::Permission,
     server::agent_store::{AgentStore, AgentUpdate},
     shared::join_agent::PublicAgentData,
@@ -135,8 +135,9 @@ impl CommandHandler for AgentListHandler {
 pub struct UpdateAgentList {
     pub base_connection: DirectConnection,
     pub credentials: PermCredentials,
-    pub list: Arc<RwLock<BTreeMap<Certificate, Device>>>,
+    pub list: watch::Sender<BTreeMap<Certificate, Device>>,
     pub verifier: ExactVerififier,
+    pub tunnel_manager: TunnelManager,
 }
 
 #[async_trait]
@@ -168,30 +169,22 @@ impl CommandDispatcher for UpdateAgentList {
                 public_data: public_data.unpack(),
             };
 
-            {
-                if let Some(device) = self.list.read().unwrap().get(&item.public_data.cert) {
-                    // Either we update the device...
-
+            self.list.send_modify(|list| {
+                if let Some(device) = list.get(&item.public_data.cert) {
                     device.update(item);
-                    continue;
+                } else {
+                    let device_connection = ForwardConnection::new(
+                        self.base_connection.clone(),
+                        self.credentials.clone(),
+                        item.public_data.cert.clone(),
+                    );
+
+                    let cert = item.public_data.cert.clone();
+                    let device = Device::new(device_connection, item, self.tunnel_manager.clone());
+
+                    list.insert(cert, device);
                 }
-            }
-
-            {
-                // ...or we create it
-
-                let device_connection = ForwardConnection::new(
-                    self.base_connection.clone(),
-                    self.credentials.clone(),
-                    item.public_data.cert.clone(),
-                );
-
-                let cert = item.public_data.cert.clone();
-
-                let device = Device::new(device_connection, item);
-
-                self.list.write().unwrap().insert(cert, device);
-            }
+            });
         }
     }
 }

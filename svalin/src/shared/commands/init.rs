@@ -45,6 +45,8 @@ impl CommandHandler for InitHandler {
             .write_object::<std::result::Result<(), ()>>(&Ok(()))
             .await?;
 
+        let _: Result<()> = session.read_object().await;
+
         self.channel.send((root, my_credentials)).await?;
 
         Ok(())
@@ -90,6 +92,8 @@ impl CommandDispatcher for Init {
         session.write_object(&server_cert).await?;
 
         let _ok: std::result::Result<(), ()> = session.read_object().await?;
+
+        session.write_object(&()).await?;
 
         debug!("init completed");
 

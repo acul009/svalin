@@ -1,4 +1,4 @@
-use std::{panic, process, time::Duration};
+use std::{borrow::Borrow, panic, process, time::Duration};
 
 use prepare_server::prepare_server;
 use test_log::test;
@@ -80,9 +80,7 @@ async fn integration_tests() {
 
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    let agents = client.device_list();
-
-    let device = agents.first().unwrap();
+    let device = client.device_list().first_key_value().unwrap().1.clone();
 
     let ping = device.ping().await.unwrap();
 

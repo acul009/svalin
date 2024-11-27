@@ -1,8 +1,21 @@
-use device_status::DeviceStatus;
-use iced::{widget::text, Length, Task};
-use svalin::client::device::Device;
+use std::{borrow::Cow, hash::Hash};
 
-use crate::ui::{screen::SubScreen, widgets::scaffold};
+use device_status::DeviceStatus;
+use futures_util::{FutureExt, SinkExt, StreamExt};
+use iced::{
+    advanced::subscription::{from_recipe, Recipe},
+    stream::channel,
+    widget::{shader::wgpu::core::device, text},
+    Length, Subscription, Task,
+};
+use svalin::{client::device::Device, shared::commands::agent_list::AgentListItem};
+use tokio::sync::watch;
+use tokio_stream::wrappers::{ReceiverStream, WatchStream};
+
+use crate::{
+    ui::{screen::SubScreen, widgets::scaffold},
+    util::watch_recipe::WatchRecipe,
+};
 
 mod device_status;
 // mod remote_terminal;
@@ -11,6 +24,7 @@ mod device_status;
 pub enum Message {
     Back,
     Status(device_status::Message),
+    ItemUpdate,
 }
 
 impl From<Message> for super::Message {
@@ -24,13 +38,31 @@ impl From<Message> for super::Message {
 
 pub struct DeviceView {
     device: Device,
+    item: AgentListItem,
     status: DeviceStatus,
+    recipe: WatchRecipe<String, AgentListItem, Message>,
 }
 
 impl DeviceView {
-    pub fn start(device: Device) -> (Self, Task<Message>) {
+    pub fn start(device: Device) -> (DeviceView, Task<Message>) {
+        let item = device.item().clone();
         let (status, task) = DeviceStatus::start(device.clone());
-        (Self { device, status }, task.map(Into::into))
+
+        let recipe = WatchRecipe::new(
+            format!("device-{:x?}", item.public_data.cert.fingerprint()),
+            device.watch_item(),
+            Message::ItemUpdate,
+        );
+
+        (
+            DeviceView {
+                device,
+                status,
+                item,
+                recipe,
+            },
+            task.map(Into::into),
+        )
     }
 }
 
@@ -40,6 +72,10 @@ impl SubScreen for DeviceView {
     fn update(&mut self, message: Self::Message) -> Task<Self::Message> {
         match message {
             Message::Status(message) => self.status.update(message).map(Into::into),
+            Message::ItemUpdate => {
+                self.item = self.device.item().clone();
+                Task::none()
+            }
             Message::Back => unreachable!(),
         }
     }
@@ -48,7 +84,7 @@ impl SubScreen for DeviceView {
         scaffold(self.status.view().map(Into::into))
             .on_back(Message::Back)
             .header(
-                text(self.device.item().public_data.name)
+                text(&self.item.public_data.name)
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .center(),
@@ -57,6 +93,9 @@ impl SubScreen for DeviceView {
     }
 
     fn subscription(&self) -> iced::Subscription<Self::Message> {
-        self.status.subscription().map(Into::into)
+        Subscription::batch(vec![
+            self.status.subscription().map(Into::into),
+            from_recipe(self.recipe.clone()),
+        ])
     }
 }

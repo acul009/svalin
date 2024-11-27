@@ -3,12 +3,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use futures::FutureExt;
 use svalin_rpc::{
     commands::forward::ForwardConnection,
     rpc::connection::{direct_connection::DirectConnection, Connection},
 };
-use tcp::{TcpTunnelCloseError, TcpTunnelConfig, TcpTunnelCreateError, TcpTunnelRunError};
+use tcp::{TcpTunnelConfig, TcpTunnelCreateError, TcpTunnelRunError};
 use thiserror::Error;
 use tokio::{
     sync::{oneshot, watch},
@@ -23,8 +22,8 @@ pub struct TunnelManager {
     inner: Arc<Mutex<TunnelManagerInner>>,
 }
 
-pub struct TunnelManagerInner {
-    active_tunnels: HashMap<Uuid, Arc<Tunnel>>,
+struct TunnelManagerInner {
+    active_tunnels: HashMap<Uuid, Tunnel>,
     join_set: JoinSet<()>,
 }
 
@@ -40,22 +39,23 @@ impl TunnelManager {
         }
     }
 
-    pub fn open(
+    pub async fn open(
         &self,
         connection: TunnelConnection,
         config: TunnelConfig,
     ) -> Result<(), TunnelCreateError> {
-        let tunnel = Arc::new(Tunnel::open(connection, config)?);
-        let id = tunnel.id;
+        let mut tunnel = Tunnel::open(connection, config).await?;
+
+        let id = tunnel.id();
         let manager = self.clone();
-        let tunnel_clone = tunnel.clone();
+        let tunnel_result = tunnel.take_result().unwrap();
 
         let mut inner = self.inner.lock().unwrap();
 
         inner.active_tunnels.insert(id, tunnel);
 
         inner.join_set.spawn(async move {
-            let (id, result) = tunnel_clone.run().await;
+            let result = tunnel_result.await_result().await;
             if let Err(err) = result {
                 tracing::error!("{err}");
             }
@@ -65,13 +65,21 @@ impl TunnelManager {
             inner.active_tunnels.remove(&id);
         });
 
-        todo!()
+        Ok(())
     }
 }
 
 pub struct Tunnel {
     id: Uuid,
     config: TunnelConfig,
+    run_result: Option<TunnelRunResult>,
+    active_send: watch::Sender<bool>,
+}
+
+impl Drop for Tunnel {
+    fn drop(&mut self) {
+        self.active_send.send(false).unwrap();
+    }
 }
 
 pub enum TunnelConfig {
@@ -91,36 +99,56 @@ pub enum TunnelRunError {
 }
 
 pub enum TunnelRunResult {
-    Tcp(
-        oneshot::Receiver<Result<(), TcpTunnelCloseError>>,
-        oneshot::Receiver<TcpTunnelRunError>,
-    ),
+    Tcp(oneshot::Receiver<TcpTunnelRunError>),
+}
+
+impl TunnelRunResult {
+    pub async fn await_result(self) -> Result<(), TunnelRunError> {
+        match self {
+            TunnelRunResult::Tcp(result) => match result.await {
+                Ok(err) => Err(err.into()),
+                Err(_) => Ok(()),
+            },
+        }
+    }
 }
 
 impl Tunnel {
     pub async fn open(
         connection: impl Connection + 'static,
-        mut active_recv: watch::Receiver<bool>,
-    ) -> (Uuid, TunnelRunResult) {
-        (
-            self.id,
-            self.run_result(connection, running, active_recv).await,
-        )
+        config: TunnelConfig,
+    ) -> Result<Tunnel, TunnelCreateError> {
+        let (active_send, active_recv) = watch::channel(false);
+        let run_result = Some(match &config {
+            TunnelConfig::Tcp(config) => {
+                TunnelRunResult::Tcp(config.run(connection, active_recv).await?)
+            }
+        });
+        let id = Uuid::new_v4();
+
+        Ok(Self {
+            id,
+            config,
+            run_result,
+            active_send,
+        })
     }
 
-    async fn run_result(
-        &self,
-        connection: impl Connection + 'static,
-        running: oneshot::Sender<Result<(), TunnelCreateError>>,
-        mut active_recv: watch::Receiver<bool>,
-    ) -> TunnelRunResult {
-        match &self.config {
-            TunnelConfig::Tcp(config) => {
-                let (create, run) = config.run(connection, active_recv);
+    pub fn id(&self) -> Uuid {
+        self.id
+    }
 
-                create.await
-                TunnelRunResult::Tcp(create, run)
-            }
-        }
+    pub fn config(&self) -> &TunnelConfig {
+        &self.config
+    }
+
+    pub fn take_result(&mut self) -> Option<TunnelRunResult> {
+        self.run_result.take()
+    }
+
+    pub fn close(&mut self) {
+        // we only care about shutting down the tunnel.
+        // if it's already closed, we don't need to do anything
+        let _ = self.active_send.send(false);
     }
 }

@@ -52,7 +52,10 @@ impl SubScreen for DeviceStatus {
     fn subscription(&self) -> iced::Subscription<Self::Message> {
         let device = self.device.clone();
         Subscription::run_with_id(
-            self.device.item().public_data.cert.fingerprint(),
+            format!(
+                "realtime-{:x?}",
+                self.device.item().public_data.cert.fingerprint()
+            ),
             channel(1, move |mut output| async move {
                 let mut subscription = device.subscribe_realtime();
 

@@ -7,11 +7,13 @@ use svalin_pki::{
     Certificate, PermCredentials,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
-use tokio::task::JoinSet;
+use tokio::{sync::watch, task::JoinSet};
 use tracing::{debug, error};
 
 use crate::{
-    shared::commands::agent_list::UpdateAgentList, verifier::upstream_verifier::UpstreamVerifier,
+    client::tunnel_manager::{self, TunnelManager},
+    shared::commands::agent_list::UpdateAgentList,
+    verifier::upstream_verifier::UpstreamVerifier,
 };
 
 use super::Client;
@@ -208,18 +210,22 @@ impl Client {
 
             debug!("connected to server");
 
+            let tunnel_manager = TunnelManager::new();
+
             let mut client = Self {
                 rpc,
                 _upstream_address: profile.upstream_address,
                 upstream_certificate: profile.upstream_certificate,
                 root_certificate: profile.root_certificate.clone(),
                 credentials: identity.clone(),
-                device_list: Arc::new(RwLock::new(BTreeMap::new())),
+                device_list: watch::channel(BTreeMap::new()).0,
+                tunnel_manager,
                 background_tasks: JoinSet::new(),
             };
 
             let list_clone = client.device_list.clone();
             let sync_connection = client.rpc.upstream_connection();
+            let tunnel_manager = client.tunnel_manager.clone();
 
             client.background_tasks.spawn(async move {
                 debug!("subscribing to upstream agent list");
@@ -229,6 +235,7 @@ impl Client {
                         credentials: identity,
                         list: list_clone,
                         verifier: ExactVerififier::new(profile.root_certificate),
+                        tunnel_manager,
                     })
                     .await
                 {

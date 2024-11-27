@@ -1,11 +1,8 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use svalin_rpc::{
     rpc::{
-        command::{
-            dispatcher::{CommandDispatcher, TakeableCommandDispatcher},
-            handler::CommandHandler,
-        },
+        command::{dispatcher::CommandDispatcher, handler::CommandHandler},
         session::Session,
     },
     transport::combined_transport::CombinedTransport,
@@ -21,7 +18,7 @@ pub struct TcpForwardDispatcher {
 }
 
 #[async_trait]
-impl TakeableCommandDispatcher for TcpForwardDispatcher {
+impl CommandDispatcher for TcpForwardDispatcher {
     type Output = ();
 
     type Request = String;
@@ -36,30 +33,26 @@ impl TakeableCommandDispatcher for TcpForwardDispatcher {
 
     async fn dispatch(
         mut self,
-        session: &mut Option<Session>,
+        session: &mut Session,
         _request: Self::Request,
     ) -> Result<Self::Output> {
-        if let Some(mut session) = session.take() {
-            let _forward_active = session.read_object::<Result<(), TcpForwardError>>().await?;
+        let _forward_active = session.read_object::<Result<(), TcpForwardError>>().await?;
 
-            let (transport_read, transport_write) = session.borrow_transport();
-            let mut transport = CombinedTransport::new(transport_read, transport_write);
+        let (transport_read, transport_write) = session.borrow_transport();
+        let mut transport = CombinedTransport::new(transport_read, transport_write);
 
-            let copy_future = copy_bidirectional(&mut transport, &mut self.stream);
+        let copy_future = copy_bidirectional(&mut transport, &mut self.stream);
 
-            select! {
-                copy_result = copy_future => {copy_result?; return Ok(())},
-                _ = self.active.changed() => {
-                    if !*self.active.borrow() {
-                        return Ok(());
-                    }
+        select! {
+            copy_result = copy_future => {copy_result?; return Ok(())},
+            _ = self.active.changed() => {
+                if !*self.active.borrow() {
+                    return Ok(());
+                }
 
-                    // No idea how to solve this, since a loop means copy_result is moved
-                    todo!()
-                },
-            }
-        } else {
-            Err(anyhow!("tried dispatching command with None"))
+                // No idea how to solve this, since a loop means copy_result is moved
+                todo!()
+            },
         }
     }
 }

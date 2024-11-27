@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::ops::Deref;
 
 use dispatcher::TcpForwardDispatcher;
 use svalin_rpc::rpc::connection::Connection;
@@ -6,10 +6,8 @@ use thiserror::Error;
 use tokio::{
     net::TcpListener,
     select,
-    sync::{broadcast, oneshot, watch},
+    sync::{oneshot, watch},
 };
-
-use super::{TunnelCreateError, TunnelRunError};
 
 pub mod dispatcher;
 pub mod handler;
@@ -33,65 +31,57 @@ pub enum TcpTunnelRunError {
 }
 
 impl TcpTunnelConfig {
-    pub fn run(
+    pub async fn run(
         &self,
         connection: impl Connection + 'static,
         mut active_recv: watch::Receiver<bool>,
-    ) -> (
-        oneshot::Receiver<Result<(), TcpTunnelCreateError>>,
-        oneshot::Receiver<TcpTunnelRunError>,
-    ) {
-        let (running, running_recv) = oneshot::channel();
-        let (error_send, error_recv) = oneshot::channel();
+    ) -> Result<oneshot::Receiver<TcpTunnelRunError>, TcpTunnelCreateError> {
         let config = self.clone();
 
+        let listener = TcpListener::bind(format!("0.0.0.0:{}", config.local_port))
+            .await
+            .map_err(|err| TcpTunnelCreateError::BindError(config.local_port, err))?;
+
+        let (error_send, error_recv) = oneshot::channel();
+
         tokio::spawn(async move {
-            let listener = TcpListener::bind(format!("0.0.0.0:{}", config.local_port)).await;
-
-            match listener {
-                Err(err) => {
-                    let _ =
-                        running.send(Err(TcpTunnelCreateError::BindError(config.local_port, err)));
-                }
-                Ok(listener) => {
-                    let _ = running.send(Ok(()));
-
-                    select! {
-                        stream = listener.accept() => {
-                            if *active_recv.borrow().deref() {
+            loop {
+                select! {
+                    stream = listener.accept() => {
+                        if *active_recv.borrow().deref() {
+                            return;
+                        }
+                        match stream {
+                            Err(err) => {
+                                let _ = error_send.send(TcpTunnelRunError::AcceptConnectionError(err));
                                 return;
                             }
-                            match stream {
-                                Err(err) => {
-                                    let _ = error_send.send(TcpTunnelRunError::AcceptConnectionError(err));
-                                }
-                                Ok((stream, _)) => {
+                            Ok((stream, _)) => {
 
-                                    let connection = connection.clone();
-                                    let dispatcher = TcpForwardDispatcher {
-                                        active: active_recv.clone(),
-                                        target: config.remote_host.clone(),
-                                        stream,
-                                    };
+                                let connection = connection.clone();
+                                let dispatcher = TcpForwardDispatcher {
+                                    active: active_recv.clone(),
+                                    target: config.remote_host.clone(),
+                                    stream,
+                                };
 
-                                    tokio::spawn(async move {
-                                        if let Err(err) = connection.dispatch(dispatcher).await {
-                                            tracing::error!("{err}");
-                                        }
-                                    });
-                                }
+                                tokio::spawn(async move {
+                                    if let Err(err) = connection.dispatch(dispatcher).await {
+                                        tracing::error!("{err}");
+                                    }
+                                });
                             }
                         }
-                        _ = active_recv.changed() => {
-                            if *active_recv.borrow().deref() {
-                                return;
-                            }
+                    }
+                    _ = active_recv.changed() => {
+                        if *active_recv.borrow().deref() {
+                            return;
                         }
                     }
                 }
             }
         });
 
-        (running_recv, error_recv)
+        Ok(error_recv)
     }
 }
