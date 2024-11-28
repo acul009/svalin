@@ -4,6 +4,7 @@ use std::fmt::{Debug, Display};
 use crate::commands::{deauthenticate::Deauthenticate, e2e::E2EDispatcher};
 use crate::rpc::command::dispatcher::TakeableCommandDispatcher;
 use crate::rpc::connection::Connection;
+use crate::rpc::peer::Peer;
 use crate::rpc::{command::handler::CommandHandler, server::RpcServer, session::Session};
 use crate::transport::combined_transport::CombinedTransport;
 use anyhow::{anyhow, Context, Result};
@@ -179,5 +180,9 @@ where
         };
 
         self.connection.dispatch(dispatcher).await
+    }
+
+    fn peer(&self) -> &Peer {
+        self.connection.peer()
     }
 }

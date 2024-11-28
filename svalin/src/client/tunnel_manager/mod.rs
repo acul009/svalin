@@ -122,6 +122,7 @@ impl Tunnel {
         connection: impl Connection + 'static,
         config: TunnelConfig,
     ) -> Result<Tunnel, TunnelCreateError> {
+        let peer = connection.peer().clone();
         let (active_send, active_recv) = watch::channel(false);
         let run_result = Some(match &config {
             TunnelConfig::Tcp(config) => {
@@ -129,7 +130,6 @@ impl Tunnel {
             }
         });
         let id = Uuid::new_v4();
-        let peer = connection.peer().clone();
 
         Ok(Self {
             id,
