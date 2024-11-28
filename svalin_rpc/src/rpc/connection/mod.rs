@@ -30,6 +30,7 @@ pub mod direct_connection;
 pub trait Connection: Send + Sync + Clone {
     // async fn open_session(&self, command_key: String) -> Result<Session>;
     async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>;
+    fn peer(&self) -> &Peer;
 }
 
 #[async_trait]
@@ -61,6 +62,10 @@ where
         let session = Session::new(read, write, self.peer().clone());
 
         session.dispatch(dispatcher).await
+    }
+
+    fn peer(&self) -> &Peer {
+        self.peer()
     }
 }
 

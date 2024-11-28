@@ -5,7 +5,10 @@ use std::{
 
 use svalin_rpc::{
     commands::forward::ForwardConnection,
-    rpc::connection::{direct_connection::DirectConnection, Connection},
+    rpc::{
+        connection::{direct_connection::DirectConnection, Connection},
+        peer::Peer,
+    },
 };
 use tcp::{TcpTunnelConfig, TcpTunnelCreateError, TcpTunnelRunError};
 use thiserror::Error;
@@ -74,6 +77,7 @@ pub struct Tunnel {
     config: TunnelConfig,
     run_result: Option<TunnelRunResult>,
     active_send: watch::Sender<bool>,
+    peer: Peer,
 }
 
 impl Drop for Tunnel {
@@ -125,12 +129,14 @@ impl Tunnel {
             }
         });
         let id = Uuid::new_v4();
+        let peer = connection.peer().clone();
 
         Ok(Self {
             id,
             config,
             run_result,
             active_send,
+            peer,
         })
     }
 
@@ -140,6 +146,10 @@ impl Tunnel {
 
     pub fn config(&self) -> &TunnelConfig {
         &self.config
+    }
+
+    pub fn peer(&self) -> &Peer {
+        &self.peer
     }
 
     pub fn take_result(&mut self) -> Option<TunnelRunResult> {
