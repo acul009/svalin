@@ -22,7 +22,8 @@ pub mod tcp;
 
 #[derive(Clone)]
 pub struct TunnelManager {
-    inner: Arc<Mutex<TunnelManagerInner>>,
+    active_tunnels: watch::Sender<HashMap<[u8; 32], HashMap<Uuid, Tunnel>>>,
+    join_set: Arc<Mutex<JoinSet<()>>>,
 }
 
 struct TunnelManagerInner {
@@ -34,11 +35,10 @@ type TunnelConnection = ForwardConnection<DirectConnection>;
 
 impl TunnelManager {
     pub fn new() -> Self {
+        let (active_tunnels, _) = watch::channel(HashMap::new());
         Self {
-            inner: Arc::new(Mutex::new(TunnelManagerInner {
-                active_tunnels: HashMap::new(),
-                join_set: JoinSet::new(),
-            })),
+            active_tunnels,
+            join_set: Arc::new(Mutex::new(JoinSet::new())),
         }
     }
 
@@ -47,28 +47,52 @@ impl TunnelManager {
         connection: TunnelConnection,
         config: TunnelConfig,
     ) -> Result<(), TunnelCreateError> {
+        let fingerprint = match connection.peer() {
+            Peer::Anonymous => return Err(TunnelCreateError::NoPeerOnConnection),
+            Peer::Certificate(certificate) => certificate.fingerprint(),
+        };
+
         let mut tunnel = Tunnel::open(connection, config).await?;
 
         let id = tunnel.id();
-        let manager = self.clone();
         let tunnel_result = tunnel.take_result().unwrap();
 
-        let mut inner = self.inner.lock().unwrap();
+        self.active_tunnels
+            .send_modify(|tunnels| match tunnels.get_mut(&fingerprint) {
+                Some(peer_tunnels) => {
+                    peer_tunnels.insert(id, tunnel);
+                }
+                None => {
+                    let mut peer_tunnels = HashMap::new();
+                    peer_tunnels.insert(id, tunnel);
+                    tunnels.insert(fingerprint, peer_tunnels);
+                }
+            });
 
-        inner.active_tunnels.insert(id, tunnel);
+        let active_tunnels = self.active_tunnels.clone();
 
-        inner.join_set.spawn(async move {
+        self.join_set.lock().unwrap().spawn(async move {
             let result = tunnel_result.await_result().await;
             if let Err(err) = result {
                 tracing::error!("{err}");
             }
 
-            let mut inner = manager.inner.lock().unwrap();
-
-            inner.active_tunnels.remove(&id);
+            active_tunnels.send_modify(|tunnels| match tunnels.get_mut(&fingerprint) {
+                None => return,
+                Some(peer_tunnels) => {
+                    peer_tunnels.remove(&id);
+                    if peer_tunnels.is_empty() {
+                        tunnels.remove(&fingerprint);
+                    }
+                }
+            });
         });
 
         Ok(())
+    }
+
+    pub fn watch_tunnels(&self) -> watch::Receiver<HashMap<[u8; 32], HashMap<Uuid, Tunnel>>> {
+        self.active_tunnels.subscribe()
     }
 }
 
@@ -92,6 +116,8 @@ pub enum TunnelConfig {
 
 #[derive(Debug, Error)]
 pub enum TunnelCreateError {
+    #[error("given connection has no peer")]
+    NoPeerOnConnection,
     #[error(transparent)]
     Tcp(#[from] TcpTunnelCreateError),
 }
