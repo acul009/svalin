@@ -2,7 +2,6 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use anyhow::Result;
-use ring::error;
 use serde::de::Visitor;
 use serde::{de, Deserialize, Serialize};
 use spki::FingerprintBytes;

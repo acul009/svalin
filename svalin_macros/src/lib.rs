@@ -24,14 +24,14 @@ fn to_dispatcher(
         block,
     } = item;
     let Signature {
-        constness,
+        
         asyncness,
-        unsafety,
-        abi,
+        
+        
         ident,
-        generics,
+        
         inputs,
-        variadic,
+        
         output,
         ..
     } = sig;

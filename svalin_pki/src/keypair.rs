@@ -1,4 +1,3 @@
-use std::hash::Hash;
 
 use crate::{
     signed_message::{CanSign, CanVerify},
@@ -7,7 +6,6 @@ use crate::{
 use anyhow::Result;
 use rcgen::{DnType, ExtendedKeyUsagePurpose, KeyUsagePurpose, SignatureAlgorithm};
 use ring::{
-    digest::SHA256,
     rand::SystemRandom,
     signature::{Ed25519KeyPair, KeyPair},
 };

@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use quinn::rustls::server::danger::ClientCertVerifier;
 use svalin_pki::{
-    verifier::{exact::ExactVerififier, KnownCertificateVerifier, Verifier},
+    verifier::{exact::ExactVerififier, KnownCertificateVerifier},
     Certificate, PermCredentials,
 };
 use tracing::debug;

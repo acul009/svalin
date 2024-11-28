@@ -1,10 +1,8 @@
 use std::{
-    error::Error,
-    fmt::{Debug, Display},
+    fmt::Debug,
     future::Future,
 };
 use thiserror::Error;
-use x509_parser::error::X509Error;
 
 use crate::{
     certificate::{SignatureVerificationError, ValidityError},
