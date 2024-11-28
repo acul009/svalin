@@ -1,6 +1,6 @@
 use iced::{
     keyboard::{self, key::Named},
-    widget::{focus_next, stack},
+    widget::focus_next,
     Subscription, Task,
 };
 use mainview::MainView;

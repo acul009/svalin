@@ -3,7 +3,7 @@ use std::{borrow::Cow, ops::RangeInclusive};
 use iced::{
     alignment::{self, Vertical},
     padding,
-    widget::{column, container, progress_bar, row, stack, text},
+    widget::{column, container, progress_bar, stack, text},
     Length, Padding,
 };
 

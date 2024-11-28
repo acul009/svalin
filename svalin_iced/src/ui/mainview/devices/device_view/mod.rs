@@ -1,21 +1,17 @@
-use std::{borrow::Cow, hash::Hash};
 
 use device_status::DeviceStatus;
-use futures_util::{FutureExt, SinkExt, StreamExt};
+use futures_util::{FutureExt, StreamExt};
 use iced::{
-    advanced::subscription::{from_recipe, Recipe},
-    stream::channel,
-    widget::{shader::wgpu::core::device, text},
+    advanced::subscription::from_recipe,
+    widget::text,
     Length, Subscription, Task,
 };
 use svalin::{client::device::Device, shared::commands::agent_list::AgentListItem};
-use tokio::sync::watch;
-use tokio_stream::wrappers::{ReceiverStream, WatchStream};
 
 use crate::{
     ui::{
         screen::SubScreen,
-        widgets::{header, scaffold},
+        widgets::header,
     },
     util::watch_recipe::WatchRecipe,
 };

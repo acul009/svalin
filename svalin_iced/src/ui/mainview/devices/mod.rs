@@ -6,7 +6,7 @@ use iced::{
     advanced::subscription::from_recipe,
     alignment::Vertical,
     widget::{button, column, container, row, stack, text},
-    Color, Length, Subscription, Task,
+    Color, Length, Task,
 };
 use svalin::client::{device::Device, Client};
 use svalin_pki::Certificate;
