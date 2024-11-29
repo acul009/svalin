@@ -27,11 +27,15 @@ pub enum Message {
     DeviceView(device_view::Message),
     ShowDevice(Device),
     ShowList,
+    OpenTunnelGui,
 }
 
 impl From<Message> for super::Message {
     fn from(value: Message) -> Self {
-        Self::Devices(value)
+        match value {
+            Message::OpenTunnelGui => Self::Context(super::Context::Tunnel),
+            message => Self::Devices(message),
+        }
     }
 }
 
@@ -95,6 +99,7 @@ impl SubScreen for Devices {
                 self.state = State::List;
                 Task::none()
             }
+            Message::OpenTunnelGui => unreachable!(),
         }
     }
 

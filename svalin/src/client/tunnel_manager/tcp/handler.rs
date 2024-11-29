@@ -10,6 +10,7 @@ use svalin_rpc::{
 };
 use thiserror::Error;
 use tokio::{io::copy_bidirectional, net::TcpStream};
+use tracing::debug;
 
 use crate::permissions::Permission;
 
@@ -37,10 +38,12 @@ impl CommandHandler for TcpForwardHandler {
     }
 
     async fn handle(&self, session: &mut Session, request: Self::Request) -> Result<()> {
+        debug!("incoming tcp_forward request: {request}");
         let stream = TcpStream::connect(request).await;
 
         match stream {
             Err(err) => {
+                debug!("failed to connect: {err}");
                 session
                     .write_object::<Result<(), TcpForwardError>>(&Err(TcpForwardError::Generic))
                     .await?;
@@ -48,8 +51,15 @@ impl CommandHandler for TcpForwardHandler {
                 return Err(err.into());
             }
             Ok(mut stream) => {
+                debug!("connected!");
+                session
+                    .write_object::<Result<(), TcpForwardError>>(&Ok(()))
+                    .await?;
+
                 let (transport_read, transport_write) = session.borrow_transport();
                 let mut transport = CombinedTransport::new(transport_read, transport_write);
+
+                debug!("copying!");
 
                 copy_bidirectional(&mut transport, &mut stream).await?;
 

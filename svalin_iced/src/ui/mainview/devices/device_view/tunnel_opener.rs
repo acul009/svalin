@@ -20,12 +20,16 @@ pub enum Message {
     Error(ErrorDisplayInfo<Arc<TunnelCreateError>>),
     CloseError,
     OpenTunnel,
+    OpenTunnelGui,
     Noop,
 }
 
 impl From<Message> for super::Message {
     fn from(message: Message) -> Self {
-        Self::TunnelOpener(message)
+        match message {
+            Message::OpenTunnelGui => Self::OpenTunnelGui,
+            message => Self::TunnelOpener(message),
+        }
     }
 }
 
@@ -118,7 +122,7 @@ impl SubScreen for TunnelOpener {
                     let config = config.clone();
                     Task::future(async move {
                         match device.open_tunnel(config).await {
-                            Ok(()) => Message::Noop,
+                            Ok(()) => Message::OpenTunnelGui,
                             Err(err) => {
                                 Message::Error(ErrorDisplayInfo::new(Arc::new(err), "TODO"))
                             }
@@ -137,6 +141,7 @@ impl SubScreen for TunnelOpener {
                 Task::none()
             }
             Message::Noop => Task::none(),
+            Message::OpenTunnelGui => unreachable!(),
         }
     }
 

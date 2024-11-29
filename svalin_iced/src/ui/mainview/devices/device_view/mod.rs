@@ -23,12 +23,14 @@ pub enum Message {
     Status(device_status::Message),
     TunnelOpener(tunnel_opener::Message),
     ItemUpdate,
+    OpenTunnelGui,
 }
 
 impl From<Message> for super::Message {
     fn from(message: Message) -> Self {
         match message {
             Message::Back => Self::ShowList,
+            Message::OpenTunnelGui => Self::OpenTunnelGui,
             message => Self::DeviceView(message),
         }
     }
@@ -79,7 +81,7 @@ impl SubScreen for DeviceView {
                 self.item = self.device.item().clone();
                 Task::none()
             }
-            Message::Back => unreachable!(),
+            Message::Back | Message::OpenTunnelGui => unreachable!(),
         }
     }
 
