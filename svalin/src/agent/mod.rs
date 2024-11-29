@@ -165,6 +165,8 @@ impl Agent {
     fn get_general_config_dir_path() -> Result<PathBuf> {
         #[cfg(target_os = "windows")]
         {
+            use anyhow::Context;
+
             let appdata = std::env::var("PROGRAMDATA")
                 .context("Failed to retrieve PROGRAMMDATA environment variable")?;
 
