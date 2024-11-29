@@ -9,7 +9,7 @@ use iced::advanced::{graphics::futures::boxed_stream, subscription::Recipe};
 use tokio::sync::watch;
 use tokio_util::sync::ReusableBoxFuture;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct WatchRecipe<I, T, Message>
 where
     I: Clone + 'static,
@@ -17,6 +17,20 @@ where
     id: Cow<'static, I>,
     watcher: watch::Receiver<T>,
     message: Message,
+}
+
+impl<I, T, Message> Clone for WatchRecipe<I, T, Message>
+where
+    I: Clone + 'static,
+    Message: Clone + 'static,
+{
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            watcher: self.watcher.clone(),
+            message: self.message.clone(),
+        }
+    }
 }
 
 impl<I, T, M> WatchRecipe<I, T, M>
@@ -35,7 +49,7 @@ where
 impl<I, T, Message> Recipe for WatchRecipe<I, T, Message>
 where
     I: Clone + Hash + Send + Sync + 'static,
-    T: Clone + Send + Sync + 'static,
+    T: Send + Sync + 'static,
     Message: Clone + Send + Sync + 'static,
 {
     type Output = Message;
@@ -59,7 +73,7 @@ pub struct WatchNotifyStream<T> {
     inner: ReusableBoxFuture<'static, (Result<(), watch::error::RecvError>, watch::Receiver<T>)>,
 }
 
-impl<T: 'static + Clone + Send + Sync> WatchNotifyStream<T> {
+impl<T: Send + Sync + 'static> WatchNotifyStream<T> {
     /// Create a new `WatchNotifyStream`
     pub fn new(rx: watch::Receiver<T>) -> Self {
         Self {
@@ -68,14 +82,14 @@ impl<T: 'static + Clone + Send + Sync> WatchNotifyStream<T> {
     }
 }
 
-async fn make_future<T: Clone + Send + Sync>(
+async fn make_future<T>(
     mut rx: watch::Receiver<T>,
 ) -> (Result<(), watch::error::RecvError>, watch::Receiver<T>) {
     let result = rx.changed().await;
     (result, rx)
 }
 
-impl<T: Clone + 'static + Send + Sync> Stream for WatchNotifyStream<T> {
+impl<T: 'static + Send + Sync> Stream for WatchNotifyStream<T> {
     type Item = ();
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

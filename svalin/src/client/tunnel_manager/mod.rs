@@ -1,8 +1,11 @@
 use std::{
     collections::HashMap,
+    fmt::Display,
     sync::{Arc, Mutex},
 };
 
+use clap::Error;
+use svalin_pki::Certificate;
 use svalin_rpc::{
     commands::forward::ForwardConnection,
     rpc::{
@@ -22,13 +25,8 @@ pub mod tcp;
 
 #[derive(Clone)]
 pub struct TunnelManager {
-    active_tunnels: watch::Sender<HashMap<[u8; 32], HashMap<Uuid, Tunnel>>>,
+    active_tunnels: watch::Sender<HashMap<Certificate, HashMap<Uuid, Tunnel>>>,
     join_set: Arc<Mutex<JoinSet<()>>>,
-}
-
-struct TunnelManagerInner {
-    active_tunnels: HashMap<Uuid, Tunnel>,
-    join_set: JoinSet<()>,
 }
 
 type TunnelConnection = ForwardConnection<DirectConnection>;
@@ -47,9 +45,9 @@ impl TunnelManager {
         connection: TunnelConnection,
         config: TunnelConfig,
     ) -> Result<(), TunnelCreateError> {
-        let fingerprint = match connection.peer() {
+        let certificate = match connection.peer() {
             Peer::Anonymous => return Err(TunnelCreateError::NoPeerOnConnection),
-            Peer::Certificate(certificate) => certificate.fingerprint(),
+            Peer::Certificate(certificate) => certificate.clone(),
         };
 
         let mut tunnel = Tunnel::open(connection, config).await?;
@@ -58,14 +56,14 @@ impl TunnelManager {
         let tunnel_result = tunnel.take_result().unwrap();
 
         self.active_tunnels
-            .send_modify(|tunnels| match tunnels.get_mut(&fingerprint) {
+            .send_modify(|tunnels| match tunnels.get_mut(&certificate) {
                 Some(peer_tunnels) => {
                     peer_tunnels.insert(id, tunnel);
                 }
                 None => {
                     let mut peer_tunnels = HashMap::new();
                     peer_tunnels.insert(id, tunnel);
-                    tunnels.insert(fingerprint, peer_tunnels);
+                    tunnels.insert(certificate.clone(), peer_tunnels);
                 }
             });
 
@@ -77,12 +75,12 @@ impl TunnelManager {
                 tracing::error!("{err}");
             }
 
-            active_tunnels.send_modify(|tunnels| match tunnels.get_mut(&fingerprint) {
+            active_tunnels.send_modify(|tunnels| match tunnels.get_mut(&certificate) {
                 None => return,
                 Some(peer_tunnels) => {
                     peer_tunnels.remove(&id);
                     if peer_tunnels.is_empty() {
-                        tunnels.remove(&fingerprint);
+                        tunnels.remove(&certificate);
                     }
                 }
             });
@@ -91,7 +89,11 @@ impl TunnelManager {
         Ok(())
     }
 
-    pub fn watch_tunnels(&self) -> watch::Receiver<HashMap<[u8; 32], HashMap<Uuid, Tunnel>>> {
+    pub fn tunnels(&self) -> watch::Ref<HashMap<Certificate, HashMap<Uuid, Tunnel>>> {
+        self.active_tunnels.borrow()
+    }
+
+    pub fn watch_tunnels(&self) -> watch::Receiver<HashMap<Certificate, HashMap<Uuid, Tunnel>>> {
         self.active_tunnels.subscribe()
     }
 }
@@ -110,6 +112,7 @@ impl Drop for Tunnel {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum TunnelConfig {
     Tcp(TcpTunnelConfig),
 }

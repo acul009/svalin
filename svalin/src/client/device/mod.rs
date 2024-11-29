@@ -1,8 +1,4 @@
-use std::{
-    fmt::Debug,
-    sync::Arc,
-    time::Duration,
-};
+use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use svalin_rpc::{
@@ -174,7 +170,7 @@ impl lazy_watch::Handler for RealtimeStatusWatchHandler {
 
     fn stop(&mut self) {
         if let Some(channel) = self.stop.take() {
-            channel.send(());
+            let _ = channel.send(());
         }
     }
 }

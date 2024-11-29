@@ -160,4 +160,12 @@ impl SubScreen for Devices {
             State::List => from_recipe(self.recipe.clone()),
         }
     }
+
+    fn dialog(&self) -> Option<crate::Element<Self::Message>> {
+        match &self.state {
+            State::AddDevice(add_device) => add_device.dialog().mapopt(Into::into),
+            State::DeviceView(device_view) => device_view.dialog().mapopt(Into::into),
+            State::List => None,
+        }
+    }
 }

@@ -2,11 +2,13 @@ use std::sync::Arc;
 
 use devices::Devices;
 use iced::{
+    advanced::graphics::futures::subscription,
     widget::{button, row, text},
-    Length, Task,
+    Length, Subscription, Task,
 };
 use svalin::client::Client;
 use tunnel::TunnelUi;
+use uuid::timestamp::context;
 
 use super::{screen::SubScreen, MapOpt};
 
@@ -31,14 +33,13 @@ enum State {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Context {
+pub enum Context {
     None,
     Tunnel,
     Test,
 }
 
 pub struct MainView {
-    client: Arc<Client>,
     state: State,
     context: Context,
     devices: Devices,
@@ -49,11 +50,10 @@ impl MainView {
     pub fn start(client: Arc<Client>) -> (Self, Task<Message>) {
         let (devices, task) = Devices::start(client.clone());
 
-        let tunnel_ui = TunnelUi::new();
+        let tunnel_ui = TunnelUi::new(client.clone());
 
         (
             Self {
-                client,
                 state: State::Devices,
                 context: Context::None,
                 devices,
@@ -118,9 +118,29 @@ impl SubScreen for MainView {
         }
     }
 
-    fn subscription(&self) -> iced::Subscription<Self::Message> {
-        match &self.state {
-            State::Devices => self.devices.subscription().map(Into::into),
+    fn dialog(&self) -> Option<crate::Element<Self::Message>> {
+        match self.state {
+            State::Devices => self.devices.dialog().mapopt(Into::into),
         }
+    }
+
+    fn subscription(&self) -> iced::Subscription<Self::Message> {
+        let state_subscription = match &self.state {
+            State::Devices => self.devices.subscription().map(Into::into),
+        };
+
+        let context_subscription = match &self.context {
+            Context::None => None,
+            Context::Tunnel => Some(self.tunnel_ui.subscription().map(Into::into)),
+            Context::Test => None,
+        };
+
+        let mut subscriptions = vec![state_subscription];
+
+        if let Some(context_subscription) = context_subscription {
+            subscriptions.push(context_subscription);
+        }
+
+        Subscription::batch(subscriptions)
     }
 }

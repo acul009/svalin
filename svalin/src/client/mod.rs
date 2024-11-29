@@ -1,6 +1,6 @@
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::time::Duration;
-use std::collections::BTreeMap;
 
 use anyhow::Result;
 
@@ -41,8 +41,8 @@ impl Debug for Client {
 }
 
 impl Client {
-    pub async fn device(&self, certificate: Certificate) -> Option<Device> {
-        self.device_list.borrow().get(&certificate).cloned()
+    pub fn device(&self, certificate: &Certificate) -> Option<Device> {
+        self.device_list.borrow().get(certificate).cloned()
     }
 
     pub async fn ping_upstream(&self) -> Result<Duration> {

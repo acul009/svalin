@@ -9,13 +9,21 @@ use tokio::{
     sync::{oneshot, watch},
 };
 
+use super::TunnelConfig;
+
 pub mod dispatcher;
 pub mod handler;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TcpTunnelConfig {
-    local_port: u16,
-    remote_host: String,
+    pub local_port: u16,
+    pub remote_host: String,
+}
+
+impl From<TcpTunnelConfig> for TunnelConfig {
+    fn from(config: TcpTunnelConfig) -> Self {
+        Self::Tcp(config)
+    }
 }
 
 #[derive(Debug, Error)]

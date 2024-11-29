@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -219,3 +220,9 @@ impl PartialOrd for Certificate {
 }
 
 impl Eq for Certificate {}
+
+impl Hash for Certificate {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.data.der.hash(state);
+    }
+}
