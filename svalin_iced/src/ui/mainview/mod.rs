@@ -75,6 +75,10 @@ impl SubScreen for MainView {
                 if self.context == context {
                     self.context = Context::None;
                 } else {
+                    match context {
+                        Context::Tunnel => self.tunnel_ui.refresh(),
+                        Context::Test | Context::None => (),
+                    };
                     self.context = context;
                 }
                 Task::none()

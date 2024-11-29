@@ -16,13 +16,8 @@ use tracing::debug;
 
 use crate::{client::device::RemoteLiveData, permissions::Permission};
 
-pub struct RealtimeStatusHandler {}
-
-impl RealtimeStatusHandler {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+#[derive(Default)]
+pub struct RealtimeStatusHandler;
 
 impl From<&PermissionPrecursor<(), RealtimeStatusHandler>> for Permission {
     fn from(_value: &PermissionPrecursor<(), RealtimeStatusHandler>) -> Self {

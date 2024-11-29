@@ -15,6 +15,7 @@ use tracing::{debug, instrument};
 
 mod init;
 
+use crate::client::tunnel_manager::tcp::handler::TcpForwardHandler;
 use crate::permissions::agent_permission_handler::AgentPermissionHandler;
 use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::commands::terminal::RemoteTerminalHandler;
@@ -81,9 +82,10 @@ impl Agent {
         e2e_commands
             .chain()
             .await
-            .add(PingHandler::new())
-            .add(RealtimeStatusHandler::new())
-            .add(RemoteTerminalHandler);
+            .add(PingHandler)
+            .add(RealtimeStatusHandler)
+            .add(RemoteTerminalHandler)
+            .add(TcpForwardHandler);
 
         let public_commands = HandlerCollection::new(permission_handler.clone());
 

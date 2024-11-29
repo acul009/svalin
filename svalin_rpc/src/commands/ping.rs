@@ -8,19 +8,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use tracing::debug;
 
+#[derive(Default)]
 pub struct PingHandler;
-
-impl Default for PingHandler {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl PingHandler {
-    pub fn new() -> Self {
-        Self
-    }
-}
 
 fn ping_key() -> String {
     "ping".to_owned()

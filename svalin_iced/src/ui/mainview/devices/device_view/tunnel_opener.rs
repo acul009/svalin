@@ -68,7 +68,7 @@ pub struct TunnelOpener {
 impl TunnelOpener {
     pub fn new(device: Device) -> Self {
         let config = TunnelConfig::Tcp(TcpTunnelConfig {
-            local_port: 80,
+            local_port: 8080,
             remote_host: String::new(),
         });
 
@@ -88,7 +88,7 @@ impl SubScreen for TunnelOpener {
         match message {
             Message::TunnelType(tunnel_type) => {
                 if let Some(config) = &self.config {
-                    if &tunnel_type == &config.into() {
+                    if tunnel_type == config.into() {
                         return Task::none();
                     }
                 }

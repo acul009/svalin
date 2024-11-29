@@ -2,24 +2,30 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_rpc::{
-    rpc::{command::handler::CommandHandler, session::Session},
+    rpc::{
+        command::handler::{CommandHandler, PermissionPrecursor},
+        session::Session,
+    },
     transport::combined_transport::CombinedTransport,
 };
 use thiserror::Error;
 use tokio::{io::copy_bidirectional, net::TcpStream};
 
-pub struct TcpForwardHandler {}
+use crate::permissions::Permission;
 
-impl TcpForwardHandler {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+#[derive(Default)]
+pub struct TcpForwardHandler;
 
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum TcpForwardError {
     #[error("Failed to connect to connect to requested target")]
     Generic,
+}
+
+impl From<&PermissionPrecursor<String, TcpForwardHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<String, TcpForwardHandler>) -> Self {
+        Permission::RootOnlyPlaceholder
+    }
 }
 
 #[async_trait]

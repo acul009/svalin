@@ -158,7 +158,7 @@ impl Server {
         commands
             .chain()
             .await
-            .add(PingHandler::new())
+            .add(PingHandler)
             .add(PublicStatusHandler::new(PublicStatus::Ready))
             .add(AddUserHandler::new(self.user_store.clone()))
             .add(join_manager.create_request_handler())

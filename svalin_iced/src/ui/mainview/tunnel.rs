@@ -42,8 +42,7 @@ impl TunnelUi {
             Message::Refresh,
         );
 
-        let tunnels: Vec<(AgentListItem, Vec<(Uuid, TunnelConfig)>)> =
-            Self::copy_tunnels(client.clone());
+        let tunnels: Vec<(AgentListItem, Vec<(Uuid, TunnelConfig)>)> = Self::copy_tunnels(&client);
 
         Self {
             client,
@@ -52,14 +51,17 @@ impl TunnelUi {
         }
     }
 
-    pub fn copy_tunnels(client: Arc<Client>) -> Vec<(AgentListItem, Vec<(Uuid, TunnelConfig)>)> {
-        client
+    fn copy_tunnels(client: &Arc<Client>) -> Vec<(AgentListItem, Vec<(Uuid, TunnelConfig)>)> {
+        let tunnels = client
             .tunnel_manager()
             .tunnels()
             .iter()
             .filter_map(|(certificate, tunnels)| {
                 let item = match client.device(certificate) {
-                    None => return None,
+                    None => {
+                        println!("No device for certificate {:x?}", certificate.fingerprint());
+                        return None;
+                    }
                     Some(device) => device,
                 }
                 .item()
@@ -72,7 +74,11 @@ impl TunnelUi {
 
                 Some((item, tunnels))
             })
-            .collect()
+            .collect();
+
+        println!("{:?}", client.tunnel_manager().tunnels().len());
+
+        tunnels
     }
 
     fn tunnel_display<'a>(config: &TunnelConfig, id: &Uuid) -> Element<'a, Message> {
@@ -86,6 +92,10 @@ impl TunnelUi {
             .into(),
         }
     }
+
+    pub fn refresh(&mut self) {
+        self.tunnels = Self::copy_tunnels(&self.client);
+    }
 }
 
 impl SubScreen for TunnelUi {
@@ -94,7 +104,7 @@ impl SubScreen for TunnelUi {
     fn update(&mut self, message: Self::Message) -> iced::Task<Self::Message> {
         match message {
             Message::Refresh => {
-                self.tunnels = Self::copy_tunnels(self.client.clone());
+                self.refresh();
                 Task::none()
             }
         }

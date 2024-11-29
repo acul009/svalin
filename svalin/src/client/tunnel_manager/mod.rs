@@ -19,6 +19,7 @@ use tokio::{
     sync::{oneshot, watch},
     task::JoinSet,
 };
+use tracing::debug;
 use uuid::Uuid;
 
 pub mod tcp;
@@ -71,6 +72,7 @@ impl TunnelManager {
 
         self.join_set.lock().unwrap().spawn(async move {
             let result = tunnel_result.await_result().await;
+            debug!("tunnel result: {result:?}");
             if let Err(err) = result {
                 tracing::error!("{err}");
             }
@@ -98,6 +100,7 @@ impl TunnelManager {
     }
 }
 
+#[derive(Debug)]
 pub struct Tunnel {
     id: Uuid,
     config: TunnelConfig,
@@ -131,6 +134,7 @@ pub enum TunnelRunError {
     Tcp(#[from] TcpTunnelRunError),
 }
 
+#[derive(Debug)]
 pub enum TunnelRunResult {
     Tcp(oneshot::Receiver<TcpTunnelRunError>),
 }

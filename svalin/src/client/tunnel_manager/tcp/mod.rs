@@ -75,7 +75,8 @@ impl TcpTunnelConfig {
 
                                 tokio::spawn(async move {
                                     if let Err(err) = connection.dispatch(dispatcher).await {
-                                        tracing::error!("{err}");
+                                        let err = err.context("error running tcp tunnel");
+                                        tracing::error!("{:#}", err);
                                     }
                                 });
                             }

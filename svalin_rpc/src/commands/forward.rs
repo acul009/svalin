@@ -152,6 +152,7 @@ pub struct ForwardConnection<T> {
     connection: T,
     credentials: PermCredentials,
     target: Certificate,
+    as_peer: Peer,
 }
 
 impl<T> ForwardConnection<T> {
@@ -159,6 +160,7 @@ impl<T> ForwardConnection<T> {
         Self {
             connection: base_connection,
             credentials,
+            as_peer: Peer::Certificate(target.clone()),
             target,
         }
     }
@@ -183,6 +185,6 @@ where
     }
 
     fn peer(&self) -> &Peer {
-        self.connection.peer()
+        &self.as_peer
     }
 }
