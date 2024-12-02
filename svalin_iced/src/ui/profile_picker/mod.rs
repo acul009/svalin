@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::{fl, Element};
 use iced::{
+    alignment::Vertical,
     widget::{button, column, container, row, stack, text, text_input},
     Length, Task,
 };
@@ -206,11 +207,11 @@ impl SubScreen for ProfilePicker {
             State::SelectProfile(profiles) => {
                 let profiles = column(profiles.iter().map(|p| {
                     row![
-                        button(text(p))
+                        button(text(p).height(Length::Fill).align_y(Vertical::Center))
                             .on_press(Message::SelectProfile(p.clone()))
                             .width(Length::Fill)
                             .height(Length::Fill),
-                        button(text("🗑️").center())
+                        button(text("🗑️").height(Length::Fill).center())
                             .on_press(Message::DeleteProfile(p.clone()))
                             .width(50)
                             .height(Length::Fill)

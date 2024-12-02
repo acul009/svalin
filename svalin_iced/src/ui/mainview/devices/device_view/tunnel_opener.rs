@@ -161,7 +161,13 @@ impl SubScreen for TunnelOpener {
                     Some(TunnelConfig::Tcp(config)) => {
                         row![
                             number_input(config.local_port, 1..=65535, Message::LocalPort),
-                            text_input("TODO", &config.remote_host).on_input(Message::RemoteHost),
+                            text_input("TODO", &config.remote_host)
+                                .on_input(Message::RemoteHost)
+                                .on_submit_maybe(if config.remote_host.is_empty() {
+                                    None
+                                } else {
+                                    Some(Message::OpenTunnel)
+                                }),
                             button("TODO").on_press_maybe(if config.remote_host.is_empty() {
                                 None
                             } else {

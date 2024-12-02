@@ -56,7 +56,7 @@ impl TcpTunnelConfig {
             loop {
                 select! {
                     stream = listener.accept() => {
-                        if *active_recv.borrow().deref() {
+                        if !*active_recv.borrow().deref() {
                             return;
                         }
                         match stream {
@@ -83,7 +83,7 @@ impl TcpTunnelConfig {
                         }
                     }
                     _ = active_recv.changed() => {
-                        if *active_recv.borrow().deref() {
+                        if !*active_recv.borrow().deref() {
                             return;
                         }
                     }

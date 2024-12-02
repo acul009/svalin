@@ -95,6 +95,17 @@ impl TunnelManager {
         self.active_tunnels.borrow()
     }
 
+    pub fn close_tunnel(&self, id: &Uuid) {
+        self.active_tunnels.send_modify(|tunnels| {
+            for (_, peer_tunnels) in tunnels.iter_mut() {
+                if let Some(tunnel) = peer_tunnels.get_mut(id) {
+                    tunnel.close();
+                    return;
+                }
+            }
+        });
+    }
+
     pub fn watch_tunnels(&self) -> watch::Receiver<HashMap<Certificate, HashMap<Uuid, Tunnel>>> {
         self.active_tunnels.subscribe()
     }
@@ -111,7 +122,7 @@ pub struct Tunnel {
 
 impl Drop for Tunnel {
     fn drop(&mut self) {
-        self.active_send.send(false).unwrap();
+        let _ = self.active_send.send(false);
     }
 }
 
@@ -156,7 +167,7 @@ impl Tunnel {
         config: TunnelConfig,
     ) -> Result<Tunnel, TunnelCreateError> {
         let peer = connection.peer().clone();
-        let (active_send, active_recv) = watch::channel(false);
+        let (active_send, active_recv) = watch::channel(true);
         let run_result = Some(match &config {
             TunnelConfig::Tcp(config) => {
                 TunnelRunResult::Tcp(config.run(connection, active_recv).await?)

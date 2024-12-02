@@ -2,8 +2,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use iced::{
     advanced::graphics::futures::subscription,
-    widget::{column, row, text},
-    Task,
+    alignment::{Horizontal, Vertical},
+    border, padding,
+    widget::{button, column, container, row, text},
+    Color, Length, Padding, Shadow, Task, Vector,
 };
 use svalin::{
     client::{
@@ -20,6 +22,7 @@ use crate::{ui::screen::SubScreen, util::watch_recipe::WatchRecipe, Element};
 #[derive(Debug, Clone)]
 pub enum Message {
     Refresh,
+    CloseTunnel(Uuid),
 }
 
 impl From<Message> for super::Message {
@@ -84,11 +87,16 @@ impl TunnelUi {
     fn tunnel_display<'a>(config: &TunnelConfig, id: &Uuid) -> Element<'a, Message> {
         match config {
             TunnelConfig::Tcp(config) => row![
-                text("TCP"),
-                text!("{}", config.local_port),
-                text("->"),
-                text!("{}", config.remote_host),
+                text("TCP").width(30),
+                text!("{}", config.local_port).width(40),
+                text("->").width(20).align_x(Horizontal::Center),
+                text!("{}", config.remote_host).width(Length::Fill),
+                button(text("Todo")).on_press(Message::CloseTunnel(id.clone()))
             ]
+            .padding(10)
+            .spacing(20)
+            .width(Length::Fill)
+            .align_y(Vertical::Center)
             .into(),
         }
     }
@@ -107,21 +115,41 @@ impl SubScreen for TunnelUi {
                 self.refresh();
                 Task::none()
             }
+            Message::CloseTunnel(id) => {
+                self.client.tunnel_manager().close_tunnel(&id);
+                Task::none()
+            }
         }
     }
 
     fn view(&self) -> crate::Element<Self::Message> {
         column(self.tunnels.iter().map(|(item, tunnels)| {
             column![
-                text(&item.public_data.name),
+                container(text(&item.public_data.name))
+                    .padding(20)
+                    .width(Length::Fill)
+                    .style(|_| container::Style {
+                        text_color: None,
+                        background: None,
+                        border: border::width(0),
+                        shadow: Shadow {
+                            color: Color::BLACK,
+                            offset: Vector { x: 0.0, y: 10.0 },
+                            blur_radius: 20.0,
+                        }
+                    }),
                 column(
                     tunnels
                         .iter()
                         .map(|(id, config)| { Self::tunnel_display(config, id) })
-                ),
+                )
+                .padding(Padding::new(20.0).left(30.0))
+                .width(Length::Fill),
             ]
+            .width(Length::Fill)
             .into()
         }))
+        .width(Length::Fill)
         .into()
     }
 

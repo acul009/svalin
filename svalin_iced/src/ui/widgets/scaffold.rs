@@ -1,6 +1,6 @@
 use iced::{
     border,
-    widget::{column, container, horizontal_rule, row, stack, vertical_rule},
+    widget::{column, container, horizontal_rule, pane_grid, row, stack, vertical_rule},
     Color, Length, Shadow,
 };
 
