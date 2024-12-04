@@ -37,7 +37,7 @@ async fn ping_test() {
     let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
 
     let commands = HandlerCollection::new(permission_handler);
-    commands.chain().await.add(PingHandler::new());
+    commands.chain().await.add(PingHandler);
 
     let server_handle = tokio::spawn(async move {
         server.run(commands).await.unwrap();
