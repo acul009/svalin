@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use iced::{
     advanced::graphics::futures::subscription,
     alignment::{Horizontal, Vertical},
-    border, padding,
+    border,
     widget::{button, column, container, row, text},
     Color, Length, Padding, Shadow, Task, Vector,
 };
@@ -91,7 +91,7 @@ impl TunnelUi {
                 text!("{}", config.local_port).width(40),
                 text("->").width(20).align_x(Horizontal::Center),
                 text!("{}", config.remote_host).width(Length::Fill),
-                button(text("Todo")).on_press(Message::CloseTunnel(id.clone()))
+                button(text(t!("tunnel.close"))).on_press(Message::CloseTunnel(id.clone()))
             ]
             .padding(10)
             .spacing(20)

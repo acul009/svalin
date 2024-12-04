@@ -1,0 +1,69 @@
+_version: 1
+app-title: Svalin
+generic:
+  cancel: Cancel
+  back: Back
+  continue: Continue
+  loading: loading...
+  close: Close
+  unlock: Unlock
+  password: Password
+  success: Success
+  error: An error has occured!
+  required-field: required
+  passwords-dont-match: Passwords must match
+  username: Username
+profile-picker:
+  error:
+    totp:
+      register: Error while creating TOTP secret
+      verify: Error while verifying TOTP code
+    server-init: Error while initializing server
+    unlock: Error while unlocking Profile
+    delete: Error while deleting profile
+    connect-to-server: Error while connecting to server
+  init-loading: initializing Server...
+  unlocking: Unlocking Profile...
+  connecting-to-server: Connecting to Server...
+  add: Add Profile
+  title:
+    unlock: Enter password to unlock profile
+    add: Add Profile
+  confirm-delete: Are you sure you want to delete %{profile}
+  input:
+    confirm-password: Confirm Password
+    totp: 2FA Code
+  copy-totp: Copy TOTP-Secret
+add-device:
+  connecting: Connecting to Device...
+  error:
+    join-code: Error while connecting to new agent
+  enrolling: Enrolling Device...
+  title:
+    join-code: Input Join Code
+    device-name: Set Device Name
+    confirm-code: Input Confirm Code
+    success: Device Successfully Added
+  input:
+    join-code: Join Code
+    device-name: Device Name
+    confirm-code: Confirm Code
+  success: The new Device was successfully enrolled!
+realtime:
+  live-unavailable: Live data not available
+  connecting: Connecting...
+  core: Core %{id}
+  memory: Memory
+  ram: RAM
+  swap: Swap
+  cpu: CPU
+tunnel:
+  close: Close
+  opener:
+    title: Open Tunnel
+  error: Error while opening tunnel
+  input:
+    remote_host: Remote Host and Port
+  open: Open
+device_list:
+  add: Add Device

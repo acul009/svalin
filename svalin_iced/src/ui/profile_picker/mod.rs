@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{fl, Element};
+use crate::Element;
 use iced::{
     alignment::Vertical,
     widget::{button, column, container, row, stack, text, text_input},
@@ -136,7 +136,7 @@ impl SubScreen for ProfilePicker {
                 if let Err(error) = Client::remove_profile(&profile) {
                     self.state = State::Error(ErrorDisplayInfo::new(
                         Arc::new(error),
-                        fl!("profile-delete-error"),
+                        t!("profile-picker.error.delete"),
                     ));
                 }
 
@@ -151,14 +151,14 @@ impl SubScreen for ProfilePicker {
                     let profile = profile.clone();
                     let password = password.clone();
 
-                    self.state = State::Loading(fl!("profile-unlock"));
+                    self.state = State::Loading(t!("profile-picker.unlocking").to_string());
 
                     Task::future(async move {
                         match Client::open_profile_string(profile, password).await {
                             Ok(client) => Message::Profile(Arc::new(client)),
                             Err(err) => Message::Error(ErrorDisplayInfo::new(
                                 Arc::new(err),
-                                fl!("profile-unlock-error"),
+                                t!("profile-picker.error.unlock"),
                             )),
                         }
                     })
@@ -172,7 +172,7 @@ impl SubScreen for ProfilePicker {
                 text_input::focus("host")
             }
             Message::Connect(host) => {
-                self.state = State::Loading(fl!("connect-to-server"));
+                self.state = State::Loading(t!("profile-picker.connecting-to-server").to_string());
                 Task::future(async move {
                     let connected = Client::first_connect(host).await;
 
@@ -181,7 +181,7 @@ impl SubScreen for ProfilePicker {
                         Ok(FirstConnect::Login(login)) => Message::Login(Arc::new(login)),
                         Err(e) => Message::Error(ErrorDisplayInfo::new(
                             Arc::new(e),
-                            fl!("connect-to-server-error"),
+                            t!("profile-picker.error.connect-to-server"),
                         )),
                     }
                 })
@@ -221,7 +221,7 @@ impl SubScreen for ProfilePicker {
                 }));
 
                 let overlay = container(
-                    button(text(fl!("profile-add")))
+                    button(text(t!("profile-picker.add")))
                         .padding(10)
                         .on_press(Message::AddProfile(String::new())),
                 )
@@ -238,19 +238,19 @@ impl SubScreen for ProfilePicker {
                 profile: _,
                 password,
             } => form()
-                .title(fl!("profile-unlock"))
+                .title(t!("profile-picker.title.unlock"))
                 .control(
-                    text_input(&fl!("password"), password)
+                    text_input(&t!("generic.password"), password)
                         .id("password")
                         .secure(true)
                         .on_input(|input| Message::Input(Input::Password(input)))
                         .on_submit(Message::UnlockProfile),
                 )
-                .primary_action(button(text(fl!("unlock"))).on_press(Message::UnlockProfile))
-                .secondary_action(button(text(fl!("cancel"))).on_press(Message::Reset))
+                .primary_action(button(text(t!("generic.unlock"))).on_press(Message::UnlockProfile))
+                .secondary_action(button(text(t!("generic.cancel"))).on_press(Message::Reset))
                 .into(),
             State::AddProfile { host } => form()
-                .title(fl!("profile-add"))
+                .title(t!("profile-picker.title.add"))
                 .control(
                     text_input("Host", host)
                         .id("host")
@@ -258,9 +258,9 @@ impl SubScreen for ProfilePicker {
                         .on_submit(Message::Connect(host.clone())),
                 )
                 .primary_action(
-                    button(text(fl!("continue"))).on_press(Message::Connect(host.clone())),
+                    button(text(t!("generic.continue"))).on_press(Message::Connect(host.clone())),
                 )
-                .secondary_action(button(text(fl!("cancel"))).on_press(Message::Reset))
+                .secondary_action(button(text(t!("generic.cancel"))).on_press(Message::Reset))
                 .into(),
         }
     }
@@ -269,8 +269,7 @@ impl SubScreen for ProfilePicker {
         if let Some(profile) = &self.confirm_delete {
             return Some(
                 dialog()
-                    .body(fl!("confirm-delete", name = profile))
-                    // .body(format!("Are you sure you want to delete {}", profile))
+                    .body(t!("profile-picker.confirm-delete", "profile" => profile))
                     .primary_action(button(text("Cancel")).on_press(Message::CancelDelete))
                     .secondary_action(
                         button(text("Delete")).on_press(Message::ConfirmDelete(profile.clone())),

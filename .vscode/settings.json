@@ -9,5 +9,9 @@
     ],
     "dart.analysisExcludedFolders": [
         "gui_flutter/rust_builder"
-    ]
+    ],
+    "i18n-ally.localesPaths": [
+        "svalin_iced/locales"
+    ],
+    "i18n-ally.keystyle": "nested"
 }

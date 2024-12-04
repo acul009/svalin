@@ -6,7 +6,7 @@ use iced_aw::card;
 use svalin::client::device::RemoteLiveData;
 use svalin_sysctl::realtime::RealtimeStatus;
 
-use crate::{fl, Element};
+use crate::Element;
 
 use super::{loading, percent_display};
 
@@ -23,18 +23,18 @@ impl<'a> RealtimeDisplay<'a> {
 impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Message> {
     fn from(value: RealtimeDisplay) -> Self {
         let content: Element<Message> = match value.realtime {
-            RemoteLiveData::Unavailable => text(fl!("live-unavailable"))
+            RemoteLiveData::Unavailable => text(t!("realtime.live-unavailable"))
                 .width(Length::Fill)
                 .center()
                 .into(),
-            RemoteLiveData::Pending => loading(fl!("connecting")).into(),
+            RemoteLiveData::Pending => loading(t!("realtime.connecting")).into(),
             RemoteLiveData::Ready(realtime) => column![
                 card(
-                    text(fl!("cpu")),
+                    text(t!("realtime.cpu")),
                     row(realtime.cpu.cores.iter().enumerate().map(|(index, usage)| {
                         let core = index + 1;
                         percent_display(0.0..=100.0, usage.load)
-                            .label(fl!("core-id", core = core.to_string()))
+                            .label(t!("realtime.core", "id" => core))
                             .padding(Padding::new(5.0).left(10.0).right(10.0))
                             .into()
                     }))
@@ -42,12 +42,12 @@ impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Mes
                 )
                 .padding(10.into()),
                 card(
-                    text(fl!("memory")),
+                    text(t!("realtime.memory")),
                     column![percent_display(
                         0.0..=(realtime.memory.total as f32),
                         realtime.memory.used as f32
                     )
-                    .label(fl!("ram"))
+                    .label(t!("realtime.ram"))
                     .subinfo(text!(
                         "{} / {} M",
                         realtime.memory.used / 1024 / 1024,
@@ -60,7 +60,7 @@ impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Mes
                                 0.0..=(realtime.swap.total as f32),
                                 realtime.swap.used as f32,
                             )
-                            .label(fl!("swap"))
+                            .label(t!("realtime.swap"))
                             .subinfo(text!(
                                 "{} / {} M",
                                 realtime.swap.used / 1024 / 1024,

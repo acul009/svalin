@@ -1,7 +1,7 @@
 use std::{fmt::Display, sync::Arc, vec};
 
 use iced::{
-    widget::{button, combo_box, container, row, text_input},
+    widget::{button, combo_box, container, row, text, text_input},
     Task,
 };
 use iced_aw::{card, number_input};
@@ -123,9 +123,10 @@ impl SubScreen for TunnelOpener {
                     Task::future(async move {
                         match device.open_tunnel(config).await {
                             Ok(()) => Message::OpenTunnelGui,
-                            Err(err) => {
-                                Message::Error(ErrorDisplayInfo::new(Arc::new(err), "TODO"))
-                            }
+                            Err(err) => Message::Error(ErrorDisplayInfo::new(
+                                Arc::new(err),
+                                t!("tunnel.error"),
+                            )),
                         }
                     })
                 } else {
@@ -147,7 +148,7 @@ impl SubScreen for TunnelOpener {
 
     fn view(&self) -> crate::Element<Self::Message> {
         container(card(
-            "TODO",
+            text(t!("tunnel.opener.title")),
             row![
                 combo_box(
                     &self.tunnel_types,
@@ -161,18 +162,20 @@ impl SubScreen for TunnelOpener {
                     Some(TunnelConfig::Tcp(config)) => {
                         row![
                             number_input(config.local_port, 1..=65535, Message::LocalPort),
-                            text_input("TODO", &config.remote_host)
+                            text_input(&t!("tunnel.input.remote_host"), &config.remote_host)
                                 .on_input(Message::RemoteHost)
                                 .on_submit_maybe(if config.remote_host.is_empty() {
                                     None
                                 } else {
                                     Some(Message::OpenTunnel)
                                 }),
-                            button("TODO").on_press_maybe(if config.remote_host.is_empty() {
-                                None
-                            } else {
-                                Some(Message::OpenTunnel)
-                            })
+                            button(text(t!("tunnel.open"))).on_press_maybe(
+                                if config.remote_host.is_empty() {
+                                    None
+                                } else {
+                                    Some(Message::OpenTunnel)
+                                }
+                            )
                         ]
                     }
                 }

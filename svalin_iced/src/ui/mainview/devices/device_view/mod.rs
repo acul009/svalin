@@ -1,5 +1,4 @@
 use device_status::DeviceStatus;
-use futures_util::{FutureExt, StreamExt};
 use iced::{
     advanced::subscription::from_recipe,
     widget::{column, scrollable, text},

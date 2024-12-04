@@ -2,13 +2,11 @@ use std::sync::Arc;
 
 use devices::Devices;
 use iced::{
-    advanced::graphics::futures::subscription,
     widget::{button, row, text},
     Length, Subscription, Task,
 };
 use svalin::client::Client;
 use tunnel::TunnelUi;
-use uuid::timestamp::context;
 
 use super::{screen::SubScreen, MapOpt};
 

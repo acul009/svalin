@@ -5,8 +5,6 @@ use iced::{
     Element,
 };
 
-use crate::fl;
-
 use super::form;
 
 pub struct ErrorDisplay<'a, Error, Message> {
@@ -20,7 +18,7 @@ impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
         Self {
             error,
             on_close: None,
-            title: fl!("error-generic").into(),
+            title: t!("error-generic").into(),
         }
     }
 
@@ -46,7 +44,7 @@ where
     Error: std::fmt::Display,
 {
     fn from(display: ErrorDisplay<'a, Error, Message>) -> Self {
-        let mut close_button = button(text(fl!("close")));
+        let mut close_button = button(text(t!("close")));
         if let Some(on_close) = display.on_close {
             close_button = close_button.on_press(on_close);
         }

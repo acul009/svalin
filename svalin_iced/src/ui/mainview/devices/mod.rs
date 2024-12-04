@@ -12,7 +12,6 @@ use svalin::client::{device::Device, Client};
 use svalin_pki::Certificate;
 
 use crate::{
-    fl,
     ui::{screen::SubScreen, MapOpt},
     util::watch_recipe::WatchRecipe,
 };
@@ -109,7 +108,7 @@ impl SubScreen for Devices {
             State::DeviceView(device_view) => device_view.view().map(Into::into),
             State::List => stack![
                 container(
-                    button(text(fl!("device-add")))
+                    button(text(t!("device_list.add")))
                         .padding(10)
                         .on_press(Message::NewDevice),
                 )

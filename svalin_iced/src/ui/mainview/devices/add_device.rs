@@ -6,13 +6,10 @@ use iced::{
 };
 use svalin::client::{add_agent::WaitingForConfirmCode, Client};
 
-use crate::{
-    fl,
-    ui::{
-        screen::SubScreen,
-        types::error_display_info::ErrorDisplayInfo,
-        widgets::{form, loading},
-    },
+use crate::ui::{
+    screen::SubScreen,
+    types::error_display_info::ErrorDisplayInfo,
+    widgets::{form, loading},
 };
 
 #[derive(Debug, Clone)]
@@ -115,14 +112,14 @@ impl SubScreen for AddDevice {
                 State::JoinCode => {
                     let join_code = self.join_code.clone();
                     let client = self.client.clone();
-                    self.state = State::Loading(fl!("connect-to-device"));
+                    self.state = State::Loading(t!("add-device.connecting").to_string());
                     Task::future(async move {
                         let waiting = client.add_agent_with_code(join_code.clone()).await;
 
                         match waiting {
                             Err(err) => Message::Error(ErrorDisplayInfo::new(
                                 Arc::new(err),
-                                fl!("join-code-error"),
+                                t!("add-device.error.join-code"),
                             )),
                             Ok(waiting) => Message::WaitingForDeviceName(Arc::new(waiting)),
                         }
@@ -136,21 +133,21 @@ impl SubScreen for AddDevice {
                     None => {
                         self.state = State::Error(ErrorDisplayInfo::new(
                             Arc::new(anyhow::anyhow!("waiting for device name")),
-                            fl!("join-code-error"),
+                            t!("add-device.error.join-code"),
                         ));
                         Task::none()
                     }
                     Some(waiting) => {
                         let confirm_code = self.confirm_code.clone();
                         let device_name = self.device_name.clone();
-                        self.state = State::Loading(fl!("enrolling-device"));
+                        self.state = State::Loading(t!("add-device.enrolling").to_string());
                         Task::future(async move {
                             let joined = waiting.confirm(confirm_code, device_name).await;
 
                             match joined {
                                 Err(err) => Message::Error(ErrorDisplayInfo::new(
                                     Arc::new(err),
-                                    fl!("confirm-code-error"),
+                                    t!("add-device.error.join-code"),
                                 )),
                                 Ok(_) => Message::Success,
                             }
@@ -192,42 +189,42 @@ impl SubScreen for AddDevice {
             State::Error(error) => error.view().on_close(Message::Back).into(),
             State::Loading(message) => loading(message).into(),
             State::JoinCode => form()
-                .title(fl!("input-join-code"))
+                .title(t!("add-device.title.join-code"))
                 .control(
-                    text_input(&fl!("join-code"), &self.join_code)
+                    text_input(&t!("add-device.input.join-code"), &self.join_code)
                         .id("join-code")
                         .on_input(|input| Message::Input(Input::JoinCode(input)))
                         .on_submit(Message::Continue),
                 )
-                .primary_action(button(text(fl!("continue"))).on_press(Message::Continue))
-                .secondary_action(button(text(fl!("back"))).on_press(Message::Back))
+                .primary_action(button(text(t!("generic.continue"))).on_press(Message::Continue))
+                .secondary_action(button(text(t!("generic.back"))).on_press(Message::Back))
                 .into(),
             State::DeviceName => form()
-                .title(fl!("input-device-name"))
+                .title(t!("add-device.title.device-name"))
                 .control(
-                    text_input(&fl!("device-name"), &self.device_name)
+                    text_input(&t!("add-device.input.device-name"), &self.device_name)
                         .id("device-name")
                         .on_input(|input| Message::Input(Input::DeviceName(input)))
                         .on_submit(Message::Continue),
                 )
-                .primary_action(button(text(fl!("continue"))).on_press(Message::Continue))
-                .secondary_action(button(text(fl!("back"))).on_press(Message::Back))
+                .primary_action(button(text(t!("generic.continue"))).on_press(Message::Continue))
+                .secondary_action(button(text(t!("generic.back"))).on_press(Message::Back))
                 .into(),
             State::ConfirmCode => form()
-                .title(fl!("input-confirm-code"))
+                .title(t!("add-device.title.confirm-code"))
                 .control(
-                    text_input(&fl!("confirm-code"), &self.confirm_code)
+                    text_input(&t!("add-device.input.confirm-code"), &self.confirm_code)
                         .id("confirm-code")
                         .on_input(|input| Message::Input(Input::ConfirmCode(input)))
                         .on_submit(Message::Continue),
                 )
-                .primary_action(button(text(fl!("continue"))).on_press(Message::Continue))
-                .secondary_action(button(text(fl!("back"))).on_press(Message::Back))
+                .primary_action(button(text(t!("generic.continue"))).on_press(Message::Continue))
+                .secondary_action(button(text(t!("generic.back"))).on_press(Message::Back))
                 .into(),
             State::Success => form()
-                .title(fl!("success"))
-                .control(text(fl!("success-join")))
-                .primary_action(button(text(fl!("back"))).on_press(Message::Exit))
+                .title(t!("add-device.title.success"))
+                .control(text(t!("add-device.success")))
+                .primary_action(button(text(t!("generic.back"))).on_press(Message::Exit))
                 .into(),
         }
     }

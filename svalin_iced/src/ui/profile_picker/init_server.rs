@@ -8,12 +8,9 @@ use iced::{
 use svalin::client::{Client, Init};
 use totp_rs::TOTP;
 
-use crate::{
-    fl,
-    ui::{
-        types::error_display_info::ErrorDisplayInfo,
-        widgets::{form, loading},
-    },
+use crate::ui::{
+    types::error_display_info::ErrorDisplayInfo,
+    widgets::{form, loading},
 };
 
 pub struct InitServer {
@@ -156,7 +153,7 @@ impl crate::ui::screen::SubScreen for InitServer {
                             Err(err) => {
                                 self.state = State::Error(ErrorDisplayInfo::new(
                                     Arc::new(err),
-                                    fl!("register-totp-error"),
+                                    t!("profile-picker.error.totp.register"),
                                 ))
                             }
                             Ok(totp) => {
@@ -184,13 +181,13 @@ impl crate::ui::screen::SubScreen for InitServer {
                         Err(err) => {
                             return Task::done(Message::Error(ErrorDisplayInfo::new(
                                 Arc::new(err.into()),
-                                fl!("totp-verify-error"),
+                                t!("profile-picker.error.totp.verify"),
                             )))
                         }
                         Ok(false) => {
                             return Task::done(Message::Error(ErrorDisplayInfo::new(
                                 Arc::new(anyhow!("wrong totp")),
-                                fl!("totp-verify-error"),
+                                t!("profile-picker.error.totp.verify"),
                             )))
                         }
 
@@ -210,12 +207,13 @@ impl crate::ui::screen::SubScreen for InitServer {
                                 let password = password.clone();
                                 let totp = totp.clone();
 
-                                self.state = State::Loading(fl!("server-init-loading"));
+                                self.state =
+                                    State::Loading(t!("profile-picker.init-loading").to_string());
                                 return Task::future(async move {
                                     match init.init(username, password.clone(), totp).await {
                                         Err(err) => Message::Error(ErrorDisplayInfo::new(
                                             Arc::new(err),
-                                            fl!("server-init-error"),
+                                            t!("profile-picker.error.server-init"),
                                         )),
                                         Ok(profile) => {
                                             let client = match Client::open_profile(
@@ -227,7 +225,7 @@ impl crate::ui::screen::SubScreen for InitServer {
                                                 Err(err) => {
                                                     return Message::Error(ErrorDisplayInfo::new(
                                                         Arc::new(err),
-                                                        fl!("server-init-error"),
+                                                        t!("profile-picker.error.server-init"),
                                                     ))
                                                 }
                                                 Ok(client) => client,
@@ -256,38 +254,41 @@ impl crate::ui::screen::SubScreen for InitServer {
                 password,
                 confirm_password,
             } => form()
-                .title(fl!("profile-add"))
+                .title(t!("profile-picker.add"))
                 .control(
-                    text_input(&fl!("username"), username)
+                    text_input(&t!("generic.username"), username)
                         .id("username")
                         .on_input(|input| Message::Input(Input::Username(input))),
                 )
                 .control(
-                    text_input(&fl!("password"), password)
+                    text_input(&t!("generic.password"), password)
                         .secure(true)
                         .on_input(|input| Message::Input(Input::Password(input))),
                 )
                 .control(
-                    text_input(&fl!("confirm-password"), confirm_password)
-                        .secure(true)
-                        .on_input(|input| Message::Input(Input::ConfirmPassword(input)))
-                        .on_submit(Message::Continue),
+                    text_input(
+                        &t!("profile-picker.input.confirm-password"),
+                        confirm_password,
+                    )
+                    .secure(true)
+                    .on_input(|input| Message::Input(Input::ConfirmPassword(input)))
+                    .on_submit(Message::Continue),
                 )
-                .primary_action(button(text(fl!("continue"))).on_press(Message::Continue))
-                .secondary_action(button(text(fl!("back"))).on_press(Message::Back))
+                .primary_action(button(text(t!("generic.continue"))).on_press(Message::Continue))
+                .secondary_action(button(text(t!("generic.back"))).on_press(Message::Back))
                 .into(),
             State::Totp { qr, totp_input, .. } => form()
-                .title(fl!("profile-add"))
+                .title(t!("profile-picker.add"))
                 .control(image(qr))
-                .control(button(text(fl!("copy-totp"))).on_press(Message::CopyTOTP))
+                .control(button(text(t!("profile-picker.copy-totp"))).on_press(Message::CopyTOTP))
                 .control(
-                    text_input(&fl!("totp"), totp_input)
+                    text_input(&t!("profile-picker.input.totp"), totp_input)
                         .id("totp")
                         .on_input(|input| Message::Input(Input::Totp(input)))
                         .on_submit(Message::Continue),
                 )
-                .primary_action(button(text(fl!("continue"))).on_press(Message::Continue))
-                .secondary_action(button(text(fl!("back"))).on_press(Message::Back))
+                .primary_action(button(text(t!("generic.continue"))).on_press(Message::Continue))
+                .secondary_action(button(text(t!("generic.back"))).on_press(Message::Back))
                 .into(),
         }
     }

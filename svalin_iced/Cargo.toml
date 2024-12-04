@@ -13,9 +13,6 @@ svalin_macros = { path = "../svalin_macros" }
 
 anyhow = "1.0.93"
 futures-util = "0.3.31"
-i18n-embed-fl = "0.9.2"
-open = "5.3.0"
-rust-embed = "8.5.0"
 tokio = { version = "1.41.1", features = ["full"] }
 totp-rs = { version = "5.6.0", features = ["qr", "gen_secret"] }
 lyon_algorithms = "1.0.4"
@@ -33,7 +30,4 @@ tokio-stream = { version = "0.1.16", features = ["full"] }
 tokio-util = "0.7.12"
 futures = "0.3.31"
 uuid = "1.11.0"
-
-[dependencies.i18n-embed]
-version = "0.15"
-features = ["fluent-system", "desktop-requester"]
+rust-i18n = "3.1.2"
