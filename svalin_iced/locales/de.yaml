@@ -1,0 +1,69 @@
+_version: '1'
+add-device:
+  connecting: Mit Gerät verbinden...
+  enrolling: Gerät wird registriert...
+  error:
+    join-code: Fehler beim Herstellen einer Verbindung zum neuen Agenten
+  input:
+    confirm-code: Code bestätigen
+    device-name: Gerätename
+    join-code: Beitrittscode
+  success: Das neue Gerät wurde erfolgreich registriert!
+  title:
+    confirm-code: Geben Sie den Bestätigungscode ein
+    device-name: Legen Sie den Gerätenamen fest
+    join-code: Geben Sie den Beitrittscode ein
+    success: Gerät erfolgreich hinzugefügt
+app-title: Svalin
+device_list:
+  add: Gerät hinzufügen
+generic:
+  back: Zurück
+  cancel: Abbrechen
+  close: Schließen
+  continue: Weiter
+  error: Es ist ein Fehler aufgetreten!
+  loading: In Arbeit...
+  password: Passwort
+  passwords-dont-match: Passwörter müssen übereinstimmen
+  required-field: Pflichtfeld 
+  success: Erfolg
+  unlock: Entsperren
+  username: Benutzername
+profile-picker:
+  add: Profil hinzufügen
+  confirm-delete: Sind Sie sicher, dass Sie %{profile} löschen möchten?
+  connecting-to-server: Verbindung zum Server herstellen...
+  copy-totp: TOTP-Geheimnis kopieren
+  error:
+    connect-to-server: Fehler beim Herstellen einer Verbindung zum Server
+    delete: Fehler beim Löschen des Profils
+    server-init: Fehler beim Initialisieren des Servers
+    totp:
+      register: Fehler beim Erstellen des TOTP-Geheimnisses
+      verify: Fehler beim Überprüfen des TOTP-Codes
+    unlock: Fehler beim Entsperren des Profils
+  init-loading: Server wird initialisiert...
+  input:
+    confirm-password: Passwort bestätigen
+    totp: 2FA-Code
+  title:
+    add: Profil hinzufügen
+    unlock: Geben Sie Ihr Passwort ein, um das Profil zu entsperren
+  unlocking: Profil entsperren...
+realtime:
+  connecting: Verbinden...
+  core: Kern %{id}
+  cpu: CPU
+  live-unavailable: Live-Daten nicht verfügbar
+  memory: Erinnerung
+  ram: RAM
+  swap: Tauschen
+tunnel:
+  close: Schließen
+  error: Fehler beim Öffnen des Tunnels
+  input:
+    remote_host: Remote-Host und Port
+  open: Offen
+  opener:
+    title: Offener Tunnel
