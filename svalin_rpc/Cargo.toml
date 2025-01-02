@@ -6,18 +6,18 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.93"
+anyhow = "1.0.95"
 async-trait = "0.1.83"
 futures = "0.3.31"
-postcard = "1.0.10"
-serde = "1.0.215"
-serde_json = "1.0.132"
-tokio = { version = "1.41.1", features = ["full"] }
+postcard = "1.1.1"
+serde = "1.0.217"
+serde_json = "1.0.134"
+tokio = { version = "1.42.0", features = ["full"] }
 svalin_macros = { path = "../svalin_macros" }
 svalin_pki = { path = "../svalin_pki", features = ["rustls"] }
-quinn = { version = "0.11.5", features = ["ring"] }
-tracing = "0.1.40"
+quinn = { version = "0.11.6", features = ["ring"] }
+tracing = "0.1.41"
 test-log = { version = "0.2.16", features = ["trace"] }
-tokio-rustls = { version = "0.26.0", default-features = false, features = [
+tokio-rustls = { version = "0.26.1", default-features = false, features = [
     "ring",
 ] }

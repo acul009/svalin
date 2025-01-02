@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.93"
+anyhow = "1.0.95"
 portable-pty = "0.8.1"
-serde = { version = "1.0.215", features = ["derive"] }
-sysinfo = { version = "0.32.0", features = ["windows", "serde"] }
-tokio = { version = "1.41.1", features = ["sync"] }
+serde = { version = "1.0.217", features = ["derive"] }
+sysinfo = { version = "0.32.1", features = ["windows", "serde"] }
+tokio = { version = "1.42.0", features = ["sync"] }
