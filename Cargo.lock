@@ -4699,7 +4699,6 @@ dependencies = [
  "async-trait",
  "clap",
  "futures",
- "iced_aw",
  "marmelade",
  "pin-project",
  "rand",

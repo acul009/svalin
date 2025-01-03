@@ -2,6 +2,9 @@
 name = "svalin"
 version = "0.1.0"
 edition = "2021"
+license-file = "../LICENSE"
+authors = ["Luca Wlcek <luca@it-rahn.de>"]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -29,5 +32,12 @@ test-log = { version = "0.2.16", features = ["trace"] }
 futures = "0.3.31"
 pin-project = "1.1.7"
 thiserror = "2.0.9"
-iced_aw = "0.11.0"
 uuid = { version = "1.11.0", features = ["v4"] }
+
+[package.metadata.deb]
+depends = "libc6 (>= 2.31)"
+systemd-units = [
+    { unit-name = "svalin-server", enable = false, start = false, unit-scripts = "packaging/systemd" },
+    { unit-name = "svalin-agent", enable = false, start = false, unit-scripts = "packaging/systemd" },
+]
+maintainer-scripts = "packaging/deb/maintainer-scripts"

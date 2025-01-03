@@ -1,0 +1,10 @@
+[Unit]
+Description=Server for Svalin
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/svalin server 0.0.0.0:1234
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

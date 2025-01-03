@@ -1,0 +1,10 @@
+[Unit]
+Description=Agent for Svalin
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/svalin agent
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
