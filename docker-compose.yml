@@ -1,0 +1,12 @@
+volumes:
+  data:
+
+
+services:
+  svalin:
+    build: .
+    image: svalin
+    ports:
+      - 1234:1234
+    volumes:
+      - data:/var/lib/svalin
