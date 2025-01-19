@@ -4711,6 +4711,7 @@ dependencies = [
  "test-log",
  "thiserror 2.0.9",
  "tokio",
+ "tokio-util",
  "totp-rs",
  "tracing",
  "tracing-subscriber",
@@ -4786,6 +4787,7 @@ dependencies = [
  "test-log",
  "tokio",
  "tokio-rustls",
+ "tokio-util",
  "tracing",
 ]
 

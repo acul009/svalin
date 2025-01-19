@@ -33,6 +33,7 @@ futures = "0.3.31"
 pin-project = "1.1.7"
 thiserror = "2.0.9"
 uuid = { version = "1.11.0", features = ["v4"] }
+tokio-util = "0.7.13"
 
 [package.metadata.deb]
 depends = "libc6 (>= 2.31)"
