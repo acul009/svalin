@@ -1,7 +1,8 @@
-use std::{net::ToSocketAddrs, panic, process};
+use std::{net::ToSocketAddrs, panic, process, time::Duration};
 
 use test_log::test;
 use tls_test_command::{TlsTest, TlsTestCommandHandler};
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 mod tls_test_command;
@@ -13,8 +14,10 @@ use crate::{
         whitelist::WhitelistPermissionHandler, DummyPermission,
     },
     rpc::{
-        client::RpcClient, command::handler::HandlerCollection, connection::Connection,
-        server::RpcServer,
+        client::RpcClient,
+        command::handler::HandlerCollection,
+        connection::Connection,
+        server::{build_rpc_server, create_rpc_socket},
     },
     verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
 };
@@ -29,19 +32,20 @@ async fn ping_test() {
         .to_self_signed_cert()
         .unwrap();
 
-    let socket =
-        RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
-
-    let server = RpcServer::new(socket, &credentials, SkipClientVerification::new()).unwrap();
-
     let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
 
     let commands = HandlerCollection::new(permission_handler);
     commands.chain().await.add(PingHandler);
 
-    let server_handle = tokio::spawn(async move {
-        server.run(commands).await.unwrap();
-    });
+    let socket = create_rpc_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
+
+    let server = build_rpc_server()
+        .credentials(credentials)
+        .commands(commands)
+        .client_cert_verifier(SkipClientVerification::new())
+        .cancellation_token(CancellationToken::new())
+        .start_server(socket)
+        .unwrap();
 
     debug!("trying to connect client");
 
@@ -55,7 +59,7 @@ async fn ping_test() {
 
     let _ping = connection.dispatch(Ping).await.unwrap();
 
-    server_handle.abort();
+    server.close(Duration::from_secs(1)).await.unwrap();
 }
 
 #[test(tokio::test)]
@@ -73,10 +77,7 @@ async fn tls_test() {
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
-    let socket =
-        RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
-
-    let server = RpcServer::new(socket, &credentials, SkipClientVerification::new()).unwrap();
+    let socket = create_rpc_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
 
     let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
 
@@ -86,9 +87,13 @@ async fn tls_test() {
         .await
         .add(TlsTestCommandHandler::new().unwrap());
 
-    let server_handle = tokio::spawn(async move {
-        server.run(commands).await.unwrap();
-    });
+    let server = build_rpc_server()
+        .credentials(credentials)
+        .commands(commands)
+        .client_cert_verifier(SkipClientVerification::new())
+        .cancellation_token(CancellationToken::new())
+        .start_server(socket)
+        .unwrap();
 
     debug!("trying to connect client");
 
@@ -102,7 +107,7 @@ async fn tls_test() {
 
     connection.dispatch(TlsTest).await.unwrap();
 
-    server_handle.abort();
+    server.close(Duration::from_secs(1)).await.unwrap();
 }
 
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -114,10 +119,7 @@ async fn perm_test() {
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
-    let socket =
-        RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
-
-    let server = RpcServer::new(socket, &credentials, SkipClientVerification::new()).unwrap();
+    let socket = create_rpc_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
 
     let permission_handler = WhitelistPermissionHandler::<DummyPermission>::new(vec![]);
 
@@ -127,9 +129,13 @@ async fn perm_test() {
         .await
         .add(TlsTestCommandHandler::new().unwrap());
 
-    let server_handle = tokio::spawn(async move {
-        server.run(commands).await.unwrap();
-    });
+    let server = build_rpc_server()
+        .credentials(credentials)
+        .commands(commands)
+        .client_cert_verifier(SkipClientVerification::new())
+        .cancellation_token(CancellationToken::new())
+        .start_server(socket)
+        .unwrap();
 
     debug!("trying to connect client");
 
@@ -143,5 +149,5 @@ async fn perm_test() {
 
     connection.dispatch(TlsTest).await.unwrap_err();
 
-    server_handle.abort();
+    server.close(Duration::from_secs(1)).await.unwrap();
 }

@@ -23,9 +23,17 @@ struct CertificateData {
     validity: Validity,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Certificate {
     data: Arc<CertificateData>,
+}
+
+impl Debug for Certificate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Certificate")
+            .field("fingerprint", &self.fingerprint())
+            .finish()
+    }
 }
 
 #[derive(Debug, Error)]

@@ -1,9 +1,11 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use tokio::task::JoinSet;
+use tokio::select;
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 use tracing::{debug, error};
 
-use crate::permissions::{PermissionCheckError, PermissionHandler};
+use crate::permissions::PermissionHandler;
 use crate::rpc::{command::handler::HandlerCollection, session::Session};
 use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
 
@@ -84,7 +86,7 @@ pub trait ServeableConnection<P>
 where
     P: PermissionHandler,
 {
-    async fn serve(&self, commands: HandlerCollection<P>) -> Result<()>;
+    async fn serve(&self, commands: HandlerCollection<P>, cancel: CancellationToken) -> Result<()>;
 }
 
 #[async_trait]
@@ -94,47 +96,63 @@ where
     P: PermissionHandler,
     P::Permission: 'static,
 {
-    async fn serve(&self, commands: HandlerCollection<P>) -> Result<()> {
+    async fn serve(&self, commands: HandlerCollection<P>, cancel: CancellationToken) -> Result<()> {
         debug!("waiting for incoming data stream");
-        let mut open_sessions = JoinSet::<()>::new();
+        let open_sessions = TaskTracker::new();
 
         loop {
-            match self.accept_raw_session().await {
-                Ok((read, write)) => {
-                    let session = Session::new(read, write, self.peer().clone());
+            select! {
+                _ = cancel.cancelled() => {
+                    debug!("canceling connection serve loop");
+                    break;
+                }
+                session = self.accept_raw_session() => {
+                    match session {
+                        Ok((read, write)) => {
+                            let session = Session::new(read, write, self.peer().clone());
 
-                    let commands2 = commands.clone();
-                    open_sessions.spawn(async move {
-                        let commands2 = commands2;
-                        let res = session
-                            .handle(&commands2)
-                            .await
-                            .context("error handling session");
-                        if let Err(e) = res {
-                            // TODO: Actually handle Error
-                            error!("{:?}", e);
-                            #[cfg(test)]
-                            {
-                                let mut chain = e.chain();
-                                chain.next(); // error handling session
-                                chain.next(); // error handling session with key
-                                if let Some(err) = chain.next() {
-                                    if let Some(err) = err.downcast_ref::<PermissionCheckError>() {
-                                        if let PermissionCheckError::PermissionDenied(_) = err {
-                                            return; // permission errors should
-                                                    // not crash during tests
-                                                    // since the client will be
-                                                    // notified anyway
+                            let commands2 = commands.clone();
+                            open_sessions.spawn(async move {
+                                let commands2 = commands2;
+                                let res = session
+                                    .handle(&commands2)
+                                    .await
+                                    .context("error handling session");
+                                if let Err(e) = res {
+                                    // TODO: Actually handle Error
+                                    error!("{:?}", e);
+                                    #[cfg(test)]
+                                    {
+                                        use crate::permissions::PermissionCheckError;
+                                        let mut chain = e.chain();
+                                        chain.next(); // error handling session
+                                        chain.next(); // error handling session with key
+                                        if let Some(err) = chain.next() {
+                                            if let Some(err) = err.downcast_ref::<PermissionCheckError>() {
+                                                if let PermissionCheckError::PermissionDenied(_) = err {
+                                                    return; // permission errors should
+                                                            // not crash during tests
+                                                            // since the client will be
+                                                            // notified anyway
+                                                }
+                                            }
                                         }
+                                        panic!("{:?}", e);
                                     }
                                 }
-                                panic!("{:?}", e);
-                            }
+                            });
+                        },
+                        Err(e) => {
+                            error!("error accepting session: {}", e);
+                            break;
                         }
-                    });
+                    }
                 }
-                Err(_err) => while open_sessions.join_next().await.is_some() {},
             }
         }
+
+        open_sessions.close();
+        open_sessions.wait().await;
+        Ok(())
     }
 }

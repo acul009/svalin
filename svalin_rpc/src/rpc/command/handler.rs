@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, marker::PhantomData, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -132,6 +132,12 @@ where
 {
     commands: Arc<RwLock<HashMap<String, Arc<dyn HandlerPermissionWrapper<P>>>>>,
     permission_handler: P,
+}
+
+impl<P: PermissionHandler> Debug for HandlerCollection<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HandlerCollection").finish()
+    }
 }
 
 impl<P> Clone for HandlerCollection<P>

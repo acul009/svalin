@@ -21,4 +21,4 @@ test-log = { version = "0.2.16", features = ["trace"] }
 tokio-rustls = { version = "0.26.1", default-features = false, features = [
     "ring",
 ] }
-tokio-util = "0.7.13"
+tokio-util = { version = "0.7.13", features = ["rt"] }

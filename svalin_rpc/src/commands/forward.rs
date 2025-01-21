@@ -1,7 +1,9 @@
 use std::error::Error;
 use std::fmt::{Debug, Display};
+use std::sync::Arc;
 
 use crate::commands::{deauthenticate::Deauthenticate, e2e::E2EDispatcher};
+use crate::permissions::PermissionHandler;
 use crate::rpc::command::dispatcher::TakeableCommandDispatcher;
 use crate::rpc::connection::Connection;
 use crate::rpc::peer::Peer;
@@ -37,18 +39,18 @@ impl Display for ForwardError {
 
 impl Error for ForwardError {}
 
-pub struct ForwardHandler {
-    server: RpcServer,
+pub struct ForwardHandler<PH: PermissionHandler> {
+    server: Arc<RpcServer<PH>>,
 }
 
-impl ForwardHandler {
-    pub fn new(server: RpcServer) -> Self {
+impl<PH: PermissionHandler> ForwardHandler<PH> {
+    pub fn new(server: Arc<RpcServer<PH>>) -> Self {
         Self { server }
     }
 }
 
 #[async_trait]
-impl CommandHandler for ForwardHandler {
+impl<PH: PermissionHandler> CommandHandler for ForwardHandler<PH> {
     type Request = Certificate;
 
     fn key() -> String {

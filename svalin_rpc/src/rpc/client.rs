@@ -6,6 +6,7 @@ use quinn::{
     crypto::rustls::QuicClientConfig, rustls::crypto::CryptoProvider, TransportConfig, VarInt,
 };
 use svalin_pki::PermCredentials;
+use tokio_util::sync::CancellationToken;
 
 use super::{
     command::handler::HandlerCollection,
@@ -91,6 +92,9 @@ impl RpcClient {
     where
         P: PermissionHandler,
     {
-        self.upstream_connection().serve(commands).await
+        // Todo: implement canceling and graceful shutdown
+        self.upstream_connection()
+            .serve(commands, CancellationToken::new())
+            .await
     }
 }
