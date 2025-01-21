@@ -29,6 +29,11 @@ Svalin has the following guidelines:
 - Be secure by default
 - Allow self-hosting
 
+Basically I'm trying to build a remote managment system which I personally enjoy using.
+I'm hoping you'll enjoy it too.
+
+If there is something bothering you, whether it's a bug, a cumbersome part of the UI or a missing feature I'd be happy to hear about it.
+
 ### Why I'm building Svalin
 
 Before I continue, let me say this: If you're happy with your solution, you don't have to switch.
@@ -100,6 +105,19 @@ TLDR: Rustdesk is primarily a remote software while Svalin is more similar to a 
 
 WIP - this isn't really complete yet.
 
+Svalin currently has 2 executables:
+- svalin
+  This can run both the server and the agent.
+- svalin_iced
+  This is the client with a GUI written in iced.
+
+I'm currently working on both a debian package as well as a docker image for the main executable.
+Before I can publish them, I need to finish the shutdown logic and figure out a publishing scheme for my CI.
+
+> [!Note]
+> While you could run the agent in a docker container, it's obviously not meant to.
+> If you have a specific use case why you'd need to run the agent in a container, please create an issue.
+
 ### Installing the server
 
 The server does not yet have an official installation method. A Debian package will come soon.
@@ -132,6 +150,9 @@ The agent will print out a join code. Add a new device in the client and enter t
 
 After receiving the join code, the client will establish an encrypted connection to the agent. The agent should now print out it's confirm code.
 Enter the confirm code along with the device name in the client and click confirm to add the new device.
+
+> [!Note]
+> The confirm code is derived from the TLS session and is meant to prevent someone from impersonating the agent.
 
 ## Contributing
 
@@ -195,7 +216,7 @@ This crate contains the code for certificate generation and encryption.
 
 ### TBRHL (Transaction Based Rolling Hash Ledger)
 
-This primitive (yet to be completed) is planned to be the base for svalin's permission system.
+This primitive (yet to be completed) is planned to be the base for svalin's integrity system.
 
 It's a log of transactions where each transaction contains the hash of the last one and is then signed by the entity creating the transaction.
 Once available on more than one device, the log cannot be modified locally without leaving a trace as each device checks the plausability of each transaction.
@@ -235,6 +256,8 @@ You'll find svalins macros here
 
 This crate contains code used by the agent for monitoring and managing a system.
 
+You might be interested in this crate if you want to build something similar to svalin or maybe a local UI for managing certain system settings.
+
 # Todo
 
 ## Strategy
@@ -248,7 +271,6 @@ This crate contains code used by the agent for monitoring and managing a system.
 
 ## Simple
 - [ ] Show Unlock Error when password on profile unlock wrong
-- [ ] Make Credentials use an Arc internally
 - [ ] Fix as many warnings as possible
 
 ## Bigger
@@ -256,9 +278,9 @@ This crate contains code used by the agent for monitoring and managing a system.
 - [ ] Add support for IPv6
 - [ ] Rate Limiting
 - [X] Init Routine
-- [ ] Login Routine (make sure the server sent hashing parameters are strong enough)
+- [ ] Login Routine (make sure the server sent hashing parameters are strong enough and non existant users are simulated with key derived hashing parameters)
 - [X] Unlock Routine
-- [ ] Make Credentials use an Arc internally
+- [X] Make Credentials use an Arc internally
 - [X] Agent init / join
 - [X] Connection forwarding
 - [X] E2E Encryption
