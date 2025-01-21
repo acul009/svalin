@@ -5,15 +5,15 @@
 > [!WARNING]
 > **This repository is not yet ready for production use.**
 > 
-> A lot of this code is still being heavily worked and, is missing security checks and has not been reviewed.
+> A lot of this code is still being heavily worked, is missing security checks and has not been reviewed.
 > 
 > The current focus is getting this behemoth of a project working in any state.
 > 
 > Once the programm is usable, it's going to be time to slowly but surely improve everything.
 > 
-> Feel free to browse the codebase and create issues for all problems you see.
+> Feel free to browse the codebase and create issues for any problems you see.
 >
-> If you have questions or want to cheer me on, you are also welcome to create an issue :)
+> If you have questions or suggestions, you're also welcome to create an issue :)
 
 ## What is this ?
 
