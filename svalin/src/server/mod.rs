@@ -11,7 +11,6 @@ use rand::{
 use serde::{Deserialize, Serialize};
 use svalin_pki::{verifier::KnownCertificateVerifier, Certificate, Keypair, PermCredentials};
 use svalin_rpc::{
-    commands::{forward::ForwardHandler, ping::PingHandler},
     permissions::{anonymous_permission_handler::AnonymousPermissionHandler, DummyPermission},
     rpc::{command::handler::HandlerCollection, server::Socket},
     verifiers::skip_verify::SkipClientVerification,
@@ -24,16 +23,10 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
-    permissions::server_permission_handler::ServerPermissionHandler,
-    shared::{
-        commands::{
-            add_user::AddUserHandler,
-            agent_list::AgentListHandler,
+    shared::commands::{
             init::InitHandler,
             public_server_status::{PublicStatus, PublicStatusHandler},
         },
-        join_agent::add_agent::AddAgentHandler,
-    },
     verifier::{
         server_storage_verifier::ServerStorageVerifier, tls_optional_wrapper::TlsOptionalWrapper,
         verification_helper::VerificationHelper,

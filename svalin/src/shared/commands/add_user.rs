@@ -114,15 +114,13 @@ impl CommandHandler for AddUserHandler {
     }
 }
 
-pub struct AddUser<'a> {
-    credentials: &'a PermCredentials,
-    password: Vec<u8>,
+pub struct AddUser {
     request: AddUserRequest,
 }
 
-impl<'a> AddUser<'a> {
+impl AddUser {
     pub async fn new(
-        credentials: &'a PermCredentials,
+        credentials: &PermCredentials,
         username: String,
         password: Vec<u8>,
         totp_secret: TOTP,
@@ -150,16 +148,12 @@ impl<'a> AddUser<'a> {
             totp_secret: totp_secret,
         };
 
-        Ok(Self {
-            credentials,
-            password,
-            request,
-        })
+        Ok(Self { request })
     }
 }
 
 #[async_trait]
-impl<'a> CommandDispatcher for AddUser<'a> {
+impl CommandDispatcher for AddUser {
     type Output = ();
     type Request = AddUserRequest;
 

@@ -7,7 +7,6 @@ use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use totp_rs::TOTP;
 use tracing::debug;
-use tracing_subscriber::field::debug;
 
 use crate::{agent::Agent, client::Client, server::Server};
 

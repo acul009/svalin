@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{Ok, Result};
-use futures::{future::try_join_all, StreamExt};
+use futures::future::try_join_all;
 use marmelade::Scope;
 use svalin_pki::{
     get_current_timestamp,

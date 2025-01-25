@@ -1,10 +1,8 @@
 use std::{
     collections::HashMap,
-    fmt::Display,
     sync::{Arc, Mutex},
 };
 
-use clap::Error;
 use svalin_pki::Certificate;
 use svalin_rpc::{
     commands::forward::ForwardConnection,
