@@ -1,7 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -45,7 +42,7 @@ struct AgentListItemTransport {
 
 pub struct AgentListHandler {
     agent_store: Arc<AgentStore>,
-    server: RpcServer,
+    server: Arc<RpcServer>,
 }
 
 impl From<&PermissionPrecursor<(), AgentListHandler>> for Permission {
@@ -55,7 +52,7 @@ impl From<&PermissionPrecursor<(), AgentListHandler>> for Permission {
 }
 
 impl AgentListHandler {
-    pub fn new(agent_store: Arc<AgentStore>, server: RpcServer) -> Self {
+    pub fn new(agent_store: Arc<AgentStore>, server: Arc<RpcServer>) -> Self {
         Self {
             agent_store,
             server,

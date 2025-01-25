@@ -2,6 +2,8 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use agent_store::AgentStore;
 use anyhow::{anyhow, Context, Result};
+use command_builder::SvalinCommandBuilder;
+use config_builder::ServerConfigBuilder;
 use rand::{
     distributions::{self},
     thread_rng, Rng,
@@ -14,7 +16,11 @@ use svalin_rpc::{
     rpc::{command::handler::HandlerCollection, server::Socket},
     verifiers::skip_verify::SkipClientVerification,
 };
-use tokio::sync::mpsc;
+use tokio::{
+    sync::mpsc,
+    time::{error::Elapsed, timeout},
+};
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
@@ -39,18 +45,24 @@ use svalin_rpc::rpc::server::RpcServer;
 use self::user_store::UserStore;
 
 pub mod agent_store;
+pub mod command_builder;
+pub mod config_builder;
 pub mod user_store;
+
+#[derive(Debug)]
+pub struct ServerConfig {
+    addr: SocketAddr,
+    scope: marmelade::Scope,
+    cancelation_token: CancellationToken,
+}
 
 pub const INIT_SERVER_SHUTDOWN_COUNTDOWN: Duration = Duration::from_secs(1);
 
 #[derive(Debug)]
 pub struct Server {
-    rpc: RpcServer,
-    scope: marmelade::Scope,
-    root: Certificate,
-    credentials: PermCredentials,
-    user_store: Arc<UserStore>,
-    agent_store: Arc<AgentStore>,
+    rpc: Arc<RpcServer>,
+    config: ServerConfig,
+    tasks: TaskTracker,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -60,66 +72,66 @@ struct BaseConfig {
 }
 
 impl Server {
-    pub async fn prepare(addr: SocketAddr, scope: marmelade::Scope) -> Result<Self> {
+    pub fn build() -> ServerConfigBuilder<(), (), ()> {
+        config_builder::new()
+    }
+
+    async fn start(config: ServerConfig) -> Result<Self> {
         let mut base_config: Option<BaseConfig> = None;
 
-        scope.view(|b| {
+        config.scope.view(|b| {
             base_config = b.get_object("base_config")?;
 
             Ok(())
         })?;
 
-        let socket = RpcServer::create_socket(addr).context("failed to create socket")?;
+        let socket = RpcServer::create_socket(config.addr).context("failed to create socket")?;
 
-        if base_config.is_none() {
-            // initialize
+        let base_config = match base_config {
+            Some(conf) => conf,
+            None => {
+                // initialize
 
-            debug!("Server is not yet initialized, starting initialization routine");
+                debug!("Server is not yet initialized, starting initialization routine");
 
-            let (root, credentials) = Self::init_server(socket.clone())
-                .await
-                .context("failed to initialize server")?;
+                let (root, credentials) =
+                    Self::init_server(socket.clone(), config.cancelation_token.child_token())
+                        .await
+                        .context("failed to initialize server")?;
 
-            debug!("Initialisation complete, waiting for init server shutdown");
+                debug!("Initialisation complete, waiting for init server shutdown");
 
-            // Sleep until the init server has shut down and released the Port
-            tokio::time::sleep(INIT_SERVER_SHUTDOWN_COUNTDOWN).await;
+                // Sleep until the init server has shut down and released the Port
+                tokio::time::sleep(INIT_SERVER_SHUTDOWN_COUNTDOWN).await;
 
-            let key = Server::get_encryption_key(&scope)?;
+                let key = Server::get_encryption_key(&config.scope)?;
 
-            let conf = BaseConfig {
-                root_cert: root,
-                credentials: credentials.to_bytes(key).await?,
-            };
+                let conf = BaseConfig {
+                    root_cert: root,
+                    credentials: credentials.to_bytes(key).await?,
+                };
 
-            scope.update(|b| {
-                b.put_object("base_config", &conf)?;
+                config.scope.update(|b| {
+                    b.put_object("base_config", &conf)?;
 
-                Ok(())
-            })?;
+                    Ok(())
+                })?;
 
-            base_config = Some(conf);
-        } else {
-            debug!("Server is already initialized");
-        }
-
-        if base_config.is_none() {
-            unreachable!("server init failed but continued anyway")
-        }
-
-        let base_config = base_config.expect("This should not ever happen");
+                conf
+            }
+        };
 
         let root = base_config.root_cert;
 
         let credentials = PermCredentials::from_bytes(
             &base_config.credentials,
-            Server::get_encryption_key(&scope)?,
+            Server::get_encryption_key(&config.scope)?,
         )
         .await?;
 
-        let user_store = UserStore::open(scope.subscope("users".into())?);
+        let user_store = UserStore::open(config.scope.subscope("users".into())?);
 
-        let agent_store = AgentStore::open(scope.subscope("agents".into())?, root.clone());
+        let agent_store = AgentStore::open(config.scope.subscope("agents".into())?, root.clone());
 
         let helper = VerificationHelper::new(root.clone(), user_store.clone());
 
@@ -133,44 +145,25 @@ impl Server {
 
         let verifier = TlsOptionalWrapper::new(verifier);
 
-        // TODO: proper client verification
-        let rpc = RpcServer::new(socket, &credentials, verifier)
-            .context("failed to create rpc server")?;
+        let command_builder = SvalinCommandBuilder {
+            root: root.clone(),
+            user_store: user_store,
+            agent_store: agent_store,
+        };
+
+        let rpc = RpcServer::build()
+            .credentials(credentials.clone())
+            .client_cert_verifier(verifier)
+            .cancellation_token(config.cancelation_token.clone())
+            .commands(command_builder)
+            .start_server(socket)
+            .await?;
 
         Ok(Self {
+            config,
             rpc,
-            scope,
-            root,
-            credentials,
-            user_store,
-            agent_store,
+            tasks: TaskTracker::new(),
         })
-    }
-
-    pub async fn run(&mut self) -> Result<()> {
-        let permission_handler: ServerPermissionHandler =
-            ServerPermissionHandler::new(self.root.clone());
-
-        let commands = HandlerCollection::new(permission_handler);
-
-        let join_manager = crate::shared::join_agent::ServerJoinManager::new();
-
-        commands
-            .chain()
-            .await
-            .add(PingHandler)
-            .add(PublicStatusHandler::new(PublicStatus::Ready))
-            .add(AddUserHandler::new(self.user_store.clone()))
-            .add(join_manager.create_request_handler())
-            .add(join_manager.create_accept_handler())
-            .add(ForwardHandler::new(self.rpc.clone()))
-            .add(AddAgentHandler::new(self.agent_store.clone())?)
-            .add(AgentListHandler::new(
-                self.agent_store.clone(),
-                self.rpc.clone(),
-            ));
-
-        self.rpc.run(commands).await
     }
 
     fn get_encryption_key(scope: &marmelade::Scope) -> Result<Vec<u8>> {
@@ -201,16 +194,10 @@ impl Server {
         }
     }
 
-    async fn init_server(socket: Socket) -> Result<(Certificate, PermCredentials)> {
-        let temp_credentials = Keypair::generate()?.to_self_signed_cert()?;
-
-        let rpc = Arc::new(RpcServer::new(
-            socket,
-            &temp_credentials,
-            SkipClientVerification::new(),
-        )?);
-        let rpc_clone = rpc.clone();
-
+    async fn init_server(
+        socket: Socket,
+        cancel: CancellationToken,
+    ) -> Result<(Certificate, PermCredentials)> {
         let (send, mut receive) = mpsc::channel::<(Certificate, PermCredentials)>(1);
 
         let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
@@ -222,26 +209,39 @@ impl Server {
             .add(InitHandler::new(send))
             .add(PublicStatusHandler::new(PublicStatus::WaitingForInit));
 
-        debug!("starting up init server");
+        let temp_credentials = Keypair::generate()?.to_self_signed_cert()?;
 
-        let handle = tokio::spawn(async move { rpc.run(commands).await });
+        debug!("starting up init server");
+        let rpc = RpcServer::build()
+            .credentials(temp_credentials)
+            .cancellation_token(cancel)
+            .client_cert_verifier(SkipClientVerification::new())
+            .commands(commands)
+            .start_server(socket)
+            .await?;
 
         debug!("init server running");
 
         if let Some(result) = receive.recv().await {
             debug!("successfully initialized server");
-            rpc_clone.close();
-            handle.abort();
+            rpc.close(Duration::from_secs(1)).await?;
             Ok(result)
         } else {
             error!("error when trying to initialize server");
-            rpc_clone.close();
-            handle.abort();
+            rpc.close(Duration::from_secs(1)).await?;
             Err(anyhow!("error initializing server"))
         }
     }
 
-    pub fn close(&self) {
-        self.rpc.close();
+    pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {
+        self.config.cancelation_token.cancel();
+        let result1 = self.rpc.close(timeout_duration).await;
+
+        let result2 = timeout(timeout_duration, self.tasks.wait()).await;
+
+        match result1 {
+            Err(e) => Err(e),
+            Ok(()) => result2,
+        }
     }
 }

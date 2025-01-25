@@ -27,25 +27,11 @@ use super::connection::direct_connection::DirectConnection;
 use super::session::Session;
 
 pub mod config_builder;
-use config_builder::RpcServerConfigBuilder;
-
-pub fn create_rpc_socket(addr: SocketAddr) -> std::io::Result<Socket> {
-    let std_socket = std::net::UdpSocket::bind(addr)?;
-    let runtime = quinn::default_runtime()
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "no async runtime found"))?;
-
-    let socket = runtime.wrap_udp_socket(std_socket)?;
-
-    Ok(Socket(socket))
-}
-
-pub fn build_rpc_server() -> RpcServerConfigBuilder<(), (), (), ()> {
-    RpcServerConfigBuilder::new()
-}
+use config_builder::{RpcCommandBuilder, RpcServerConfigBuilder};
 
 #[derive(Debug)]
-pub struct RpcServer<PH: PermissionHandler> {
-    config: RpcServerConfig<PH>,
+pub struct RpcServer {
+    config: RpcServerConfig,
     endpoint: quinn::Endpoint,
     connection_data: Mutex<ServerConnectionData>,
     client_status_broadcast: broadcast::Sender<ClientConnectionStatus>,
@@ -53,11 +39,10 @@ pub struct RpcServer<PH: PermissionHandler> {
 }
 
 #[derive(Debug)]
-struct RpcServerConfig<PH: PermissionHandler> {
+struct RpcServerConfig {
     credentials: PermCredentials,
     client_cert_verifier: Arc<dyn ClientCertVerifier>,
     cancellation_token: CancellationToken,
-    commands: HandlerCollection<PH>,
 }
 
 #[derive(Debug, Clone)]
@@ -74,24 +59,43 @@ struct ServerConnectionData {
 #[derive(Debug, Clone)]
 pub struct Socket(Arc<dyn quinn::AsyncUdpSocket>);
 
-impl<PH: PermissionHandler> RpcServer<PH> {
-    fn run(socket: Socket, config: RpcServerConfig<PH>) -> Result<Arc<Self>> {
+impl RpcServer {
+    pub fn build() -> RpcServerConfigBuilder<(), (), (), ()> {
+        RpcServerConfigBuilder::new()
+    }
+
+    pub fn create_socket(addr: SocketAddr) -> std::io::Result<Socket> {
+        let std_socket = std::net::UdpSocket::bind(addr)?;
+        let runtime = quinn::default_runtime().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::Other, "no async runtime found")
+        })?;
+
+        let socket = runtime.wrap_udp_socket(std_socket)?;
+
+        Ok(Socket(socket))
+    }
+
+    async fn run(
+        socket: Socket,
+        config: RpcServerConfig,
+        command_builder: impl RpcCommandBuilder,
+    ) -> Result<Arc<Self>> {
         let server = Self::create(socket, config)?;
 
-        let serve_future = server.clone().serve();
+        let serve_future = server.clone().serve(command_builder.build(&server).await?);
 
         server.tasks.spawn(serve_future);
 
         Ok(server)
     }
 
-    fn create(socket: Socket, config: RpcServerConfig<PH>) -> Result<Arc<Self>> {
+    fn create(socket: Socket, config: RpcServerConfig) -> Result<Arc<Self>> {
         if CryptoProvider::get_default().is_none() {
             let _ = quinn::rustls::crypto::ring::default_provider().install_default();
         }
 
-        let endpoint = RpcServer::<PH>::create_endpoint(socket, &config)
-            .context("failed to create rpc endpoint")?;
+        let endpoint =
+            RpcServer::create_endpoint(socket, &config).context("failed to create rpc endpoint")?;
 
         let (br_send, _) = broadcast::channel::<ClientConnectionStatus>(10);
 
@@ -106,10 +110,7 @@ impl<PH: PermissionHandler> RpcServer<PH> {
         }))
     }
 
-    fn create_endpoint(
-        socket: Socket,
-        config: &RpcServerConfig<impl PermissionHandler>,
-    ) -> Result<quinn::Endpoint> {
+    fn create_endpoint(socket: Socket, config: &RpcServerConfig) -> Result<quinn::Endpoint> {
         let priv_key = rustls::pki_types::PrivateKeyDer::try_from(
             config.credentials.get_key_bytes().to_owned(),
         )
@@ -141,13 +142,14 @@ impl<PH: PermissionHandler> RpcServer<PH> {
         Ok(endpoint)
     }
 
-    async fn serve(self: Arc<Self>) {
+    async fn serve(self: Arc<Self>, commands: HandlerCollection<impl PermissionHandler>) {
         debug!("starting server");
 
         loop {
+            debug!("Waiting for next connection");
             select! {
                 _ = self.config.cancellation_token.cancelled() => {
-                    debug!("canceling RPC serve loop");
+                    debug!("canceling RPC main serve loop");
                     break;
                 }
                 conn_option = self.endpoint.accept() => {
@@ -157,9 +159,8 @@ impl<PH: PermissionHandler> RpcServer<PH> {
                         },
                         Some(conn) => {
                             debug!("connection incoming");
-                            let serve_connection_future = self.clone().serve_connection(conn);
+                            let serve_connection_future = self.clone().serve_connection(conn, commands.clone());
                             self.tasks.spawn(serve_connection_future);
-                            debug!("Waiting for next connection");
                         }
                     }
                 }
@@ -167,8 +168,12 @@ impl<PH: PermissionHandler> RpcServer<PH> {
         }
     }
 
-    async fn serve_connection(self: Arc<Self>, conn: quinn::Incoming) {
-        let result = self.serve_connection_inner(conn).await;
+    async fn serve_connection(
+        self: Arc<Self>,
+        conn: quinn::Incoming,
+        commands: HandlerCollection<impl PermissionHandler>,
+    ) {
+        let result = self.serve_connection_inner(conn, commands).await;
 
         if let Err(e) = result {
             // TODO: actually handle error
@@ -176,7 +181,11 @@ impl<PH: PermissionHandler> RpcServer<PH> {
         }
     }
 
-    async fn serve_connection_inner(self: Arc<Self>, conn: quinn::Incoming) -> Result<()> {
+    async fn serve_connection_inner(
+        self: Arc<Self>,
+        conn: quinn::Incoming,
+        commands: HandlerCollection<impl PermissionHandler>,
+    ) -> Result<()> {
         debug!("spawned new task for incoming connection");
         debug!("waiting for connection to get ready...");
 
@@ -205,7 +214,7 @@ impl<PH: PermissionHandler> RpcServer<PH> {
         }
 
         conn.serve(
-            self.config.commands.clone(),
+            commands.clone(),
             self.config.cancellation_token.child_token(),
         )
         .await?;
@@ -233,17 +242,16 @@ impl<PH: PermissionHandler> RpcServer<PH> {
         }
     }
 
-    /// Todo: make this an awaitable shutdown instead
     pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {
         self.config.cancellation_token.cancel();
         self.tasks.close();
 
-        timeout(timeout_duration, self.tasks.wait()).await?;
+        let result = timeout(timeout_duration, self.tasks.wait()).await;
 
         self.endpoint
             .close(0u32.into(), b"graceful shutdown, goodbye");
 
-        Ok(())
+        result
     }
 
     pub async fn open_session_with(&self, peer: Certificate) -> Result<Session> {

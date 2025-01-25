@@ -1,6 +1,12 @@
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
 use clap::{Parser, Subcommand};
 use svalin::{agent::Agent, server::Server};
 
+use tokio_util::sync::CancellationToken;
 use tracing_subscriber;
 
 #[derive(Debug, Parser)]
@@ -40,11 +46,38 @@ async fn run() {
         Command::Server { address } => {
             if let Ok(addr) = address.parse() {
                 let db = marmelade::DB::open("./server.jammdb").expect("failed to open client db");
-                let mut server = Server::prepare(addr, db.scope("default".into()).unwrap())
-                    .await
-                    .unwrap();
 
-                server.run().await.unwrap();
+                let mutex = Arc::new(Mutex::<Option<Server>>::new(None));
+                let mutex2 = mutex.clone();
+
+                let cancel = CancellationToken::new();
+                let cancel2 = cancel.clone();
+
+                tokio::spawn(async move {
+                    let server = Server::build()
+                        .addr(addr)
+                        .scope(db.scope("default".into()).unwrap())
+                        .cancel(cancel2)
+                        .start_server()
+                        .await
+                        .unwrap();
+
+                    *mutex2.lock().unwrap() = Some(server);
+                });
+
+                // Wait for shutdown signal
+                tokio::signal::ctrl_c().await.unwrap();
+
+                println!("Shutting down server...");
+                cancel.cancel();
+
+                let server = mutex.lock().unwrap().take();
+
+                if let Some(server) = server {
+                    server.close(Duration::from_secs(5)).await.unwrap();
+                } else {
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                }
             }
         }
         Command::Agent { action } => match action {

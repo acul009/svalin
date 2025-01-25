@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 
 use anyhow::Result;
 use quinn::rustls::server::danger::ClientCertVerifier;
@@ -12,7 +12,7 @@ use super::{RpcServer, RpcServerConfig, Socket};
 pub struct RpcServerConfigBuilder<A, B, C, D> {
     credentials: A,
     client_cert_verifier: B,
-    commands: C,
+    command_builder: C,
     cancellation_token: D,
 }
 
@@ -21,7 +21,7 @@ impl RpcServerConfigBuilder<(), (), (), ()> {
         RpcServerConfigBuilder {
             credentials: (),
             client_cert_verifier: (),
-            commands: (),
+            command_builder: (),
             cancellation_token: (),
         }
     }
@@ -35,7 +35,7 @@ impl<A, B, C, D> RpcServerConfigBuilder<A, B, C, D> {
         RpcServerConfigBuilder {
             credentials,
             client_cert_verifier: self.client_cert_verifier,
-            commands: self.commands,
+            command_builder: self.command_builder,
             cancellation_token: self.cancellation_token,
         }
     }
@@ -47,19 +47,19 @@ impl<A, B, C, D> RpcServerConfigBuilder<A, B, C, D> {
         RpcServerConfigBuilder {
             credentials: self.credentials,
             client_cert_verifier,
-            commands: self.commands,
+            command_builder: self.command_builder,
             cancellation_token: self.cancellation_token,
         }
     }
 
-    pub fn commands<PH: PermissionHandler>(
+    pub fn commands<CB: RpcCommandBuilder>(
         self,
-        commands: HandlerCollection<PH>,
-    ) -> RpcServerConfigBuilder<A, B, HandlerCollection<PH>, D> {
+        command_builder: CB,
+    ) -> RpcServerConfigBuilder<A, B, CB, D> {
         RpcServerConfigBuilder {
             credentials: self.credentials,
             client_cert_verifier: self.client_cert_verifier,
-            commands,
+            command_builder,
             cancellation_token: self.cancellation_token,
         }
     }
@@ -71,32 +71,40 @@ impl<A, B, C, D> RpcServerConfigBuilder<A, B, C, D> {
         RpcServerConfigBuilder {
             credentials: self.credentials,
             client_cert_verifier: self.client_cert_verifier,
-            commands: self.commands,
+            command_builder: self.command_builder,
             cancellation_token,
         }
     }
 }
 
-impl<PH: PermissionHandler>
-    RpcServerConfigBuilder<
-        PermCredentials,
-        Arc<dyn ClientCertVerifier>,
-        HandlerCollection<PH>,
-        CancellationToken,
-    >
+impl<CB> RpcServerConfigBuilder<PermCredentials, Arc<dyn ClientCertVerifier>, CB, CancellationToken>
+where
+    CB: RpcCommandBuilder,
 {
-    pub fn start_server(self, socket: Socket) -> Result<Arc<RpcServer<PH>>> {
-        let config = self.to_config();
-
-        RpcServer::run(socket, config)
-    }
-
-    fn to_config(self) -> RpcServerConfig<PH> {
-        RpcServerConfig {
+    pub async fn start_server(self, socket: Socket) -> Result<Arc<RpcServer>> {
+        let config = RpcServerConfig {
             credentials: self.credentials,
             client_cert_verifier: self.client_cert_verifier,
             cancellation_token: self.cancellation_token,
-            commands: self.commands,
-        }
+        };
+
+        RpcServer::run(socket, config, self.command_builder).await
+    }
+}
+
+pub trait RpcCommandBuilder {
+    type PH: PermissionHandler;
+
+    fn build(
+        self,
+        server: &Arc<RpcServer>,
+    ) -> impl Future<Output = Result<HandlerCollection<Self::PH>>>;
+}
+
+impl<PH: PermissionHandler> RpcCommandBuilder for HandlerCollection<PH> {
+    type PH = PH;
+
+    async fn build(self, _: &Arc<RpcServer>) -> Result<HandlerCollection<PH>> {
+        Ok(self)
     }
 }

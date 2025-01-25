@@ -1,15 +1,15 @@
 use std::{panic, process, time::Duration};
 
-use prepare_server::prepare_server;
+use anyhow::Context;
+use std::net::ToSocketAddrs;
 use test_log::test;
 use tokio::sync::oneshot;
+use tokio_util::sync::CancellationToken;
 use totp_rs::TOTP;
 use tracing::debug;
+use tracing_subscriber::field::debug;
 
-use crate::{agent::Agent, client::Client};
-
-mod prepare_server;
-// mod test_init;
+use crate::{agent::Agent, client::Client, server::Server};
 
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn integration_tests() {
@@ -19,15 +19,34 @@ async fn integration_tests() {
         process::exit(1);
     }));
 
-    let server_handle = tokio::spawn(async move {
-        let mut server = prepare_server().await.unwrap();
-        server.run().await.unwrap();
-    });
-
     // delete test dbs
     let _ = std::fs::remove_file("./client.jammdb");
-    let _ = std::fs::remove_file("./server.jammdb");
+    let _ = std::fs::remove_file("./server_test.jammdb");
     let _ = std::fs::remove_file("./agent.jammdb");
+
+    let addr = "0.0.0.0:1234".to_socket_addrs().unwrap().next().unwrap();
+    // delete the test db
+    let db = marmelade::DB::open("./server_test.jammdb").expect("failed to open client db");
+
+    let (send_server, recv_server) = oneshot::channel();
+
+    tokio::spawn(async move {
+        let server = Server::build()
+            .addr(addr)
+            .scope(
+                db.scope("default".into())
+                    .context("Failed to prepare server")
+                    .unwrap(),
+            )
+            .cancel(CancellationToken::new())
+            .start_server()
+            .await
+            .unwrap();
+
+        debug!("server started");
+
+        send_server.send(server).unwrap();
+    });
 
     let host = "localhost:1234".to_owned();
 
@@ -88,7 +107,16 @@ async fn integration_tests() {
 
     client.close();
 
-    server_handle.abort();
+    debug!("closing server");
+
+    // TODO: make this actually work properly
+    let _ = recv_server
+        .await
+        .unwrap()
+        .close(Duration::from_secs(1))
+        .await;
+
+    debug!("server closed");
 
     agent_handle.abort();
 

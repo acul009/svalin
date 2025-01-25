@@ -14,10 +14,8 @@ use crate::{
         whitelist::WhitelistPermissionHandler, DummyPermission,
     },
     rpc::{
-        client::RpcClient,
-        command::handler::HandlerCollection,
-        connection::Connection,
-        server::{build_rpc_server, create_rpc_socket},
+        client::RpcClient, command::handler::HandlerCollection, connection::Connection,
+        server::RpcServer,
     },
     verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
 };
@@ -37,14 +35,16 @@ async fn ping_test() {
     let commands = HandlerCollection::new(permission_handler);
     commands.chain().await.add(PingHandler);
 
-    let socket = create_rpc_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
+    let socket =
+        RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
 
-    let server = build_rpc_server()
+    let server = RpcServer::build()
         .credentials(credentials)
         .commands(commands)
         .client_cert_verifier(SkipClientVerification::new())
         .cancellation_token(CancellationToken::new())
         .start_server(socket)
+        .await
         .unwrap();
 
     debug!("trying to connect client");
@@ -77,7 +77,8 @@ async fn tls_test() {
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
-    let socket = create_rpc_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
+    let socket =
+        RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
 
     let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
 
@@ -87,12 +88,13 @@ async fn tls_test() {
         .await
         .add(TlsTestCommandHandler::new().unwrap());
 
-    let server = build_rpc_server()
+    let server = RpcServer::build()
         .credentials(credentials)
         .commands(commands)
         .client_cert_verifier(SkipClientVerification::new())
         .cancellation_token(CancellationToken::new())
         .start_server(socket)
+        .await
         .unwrap();
 
     debug!("trying to connect client");
@@ -119,7 +121,8 @@ async fn perm_test() {
         .unwrap()
         .to_self_signed_cert()
         .unwrap();
-    let socket = create_rpc_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
+    let socket =
+        RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
 
     let permission_handler = WhitelistPermissionHandler::<DummyPermission>::new(vec![]);
 
@@ -129,12 +132,13 @@ async fn perm_test() {
         .await
         .add(TlsTestCommandHandler::new().unwrap());
 
-    let server = build_rpc_server()
+    let server = RpcServer::build()
         .credentials(credentials)
         .commands(commands)
         .client_cert_verifier(SkipClientVerification::new())
         .cancellation_token(CancellationToken::new())
         .start_server(socket)
+        .await
         .unwrap();
 
     debug!("trying to connect client");
