@@ -7,17 +7,17 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.95"
-async-trait = "0.1.83"
+async-trait = "0.1.85"
 futures = "0.3.31"
 postcard = "1.1.1"
 serde = "1.0.217"
-serde_json = "1.0.134"
-tokio = { version = "1.42.0", features = ["full"] }
+serde_json = "1.0.137"
+tokio = { version = "1.43.0", features = ["full"] }
 svalin_macros = { path = "../svalin_macros" }
 svalin_pki = { path = "../svalin_pki", features = ["rustls"] }
 quinn = { version = "0.11.6", features = ["ring"] }
 tracing = "0.1.41"
-test-log = { version = "0.2.16", features = ["trace"] }
+test-log = { version = "0.2.17", features = ["trace"] }
 tokio-rustls = { version = "0.26.1", default-features = false, features = [
     "ring",
 ] }

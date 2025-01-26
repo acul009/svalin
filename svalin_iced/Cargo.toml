@@ -13,7 +13,7 @@ svalin_macros = { path = "../svalin_macros" }
 
 anyhow = "1.0.95"
 futures-util = "0.3.31"
-tokio = { version = "1.42.0", features = ["full"] }
+tokio = { version = "1.43.0", features = ["full"] }
 totp-rs = { version = "5.6.0", features = ["qr", "gen_secret"] }
 lyon_algorithms = "1.0.5"
 iced = { version = "0.13.1", features = [
@@ -25,9 +25,9 @@ iced = { version = "0.13.1", features = [
     "canvas",
 ] }
 iced_aw = "0.11.0"
-thiserror = "2.0.9"
+thiserror = "2.0.11"
 tokio-stream = { version = "0.1.17", features = ["full"] }
 tokio-util = "0.7.13"
 futures = "0.3.31"
-uuid = "1.11.0"
+uuid = "1.12.1"
 rust-i18n = "3.1.2"

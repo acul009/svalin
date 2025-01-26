@@ -8,4 +8,4 @@ anyhow = "1.0.95"
 portable-pty = "0.8.1"
 serde = { version = "1.0.217", features = ["derive"] }
 sysinfo = { version = "0.32.1", features = ["windows", "serde"] }
-tokio = { version = "1.42.0", features = ["sync"] }
+tokio = { version = "1.43.0", features = ["sync"] }
