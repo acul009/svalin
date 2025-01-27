@@ -9,7 +9,8 @@ use svalin_rpc::rpc::{
     session::Session,
 };
 use svalin_sysctl::pty::{PtyProcess, TerminalSize};
-use tokio::{sync::mpsc, task::JoinSet};
+use tokio::{select, sync::mpsc, task::JoinSet};
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::debug;
 
 use crate::permissions::Permission;
@@ -37,52 +38,77 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
         "remote-terminal".into()
     }
 
-    async fn handle(&self, session: &mut Option<Session>, _: Self::Request) -> Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Option<Session>,
+        _: Self::Request,
+        cancel: CancellationToken,
+    ) -> Result<()> {
         if let Some(mut session) = session.take() {
+            let tasks = TaskTracker::new();
             let size: TerminalSize = session.read_object().await?;
             let (pty, mut pty_reader) = PtyProcess::shell(size)?;
 
             let (mut read, mut write, _) = session.destructure();
 
-            tokio::spawn(async move {
+            tasks.spawn(async move {
                 loop {
-                    let output = pty_reader.recv().await;
-                    match output {
-                        Some(output) => {
-                            if let Err(err) = write.write_object(&output).await {
-                                tracing::error!("{err}");
-                                return;
-                            } else {
-                                if let Ok(debug_string) = String::from_utf8(output) {
-                                    tracing::debug!("wrote to terminal: {debug_string}");
+                    select! {
+                        output = pty_reader.recv() => {
+
+                            match output {
+                                Some(output) => {
+                                    if let Err(err) = write.write_object(&output).await {
+                                        tracing::error!("{err}");
+                                        return;
+                                    } else {
+                                        if let Ok(debug_string) = String::from_utf8(output) {
+                                            tracing::debug!("wrote to terminal: {debug_string}");
+                                        }
+                                    }
+                                }
+                                None => {
+                                    let _ = write.shutdown().await;
+                                    return;
                                 }
                             }
-                        }
-                        None => {
-                            let _ = write.shutdown().await;
-                            return;
                         }
                     }
                 }
             });
 
             loop {
-                let packet: TerminalPacket = read.read_object().await?;
-                debug!("got terminal packet: {packet:?}");
-                match packet {
-                    TerminalPacket::Close => {
+                select! {
+                    _ = cancel.cancelled() => {
                         pty.close();
-                        return Ok(());
+                        break;
                     }
-                    TerminalPacket::Input(input) => {
-                        if let Err(err) = pty.write(input).await {
-                            tracing::error!("{err}");
-                            return Err(err);
-                        }
+                    packet = read.read_object() => {
+                        let packet = packet?;
+
+                        debug!("got terminal packet: {packet:?}");
+                        match packet {
+                            TerminalPacket::Close => {
+                                pty.close();
+                                cancel.cancel();
+                                return Ok(());
+                            }
+                            TerminalPacket::Input(input) => {
+                                if let Err(err) = pty.write(input).await {
+                                    tracing::error!("{err}");
+                                    return Err(err);
+                                }
+                            }
+                            TerminalPacket::Resize(size) => pty.resize(size).unwrap(),
+                        };
                     }
-                    TerminalPacket::Resize(size) => pty.resize(size).unwrap(),
-                };
+                }
             }
+
+            tasks.close();
+            tasks.wait().await;
+
+            Ok(())
         } else {
             Err(anyhow!("tried executing commandhandler with None"))
         }

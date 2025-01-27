@@ -10,7 +10,8 @@ use svalin_rpc::{
     transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
     verifiers::skip_verify::SkipServerVerification,
 };
-use tokio::io::copy_bidirectional;
+use tokio::{io::copy_bidirectional, select};
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument};
 
 use super::ServerJoinManager;
@@ -33,7 +34,12 @@ impl CommandHandler for JoinAcceptHandler {
         "accept_join".to_string()
     }
 
-    async fn handle(&self, session: &mut Session, _: Self::Request) -> anyhow::Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Session,
+        _: Self::Request,
+        cancel: CancellationToken,
+    ) -> anyhow::Result<()> {
         let join_code: String = session.read_object().await?;
 
         let agent_session = self.manager.get_session(&join_code);
@@ -51,9 +57,12 @@ impl CommandHandler for JoinAcceptHandler {
                 let mut transport1 = CombinedTransport::new(read1, write1);
                 let mut transport2 = CombinedTransport::new(read2, write2);
 
-                copy_bidirectional(&mut transport1, &mut transport2).await?;
+                select! {
+                        _ = cancel.cancelled() => {}
+                        result = copy_bidirectional(&mut transport1, &mut transport2) => {result?;}
+                }
 
-                debug!("finished forwarding session");
+                debug!("finished forwarding join accept session");
 
                 Ok(())
             }

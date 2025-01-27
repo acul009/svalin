@@ -10,6 +10,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use svalin_pki::Keypair;
+use tokio_util::sync::CancellationToken;
 
 use crate::rpc::session::Session;
 
@@ -33,7 +34,12 @@ impl TakeableCommandHandler for TlsTestCommandHandler {
         tls_test_key()
     }
 
-    async fn handle(&self, session: &mut Option<Session>, _: Self::Request) -> anyhow::Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Option<Session>,
+        _: Self::Request,
+        _: CancellationToken,
+    ) -> anyhow::Result<()> {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure_transport();
 

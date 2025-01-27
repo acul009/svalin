@@ -54,6 +54,8 @@ async fn run() {
                 let cancel2 = cancel.clone();
 
                 tokio::spawn(async move {
+                    // This needs to be in a seperate task since the init server will block on
+                    // start_server
                     let server = Server::build()
                         .addr(addr)
                         .scope(db.scope("default".into()).unwrap())

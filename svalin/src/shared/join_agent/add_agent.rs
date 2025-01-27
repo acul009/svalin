@@ -11,6 +11,7 @@ use svalin_rpc::rpc::{
     },
     session::Session,
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::{permissions::Permission, server::agent_store::AgentStore};
 
@@ -55,7 +56,12 @@ impl CommandHandler for AddAgentHandler {
         "add_agent".to_owned()
     }
 
-    async fn handle(&self, session: &mut Session, request: Self::Request) -> Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Session,
+        request: Self::Request,
+        _: CancellationToken,
+    ) -> Result<()> {
         let agent = request;
 
         if let Err(err) = self.store.add_agent(agent).await {

@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, instrument};
 
 use crate::{
@@ -57,7 +58,11 @@ impl Session {
         Self { read, write, peer }
     }
 
-    pub(crate) async fn handle<P>(mut self, commands: &HandlerCollection<P>) -> Result<()>
+    pub(crate) async fn handle<P>(
+        mut self,
+        commands: &HandlerCollection<P>,
+        cancel: CancellationToken,
+    ) -> Result<()>
     where
         P: PermissionHandler,
     {
@@ -73,7 +78,7 @@ impl Session {
         debug!("requested command: {key}");
 
         commands
-            .handle_session(self, header)
+            .handle_session(self, header, cancel)
             .await
             .context(format!("error handling session with key {key}"))
     }

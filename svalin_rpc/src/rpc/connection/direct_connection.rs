@@ -52,6 +52,10 @@ impl ServeableConnectionBase for DirectConnection {
 
         Ok((Box::new(transport.1), Box::new(transport.0)))
     }
+
+    async fn close(&self) {
+        self.conn.close(0u32.into(), b"graceful shutdown, goodbye");
+    }
 }
 
 impl DirectConnection {

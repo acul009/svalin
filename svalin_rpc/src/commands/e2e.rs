@@ -7,6 +7,7 @@ use svalin_pki::{
     verifier::{exact::ExactVerififier, KnownCertificateVerifier},
     Certificate, PermCredentials,
 };
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 use crate::{
@@ -64,7 +65,12 @@ where
         e2e_key()
     }
 
-    async fn handle(&self, session: &mut Option<Session>, _: Self::Request) -> anyhow::Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Option<Session>,
+        _: Self::Request,
+        cancel: CancellationToken,
+    ) -> anyhow::Result<()> {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure_transport();
 
@@ -82,7 +88,7 @@ where
             // TODO: after verifying this, set the correct peer
             let session = Session::new(Box::new(read), Box::new(write), peer);
 
-            session.handle(&self.handler_collection).await
+            session.handle(&self.handler_collection, cancel).await
         } else {
             Err(anyhow!("no session given"))
         }

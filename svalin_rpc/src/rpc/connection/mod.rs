@@ -79,6 +79,8 @@ pub trait ServeableConnectionBase: ConnectionBase {
         Box<dyn SessionTransportReader>,
         Box<dyn SessionTransportWriter>,
     )>;
+
+    async fn close(&self);
 }
 
 #[async_trait]
@@ -101,6 +103,7 @@ where
         let open_sessions = TaskTracker::new();
 
         loop {
+            let cancel2 = cancel.clone();
             select! {
                 _ = cancel.cancelled() => {
                     debug!("canceling connection serve loop");
@@ -115,7 +118,7 @@ where
                             open_sessions.spawn(async move {
                                 let commands2 = commands2;
                                 let res = session
-                                    .handle(&commands2)
+                                    .handle(&commands2, cancel2)
                                     .await
                                     .context("error handling session");
                                 if let Err(e) = res {
@@ -137,6 +140,7 @@ where
                                                 }
                                             }
                                         }
+                                        // all other errors should crash, so the test fails
                                         panic!("{:?}", e);
                                     }
                                 }
@@ -153,6 +157,7 @@ where
 
         open_sessions.close();
         open_sessions.wait().await;
+        self.close().await;
         Ok(())
     }
 }

@@ -113,7 +113,8 @@ async fn integration_tests() {
         .await
         .unwrap()
         .close(Duration::from_secs(1))
-        .await;
+        .await
+        .unwrap();
 
     debug!("server closed");
 

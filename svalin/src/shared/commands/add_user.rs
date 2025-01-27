@@ -11,6 +11,7 @@ use svalin_rpc::rpc::{
     },
     session::Session,
 };
+use tokio_util::sync::CancellationToken;
 use totp_rs::TOTP;
 use tracing::{debug, error, instrument};
 
@@ -71,7 +72,12 @@ impl CommandHandler for AddUserHandler {
 
     #[must_use]
     #[instrument(skip_all)]
-    async fn handle(&self, session: &mut Session, request: Self::Request) -> anyhow::Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Session,
+        request: Self::Request,
+        _: CancellationToken,
+    ) -> anyhow::Result<()> {
         debug!("request received, performing checks");
 
         let actual_current_totp = request.totp_secret.generate_current()?;

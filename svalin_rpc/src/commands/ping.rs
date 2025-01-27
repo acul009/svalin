@@ -6,6 +6,7 @@ use crate::rpc::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 #[derive(Default)]
@@ -23,7 +24,12 @@ impl CommandHandler for PingHandler {
         ping_key()
     }
 
-    async fn handle(&self, session: &mut Session, _: Self::Request) -> anyhow::Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Session,
+        _: Self::Request,
+        _: CancellationToken,
+    ) -> anyhow::Result<()> {
         let ping: u64 = session.read_object().await?;
         session.write_object(&ping).await?;
 

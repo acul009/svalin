@@ -60,7 +60,7 @@ struct ServerConnectionData {
 pub struct Socket(Arc<dyn quinn::AsyncUdpSocket>);
 
 impl RpcServer {
-    pub fn build() -> RpcServerConfigBuilder<(), (), (), ()> {
+    pub fn build() -> RpcServerConfigBuilder<(), (), (), (), ()> {
         RpcServerConfigBuilder::new()
     }
 
@@ -79,17 +79,35 @@ impl RpcServer {
         socket: Socket,
         config: RpcServerConfig,
         command_builder: impl RpcCommandBuilder,
+        master_tracker: TaskTracker,
     ) -> Result<Arc<Self>> {
-        let server = Self::create(socket, config)?;
+        let server = Self::create(socket, config, master_tracker)?;
 
         let serve_future = server.clone().serve(command_builder.build(&server).await?);
 
         server.tasks.spawn(serve_future);
 
+        let cancel_token = server.config.cancellation_token.clone();
+        let tasks = server.tasks.clone();
+        let endpoint = server.endpoint.clone();
+
+        tokio::spawn(async move {
+            // fallback in case the close method is not called
+            cancel_token.cancelled().await;
+            tasks.close();
+            tasks.wait().await;
+
+            endpoint.close(0u32.into(), b"graceful shutdown, goodbye");
+        });
+
         Ok(server)
     }
 
-    fn create(socket: Socket, config: RpcServerConfig) -> Result<Arc<Self>> {
+    fn create(
+        socket: Socket,
+        config: RpcServerConfig,
+        master_tracker: TaskTracker,
+    ) -> Result<Arc<Self>> {
         if CryptoProvider::get_default().is_none() {
             let _ = quinn::rustls::crypto::ring::default_provider().install_default();
         }
@@ -99,6 +117,13 @@ impl RpcServer {
 
         let (br_send, _) = broadcast::channel::<ClientConnectionStatus>(10);
 
+        let tasks = TaskTracker::new();
+        let tasks2 = tasks.clone();
+
+        master_tracker.spawn(async move {
+            tasks2.wait().await;
+        });
+
         Ok(Arc::new(Self {
             endpoint,
             connection_data: Mutex::new(ServerConnectionData {
@@ -106,7 +131,7 @@ impl RpcServer {
             }),
             client_status_broadcast: br_send,
             config,
-            tasks: TaskTracker::new(),
+            tasks,
         }))
     }
 

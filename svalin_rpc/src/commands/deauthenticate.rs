@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 use crate::{
@@ -45,7 +46,12 @@ where
         deauth_key()
     }
 
-    async fn handle(&self, session: &mut Option<Session>, _request: Self::Request) -> Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Option<Session>,
+        _request: Self::Request,
+        cancel: CancellationToken,
+    ) -> Result<()> {
         if let Some(session) = session.take() {
             let (read, write, _) = session.destructure_transport();
 
@@ -53,7 +59,7 @@ where
 
             debug!("session deauthenticated, handing to next handler");
 
-            session2.handle(&self.handler_collection).await
+            session2.handle(&self.handler_collection, cancel).await
         } else {
             Err(anyhow!("Handler is missing the required session"))
         }

@@ -14,6 +14,7 @@ use svalin_rpc::{
     verifiers::skip_verify::SkipClientVerification,
 };
 use tokio::sync::oneshot;
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 use super::{AgentInitPayload, ServerJoinManager};
@@ -40,7 +41,12 @@ impl TakeableCommandHandler for JoinRequestHandler {
         "join_request".to_string()
     }
 
-    async fn handle(&self, session: &mut Option<Session>, _: Self::Request) -> Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Option<Session>,
+        _: Self::Request,
+        _: CancellationToken,
+    ) -> Result<()> {
         if let Some(mut session) = session.take() {
             let mut join_code = create_join_code();
             while let Err(sess) = self.manager.add_session(join_code, session).await {

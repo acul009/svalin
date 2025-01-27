@@ -5,6 +5,7 @@ use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::Session,
 };
+use tokio_util::sync::CancellationToken;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum PublicStatus {
@@ -31,7 +32,12 @@ impl CommandHandler for PublicStatusHandler {
     }
 
     #[must_use]
-    async fn handle(&self, session: &mut Session, _: Self::Request) -> anyhow::Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Session,
+        _: Self::Request,
+        _: CancellationToken,
+    ) -> anyhow::Result<()> {
         session.write_object(&self.current_status).await?;
         Ok(())
     }

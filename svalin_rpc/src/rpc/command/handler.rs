@@ -4,6 +4,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::{RwLock, RwLockWriteGuard};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     permissions::PermissionHandler,
@@ -17,7 +18,12 @@ pub trait CommandHandler: Sync + Send {
     type Request: Send + Serialize + DeserializeOwned;
 
     fn key() -> String;
-    async fn handle(&self, session: &mut Session, request: Self::Request) -> Result<()>;
+    async fn handle(
+        &self,
+        session: &mut Session,
+        request: Self::Request,
+        cancel: CancellationToken,
+    ) -> Result<()>;
 }
 
 /// Some handlers may require taking ownership of the session.
@@ -28,7 +34,12 @@ pub trait TakeableCommandHandler: Sync + Send {
     type Request: Send + Serialize + DeserializeOwned;
 
     fn key() -> String;
-    async fn handle(&self, session: &mut Option<Session>, request: Self::Request) -> Result<()>;
+    async fn handle(
+        &self,
+        session: &mut Option<Session>,
+        request: Self::Request,
+        cancel: CancellationToken,
+    ) -> Result<()>;
 }
 
 #[async_trait]
@@ -42,9 +53,14 @@ where
         Self::key()
     }
 
-    async fn handle(&self, session: &mut Option<Session>, request: Self::Request) -> Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Option<Session>,
+        request: Self::Request,
+        cancel: CancellationToken,
+    ) -> Result<()> {
         if let Some(session) = session {
-            self.handle(session, request).await
+            self.handle(session, request, cancel).await
         } else {
             Err(anyhow!("tried executing commandhandler with None"))
         }
@@ -58,7 +74,12 @@ pub trait HandlerPermissionWrapper<P>: Send + Sync
 where
     P: PermissionHandler,
 {
-    async fn handle_with_permission(&self, session: Session, permission_handler: &P) -> Result<()>;
+    async fn handle_with_permission(
+        &self,
+        session: Session,
+        permission_handler: &P,
+        cancel: CancellationToken,
+    ) -> Result<()>;
 }
 
 /// This struct is used as a basis to enable conversion to a permission.
@@ -87,6 +108,7 @@ where
         &self,
         mut session: Session,
         permission_handler: &P,
+        cancel: CancellationToken,
     ) -> Result<()> {
         let request: H::Request = session.read_object().await?;
 
@@ -113,7 +135,7 @@ where
 
         let mut opt = Some(session);
 
-        let handle_error = self.handle(&mut opt, request).await;
+        let handle_error = self.handle(&mut opt, request, cancel).await;
 
         if let Some(session) = opt {
             // Todo: handle error somehow?
@@ -172,10 +194,11 @@ where
         &self,
         mut session: Session,
         request_header: SessionRequestHeader,
+        cancel: CancellationToken,
     ) -> Result<()> {
         if let Some(handler) = self.commands.read().await.get(&request_header.command_key) {
             handler
-                .handle_with_permission(session, &self.permission_handler)
+                .handle_with_permission(session, &self.permission_handler, cancel)
                 .await
         } else {
             session

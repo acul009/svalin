@@ -2,7 +2,6 @@ use std::{pin::pin, time::Duration};
 
 use anyhow::Result;
 use async_trait::async_trait;
-use futures::{select, FutureExt};
 use svalin_rpc::rpc::{
     command::{
         dispatcher::CommandDispatcher,
@@ -11,7 +10,11 @@ use svalin_rpc::rpc::{
     session::Session,
 };
 use svalin_sysctl::realtime::RealtimeStatus;
-use tokio::sync::{oneshot, watch};
+use tokio::{
+    select,
+    sync::{oneshot, watch},
+};
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 use crate::{client::device::RemoteLiveData, permissions::Permission};
@@ -33,22 +36,33 @@ impl CommandHandler for RealtimeStatusHandler {
         "realtime-status".into()
     }
 
-    async fn handle(&self, session: &mut Session, _: Self::Request) -> Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Session,
+        _: Self::Request,
+        cancel: CancellationToken,
+    ) -> Result<()> {
         debug!("realtime status requested");
         loop {
             let status = RealtimeStatus::get().await;
             debug!("sending realtime status");
             debug!("cpu: {:?}", status.cpu);
+
             session.write_object(&status).await?;
 
-            tokio::time::sleep(Duration::from_secs(2)).await;
+            select! {
+                _ = cancel.cancelled() => {
+                    return Ok(());
+                }
+                _ = tokio::time::sleep(Duration::from_secs(2)) => {},
+            }
         }
     }
 }
 
 pub struct SubscribeRealtimeStatus {
     pub send: watch::Sender<RemoteLiveData<RealtimeStatus>>,
-    pub stop: oneshot::Receiver<()>,
+    pub cancel: CancellationToken,
 }
 
 #[async_trait]
@@ -65,13 +79,12 @@ impl CommandDispatcher for SubscribeRealtimeStatus {
     }
 
     async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<()> {
-        let mut stop = pin!(self.stop.fuse());
         loop {
             select! {
-                _ = stop => {
+                _ = self.cancel.cancelled() => {
                     return Ok(());
                 },
-                status  = session.read_object::<RealtimeStatus>().fuse() => {
+                status  = session.read_object::<RealtimeStatus>() => {
                     match status {
                         Ok(status) => {
                             debug!("received realtime status");

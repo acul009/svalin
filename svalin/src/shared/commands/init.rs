@@ -7,6 +7,7 @@ use svalin_rpc::rpc::{
     session::Session,
 };
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 pub(crate) struct InitHandler {
@@ -23,7 +24,12 @@ impl InitHandler {
 impl CommandHandler for InitHandler {
     type Request = Certificate;
 
-    async fn handle(&self, session: &mut Session, request: Self::Request) -> anyhow::Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Session,
+        request: Self::Request,
+        _: CancellationToken,
+    ) -> anyhow::Result<()> {
         debug!("incoming init request");
 
         if self.channel.is_closed() {

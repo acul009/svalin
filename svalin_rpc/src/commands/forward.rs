@@ -13,6 +13,8 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
 use tokio::io::AsyncWriteExt;
+use tokio::select;
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 fn forward_key() -> String {
@@ -57,7 +59,12 @@ impl CommandHandler for ForwardHandler {
     }
 
     #[must_use]
-    async fn handle(&self, session: &mut Session, target: Self::Request) -> anyhow::Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Session,
+        target: Self::Request,
+        cancel: CancellationToken,
+    ) -> anyhow::Result<()> {
         debug!("client requesting forward");
 
         debug!("received forward request to {:?}", target);
@@ -78,6 +85,13 @@ impl CommandHandler for ForwardHandler {
                     let mut transport2 = CombinedTransport::new(read2, write2);
 
                     tokio::io::copy_bidirectional(&mut transport1, &mut transport2).await?;
+
+                    select! {
+                        result = tokio::io::copy_bidirectional(&mut transport1, &mut transport2) => {
+                            result?;
+                        }
+                        _ = cancel.cancelled() => {}
+                    }
 
                     let _ = transport1.shutdown().await;
                     let _ = transport2.shutdown().await;

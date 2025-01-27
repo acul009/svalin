@@ -24,9 +24,9 @@ use tracing::{debug, error};
 
 use crate::{
     shared::commands::{
-            init::InitHandler,
-            public_server_status::{PublicStatus, PublicStatusHandler},
-        },
+        init::InitHandler,
+        public_server_status::{PublicStatus, PublicStatusHandler},
+    },
     verifier::{
         server_storage_verifier::ServerStorageVerifier, tls_optional_wrapper::TlsOptionalWrapper,
         verification_helper::VerificationHelper,
@@ -144,19 +144,18 @@ impl Server {
             agent_store: agent_store,
         };
 
+        let tasks = TaskTracker::new();
+
         let rpc = RpcServer::build()
             .credentials(credentials.clone())
             .client_cert_verifier(verifier)
             .cancellation_token(config.cancelation_token.clone())
             .commands(command_builder)
+            .task_tracker(tasks.clone())
             .start_server(socket)
             .await?;
 
-        Ok(Self {
-            config,
-            rpc,
-            tasks: TaskTracker::new(),
-        })
+        Ok(Self { config, rpc, tasks })
     }
 
     fn get_encryption_key(scope: &marmelade::Scope) -> Result<Vec<u8>> {
@@ -210,6 +209,7 @@ impl Server {
             .cancellation_token(cancel)
             .client_cert_verifier(SkipClientVerification::new())
             .commands(commands)
+            .task_tracker(TaskTracker::new())
             .start_server(socket)
             .await?;
 
@@ -230,6 +230,7 @@ impl Server {
         self.config.cancelation_token.cancel();
         let result1 = self.rpc.close(timeout_duration).await;
 
+        self.tasks.close();
         let result2 = timeout(timeout_duration, self.tasks.wait()).await;
 
         match result1 {

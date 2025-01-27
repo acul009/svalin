@@ -2,7 +2,7 @@ use std::{net::ToSocketAddrs, panic, process, time::Duration};
 
 use test_log::test;
 use tls_test_command::{TlsTest, TlsTestCommandHandler};
-use tokio_util::sync::CancellationToken;
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::debug;
 
 mod tls_test_command;
@@ -43,6 +43,7 @@ async fn ping_test() {
         .commands(commands)
         .client_cert_verifier(SkipClientVerification::new())
         .cancellation_token(CancellationToken::new())
+        .task_tracker(TaskTracker::new())
         .start_server(socket)
         .await
         .unwrap();
@@ -93,6 +94,7 @@ async fn tls_test() {
         .commands(commands)
         .client_cert_verifier(SkipClientVerification::new())
         .cancellation_token(CancellationToken::new())
+        .task_tracker(TaskTracker::new())
         .start_server(socket)
         .await
         .unwrap();
@@ -137,6 +139,7 @@ async fn perm_test() {
         .commands(commands)
         .client_cert_verifier(SkipClientVerification::new())
         .cancellation_token(CancellationToken::new())
+        .task_tracker(TaskTracker::new())
         .start_server(socket)
         .await
         .unwrap();

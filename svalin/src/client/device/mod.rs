@@ -7,6 +7,7 @@ use svalin_rpc::{
 };
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::{oneshot, watch};
+use tokio_util::sync::CancellationToken;
 use tracing::error;
 
 use crate::shared::{
@@ -127,14 +128,14 @@ impl Device {
 
 pub struct RealtimeStatusWatchHandler {
     connection: ForwardConnection<DirectConnection>,
-    stop: Option<oneshot::Sender<()>>,
+    cancel: Option<CancellationToken>,
 }
 
 impl RealtimeStatusWatchHandler {
     fn new(connection: ForwardConnection<DirectConnection>) -> Self {
         Self {
             connection,
-            stop: None,
+            cancel: None,
         }
     }
 }
@@ -145,20 +146,15 @@ impl lazy_watch::Handler for RealtimeStatusWatchHandler {
     fn start(&mut self, send: &watch::Sender<Self::T>) {
         let connection = self.connection.clone();
         let _ = send.send(RemoteLiveData::Pending);
-        let (stop_send, stop_recv) = oneshot::channel();
-        self.stop = Some(stop_send);
+        let cancel = CancellationToken::new();
+        self.cancel = Some(cancel.clone());
         let send = send.clone();
 
         tokio::spawn(async move {
-            let mut stop_recv = stop_recv;
-            if stop_recv.try_recv().is_ok() {
-                return;
-            }
-
             if let Err(err) = connection
                 .dispatch(SubscribeRealtimeStatus {
                     send: send.clone(),
-                    stop: stop_recv,
+                    cancel: cancel,
                 })
                 .await
             {
@@ -169,8 +165,8 @@ impl lazy_watch::Handler for RealtimeStatusWatchHandler {
     }
 
     fn stop(&mut self) {
-        if let Some(channel) = self.stop.take() {
-            let _ = channel.send(());
+        if let Some(cancel) = self.cancel.take() {
+            cancel.cancel();
         }
     }
 }

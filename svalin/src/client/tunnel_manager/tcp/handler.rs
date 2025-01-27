@@ -9,8 +9,13 @@ use svalin_rpc::{
     transport::combined_transport::CombinedTransport,
 };
 use thiserror::Error;
-use tokio::{io::copy_bidirectional, net::TcpStream};
-use tracing::debug;
+use tokio::{
+    io::{copy_bidirectional, AsyncWriteExt},
+    net::TcpStream,
+    select,
+};
+use tokio_util::sync::CancellationToken;
+use tracing::{debug, error};
 
 use crate::permissions::Permission;
 
@@ -37,7 +42,12 @@ impl CommandHandler for TcpForwardHandler {
         "tcp_forward".to_string()
     }
 
-    async fn handle(&self, session: &mut Session, request: Self::Request) -> Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Session,
+        request: Self::Request,
+        cancel: CancellationToken,
+    ) -> Result<()> {
         debug!("incoming tcp_forward request: {request}");
         let stream = TcpStream::connect(request).await;
 
@@ -61,7 +71,21 @@ impl CommandHandler for TcpForwardHandler {
 
                 debug!("copying!");
 
-                copy_bidirectional(&mut transport, &mut stream).await?;
+                select! {
+                    _ = cancel.cancelled() => {
+
+                    }
+                    result = copy_bidirectional(&mut stream, &mut transport) => {
+                        result?;
+                    }
+                }
+
+                if let Err(err) = stream.shutdown().await {
+                    error!("error shutting down stream: {err}");
+                }
+                if let Err(err) = transport.shutdown().await {
+                    error!("error shutting down transport: {err}");
+                }
 
                 Ok(())
             }

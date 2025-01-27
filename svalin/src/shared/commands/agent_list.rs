@@ -20,6 +20,7 @@ use svalin_rpc::{
     },
 };
 use tokio::{select, sync::watch};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     client::{device::Device, tunnel_manager::TunnelManager},
@@ -68,7 +69,12 @@ impl CommandHandler for AgentListHandler {
         "agent_list".into()
     }
 
-    async fn handle(&self, session: &mut Session, _: Self::Request) -> Result<()> {
+    async fn handle(
+        &self,
+        session: &mut Session,
+        _: Self::Request,
+        cancel: CancellationToken,
+    ) -> Result<()> {
         let mut receiver = self.server.subscribe_to_connection_status();
         let currently_online = self.server.get_current_connected_clients().await;
 
@@ -88,6 +94,7 @@ impl CommandHandler for AgentListHandler {
 
         loop {
             select! {
+                _ = cancel.cancelled() => return Ok(()),
                 online_update = receiver.recv() => {
                     let online_update = online_update?;
 
