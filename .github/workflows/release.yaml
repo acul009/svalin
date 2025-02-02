@@ -11,8 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: cargo-bins/cargo-binstall@main
       - name: install cargo-deb
-        run: cargo install cargo-deb
+        run: cargo binstall cargo-deb
       - name: compile svalin and svalin-iced
         run: cargo build --release --bins
       - name: build debian package
