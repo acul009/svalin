@@ -11,8 +11,7 @@ use tokio::{sync::watch, task::JoinSet};
 use tracing::{debug, error};
 
 use crate::{
-    client::tunnel_manager::{TunnelManager},
-    shared::commands::agent_list::UpdateAgentList,
+    client::tunnel_manager::TunnelManager, shared::commands::agent_list::UpdateAgentList,
     verifier::upstream_verifier::UpstreamVerifier,
 };
 

@@ -6,7 +6,7 @@ use svalin_rpc::{
     rpc::connection::{direct_connection::DirectConnection, Connection},
 };
 use svalin_sysctl::realtime::RealtimeStatus;
-use tokio::sync::{oneshot, watch};
+use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 
