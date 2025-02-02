@@ -1,0 +1,29 @@
+name: build and publish release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: install cargo-deb
+        run: cargo install cargo-deb
+      - name: compile svalin and svalin-iced
+        run: cargo build --release --bins
+      - name: build debian package
+        run: cargo deb --package svalin --manifest-path svalin/Cargo.toml --no-build
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            target/release/svalin
+            target/release/svalin_iced
+            target/debian/*.deb
+          prerelease: true
