@@ -18,7 +18,8 @@ jobs:
       - name: install cargo-deb
         run: cargo install cargo-deb
       - name: build debian package
-        run: cargo-deb --package svalin --manifest-path svalin/Cargo.toml --no-build
+        run: cargo-deb --package svalin --manifest-path svalin/Cargo.toml --no-build --no-build 
+-o target/debian/svalin.deb
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
