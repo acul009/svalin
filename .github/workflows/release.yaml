@@ -13,13 +13,10 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           rustflags: ""
-      - uses: cargo-bins/cargo-binstall@main
-      - name: install cargo-deb
-        run: cargo binstall cargo-deb
       - name: compile svalin and svalin-iced
         run: cargo build --release --bins
       - name: build debian package
-        run: cargo deb --package svalin --manifest-path svalin/Cargo.toml --no-build
+        run: cargo-deb --package svalin --manifest-path svalin/Cargo.toml --no-build
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
