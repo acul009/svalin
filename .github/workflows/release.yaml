@@ -27,3 +27,16 @@ jobs:
             target/release/svalin_iced
             target/debian/*.deb
           prerelease: true
+      - name: Build Docker Image
+        run: docker build -t svalin:${{ github.ref_name }} .
+      - name: Tag Docker as latest
+        run: docker tag svalin:${{ github.ref_name }} svalin:latest
+        if: ${{ ! endsWith(github.ref_name, 'beta') && ! endsWith(github.ref_name, 'alpha') }}
+      - name: Tag Docker as beta
+        run: docker tag svalin:${{ github.ref_name }} svalin:beta
+        if: endsWith(github.ref_name, 'beta')
+      - name: Tag Docker as alpha
+        run: docker tag svalin:${{ github.ref_name }} svalin:alpha
+        if: endsWith(github.ref_name, 'alpha')
+      - name: Push Docker Image
+        
