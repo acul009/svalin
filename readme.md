@@ -105,14 +105,22 @@ TLDR: Rustdesk is primarily a remote software while Svalin is more similar to a 
 
 WIP - this isn't really complete yet.
 
+Pre-Flight-Checklist:
+- [X] add graceful shutdown
+- [X] create a debian package
+- [X] create a docker image
+- [ ] add logic for login ( don't forget fake hashing parameters )
+- [ ] add remote terminal
+
 Svalin currently has 2 executables:
 - svalin
   This can run both the server and the agent.
 - svalin_iced
   This is the client with a GUI written in iced.
 
-I'm currently working on both a debian package as well as a docker image for the main executable.
-Before I can publish them, I need to finish the shutdown logic and figure out a publishing scheme for my CI.
+Right now there are both a debian package as well as a docker image for the main executable.
+
+You'll find the executables and packages under the Releases section.
 
 > [!Note]
 > While you could run the agent in a docker container, it's obviously not meant to.
