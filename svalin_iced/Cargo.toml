@@ -1,7 +1,7 @@
 [package]
 name = "svalin_iced"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 
@@ -10,6 +10,8 @@ svalin_pki = { path = "../svalin_pki" }
 svalin_rpc = { path = "../svalin_rpc" }
 svalin_sysctl = { path = "../svalin_sysctl" }
 svalin_macros = { path = "../svalin_macros" }
+
+frozen_term = { path = "../frozen_term" }
 
 anyhow = "1.0.95"
 futures-util = "0.3.31"

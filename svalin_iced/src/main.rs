@@ -14,19 +14,10 @@ type Element<'a, Message> = iced::Element<'a, Message, crate::Theme>;
 fn main() {
     svalin::tracing_subscriber::fmt::init();
 
-    iced::application(Title, UI::update, UI::view)
+    iced::daemon(UI::title, UI::update, UI::view)
         .subscription(UI::subscription)
-        .theme(|_| iced::Theme::Dark)
+        .theme(|_, _| iced::Theme::Dark)
         .antialiasing(true)
-        .centered()
         .run_with(UI::start)
         .unwrap();
-}
-
-struct Title;
-
-impl application::Title<UI> for Title {
-    fn title(&self, _state: &UI) -> String {
-        t!("app-title").to_string()
-    }
 }

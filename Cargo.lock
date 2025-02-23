@@ -5252,6 +5252,7 @@ name = "svalin_iced"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "frozen_term",
  "futures",
  "futures-util",
  "iced",
