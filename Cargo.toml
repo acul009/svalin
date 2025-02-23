@@ -3,6 +3,8 @@
 resolver = "2"
 
 members = [
+    "frostbyte_term",
+    "frozen_term",
     "marmelade",
     "svalin",
     "svalin_macros",
