@@ -178,7 +178,7 @@ impl SubScreen for AddDevice {
 
                 text_input::focus("device-name").into()
             }
-            Message::Exit => unreachable!(),
+            Message::Exit => Action::instruction(Instruction::Exit),
         }
     }
 

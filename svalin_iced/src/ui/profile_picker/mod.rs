@@ -227,7 +227,7 @@ impl SubScreen for ProfilePicker {
             Message::Login(_login) => {
                 todo!()
             }
-            Message::Profile(_) => unreachable!(),
+            Message::Profile(client) => Action::instruction(Instruction::OpenProfile(client)),
         }
     }
 

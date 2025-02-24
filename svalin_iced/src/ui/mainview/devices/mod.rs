@@ -118,7 +118,7 @@ impl SubScreen for Devices {
                 self.state = State::List;
                 Action::none()
             }
-            Message::OpenTunnelGui => unreachable!(),
+            Message::OpenTunnelGui => Action::instruction(Instruction::OpenTunnelGui),
         }
     }
 
