@@ -2,10 +2,13 @@ use iced::{Subscription, Task};
 
 use crate::Element;
 
+use super::action::Action;
+
 pub trait SubScreen {
+    type Instruction;
     type Message;
 
-    fn update(&mut self, message: Self::Message) -> Task<Self::Message>;
+    fn update(&mut self, message: Self::Message) -> Action<Self::Instruction, Self::Message>;
 
     fn view(&self) -> Element<Self::Message>;
 

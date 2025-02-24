@@ -1,34 +1,32 @@
 use std::{collections::HashMap, sync::Arc};
 
 use iced::{
+    Color, Length, Padding, Shadow, Vector,
     advanced::graphics::futures::subscription,
     alignment::{Horizontal, Vertical},
     border,
     widget::{button, column, container, row, text},
-    Color, Length, Padding, Shadow, Task, Vector,
 };
 use svalin::{
     client::{
-        tunnel_manager::{Tunnel, TunnelConfig},
         Client,
+        tunnel_manager::{Tunnel, TunnelConfig},
     },
     shared::commands::agent_list::AgentListItem,
 };
 use svalin_pki::Certificate;
 use uuid::Uuid;
 
-use crate::{ui::screen::SubScreen, util::watch_recipe::WatchRecipe, Element};
+use crate::{
+    Element,
+    ui::{action::Action, screen::SubScreen},
+    util::watch_recipe::WatchRecipe,
+};
 
 #[derive(Debug, Clone)]
 pub enum Message {
     Refresh,
     CloseTunnel(Uuid),
-}
-
-impl From<Message> for super::Message {
-    fn from(value: Message) -> Self {
-        Self::Tunnel(value)
-    }
 }
 
 pub struct TunnelUi {
@@ -107,17 +105,18 @@ impl TunnelUi {
 }
 
 impl SubScreen for TunnelUi {
+    type Instruction = ();
     type Message = Message;
 
-    fn update(&mut self, message: Self::Message) -> iced::Task<Self::Message> {
+    fn update(&mut self, message: Self::Message) -> Action<(), Message> {
         match message {
             Message::Refresh => {
                 self.refresh();
-                Task::none()
+                Action::none()
             }
             Message::CloseTunnel(id) => {
                 self.client.tunnel_manager().close_tunnel(&id);
-                Task::none()
+                Action::none()
             }
         }
     }

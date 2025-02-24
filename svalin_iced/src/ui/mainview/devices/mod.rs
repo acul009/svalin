@@ -3,16 +3,16 @@ use std::{collections::BTreeMap, sync::Arc};
 use add_device::AddDevice;
 use device_view::DeviceView;
 use iced::{
+    Color, Length, Task,
     advanced::subscription::from_recipe,
     alignment::Vertical,
     widget::{button, column, container, row, stack, text},
-    Color, Length, Task,
 };
-use svalin::client::{device::Device, Client};
+use svalin::client::{Client, device::Device};
 use svalin_pki::Certificate;
 
 use crate::{
-    ui::{screen::SubScreen, MapOpt},
+    ui::{MapOpt, action::Action, screen::SubScreen},
     util::watch_recipe::WatchRecipe,
 };
 
@@ -29,13 +29,8 @@ pub enum Message {
     OpenTunnelGui,
 }
 
-impl From<Message> for super::Message {
-    fn from(value: Message) -> Self {
-        match value {
-            Message::OpenTunnelGui => Self::Context(super::Context::Tunnel),
-            message => Self::Devices(message),
-        }
-    }
+pub enum Instruction {
+    OpenTunnelGui,
 }
 
 pub enum State {
@@ -70,33 +65,58 @@ impl Devices {
 }
 
 impl SubScreen for Devices {
+    type Instruction = Instruction;
     type Message = Message;
 
-    fn update(&mut self, message: Self::Message) -> Task<Self::Message> {
+    fn update(&mut self, message: Self::Message) -> Action<Instruction, Message> {
         match message {
             Message::AddDevice(message) => match &mut self.state {
-                State::AddDevice(add_device) => add_device.update(message).map(Into::into),
-                _ => Task::none(),
+                State::AddDevice(add_device) => {
+                    let action = add_device.update(message).map(Message::AddDevice);
+
+                    match action.instruction {
+                        Some(add_device::Instruction::Exit) => {
+                            self.state = State::List;
+                        }
+                        None => (),
+                    };
+
+                    action.strip_instruction()
+                }
+                _ => Action::none(),
             },
             Message::NewDevice => {
                 let (add_device, task) = AddDevice::start(self.client.clone());
 
                 self.state = State::AddDevice(add_device);
-                task.map(Into::into)
+                task.map(Message::AddDevice).into()
             }
             Message::DeviceView(message) => match &mut self.state {
-                State::DeviceView(device_view) => device_view.update(message).map(Into::into),
-                _ => Task::none(),
+                State::DeviceView(device_view) => {
+                    let action = device_view.update(message).map(Message::DeviceView);
+
+                    match action.instruction {
+                        Some(device_view::Instruction::Back) => {
+                            self.state = State::List;
+                            Action::none()
+                        }
+                        Some(device_view::Instruction::OpenTunnelGui) => {
+                            action.with_instruction(Instruction::OpenTunnelGui)
+                        }
+                        None => Action::none(),
+                    }
+                }
+                _ => Action::none(),
             },
             Message::ShowDevice(device) => {
                 let (device_view, task) = DeviceView::start(device);
 
                 self.state = State::DeviceView(device_view);
-                task.map(Into::into)
+                task.map(Message::DeviceView).into()
             }
             Message::ShowList => {
                 self.state = State::List;
-                Task::none()
+                Action::none()
             }
             Message::OpenTunnelGui => unreachable!(),
         }
@@ -104,8 +124,8 @@ impl SubScreen for Devices {
 
     fn view(&self) -> crate::Element<Self::Message> {
         match &self.state {
-            State::AddDevice(add_device) => add_device.view().map(Into::into),
-            State::DeviceView(device_view) => device_view.view().map(Into::into),
+            State::AddDevice(add_device) => add_device.view().map(Message::AddDevice),
+            State::DeviceView(device_view) => device_view.view().map(Message::DeviceView),
             State::List => stack![
                 container(
                     button(text(t!("device_list.add")))
@@ -151,24 +171,24 @@ impl SubScreen for Devices {
 
     fn header(&self) -> Option<crate::Element<Self::Message>> {
         match &self.state {
-            State::AddDevice(add_device) => add_device.header().mapopt(Into::into),
-            State::DeviceView(device_view) => device_view.header().mapopt(Into::into),
+            State::AddDevice(add_device) => add_device.header().mapopt(Message::AddDevice),
+            State::DeviceView(device_view) => device_view.header().mapopt(Message::DeviceView),
             State::List => None,
         }
     }
 
     fn subscription(&self) -> iced::Subscription<Self::Message> {
         match &self.state {
-            State::AddDevice(add_device) => add_device.subscription().map(Into::into),
-            State::DeviceView(device_view) => device_view.subscription().map(Into::into),
+            State::AddDevice(add_device) => add_device.subscription().map(Message::AddDevice),
+            State::DeviceView(device_view) => device_view.subscription().map(Message::DeviceView),
             State::List => from_recipe(self.recipe.clone()),
         }
     }
 
     fn dialog(&self) -> Option<crate::Element<Self::Message>> {
         match &self.state {
-            State::AddDevice(add_device) => add_device.dialog().mapopt(Into::into),
-            State::DeviceView(device_view) => device_view.dialog().mapopt(Into::into),
+            State::AddDevice(add_device) => add_device.dialog().mapopt(Message::AddDevice),
+            State::DeviceView(device_view) => device_view.dialog().mapopt(Message::DeviceView),
             State::List => None,
         }
     }

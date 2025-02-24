@@ -1,16 +1,16 @@
 use std::{fmt::Display, sync::Arc, vec};
 
 use iced::{
-    widget::{button, combo_box, container, row, text, text_input},
     Task,
+    widget::{button, combo_box, container, row, text, text_input},
 };
 use iced_aw::{card, number_input};
 use svalin::client::{
     device::Device,
-    tunnel_manager::{tcp::TcpTunnelConfig, TunnelConfig, TunnelCreateError},
+    tunnel_manager::{TunnelConfig, TunnelCreateError, tcp::TcpTunnelConfig},
 };
 
-use crate::ui::{screen::SubScreen, types::error_display_info::ErrorDisplayInfo};
+use crate::ui::{action::Action, screen::SubScreen, types::error_display_info::ErrorDisplayInfo};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -21,16 +21,10 @@ pub enum Message {
     CloseError,
     OpenTunnel,
     OpenTunnelGui,
-    Noop,
 }
 
-impl From<Message> for super::Message {
-    fn from(message: Message) -> Self {
-        match message {
-            Message::OpenTunnelGui => Self::OpenTunnelGui,
-            message => Self::TunnelOpener(message),
-        }
-    }
+pub enum Instruction {
+    OpenTunnelGui,
 }
 
 impl From<&TunnelConfig> for &TunnelType {
@@ -71,32 +65,36 @@ pub struct TunnelOpener {
 
 impl TunnelOpener {
     pub fn new(device: Device) -> Self {
-        let config = TunnelConfig::Tcp(TcpTunnelConfig {
-            local_port: 8080,
-            remote_host: String::new(),
-        });
-
         Self {
             device,
             tunnel_types: combo_box::State::new(vec![TunnelType::TCP]),
-            config: Some(config),
+            config: None,
             error: None,
         }
     }
 }
 
 impl SubScreen for TunnelOpener {
+    type Instruction = Instruction;
     type Message = Message;
 
-    fn update(&mut self, message: Self::Message) -> iced::Task<Self::Message> {
+    fn update(&mut self, message: Self::Message) -> Action<Instruction, Message> {
         match message {
             Message::TunnelType(tunnel_type) => {
                 if let Some(config) = &self.config {
                     if tunnel_type == config.into() {
-                        return Task::none();
+                        return Action::none();
                     }
                 }
-                Task::none()
+
+                self.config = match tunnel_type {
+                    TunnelType::TCP => Some(TunnelConfig::Tcp(TcpTunnelConfig {
+                        local_port: 8080,
+                        remote_host: String::new(),
+                    })),
+                };
+
+                Action::none()
             }
             Message::LocalPort(port) => {
                 match &mut self.config {
@@ -105,7 +103,7 @@ impl SubScreen for TunnelOpener {
                     }
                     None => (),
                 }
-                Task::none()
+                Action::none()
             }
             Message::RemoteHost(host) => {
                 match &mut self.config {
@@ -114,7 +112,7 @@ impl SubScreen for TunnelOpener {
                     }
                     None => (),
                 }
-                Task::none()
+                Action::none()
             }
             Message::OpenTunnel => {
                 if let Some(config) = &self.config {
@@ -129,20 +127,20 @@ impl SubScreen for TunnelOpener {
                             )),
                         }
                     })
+                    .into()
                 } else {
-                    Task::none()
+                    Action::none()
                 }
             }
             Message::Error(info) => {
                 self.error = Some(info);
-                Task::none()
+                Action::none()
             }
             Message::CloseError => {
                 self.error = None;
-                Task::none()
+                Action::none()
             }
-            Message::Noop => Task::none(),
-            Message::OpenTunnelGui => unreachable!(),
+            Message::OpenTunnelGui => Action::instruction(Instruction::OpenTunnelGui),
         }
     }
 

@@ -1,20 +1,16 @@
 use futures_util::SinkExt;
-use iced::{stream::channel, widget::column, Subscription, Task};
+use iced::{Subscription, Task, stream::channel, widget::column};
 use svalin::client::device::{Device, RemoteLiveData};
 use svalin_sysctl::realtime::RealtimeStatus;
 
-use crate::ui::{screen::SubScreen, widgets::realtime};
+use crate::ui::{action::Action, screen::SubScreen, widgets::realtime};
 
 #[derive(Debug, Clone)]
 pub enum Message {
     Realtime(RemoteLiveData<RealtimeStatus>),
 }
 
-impl From<Message> for super::Message {
-    fn from(message: Message) -> Self {
-        Self::Status(message)
-    }
-}
+pub enum Instruction {}
 
 pub struct DeviceStatus {
     device: Device,
@@ -34,13 +30,14 @@ impl DeviceStatus {
 }
 
 impl SubScreen for DeviceStatus {
+    type Instruction = Instruction;
     type Message = Message;
 
-    fn update(&mut self, message: Self::Message) -> Task<Self::Message> {
+    fn update(&mut self, message: Self::Message) -> Action<Instruction, Message> {
         match message {
             Message::Realtime(remote_live_data) => {
                 self.realtime = remote_live_data;
-                Task::none()
+                Action::none()
             }
         }
     }

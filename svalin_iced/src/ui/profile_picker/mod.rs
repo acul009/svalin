@@ -2,14 +2,15 @@ use std::sync::Arc;
 
 use crate::Element;
 use iced::{
+    Length, Task,
     alignment::Vertical,
     widget::{button, column, container, row, stack, text, text_input},
-    Length, Task,
 };
 use init_server::InitServer;
 use svalin::client::{Client, FirstConnect, Init, Login};
 
 use super::{
+    action::Action,
     screen::SubScreen,
     types::error_display_info::ErrorDisplayInfo,
     widgets::{dialog, form, loading},
@@ -49,10 +50,8 @@ pub enum Message {
     Profile(Arc<Client>),
 }
 
-impl From<Message> for super::Message {
-    fn from(value: Message) -> Self {
-        Self::ProfilePicker(value)
-    }
+pub enum Instruction {
+    OpenProfile(Arc<Client>),
 }
 
 #[derive(Debug, Clone)]
@@ -62,6 +61,16 @@ pub enum Input {
 }
 
 impl Input {
+    /// ***********  ✨ Codeium Command ⭐  ************
+    /// Updates the state of the `ProfilePicker` based on the input provided.
+    ///
+    /// - If the current state is `State::AddProfile`, updates the host with the
+    ///   new host value from the input.
+    /// - If the current state is `State::UnlockProfile`, updates the password
+    ///   with the new password value from the input.
+    /// - Returns a `Task` that performs no additional actions.
+
+    /// ****  90b3bd9a-7dc8-46fa-acd6-e8e465dfa8cd  ******
     fn update(self, state: &mut ProfilePicker) -> Task<Message> {
         match &mut state.state {
             State::AddProfile { host } => {
@@ -90,33 +99,54 @@ impl ProfilePicker {
             Task::done(Message::Reset),
         )
     }
+
+    fn add_profile(&mut self, host: String) {
+        self.state = State::AddProfile { host };
+    }
 }
 
 impl SubScreen for ProfilePicker {
     type Message = Message;
+    type Instruction = Instruction;
 
-    fn update(&mut self, message: Message) -> Task<Message> {
+    fn update(&mut self, message: Message) -> Action<Instruction, Message> {
         match message {
             Message::InitServer(message) => {
                 if let State::InitServer(init_server) = &mut self.state {
-                    return init_server.update(message).map(Into::into);
+                    let mut action: Action<init_server::Instruction, Message> =
+                        init_server.update(message).map(Message::InitServer);
+
+                    if let Some(instruction) = action.instruction.take() {
+                        match instruction {
+                            init_server::Instruction::OpenProfile(client) => {
+                                return action.with_instruction(Instruction::OpenProfile(client));
+                            }
+                            init_server::Instruction::Exit(host) => {
+                                self.add_profile(host);
+                            }
+                        }
+                    };
+
+                    action.strip_instruction()
+                } else {
+                    Action::none()
                 }
-                Task::none()
             }
             Message::Error(display_info) => {
                 self.state = State::Error(display_info);
-                Task::none()
+                Action::none()
             }
-            Message::Input(input) => input.update(self),
+            Message::Input(input) => input.update(self).into(),
             Message::Reset => {
                 let profiles = Client::get_profiles().unwrap_or_else(|_| Vec::new());
 
                 if profiles.is_empty() {
-                    return Task::done(Message::AddProfile(String::new()));
+                    self.add_profile(String::new());
                 } else {
                     self.state = State::SelectProfile(profiles);
                 }
-                Task::none()
+
+                Action::none()
             }
             Message::SelectProfile(profile) => {
                 self.state = State::UnlockProfile {
@@ -124,11 +154,11 @@ impl SubScreen for ProfilePicker {
                     password: String::new(),
                 };
 
-                text_input::focus("password")
+                text_input::focus("password").into()
             }
             Message::DeleteProfile(profile) => {
                 self.confirm_delete = Some(profile.clone());
-                Task::none()
+                Action::none()
             }
             Message::ConfirmDelete(profile) => {
                 self.confirm_delete = None;
@@ -140,11 +170,11 @@ impl SubScreen for ProfilePicker {
                     ));
                 }
 
-                Task::done(Message::Reset)
+                Action::none()
             }
             Message::CancelDelete => {
                 self.confirm_delete = None;
-                Task::none()
+                Action::none()
             }
             Message::UnlockProfile => {
                 if let State::UnlockProfile { profile, password } = &self.state {
@@ -162,14 +192,15 @@ impl SubScreen for ProfilePicker {
                             )),
                         }
                     })
+                    .into()
                 } else {
-                    Task::none()
+                    Action::none()
                 }
             }
             Message::AddProfile(host) => {
                 self.state = State::AddProfile { host };
 
-                text_input::focus("host")
+                text_input::focus("host").into()
             }
             Message::Connect(host) => {
                 self.state = State::Loading(t!("profile-picker.connecting-to-server").to_string());
@@ -185,12 +216,13 @@ impl SubScreen for ProfilePicker {
                         )),
                     }
                 })
+                .into()
             }
             Message::Init(init) => {
                 let (state, task) = InitServer::start(init);
                 self.state = State::InitServer(state);
 
-                task.map(Into::into)
+                task.map(Message::InitServer).into()
             }
             Message::Login(_login) => {
                 todo!()
@@ -201,7 +233,7 @@ impl SubScreen for ProfilePicker {
 
     fn view(&self) -> Element<Message> {
         match &self.state {
-            State::InitServer(init_server) => init_server.view().map(Into::into),
+            State::InitServer(init_server) => init_server.view().map(Message::InitServer),
             State::Error(display_info) => display_info.view().on_close(Message::Reset).into(),
             State::Loading(message) => loading(message).expand().into(),
             State::SelectProfile(profiles) => {

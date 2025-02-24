@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use iced::{
-    widget::{button, text, text_input},
     Task,
+    widget::{button, text, text_input},
 };
-use svalin::client::{add_agent::WaitingForConfirmCode, Client};
+use svalin::client::{Client, add_agent::WaitingForConfirmCode};
 
 use crate::ui::{
+    action::Action,
     screen::SubScreen,
     types::error_display_info::ErrorDisplayInfo,
     widgets::{form, loading},
@@ -23,13 +24,8 @@ pub enum Message {
     Success,
 }
 
-impl From<Message> for super::Message {
-    fn from(value: Message) -> Self {
-        match value {
-            Message::Exit => Self::ShowList,
-            msg => Self::AddDevice(msg),
-        }
-    }
+pub enum Instruction {
+    Exit,
 }
 
 #[derive(Debug, Clone)]
@@ -90,25 +86,25 @@ impl AddDevice {
 }
 
 impl SubScreen for AddDevice {
+    type Instruction = Instruction;
     type Message = Message;
 
-    fn update(&mut self, message: Self::Message) -> Task<Self::Message> {
+    fn update(&mut self, message: Self::Message) -> Action<Instruction, Message> {
         match message {
             Message::Error(error) => {
                 self.state = State::Error(error);
-                Task::none()
+                Action::none()
             }
             Message::Input(input) => {
                 input.update(self);
-
-                Task::none()
+                Action::none()
             }
             Message::Success => {
                 self.state = State::Success;
-                Task::none()
+                Action::none()
             }
             Message::Continue => match &mut self.state {
-                State::Error(_) => Task::none(),
+                State::Error(_) => Action::none(),
                 State::JoinCode => {
                     let join_code = self.join_code.clone();
                     let client = self.client.clone();
@@ -124,10 +120,11 @@ impl SubScreen for AddDevice {
                             Ok(waiting) => Message::WaitingForDeviceName(Arc::new(waiting)),
                         }
                     })
+                    .into()
                 }
                 State::DeviceName => {
                     self.state = State::ConfirmCode;
-                    text_input::focus("confirm-code")
+                    text_input::focus("confirm-code").into()
                 }
                 State::ConfirmCode => match self.waiting.take() {
                     None => {
@@ -135,7 +132,7 @@ impl SubScreen for AddDevice {
                             Arc::new(anyhow::anyhow!("waiting for device name")),
                             t!("add-device.error.join-code"),
                         ));
-                        Task::none()
+                        Action::none()
                     }
                     Some(waiting) => {
                         let confirm_code = self.confirm_code.clone();
@@ -152,25 +149,26 @@ impl SubScreen for AddDevice {
                                 Ok(_) => Message::Success,
                             }
                         })
+                        .into()
                     }
                 },
-                State::Success | State::Loading(_) => Task::none(),
+                State::Success | State::Loading(_) => Action::none(),
             },
             Message::Back => match &mut self.state {
-                State::JoinCode => Task::done(Message::Exit),
+                State::JoinCode => Action::instruction(Instruction::Exit),
                 State::Error(_) | State::DeviceName => {
                     self.state = State::JoinCode;
                     self.join_code = String::new();
                     self.confirm_code = String::new();
                     self.waiting = None;
-                    text_input::focus("join-code")
+                    text_input::focus("join-code").into()
                 }
                 State::ConfirmCode => {
                     self.state = State::DeviceName;
                     self.confirm_code = String::new();
-                    text_input::focus("device-name")
+                    text_input::focus("device-name").into()
                 }
-                State::Success | State::Loading(_) => Task::none(),
+                State::Success | State::Loading(_) => Action::none(),
             },
             Message::WaitingForDeviceName(waiting) => {
                 let waiting = Arc::into_inner(waiting).unwrap();
@@ -178,7 +176,7 @@ impl SubScreen for AddDevice {
                 self.waiting = Some(waiting);
                 self.state = State::DeviceName;
 
-                text_input::focus("device-name")
+                text_input::focus("device-name").into()
             }
             Message::Exit => unreachable!(),
         }

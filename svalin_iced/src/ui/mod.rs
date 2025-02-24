@@ -1,7 +1,8 @@
 use iced::{
+    Subscription, Task,
     keyboard::{self, key::Named},
     widget::{center, focus_next, text},
-    window, Subscription, Task,
+    window,
 };
 use mainview::MainView;
 use profile_picker::ProfilePicker;
@@ -9,6 +10,8 @@ use screen::SubScreen;
 use widgets::scaffold;
 
 use crate::Element;
+
+pub mod action;
 
 pub mod components;
 mod mainview;
@@ -61,20 +64,27 @@ impl UI {
         match message {
             Message::Noop => Task::none(),
             Message::Tab => focus_next(),
-            Message::ProfilePicker(profile_picker::Message::Profile(client)) => {
-                let (state, task) = MainView::start(client);
-
-                self.screen = Screen::MainView(state);
-                task.map(Into::into)
-            }
             Message::ProfilePicker(message) => match &mut self.screen {
                 Screen::ProfilePicker(profile_picker) => {
-                    profile_picker.update(message).map(Into::into)
+                    let action = profile_picker.update(message).map(Message::ProfilePicker);
+
+                    match action.instruction {
+                        Some(profile_picker::Instruction::OpenProfile(client)) => {
+                            let (state, task) = MainView::start(client);
+
+                            self.screen = Screen::MainView(state);
+
+                            Task::batch(vec![task.map(Message::MainView), action.task])
+                        }
+                        None => action.task,
+                    }
                 }
                 _ => Task::none(),
             },
             Message::MainView(message) => match &mut self.screen {
-                Screen::MainView(main_view) => main_view.update(message).map(Into::into),
+                Screen::MainView(main_view) => {
+                    main_view.update(message).map(Message::MainView).task
+                }
                 _ => Task::none(),
             },
         }
@@ -87,25 +97,31 @@ impl UI {
     pub fn view(&self, window_id: window::Id) -> Element<Message> {
         if window_id == self.main_window_id {
             let screen: Element<Message> = match &self.screen {
-                Screen::ProfilePicker(profile_picker) => profile_picker.view().map(Into::into),
-                Screen::MainView(mainview) => mainview.view().map(Into::into),
+                Screen::ProfilePicker(profile_picker) => {
+                    profile_picker.view().map(Message::ProfilePicker)
+                }
+                Screen::MainView(mainview) => mainview.view().map(Message::MainView),
             };
 
             let header = match &self.screen {
-                Screen::ProfilePicker(profile_picker) => profile_picker.header().mapopt(Into::into),
-                Screen::MainView(mainview) => mainview.header().mapopt(Into::into),
+                Screen::ProfilePicker(profile_picker) => {
+                    profile_picker.header().mapopt(Message::ProfilePicker)
+                }
+                Screen::MainView(mainview) => mainview.header().mapopt(Message::MainView),
             };
 
             let dialog = match &self.screen {
-                Screen::ProfilePicker(profile_picker) => profile_picker.dialog().mapopt(Into::into),
-                Screen::MainView(mainview) => mainview.dialog().mapopt(Into::into),
+                Screen::ProfilePicker(profile_picker) => {
+                    profile_picker.dialog().mapopt(Message::ProfilePicker)
+                }
+                Screen::MainView(mainview) => mainview.dialog().mapopt(Message::MainView),
             };
 
             let context = match &self.screen {
                 Screen::ProfilePicker(profile_picker) => {
-                    profile_picker.context().mapopt(Into::into)
+                    profile_picker.context().mapopt(Message::ProfilePicker)
                 }
-                Screen::MainView(mainview) => mainview.context().mapopt(Into::into),
+                Screen::MainView(mainview) => mainview.context().mapopt(Message::MainView),
             };
 
             scaffold(screen)
@@ -131,7 +147,7 @@ impl UI {
         match &self.screen {
             Screen::ProfilePicker(_profile_picker) => (),
             Screen::MainView(mainview) => {
-                subscriptions.push(mainview.subscription().map(Into::into));
+                subscriptions.push(mainview.subscription().map(Message::MainView));
             }
         };
 
