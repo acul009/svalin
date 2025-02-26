@@ -45,21 +45,18 @@ pub struct Devices {
 }
 
 impl Devices {
-    pub fn start(client: Arc<Client>) -> (Self, Task<Message>) {
+    pub fn new(client: Arc<Client>) -> Self {
         let recipe = WatchRecipe::new(
             String::from("devices"),
             client.watch_device_list(),
             Message::ShowList,
         );
 
-        (
-            Self {
-                client,
-                state: State::List,
-                recipe,
-            },
-            Task::none(),
-        )
+        Self {
+            client,
+            state: State::List,
+            recipe,
+        }
     }
 }
 
@@ -106,10 +103,10 @@ impl Devices {
                 _ => Action::None,
             },
             Message::ShowDevice(device) => {
-                let (device_view, task) = DeviceView::start(device);
+                let device_view = DeviceView::new(device);
 
                 self.state = State::DeviceView(device_view);
-                Action::Run(task.map(Message::DeviceView))
+                Action::None
             }
             Message::ShowList => {
                 self.state = State::List;

@@ -44,20 +44,17 @@ pub struct MainView {
 }
 
 impl MainView {
-    pub fn start(client: Arc<Client>) -> (Self, Task<Message>) {
-        let (devices, task) = Devices::start(client.clone());
+    pub fn new(client: Arc<Client>) -> Self {
+        let devices = Devices::new(client.clone());
 
         let tunnel_ui = TunnelUi::new(client.clone());
 
-        (
-            Self {
-                state: State::Devices,
-                context: Context::None,
-                devices,
-                tunnel_ui,
-            },
-            task.map(Message::Devices),
-        )
+        Self {
+            state: State::Devices,
+            context: Context::None,
+            devices,
+            tunnel_ui,
+        }
     }
 
     pub fn update(&mut self, message: Message) -> Action {

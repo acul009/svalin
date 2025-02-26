@@ -40,9 +40,9 @@ pub struct DeviceView {
 }
 
 impl DeviceView {
-    pub fn start(device: Device) -> (DeviceView, Task<Message>) {
+    pub fn new(device: Device) -> DeviceView {
         let item = device.item().clone();
-        let (status, task) = DeviceStatus::start(device.clone());
+        let status = DeviceStatus::new(device.clone());
 
         let recipe = WatchRecipe::new(
             format!("device-{:x?}", item.public_data.cert.fingerprint()),
@@ -52,16 +52,13 @@ impl DeviceView {
 
         let tunnel_opener = TunnelOpener::new(device.clone());
 
-        (
-            DeviceView {
-                device,
-                status,
-                item,
-                recipe,
-                tunnel_opener,
-            },
-            task.map(Message::Status),
-        )
+        DeviceView {
+            device,
+            status,
+            item,
+            recipe,
+            tunnel_opener,
+        }
     }
 
     pub fn update(&mut self, message: Message) -> Action {

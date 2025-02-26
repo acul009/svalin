@@ -16,14 +16,11 @@ pub struct DeviceStatus {
 }
 
 impl DeviceStatus {
-    pub fn start(device: Device) -> (Self, Task<Message>) {
-        (
-            Self {
-                device,
-                realtime: RemoteLiveData::Pending,
-            },
-            Task::none(),
-        )
+    pub fn new(device: Device) -> Self {
+        Self {
+            device,
+            realtime: RemoteLiveData::Pending,
+        }
     }
 
     pub fn update(&mut self, message: Message) {

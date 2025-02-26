@@ -66,11 +66,11 @@ impl UI {
 
                     match action {
                         profile_picker::Action::OpenProfile(client) => {
-                            let (state, task) = MainView::start(client);
+                            let state = MainView::new(client);
 
                             self.screen = Screen::MainView(state);
 
-                            task.map(Message::MainView)
+                            Task::none()
                         }
                         profile_picker::Action::None => Task::none(),
                         profile_picker::Action::Run(task) => task.map(Message::ProfilePicker),
