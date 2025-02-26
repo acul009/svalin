@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use add_device::AddDevice;
 use device_view::DeviceView;
 use iced::{
-    Color, Length, Task,
+    Color, Length, Subscription, Task,
     advanced::subscription::from_recipe,
     alignment::Vertical,
     widget::{button, column, container, row, stack, text},
@@ -11,10 +11,7 @@ use iced::{
 use svalin::client::{Client, device::Device};
 use svalin_pki::Certificate;
 
-use crate::{
-    ui::{MapOpt, action::Action, screen::SubScreen},
-    util::watch_recipe::WatchRecipe,
-};
+use crate::{ui::MapOpt, util::watch_recipe::WatchRecipe};
 
 mod add_device;
 mod device_view;
@@ -29,8 +26,10 @@ pub enum Message {
     OpenTunnelGui,
 }
 
-pub enum Instruction {
+pub enum Action {
+    None,
     OpenTunnelGui,
+    Run(Task<Message>),
 }
 
 pub enum State {
@@ -64,65 +63,63 @@ impl Devices {
     }
 }
 
-impl SubScreen for Devices {
-    type Instruction = Instruction;
-    type Message = Message;
-
-    fn update(&mut self, message: Self::Message) -> Action<Instruction, Message> {
+impl Devices {
+    pub fn update(&mut self, message: Message) -> Action {
         match message {
             Message::AddDevice(message) => match &mut self.state {
                 State::AddDevice(add_device) => {
-                    let action = add_device.update(message).map(Message::AddDevice);
+                    let action = add_device.update(message);
 
-                    match action.instruction {
-                        Some(add_device::Instruction::Exit) => {
+                    match action {
+                        add_device::Action::Exit => {
                             self.state = State::List;
+                            Action::None
                         }
-                        None => (),
-                    };
-
-                    action.strip_instruction()
+                        add_device::Action::Run(task) => Action::Run(task.map(Message::AddDevice)),
+                        add_device::Action::None => Action::None,
+                    }
                 }
-                _ => Action::none(),
+                _ => Action::None,
             },
             Message::NewDevice => {
                 let (add_device, task) = AddDevice::start(self.client.clone());
 
                 self.state = State::AddDevice(add_device);
-                task.map(Message::AddDevice).into()
+                Action::Run(task.map(Message::AddDevice))
             }
             Message::DeviceView(message) => match &mut self.state {
                 State::DeviceView(device_view) => {
-                    let action = device_view.update(message).map(Message::DeviceView);
+                    let action = device_view.update(message);
 
-                    match action.instruction {
-                        Some(device_view::Instruction::Back) => {
+                    match action {
+                        device_view::Action::Back => {
                             self.state = State::List;
-                            Action::none()
+                            Action::None
                         }
-                        Some(device_view::Instruction::OpenTunnelGui) => {
-                            action.with_instruction(Instruction::OpenTunnelGui)
+                        device_view::Action::OpenTunnelGui => Action::OpenTunnelGui,
+                        device_view::Action::Run(task) => {
+                            Action::Run(task.map(Message::DeviceView))
                         }
-                        None => Action::none(),
+                        device_view::Action::None => Action::None,
                     }
                 }
-                _ => Action::none(),
+                _ => Action::None,
             },
             Message::ShowDevice(device) => {
                 let (device_view, task) = DeviceView::start(device);
 
                 self.state = State::DeviceView(device_view);
-                task.map(Message::DeviceView).into()
+                Action::Run(task.map(Message::DeviceView))
             }
             Message::ShowList => {
                 self.state = State::List;
-                Action::none()
+                Action::None
             }
-            Message::OpenTunnelGui => Action::instruction(Instruction::OpenTunnelGui),
+            Message::OpenTunnelGui => Action::OpenTunnelGui,
         }
     }
 
-    fn view(&self) -> crate::Element<Self::Message> {
+    pub fn view(&self) -> crate::Element<Message> {
         match &self.state {
             State::AddDevice(add_device) => add_device.view().map(Message::AddDevice),
             State::DeviceView(device_view) => device_view.view().map(Message::DeviceView),
@@ -169,25 +166,25 @@ impl SubScreen for Devices {
         }
     }
 
-    fn header(&self) -> Option<crate::Element<Self::Message>> {
+    pub fn header(&self) -> Option<crate::Element<Message>> {
         match &self.state {
-            State::AddDevice(add_device) => add_device.header().mapopt(Message::AddDevice),
+            State::AddDevice(_) => None,
             State::DeviceView(device_view) => device_view.header().mapopt(Message::DeviceView),
             State::List => None,
         }
     }
 
-    fn subscription(&self) -> iced::Subscription<Self::Message> {
+    pub fn subscription(&self) -> iced::Subscription<Message> {
         match &self.state {
-            State::AddDevice(add_device) => add_device.subscription().map(Message::AddDevice),
+            State::AddDevice(_) => Subscription::none(),
             State::DeviceView(device_view) => device_view.subscription().map(Message::DeviceView),
             State::List => from_recipe(self.recipe.clone()),
         }
     }
 
-    fn dialog(&self) -> Option<crate::Element<Self::Message>> {
+    pub fn dialog(&self) -> Option<crate::Element<Message>> {
         match &self.state {
-            State::AddDevice(add_device) => add_device.dialog().mapopt(Message::AddDevice),
+            State::AddDevice(_) => None,
             State::DeviceView(device_view) => device_view.dialog().mapopt(Message::DeviceView),
             State::List => None,
         }

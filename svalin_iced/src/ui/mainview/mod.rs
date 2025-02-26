@@ -8,7 +8,7 @@ use iced::{
 use svalin::client::Client;
 use tunnel::TunnelUi;
 
-use super::{MapOpt, action::Action, screen::SubScreen};
+use super::MapOpt;
 
 mod devices;
 mod tunnel;
@@ -18,6 +18,11 @@ pub enum Message {
     Devices(devices::Message),
     Tunnel(tunnel::Message),
     Context(Context),
+}
+
+pub enum Action {
+    None,
+    Run(Task<Message>),
 }
 
 enum State {
@@ -54,27 +59,25 @@ impl MainView {
             task.map(Message::Devices),
         )
     }
-}
 
-impl SubScreen for MainView {
-    type Instruction = ();
-    type Message = Message;
-
-    fn update(&mut self, message: Self::Message) -> Action<(), Message> {
+    pub fn update(&mut self, message: Message) -> Action {
         match message {
             Message::Devices(msg) => {
-                let action = self.devices.update(msg).map(Message::Devices);
+                let action = self.devices.update(msg);
 
-                match action.instruction {
-                    Some(devices::Instruction::OpenTunnelGui) => {
+                match action {
+                    devices::Action::None => Action::None,
+                    devices::Action::OpenTunnelGui => {
                         self.context = Context::Tunnel;
+                        Action::None
                     }
-                    None => (),
-                };
-
-                action.strip_instruction()
+                    devices::Action::Run(task) => Action::Run(task.map(Message::Devices)),
+                }
             }
-            Message::Tunnel(msg) => self.tunnel_ui.update(msg).map(Message::Tunnel),
+            Message::Tunnel(msg) => {
+                self.tunnel_ui.update(msg);
+                Action::None
+            }
             Message::Context(context) => {
                 if self.context == context {
                     self.context = Context::None;
@@ -86,18 +89,18 @@ impl SubScreen for MainView {
                     self.context = context;
                 }
 
-                Action::none()
+                Action::None
             }
         }
     }
 
-    fn view(&self) -> crate::Element<Self::Message> {
+    pub fn view(&self) -> crate::Element<Message> {
         match &self.state {
             State::Devices => self.devices.view().map(Message::Devices),
         }
     }
 
-    fn header(&self) -> Option<crate::Element<Self::Message>> {
+    pub fn header(&self) -> Option<crate::Element<Message>> {
         let subheader = match &self.state {
             State::Devices => self.devices.header().mapopt(Message::Devices),
         }
@@ -119,7 +122,7 @@ impl SubScreen for MainView {
         Some(row![subheader, actions].into())
     }
 
-    fn context(&self) -> Option<crate::Element<Self::Message>> {
+    pub fn context(&self) -> Option<crate::Element<Message>> {
         match &self.context {
             Context::None => None,
             Context::Tunnel => Some(self.tunnel_ui.view().map(Message::Tunnel)),
@@ -127,13 +130,13 @@ impl SubScreen for MainView {
         }
     }
 
-    fn dialog(&self) -> Option<crate::Element<Self::Message>> {
+    pub fn dialog(&self) -> Option<crate::Element<Message>> {
         match self.state {
             State::Devices => self.devices.dialog().mapopt(Message::Devices),
         }
     }
 
-    fn subscription(&self) -> iced::Subscription<Self::Message> {
+    pub fn subscription(&self) -> iced::Subscription<Message> {
         let state_subscription = match &self.state {
             State::Devices => self.devices.subscription().map(Message::Devices),
         };

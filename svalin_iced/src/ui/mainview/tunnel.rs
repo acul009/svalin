@@ -17,11 +17,7 @@ use svalin::{
 use svalin_pki::Certificate;
 use uuid::Uuid;
 
-use crate::{
-    Element,
-    ui::{action::Action, screen::SubScreen},
-    util::watch_recipe::WatchRecipe,
-};
+use crate::{Element, util::watch_recipe::WatchRecipe};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -102,26 +98,19 @@ impl TunnelUi {
     pub fn refresh(&mut self) {
         self.tunnels = Self::copy_tunnels(&self.client);
     }
-}
 
-impl SubScreen for TunnelUi {
-    type Instruction = ();
-    type Message = Message;
-
-    fn update(&mut self, message: Self::Message) -> Action<(), Message> {
+    pub fn update(&mut self, message: Message) {
         match message {
             Message::Refresh => {
                 self.refresh();
-                Action::none()
             }
             Message::CloseTunnel(id) => {
                 self.client.tunnel_manager().close_tunnel(&id);
-                Action::none()
             }
         }
     }
 
-    fn view(&self) -> crate::Element<Self::Message> {
+    pub fn view(&self) -> crate::Element<Message> {
         column(self.tunnels.iter().map(|(item, tunnels)| {
             column![
                 container(text(&item.public_data.name))
@@ -152,7 +141,7 @@ impl SubScreen for TunnelUi {
         .into()
     }
 
-    fn subscription(&self) -> iced::Subscription<Self::Message> {
+    pub fn subscription(&self) -> iced::Subscription<Message> {
         subscription::from_recipe(self.recipe.clone())
     }
 }

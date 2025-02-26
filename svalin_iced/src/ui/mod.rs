@@ -6,17 +6,13 @@ use iced::{
 };
 use mainview::MainView;
 use profile_picker::ProfilePicker;
-use screen::SubScreen;
 use widgets::scaffold;
 
 use crate::Element;
 
-pub mod action;
-
 pub mod components;
 mod mainview;
 mod profile_picker;
-pub mod screen;
 pub mod types;
 pub mod widgets;
 mod window_helper;
@@ -66,24 +62,30 @@ impl UI {
             Message::Tab => focus_next(),
             Message::ProfilePicker(message) => match &mut self.screen {
                 Screen::ProfilePicker(profile_picker) => {
-                    let action = profile_picker.update(message).map(Message::ProfilePicker);
+                    let action = profile_picker.update(message);
 
-                    match action.instruction {
-                        Some(profile_picker::Instruction::OpenProfile(client)) => {
+                    match action {
+                        profile_picker::Action::OpenProfile(client) => {
                             let (state, task) = MainView::start(client);
 
                             self.screen = Screen::MainView(state);
 
-                            Task::batch(vec![task.map(Message::MainView), action.task])
+                            task.map(Message::MainView)
                         }
-                        None => action.task,
+                        profile_picker::Action::None => Task::none(),
+                        profile_picker::Action::Run(task) => task.map(Message::ProfilePicker),
                     }
                 }
                 _ => Task::none(),
             },
             Message::MainView(message) => match &mut self.screen {
                 Screen::MainView(main_view) => {
-                    main_view.update(message).map(Message::MainView).task
+                    let action = main_view.update(message);
+
+                    match action {
+                        mainview::Action::None => Task::none(),
+                        mainview::Action::Run(task) => task.map(Message::MainView),
+                    }
                 }
                 _ => Task::none(),
             },
@@ -104,9 +106,7 @@ impl UI {
             };
 
             let header = match &self.screen {
-                Screen::ProfilePicker(profile_picker) => {
-                    profile_picker.header().mapopt(Message::ProfilePicker)
-                }
+                Screen::ProfilePicker(_) => None,
                 Screen::MainView(mainview) => mainview.header().mapopt(Message::MainView),
             };
 
@@ -118,9 +118,7 @@ impl UI {
             };
 
             let context = match &self.screen {
-                Screen::ProfilePicker(profile_picker) => {
-                    profile_picker.context().mapopt(Message::ProfilePicker)
-                }
+                Screen::ProfilePicker(_) => None,
                 Screen::MainView(mainview) => mainview.context().mapopt(Message::MainView),
             };
 

@@ -8,7 +8,7 @@ use svalin::{client::device::Device, shared::commands::agent_list::AgentListItem
 use tunnel_opener::TunnelOpener;
 
 use crate::{
-    ui::{MapOpt, action::Action, screen::SubScreen, widgets::header},
+    ui::{MapOpt, widgets::header},
     util::watch_recipe::WatchRecipe,
 };
 
@@ -24,9 +24,11 @@ pub enum Message {
     ItemUpdate,
 }
 
-pub enum Instruction {
+pub enum Action {
+    None,
     Back,
     OpenTunnelGui,
+    Run(Task<Message>),
 }
 
 pub struct DeviceView {
@@ -61,35 +63,33 @@ impl DeviceView {
             task.map(Message::Status),
         )
     }
-}
 
-impl SubScreen for DeviceView {
-    type Instruction = Instruction;
-    type Message = Message;
-
-    fn update(&mut self, message: Self::Message) -> Action<Instruction, Message> {
+    pub fn update(&mut self, message: Message) -> Action {
         match message {
-            Message::Status(message) => self
-                .status
-                .update(message)
-                .map(Message::Status)
-                .strip_instruction(),
-            Message::TunnelOpener(message) => self
-                .tunnel_opener
-                .update(message)
-                .map(Message::TunnelOpener)
-                .map_instruction(|instuction| match instuction {
-                    tunnel_opener::Instruction::OpenTunnelGui => Instruction::OpenTunnelGui,
-                }),
+            Message::Status(message) => {
+                self.status.update(message);
+                Action::None
+            }
+            Message::TunnelOpener(message) => {
+                let action = self.tunnel_opener.update(message);
+
+                match action {
+                    tunnel_opener::Action::OpenTunnelGui => Action::OpenTunnelGui,
+                    tunnel_opener::Action::Run(task) => {
+                        Action::Run(task.map(Message::TunnelOpener))
+                    }
+                    tunnel_opener::Action::None => Action::None,
+                }
+            }
             Message::ItemUpdate => {
                 self.item = self.device.item().clone();
-                Action::none()
+                Action::None
             }
-            Message::Back => Action::instruction(Instruction::Back),
+            Message::Back => Action::Back,
         }
     }
 
-    fn view(&self) -> crate::Element<Self::Message> {
+    pub fn view(&self) -> crate::Element<Message> {
         scrollable(
             column![
                 self.status.view().map(Message::Status),
@@ -100,7 +100,7 @@ impl SubScreen for DeviceView {
         .into()
     }
 
-    fn header(&self) -> Option<crate::Element<Self::Message>> {
+    pub fn header(&self) -> Option<crate::Element<Message>> {
         Some(
             header(
                 text(&self.item.public_data.name)
@@ -113,11 +113,11 @@ impl SubScreen for DeviceView {
         )
     }
 
-    fn dialog(&self) -> Option<crate::Element<Self::Message>> {
+    pub fn dialog(&self) -> Option<crate::Element<Message>> {
         self.tunnel_opener.dialog().mapopt(Message::TunnelOpener)
     }
 
-    fn subscription(&self) -> iced::Subscription<Self::Message> {
+    pub fn subscription(&self) -> iced::Subscription<Message> {
         Subscription::batch(vec![
             self.status.subscription().map(Message::Status),
             from_recipe(self.recipe.clone()),

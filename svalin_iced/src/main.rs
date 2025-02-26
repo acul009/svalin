@@ -1,4 +1,3 @@
-use iced::application;
 use ui::UI;
 
 pub mod ui;

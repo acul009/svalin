@@ -9,7 +9,6 @@ use svalin::client::{Client, Init};
 use totp_rs::TOTP;
 
 use crate::ui::{
-    action::Action,
     types::error_display_info::ErrorDisplayInfo,
     widgets::{form, loading},
 };
@@ -24,9 +23,11 @@ pub enum Message {
     Client(Arc<Client>),
 }
 
-pub enum Instruction {
+pub enum Action {
+    None,
     OpenProfile(Arc<Client>),
     Exit(String),
+    Run(Task<Message>),
 }
 
 pub struct InitServer {
@@ -97,26 +98,27 @@ impl InitServer {
         )
     }
 
-    fn error(&mut self, display_info: ErrorDisplayInfo<Arc<anyhow::Error>>) {
-        self.state = State::Error(display_info);
-    }
-}
-
-impl crate::ui::screen::SubScreen for InitServer {
-    type Instruction = Instruction;
-    type Message = Message;
-
-    fn update(&mut self, message: Self::Message) -> Action<Instruction, Message> {
+    pub fn update(&mut self, message: Message) -> Action {
         match message {
-            Message::Error(display_info) => self.error(display_info),
-            Message::Input(input) => input.update(self),
+            Message::Error(display_info) => {
+                self.error(display_info);
+
+                Action::None
+            }
+            Message::Input(input) => {
+                input.update(self);
+
+                Action::None
+            }
             Message::CopyTOTP => {
                 if let State::Totp { totp, .. } = &self.state {
-                    return iced::clipboard::write(totp.get_url()).into();
+                    Action::Run(iced::clipboard::write(totp.get_url()))
+                } else {
+                    Action::None
                 }
             }
             Message::Back => match &self.state {
-                State::Loading(_) => (),
+                State::Loading(_) => Action::None,
                 State::Totp {
                     username, password, ..
                 } => {
@@ -124,20 +126,19 @@ impl crate::ui::screen::SubScreen for InitServer {
                         username: username.clone(),
                         password: password.clone(),
                         confirm_password: password.clone(),
-                    }
+                    };
+
+                    Action::None
                 }
-                State::Error(_) | State::User { .. } => {
-                    return Action::instruction(Instruction::Exit(
-                        self.init
-                            .as_ref()
-                            .map_or("".to_string(), |init| init.address().to_string()),
-                    ));
-                }
+                State::Error(_) | State::User { .. } => Action::Exit(
+                    self.init
+                        .as_ref()
+                        .map_or("".to_string(), |init| init.address().to_string()),
+                ),
             },
             Message::Continue => {
                 match &self.state {
-                    State::Loading(_) => (),
-                    State::Error(_) => (),
+                    State::Loading(_) | State::Error(_) => Action::None,
                     State::User {
                         username,
                         password,
@@ -146,7 +147,7 @@ impl crate::ui::screen::SubScreen for InitServer {
                         // Todo: check inputs
 
                         if password != confirm_password {
-                            return Action::none();
+                            return Action::None;
                         }
 
                         match new_totp(username.clone()) {
@@ -154,7 +155,9 @@ impl crate::ui::screen::SubScreen for InitServer {
                                 self.state = State::Error(ErrorDisplayInfo::new(
                                     Arc::new(err),
                                     t!("profile-picker.error.totp.register"),
-                                ))
+                                ));
+
+                                Action::None
                             }
                             Ok(totp) => {
                                 let qr_code = image::Handle::from_bytes(totp.get_qr_png().unwrap());
@@ -167,7 +170,7 @@ impl crate::ui::screen::SubScreen for InitServer {
                                     totp_input: String::new(),
                                 };
 
-                                return text_input::focus("totp").into();
+                                Action::Run(text_input::focus("totp"))
                             }
                         }
                     }
@@ -183,14 +186,14 @@ impl crate::ui::screen::SubScreen for InitServer {
                                 Arc::new(err.into()),
                                 t!("profile-picker.error.totp.verify"),
                             ));
-                            return Action::none();
+                            return Action::None;
                         }
                         Ok(false) => {
                             self.error(ErrorDisplayInfo::new(
                                 Arc::new(anyhow!("wrong totp")),
                                 t!("profile-picker.error.totp.verify"),
                             ));
-                            return Action::none();
+                            return Action::None;
                         }
 
                         Ok(true) => match self.init.take() {
@@ -199,11 +202,11 @@ impl crate::ui::screen::SubScreen for InitServer {
                                     Arc::new(anyhow!("init already used")),
                                     "init already used",
                                 ));
-                                return Action::none();
+                                return Action::None;
                             }
                             Some(init) => {
                                 let init = match Arc::into_inner(init) {
-                                    None => return Action::none(),
+                                    None => return Action::None,
                                     Some(init) => init,
                                 };
                                 let username = username.clone();
@@ -212,7 +215,8 @@ impl crate::ui::screen::SubScreen for InitServer {
 
                                 self.state =
                                     State::Loading(t!("profile-picker.init-loading").to_string());
-                                return Task::future(async move {
+
+                                Action::Run(Task::future(async move {
                                     match init.init(username, password.clone(), totp).await {
                                         Err(err) => Message::Error(ErrorDisplayInfo::new(
                                             Arc::new(err),
@@ -237,22 +241,21 @@ impl crate::ui::screen::SubScreen for InitServer {
                                             Message::Client(Arc::new(client))
                                         }
                                     }
-                                })
-                                .into();
+                                }))
                             }
                         },
                     },
                 }
             }
-            Message::Client(client) => {
-                return Action::instruction(Instruction::OpenProfile(client));
-            }
+            Message::Client(client) => Action::OpenProfile(client),
         }
-
-        Action::none()
     }
 
-    fn view(&self) -> crate::Element<Self::Message> {
+    pub fn error(&mut self, display_info: ErrorDisplayInfo<Arc<anyhow::Error>>) {
+        self.state = State::Error(display_info);
+    }
+
+    pub fn view(&self) -> crate::Element<Message> {
         match &self.state {
             State::Error(display_info) => display_info.view().on_close(Message::Back).into(),
             State::Loading(message) => loading(message).expand().into(),

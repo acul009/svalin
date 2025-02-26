@@ -3,14 +3,12 @@ use iced::{Subscription, Task, stream::channel, widget::column};
 use svalin::client::device::{Device, RemoteLiveData};
 use svalin_sysctl::realtime::RealtimeStatus;
 
-use crate::ui::{action::Action, screen::SubScreen, widgets::realtime};
+use crate::ui::widgets::realtime;
 
 #[derive(Debug, Clone)]
 pub enum Message {
     Realtime(RemoteLiveData<RealtimeStatus>),
 }
-
-pub enum Instruction {}
 
 pub struct DeviceStatus {
     device: Device,
@@ -27,26 +25,20 @@ impl DeviceStatus {
             Task::none(),
         )
     }
-}
 
-impl SubScreen for DeviceStatus {
-    type Instruction = Instruction;
-    type Message = Message;
-
-    fn update(&mut self, message: Self::Message) -> Action<Instruction, Message> {
+    pub fn update(&mut self, message: Message) {
         match message {
             Message::Realtime(remote_live_data) => {
                 self.realtime = remote_live_data;
-                Action::none()
             }
         }
     }
 
-    fn view(&self) -> crate::Element<Self::Message> {
+    pub fn view(&self) -> crate::Element<Message> {
         column![realtime(&self.realtime)].into()
     }
 
-    fn subscription(&self) -> iced::Subscription<Self::Message> {
+    pub fn subscription(&self) -> iced::Subscription<Message> {
         let device = self.device.clone();
         Subscription::run_with_id(
             format!(

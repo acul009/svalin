@@ -10,7 +10,7 @@ use svalin::client::{
     tunnel_manager::{TunnelConfig, TunnelCreateError, tcp::TcpTunnelConfig},
 };
 
-use crate::ui::{action::Action, screen::SubScreen, types::error_display_info::ErrorDisplayInfo};
+use crate::ui::types::error_display_info::ErrorDisplayInfo;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -23,8 +23,10 @@ pub enum Message {
     OpenTunnelGui,
 }
 
-pub enum Instruction {
+pub enum Action {
+    None,
     OpenTunnelGui,
+    Run(Task<Message>),
 }
 
 impl From<&TunnelConfig> for &TunnelType {
@@ -72,18 +74,13 @@ impl TunnelOpener {
             error: None,
         }
     }
-}
 
-impl SubScreen for TunnelOpener {
-    type Instruction = Instruction;
-    type Message = Message;
-
-    fn update(&mut self, message: Self::Message) -> Action<Instruction, Message> {
+    pub fn update(&mut self, message: Message) -> Action {
         match message {
             Message::TunnelType(tunnel_type) => {
                 if let Some(config) = &self.config {
                     if tunnel_type == config.into() {
-                        return Action::none();
+                        return Action::None;
                     }
                 }
 
@@ -94,7 +91,7 @@ impl SubScreen for TunnelOpener {
                     })),
                 };
 
-                Action::none()
+                Action::None
             }
             Message::LocalPort(port) => {
                 match &mut self.config {
@@ -103,7 +100,7 @@ impl SubScreen for TunnelOpener {
                     }
                     None => (),
                 }
-                Action::none()
+                Action::None
             }
             Message::RemoteHost(host) => {
                 match &mut self.config {
@@ -112,13 +109,13 @@ impl SubScreen for TunnelOpener {
                     }
                     None => (),
                 }
-                Action::none()
+                Action::None
             }
             Message::OpenTunnel => {
                 if let Some(config) = &self.config {
                     let device = self.device.clone();
                     let config = config.clone();
-                    Task::future(async move {
+                    Action::Run(Task::future(async move {
                         match device.open_tunnel(config).await {
                             Ok(()) => Message::OpenTunnelGui,
                             Err(err) => Message::Error(ErrorDisplayInfo::new(
@@ -126,25 +123,24 @@ impl SubScreen for TunnelOpener {
                                 t!("tunnel.error"),
                             )),
                         }
-                    })
-                    .into()
+                    }))
                 } else {
-                    Action::none()
+                    Action::None
                 }
             }
             Message::Error(info) => {
                 self.error = Some(info);
-                Action::none()
+                Action::None
             }
             Message::CloseError => {
                 self.error = None;
-                Action::none()
+                Action::None
             }
-            Message::OpenTunnelGui => Action::instruction(Instruction::OpenTunnelGui),
+            Message::OpenTunnelGui => Action::OpenTunnelGui,
         }
     }
 
-    fn view(&self) -> crate::Element<Self::Message> {
+    pub fn view(&self) -> crate::Element<Message> {
         container(card(
             text(t!("tunnel.opener.title")),
             row![
@@ -186,7 +182,7 @@ impl SubScreen for TunnelOpener {
         .into()
     }
 
-    fn dialog(&self) -> Option<crate::Element<Self::Message>> {
+    pub fn dialog(&self) -> Option<crate::Element<Message>> {
         self.error
             .as_ref()
             .map(|error| error.view().on_close(Message::CloseError).into())

@@ -7,8 +7,6 @@ use iced::{
 use svalin::client::{Client, add_agent::WaitingForConfirmCode};
 
 use crate::ui::{
-    action::Action,
-    screen::SubScreen,
     types::error_display_info::ErrorDisplayInfo,
     widgets::{form, loading},
 };
@@ -24,8 +22,10 @@ pub enum Message {
     Success,
 }
 
-pub enum Instruction {
+pub enum Action {
+    None,
     Exit,
+    Run(Task<Message>),
 }
 
 #[derive(Debug, Clone)]
@@ -83,33 +83,28 @@ impl AddDevice {
             text_input::focus("join-code"),
         )
     }
-}
 
-impl SubScreen for AddDevice {
-    type Instruction = Instruction;
-    type Message = Message;
-
-    fn update(&mut self, message: Self::Message) -> Action<Instruction, Message> {
+    pub fn update(&mut self, message: Message) -> Action {
         match message {
             Message::Error(error) => {
                 self.state = State::Error(error);
-                Action::none()
+                Action::None
             }
             Message::Input(input) => {
                 input.update(self);
-                Action::none()
+                Action::None
             }
             Message::Success => {
                 self.state = State::Success;
-                Action::none()
+                Action::None
             }
             Message::Continue => match &mut self.state {
-                State::Error(_) => Action::none(),
+                State::Error(_) => Action::None,
                 State::JoinCode => {
                     let join_code = self.join_code.clone();
                     let client = self.client.clone();
                     self.state = State::Loading(t!("add-device.connecting").to_string());
-                    Task::future(async move {
+                    Action::Run(Task::future(async move {
                         let waiting = client.add_agent_with_code(join_code.clone()).await;
 
                         match waiting {
@@ -119,12 +114,11 @@ impl SubScreen for AddDevice {
                             )),
                             Ok(waiting) => Message::WaitingForDeviceName(Arc::new(waiting)),
                         }
-                    })
-                    .into()
+                    }))
                 }
                 State::DeviceName => {
                     self.state = State::ConfirmCode;
-                    text_input::focus("confirm-code").into()
+                    Action::Run(text_input::focus("confirm-code"))
                 }
                 State::ConfirmCode => match self.waiting.take() {
                     None => {
@@ -132,13 +126,14 @@ impl SubScreen for AddDevice {
                             Arc::new(anyhow::anyhow!("waiting for device name")),
                             t!("add-device.error.join-code"),
                         ));
-                        Action::none()
+                        Action::None
                     }
                     Some(waiting) => {
                         let confirm_code = self.confirm_code.clone();
                         let device_name = self.device_name.clone();
                         self.state = State::Loading(t!("add-device.enrolling").to_string());
-                        Task::future(async move {
+
+                        Action::Run(Task::future(async move {
                             let joined = waiting.confirm(confirm_code, device_name).await;
 
                             match joined {
@@ -148,27 +143,26 @@ impl SubScreen for AddDevice {
                                 )),
                                 Ok(_) => Message::Success,
                             }
-                        })
-                        .into()
+                        }))
                     }
                 },
-                State::Success | State::Loading(_) => Action::none(),
+                State::Success | State::Loading(_) => Action::None,
             },
             Message::Back => match &mut self.state {
-                State::JoinCode => Action::instruction(Instruction::Exit),
+                State::JoinCode => Action::Exit,
                 State::Error(_) | State::DeviceName => {
                     self.state = State::JoinCode;
                     self.join_code = String::new();
                     self.confirm_code = String::new();
                     self.waiting = None;
-                    text_input::focus("join-code").into()
+                    Action::Run(text_input::focus("join-code"))
                 }
                 State::ConfirmCode => {
                     self.state = State::DeviceName;
                     self.confirm_code = String::new();
-                    text_input::focus("device-name").into()
+                    Action::Run(text_input::focus("device-name"))
                 }
-                State::Success | State::Loading(_) => Action::none(),
+                State::Success | State::Loading(_) => Action::None,
             },
             Message::WaitingForDeviceName(waiting) => {
                 let waiting = Arc::into_inner(waiting).unwrap();
@@ -176,13 +170,13 @@ impl SubScreen for AddDevice {
                 self.waiting = Some(waiting);
                 self.state = State::DeviceName;
 
-                text_input::focus("device-name").into()
+                Action::Run(text_input::focus("device-name"))
             }
-            Message::Exit => Action::instruction(Instruction::Exit),
+            Message::Exit => Action::Exit,
         }
     }
 
-    fn view(&self) -> crate::Element<Self::Message> {
+    pub fn view(&self) -> crate::Element<Message> {
         match &self.state {
             State::Error(error) => error.view().on_close(Message::Back).into(),
             State::Loading(message) => loading(message).into(),
