@@ -155,7 +155,7 @@ impl TunnelOpener {
                     None => row![],
                     Some(TunnelConfig::Tcp(config)) => {
                         row![
-                            number_input(config.local_port, 1..=65535, Message::LocalPort),
+                            number_input(&config.local_port, 1..=65535, Message::LocalPort),
                             text_input(&t!("tunnel.input.remote_host"), &config.remote_host)
                                 .on_input(Message::RemoteHost)
                                 .on_submit_maybe(if config.remote_host.is_empty() {
