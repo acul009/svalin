@@ -26,7 +26,7 @@ iced = { version = "0.13.1", features = [
     "image",
     "canvas",
 ] }
-iced_aw = "0.11.0"
+iced_aw = "0.12.1"
 thiserror = "2.0.11"
 tokio-stream = { version = "0.1.17", features = ["full"] }
 tokio-util = "0.7.13"

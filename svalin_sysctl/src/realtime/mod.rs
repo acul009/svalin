@@ -44,8 +44,8 @@ impl RealtimeStatus {
         let mut sys_lock = SYS.lock().await;
 
         sys_lock.refresh_specifics(
-            RefreshKind::new()
-                .with_cpu(CpuRefreshKind::new().with_cpu_usage())
+            RefreshKind::nothing()
+                .with_cpu(CpuRefreshKind::everything())
                 .with_memory(MemoryRefreshKind::everything()),
         );
 
