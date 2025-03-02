@@ -7,14 +7,14 @@ edition = "2024"
 rustls = ["dep:rustls"]
 
 [dependencies]
-anyhow = "1.0.95"
+anyhow = "1.0.96"
 argon2 = { version = "0.5.3", features = ["simple", "std"] }
 postcard = "1.1.1"
 rand = "0.9.0"
 rcgen = { version = "0.12.1", features = ["pem", "ring", "x509-parser"] }
-ring = "0.17.8"
-rustls = { version = "0.23.21", optional = true, default-features = false }
-serde = "1.0.217"
+ring = "0.17.11"
+rustls = { version = "0.23.23", optional = true, default-features = false }
+serde = "1.0.218"
 spki = { version = "0.7.3", features = ["alloc", "fingerprint", "sha2", "std"] }
 thiserror = "2.0.11"
 time = "0.3.37"

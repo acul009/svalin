@@ -13,7 +13,7 @@ svalin_macros = { path = "../svalin_macros" }
 
 frozen_term = { path = "../frozen_term" }
 
-anyhow = "1.0.95"
+anyhow = "1.0.96"
 futures-util = "0.3.31"
 tokio = { version = "1.43.0", features = ["full"] }
 totp-rs = { version = "5.6.0", features = ["qr", "gen_secret"] }
@@ -31,5 +31,5 @@ thiserror = "2.0.11"
 tokio-stream = { version = "0.1.17", features = ["full"] }
 tokio-util = "0.7.13"
 futures = "0.3.31"
-uuid = "1.12.1"
-rust-i18n = "3.1.2"
+uuid = "1.15.1"
+rust-i18n = "3.1.3"
