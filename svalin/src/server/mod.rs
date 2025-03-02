@@ -1,17 +1,14 @@
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use agent_store::AgentStore;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use command_builder::SvalinCommandBuilder;
 use config_builder::ServerConfigBuilder;
-use rand::{
-    distributions::{self},
-    thread_rng, Rng,
-};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{verifier::KnownCertificateVerifier, Certificate, Keypair, PermCredentials};
+use svalin_pki::{Certificate, Keypair, PermCredentials, verifier::KnownCertificateVerifier};
 use svalin_rpc::{
-    permissions::{anonymous_permission_handler::AnonymousPermissionHandler, DummyPermission},
+    permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},
     rpc::{command::handler::HandlerCollection, server::Socket},
     verifiers::skip_verify::SkipClientVerification,
 };
@@ -62,6 +59,7 @@ pub struct Server {
 struct BaseConfig {
     root_cert: Certificate,
     credentials: Vec<u8>,
+    pseudo_data_seed: Vec<u8>,
 }
 
 impl Server {
@@ -99,9 +97,15 @@ impl Server {
 
                 let key = Server::get_encryption_key(&config.scope)?;
 
+                let pseudo_data_seed: Vec<u8> = rand::rng()
+                    .sample_iter(rand::distr::StandardUniform)
+                    .take(32)
+                    .collect();
+
                 let conf = BaseConfig {
                     root_cert: root,
                     credentials: credentials.to_bytes(key).await?,
+                    pseudo_data_seed,
                 };
 
                 config.scope.update(|b| {
@@ -172,8 +176,8 @@ impl Server {
         if let Some(key) = saved_key {
             Ok(key)
         } else {
-            let key: Vec<u8> = thread_rng()
-                .sample_iter(distributions::Standard)
+            let key: Vec<u8> = rand::rng()
+                .sample_iter(rand::distr::StandardUniform)
                 .take(32)
                 .collect();
 

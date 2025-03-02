@@ -1,8 +1,6 @@
-use anyhow::{anyhow, Ok, Result};
-use argon2::{
-    password_hash::{rand_core::OsRng, SaltString},
-    Argon2, Params,
-};
+use anyhow::{Ok, Result, anyhow};
+use argon2::{Argon2, Params};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -11,29 +9,54 @@ pub struct ArgonParams {
     m_cost: u32,
     t_cost: u32,
     p_cost: u32,
-    salt: String,
+    salt: Vec<u8>,
 }
 
 impl ArgonParams {
-    pub fn basic() -> Self {
-        let salt = SaltString::generate(&mut OsRng);
+    fn random_salt() -> Vec<u8> {
+        rand::rng()
+            .sample_iter(rand::distr::StandardUniform)
+            .take(32)
+            .collect()
+    }
 
-        Self {
-            m_cost: 32 * 1024,
-            t_cost: 2,
-            p_cost: 4,
-            salt: salt.as_str().to_owned(),
-        }
+    fn fake_salt(seed: &[u8]) -> Vec<u8> {
+        let hash = ring::digest::digest(&ring::digest::SHA512_256, seed);
+
+        hash.as_ref().to_vec()
     }
 
     pub fn strong() -> Self {
-        let salt = SaltString::generate(&mut OsRng);
+        Self::strong_with_salt(Self::random_salt())
+    }
 
+    pub fn strong_with_fake_salt(seed: &[u8]) -> Self {
+        Self::strong_with_salt(Self::fake_salt(seed))
+    }
+
+    fn strong_with_salt(salt: Vec<u8>) -> Self {
         Self {
             m_cost: 128 * 1024,
             t_cost: 2,
             p_cost: 8,
-            salt: salt.as_str().to_owned(),
+            salt: salt,
+        }
+    }
+
+    pub fn basic() -> Self {
+        Self::basic_with_salt(Self::random_salt())
+    }
+
+    pub fn basic_with_fake_salt(seed: &[u8]) -> Self {
+        Self::basic_with_salt(Self::fake_salt(seed))
+    }
+
+    fn basic_with_salt(salt: Vec<u8>) -> Self {
+        Self {
+            m_cost: 32 * 1024,
+            t_cost: 2,
+            p_cost: 4,
+            salt,
         }
     }
 
@@ -41,7 +64,7 @@ impl ArgonParams {
         let params = self.get_params().map_err(|err| anyhow!(err))?;
         let argon = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x10, params);
 
-        let salt_bytes = self.salt.as_bytes().to_owned();
+        let salt_bytes = self.salt.as_slice().to_owned();
         debug!("spawning blocking task");
 
         let result = tokio::task::spawn_blocking(move || {

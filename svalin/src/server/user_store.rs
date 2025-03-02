@@ -1,6 +1,6 @@
 use std::{fmt::Debug, sync::Arc};
 
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{Ok, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{ArgonParams, Certificate, PasswordHash};
 use totp_rs::TOTP;
@@ -9,11 +9,11 @@ use tracing::{debug, instrument};
 #[derive(Serialize, Deserialize)]
 pub struct StoredUser {
     pub certificate: Certificate,
-    username: String,
-    encrypted_credentials: Vec<u8>,
-    client_hash_options: ArgonParams,
-    password_double_hash: PasswordHash,
-    totp_secret: TOTP,
+    pub username: String,
+    pub encrypted_credentials: Vec<u8>,
+    pub client_hash_options: ArgonParams,
+    pub password_double_hash: PasswordHash,
+    pub totp_secret: TOTP,
 }
 
 #[derive(Debug)]
@@ -39,7 +39,7 @@ impl UserStore {
         Ok(user)
     }
 
-    fn get_user_by_username(&self, username: &str) -> Result<Option<StoredUser>> {
+    pub fn get_user_by_username(&self, username: &str) -> Result<Option<StoredUser>> {
         let mut user: Option<StoredUser> = None;
 
         self.scope.view(|b| {

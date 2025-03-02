@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use rand::Rng;
 use svalin_pki::{Certificate, Keypair};
@@ -30,7 +30,7 @@ impl JoinRequestHandler {
 }
 
 fn create_join_code() -> String {
-    rand::thread_rng().gen_range(0..999999).to_string()
+    rand::rng().random_range(0..999999).to_string()
 }
 
 #[async_trait]
