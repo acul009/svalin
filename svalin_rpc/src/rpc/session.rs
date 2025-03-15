@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, instrument};
@@ -170,89 +170,14 @@ impl Session {
     }
 }
 
-// pub struct UnauthorizedSession<P> {
-//     session: Session,
-//     permission_handler: P,
-// }
+#[macro_export]
+macro_rules! write_object {
+    ($session:ident, $msg:ident) => {{
+        $session.write.write_object($msg).await;
+    }};
+}
 
-// impl<P> UnauthorizedSession<P>
-// where
-//     P: PermissionHandler,
-// {
-//     pub async fn authorize<'a>(
-//         &'a mut self,
-//         permission: impl Into<P::Permission> + Sized,
-//     ) -> Result<&'a mut Session, PermissionCheckError> {
-//         let perm_check = self
-//             .permission_handler
-//             .may(&self.session.peer, permission)
-//             .await;
-
-//         match perm_check {
-//             Ok(_) => {
-//                 self.session.write_object::<Result<(), ()>>(&Ok(())).await?;
-//                 Ok(&mut self.session)
-//             }
-//             Err(err) => {
-//                 // Todo: handle error somehow?
-//                 let _err = self.session.write_object::<Result<(),
-// ()>>(&Err(())).await;
-
-//                 Err(err)
-//             }
-//         }
-//     }
-
-//     pub async fn authorize_owned<'a, H: PermissionHandler>(
-//         mut self,
-//         permission: &P::Permission,
-//     ) -> Result<Session, PermissionCheckError> {
-//         let perm_check = self
-//             .permission_handler
-//             .may(&self.session.peer, permission)
-//             .await;
-
-//         match perm_check {
-//             Ok(_) => {
-//                 self.session.write_object::<Result<(), ()>>(&Ok(())).await?;
-//                 Ok(self.session)
-//             }
-//             Err(err) => {
-//                 // Todo: handle error somehow?
-//                 let _err = self.session.write_object::<Result<(),
-// ()>>(&Err(())).await;
-
-//                 Err(err)
-//             }
-//         }
-//     }
-
-//     pub async fn read_object<W: serde::de::DeserializeOwned>(&mut self) ->
-// Result<W> {         // debug!("Reading: {}", std::any::type_name::<W>());
-//         self.session.read_object().await
-//     }
-
-//     pub(crate) async fn shutdown(self) {
-//         self.session.shutdown().await
-//     }
-// }
-
-// pub struct PendingSession {
-//     session: Session,
-// }
-
-// impl PendingSession {
-//     pub async fn check_authorization<'a>(&'a mut self) -> Result<&'a mut
-// Session> {         let perm_result: Result<(), ()> =
-// self.session.read_object().await?;
-
-//         match perm_result {
-//             Ok(_) => Ok(&mut self.session),
-//             Err(_) => Err(anyhow!("Rpc-Error: Permission denied")),
-//         }
-//     }
-
-//     pub async fn write_object<W: Serialize>(&mut self, object: &W) ->
-// Result<()> {         self.session.write_object(object).await
-//     }
-// }
+#[macro_export]
+macro_rules! read_object {
+    ($session:ident) => {{ $session.read.read_object().await }};
+}

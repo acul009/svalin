@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use svalin_pki::{ArgonParams, Certificate, CertificateRequest, PermCredentials};
 use svalin_rpc::{
@@ -191,7 +191,7 @@ async fn prepare_agent_enroll(
     .await?;
 
     let mut key_material = [0u8; 32];
-    tls_transport
+    let key_material = tls_transport
         .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
         .unwrap();
 

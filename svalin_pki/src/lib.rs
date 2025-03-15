@@ -13,7 +13,7 @@ pub mod verifier;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 pub use certificate::Certificate;
 pub use certificate_request::CertificateRequest;
 pub use error::Error;
@@ -21,6 +21,8 @@ pub use hash::*;
 pub use keypair::Keypair;
 pub use perm_credentials::PermCredentials;
 use ring::rand::{SecureRandom, SystemRandom};
+
+pub use argon2;
 
 #[cfg(test)]
 mod test;

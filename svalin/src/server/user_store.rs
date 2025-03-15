@@ -1,6 +1,8 @@
 use std::{fmt::Debug, sync::Arc};
 
 use anyhow::{Ok, Result, anyhow};
+use aucpace::StrongDatabase;
+use password_hash::ParamsString;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{ArgonParams, Certificate, PasswordHash};
 use totp_rs::TOTP;
@@ -14,6 +16,14 @@ pub struct StoredUser {
     pub client_hash_options: ArgonParams,
     pub password_double_hash: PasswordHash,
     pub totp_secret: TOTP,
+    pub pake_data: PakeData,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PakeData {
+    password_verifier: curve25519_dalek::RistrettoPoint,
+    exponent: curve25519_dalek::Scalar,
+    params_string: String,
 }
 
 #[derive(Debug)]
@@ -39,7 +49,7 @@ impl UserStore {
         Ok(user)
     }
 
-    pub fn get_user_by_username(&self, username: &str) -> Result<Option<StoredUser>> {
+    pub fn get_user_by_username(&self, username: &[u8]) -> Result<Option<StoredUser>> {
         let mut user: Option<StoredUser> = None;
 
         self.scope.view(|b| {
@@ -77,6 +87,7 @@ impl UserStore {
                 .derive_password_hash(client_hash.to_vec())
                 .await?,
             totp_secret,
+            pake_data: todo!(),
         };
 
         debug!("requesting user update transaction");
@@ -105,5 +116,41 @@ impl UserStore {
         debug!("user successfully added");
 
         Ok(())
+    }
+}
+
+impl StrongDatabase for UserStore {
+    type PasswordVerifier = curve25519_dalek::RistrettoPoint;
+
+    type Exponent = curve25519_dalek::Scalar;
+
+    fn lookup_verifier_strong(
+        &self,
+        username: &[u8],
+    ) -> Option<(Self::PasswordVerifier, Self::Exponent, ParamsString)> {
+        let user = self
+            .get_user_by_username(username)
+            .map_err(|err| tracing::error!("{}", err))
+            .ok()??;
+        let pake = user.pake_data;
+
+        let params = pake
+            .params_string
+            .parse()
+            .map_err(|err| tracing::error!("{}", err))
+            .ok()?;
+
+        Some((pake.password_verifier, pake.exponent, params))
+    }
+
+    fn store_verifier_strong(
+        &mut self,
+        username: &[u8],
+        uad: Option<&[u8]>,
+        verifier: Self::PasswordVerifier,
+        secret_exponent: Self::Exponent,
+        params: ParamsString,
+    ) {
+        unimplemented!();
     }
 }

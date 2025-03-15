@@ -1,5 +1,5 @@
 use anyhow::{Context, Ok, Result};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use super::{
     chunked_transport::{ChunkReader, ChunkWriter},
@@ -21,7 +21,7 @@ impl ObjectReader {
         }
     }
 
-    pub async fn read_object<U: DeserializeOwned>(&mut self) -> Result<U> {
+    pub async fn read_object<'de, U: Deserialize<'de>>(&mut self) -> Result<U> {
         let chunk = self
             .read
             .read_chunk()
