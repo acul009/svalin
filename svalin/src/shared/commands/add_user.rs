@@ -1,9 +1,12 @@
 use std::{fmt::Display, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
+use aucpace::{AuCPaceClient, ClientMessage};
+use curve25519_dalek::{RistrettoPoint, Scalar};
+use password_hash::{ParamsString, rand_core::OsRng};
 use serde::{Deserialize, Serialize};
-use svalin_pki::{ArgonParams, Certificate, PermCredentials};
+use svalin_pki::{ArgonParams, Certificate, PermCredentials, argon2::Argon2};
 use svalin_rpc::rpc::{
     command::{
         dispatcher::CommandDispatcher,
@@ -15,17 +18,30 @@ use tokio_util::sync::CancellationToken;
 use totp_rs::TOTP;
 use tracing::{debug, error, instrument};
 
-use crate::{permissions::Permission, server::user_store::UserStore};
+use crate::{
+    permissions::Permission,
+    server::user_store::{UserStore, serde_paramsstring},
+};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct AddUserRequest {
     certificate: Certificate,
-    username: String,
+    // username: String,
     encrypted_credentials: Vec<u8>,
-    client_hash: [u8; 32],
-    client_hash_options: ArgonParams,
     totp_secret: TOTP,
     current_totp: String,
+    /// The username of whoever is registering
+    username: Vec<u8>,
+
+    /// The salt used when computing the verifier
+    secret_exponent: Scalar,
+
+    /// The password hasher's parameters used when computing the verifier
+    #[serde(with = "serde_paramsstring")]
+    params: ParamsString,
+
+    /// The verifier computer from the user's password
+    verifier: RistrettoPoint,
 }
 
 impl From<&PermissionPrecursor<AddUserRequest, AddUserHandler>> for Permission {
@@ -97,9 +113,10 @@ impl CommandHandler for AddUserHandler {
                 request.certificate,
                 request.username,
                 request.encrypted_credentials,
-                request.client_hash,
-                request.client_hash_options,
                 request.totp_secret,
+                todo!(),
+                todo!(),
+                todo!(),
             )
             .await;
 
@@ -127,10 +144,29 @@ pub struct AddUser {
 impl AddUser {
     pub async fn new(
         credentials: &PermCredentials,
-        username: String,
+        username: Vec<u8>,
         password: Vec<u8>,
         totp_secret: TOTP,
     ) -> Result<Self> {
+        let mut pace_client = AuCPaceClient::<sha2::Sha512, Argon2, OsRng, 16>::new(OsRng);
+
+        if let ClientMessage::StrongRegistration {
+            username,
+            secret_exponent,
+            params,
+            verifier,
+        } = pace_client
+            .register_alloc_strong(
+                &username,
+                password.clone(),
+                ArgonParams::strong().get_params(),
+                Argon2::default(),
+            )
+            .map_err(|err| anyhow!(err))?
+        {
+            todo!()
+        }
+
         let client_hash_options = ArgonParams::strong();
 
         debug!("requesting user to be added");
@@ -148,10 +184,11 @@ impl AddUser {
             certificate,
             username: username,
             encrypted_credentials,
-            client_hash,
-            client_hash_options,
             current_totp: totp_secret.generate_current()?,
             totp_secret: totp_secret,
+            params: todo!(),
+            secret_exponent: todo!(),
+            verifier: todo!(),
         };
 
         Ok(Self { request })

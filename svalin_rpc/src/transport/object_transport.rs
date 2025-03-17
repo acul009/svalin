@@ -21,7 +21,7 @@ impl ObjectReader {
         }
     }
 
-    pub async fn read_object<'de, U: Deserialize<'de>>(&mut self) -> Result<U> {
+    pub async fn read_object<U: DeserializeOwned>(&mut self) -> Result<U> {
         let chunk = self
             .read
             .read_chunk()

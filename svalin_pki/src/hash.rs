@@ -61,7 +61,7 @@ impl ArgonParams {
     }
 
     pub async fn derive_key(&self, secret: Vec<u8>) -> Result<[u8; 32]> {
-        let params = self.get_params().map_err(|err| anyhow!(err))?;
+        let params = self.get_params();
         let argon = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x10, params);
 
         let salt_bytes = self.salt.as_slice().to_owned();
@@ -91,8 +91,8 @@ impl ArgonParams {
         Ok(PasswordHash { params: self, hash })
     }
 
-    fn get_params(&self) -> Result<Params, argon2::Error> {
-        Params::new(self.m_cost, self.t_cost, self.p_cost, None)
+    pub fn get_params(&self) -> Params {
+        Params::new(self.m_cost, self.t_cost, self.p_cost, None).unwrap()
     }
 }
 

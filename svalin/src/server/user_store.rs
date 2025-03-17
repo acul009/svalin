@@ -2,6 +2,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use anyhow::{Ok, Result, anyhow};
 use aucpace::StrongDatabase;
+use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::ParamsString;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{ArgonParams, Certificate, PasswordHash};
@@ -11,19 +12,20 @@ use tracing::{debug, instrument};
 #[derive(Serialize, Deserialize)]
 pub struct StoredUser {
     pub certificate: Certificate,
-    pub username: String,
     pub encrypted_credentials: Vec<u8>,
-    pub client_hash_options: ArgonParams,
-    pub password_double_hash: PasswordHash,
     pub totp_secret: TOTP,
-    pub pake_data: PakeData,
-}
+    /// The username of whoever is registering
+    pub username: Vec<u8>,
 
-#[derive(Serialize, Deserialize)]
-pub struct PakeData {
-    password_verifier: curve25519_dalek::RistrettoPoint,
-    exponent: curve25519_dalek::Scalar,
-    params_string: String,
+    /// The salt used when computing the verifier
+    pub secret_exponent: Scalar,
+
+    /// The password hasher's parameters used when computing the verifier
+    #[serde(with = "serde_paramsstring")]
+    pub params: ParamsString,
+
+    /// The verifier computer from the user's password
+    pub verifier: RistrettoPoint,
 }
 
 #[derive(Debug)]
@@ -72,22 +74,21 @@ impl UserStore {
     pub async fn add_user(
         &self,
         certificate: Certificate,
-        username: String,
+        username: Vec<u8>,
         encrypted_credentials: Vec<u8>,
-        client_hash: [u8; 32],
-        client_hash_options: ArgonParams,
         totp_secret: TOTP,
+        secret_exponent: Scalar,
+        params: ParamsString,
+        verifier: RistrettoPoint,
     ) -> Result<()> {
         let user = StoredUser {
             certificate,
             username,
             encrypted_credentials,
-            client_hash_options,
-            password_double_hash: ArgonParams::basic()
-                .derive_password_hash(client_hash.to_vec())
-                .await?,
             totp_secret,
-            pake_data: todo!(),
+            secret_exponent,
+            params,
+            verifier,
         };
 
         debug!("requesting user update transaction");
@@ -132,25 +133,56 @@ impl StrongDatabase for UserStore {
             .get_user_by_username(username)
             .map_err(|err| tracing::error!("{}", err))
             .ok()??;
-        let pake = user.pake_data;
 
-        let params = pake
-            .params_string
-            .parse()
-            .map_err(|err| tracing::error!("{}", err))
-            .ok()?;
-
-        Some((pake.password_verifier, pake.exponent, params))
+        Some((user.verifier, user.secret_exponent, user.params))
     }
 
     fn store_verifier_strong(
         &mut self,
-        username: &[u8],
-        uad: Option<&[u8]>,
-        verifier: Self::PasswordVerifier,
-        secret_exponent: Self::Exponent,
-        params: ParamsString,
+        _username: &[u8],
+        _uad: Option<&[u8]>,
+        _verifier: Self::PasswordVerifier,
+        _secret_exponent: Self::Exponent,
+        _params: ParamsString,
     ) {
         unimplemented!();
+    }
+}
+
+pub mod serde_paramsstring {
+    use core::fmt;
+    use password_hash::ParamsString;
+    use serde::de::{Error, Visitor};
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S>(data: &ParamsString, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(data.as_str())
+    }
+
+    struct ParamsStringVisitor {}
+
+    impl<'de> Visitor<'de> for ParamsStringVisitor {
+        type Value = ParamsString;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(formatter, "a valid PHC parameter string")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: Error,
+        {
+            v.parse().map_err(Error::custom)
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<ParamsString, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(ParamsStringVisitor {})
     }
 }

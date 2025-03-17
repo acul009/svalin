@@ -178,20 +178,9 @@ impl TakeableCommandHandler for LoginHandler {
 
             let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
 
-            // ===== Send user Hash credentials =====
+            // ===== Get User =====
 
             let user = self.user_store.get_user_by_username(username.as_ref())?;
-
-            let hash_params = match &user {
-                Some(user) => user.client_hash_options.clone(),
-                None => {
-                    let mut seed = self.fake_seed.clone();
-                    seed.extend_from_slice(username.as_bytes());
-                    ArgonParams::strong_with_fake_salt(&seed)
-                }
-            };
-
-            session.write_object(&hash_params).await?;
 
             // ===== SSID Establishment =====
             let mut pake_server: AuCPaceServer<_, _, NONCE_LENGTH> =
