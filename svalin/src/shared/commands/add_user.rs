@@ -114,9 +114,9 @@ impl CommandHandler for AddUserHandler {
                 request.username,
                 request.encrypted_credentials,
                 request.totp_secret,
-                todo!(),
-                todo!(),
-                todo!(),
+                request.secret_exponent,
+                request.params,
+                request.verifier,
             )
             .await;
 
@@ -150,12 +150,7 @@ impl AddUser {
     ) -> Result<Self> {
         let mut pace_client = AuCPaceClient::<sha2::Sha512, Argon2, OsRng, 16>::new(OsRng);
 
-        if let ClientMessage::StrongRegistration {
-            username,
-            secret_exponent,
-            params,
-            verifier,
-        } = pace_client
+        let (username, secret_exponent, params, verifier) = match pace_client
             .register_alloc_strong(
                 &username,
                 password.clone(),
@@ -164,10 +159,16 @@ impl AddUser {
             )
             .map_err(|err| anyhow!(err))?
         {
-            todo!()
-        }
-
-        let client_hash_options = ArgonParams::strong();
+            ClientMessage::StrongRegistration {
+                username,
+                secret_exponent,
+                params,
+                verifier,
+            } => (username, secret_exponent, params, verifier),
+            _ => {
+                return Err(anyhow!("unexpected message"));
+            }
+        };
 
         debug!("requesting user to be added");
 
@@ -177,18 +178,15 @@ impl AddUser {
         let encrypted_credentials = credentials.to_bytes(password.clone()).await?;
         debug!("credentials encrypted");
 
-        let client_hash = client_hash_options.derive_key(password.clone()).await?;
-        debug!("password hash created");
-
         let request = AddUserRequest {
             certificate,
-            username: username,
+            username: username.to_vec(),
             encrypted_credentials,
             current_totp: totp_secret.generate_current()?,
             totp_secret: totp_secret,
-            params: todo!(),
-            secret_exponent: todo!(),
-            verifier: todo!(),
+            params: params,
+            secret_exponent: secret_exponent,
+            verifier: verifier,
         };
 
         Ok(Self { request })

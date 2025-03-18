@@ -92,7 +92,7 @@ impl Init {
             .dispatch(
                 AddUser::new(
                     &root,
-                    username.clone(),
+                    username.clone().into(),
                     password.clone().into(),
                     totp_secret,
                 )
