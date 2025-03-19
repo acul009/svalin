@@ -2,24 +2,20 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use aucpace::{AuCPaceServer, ClientMessage, ServerMessage};
 use curve25519_dalek::RistrettoPoint;
+use password_hash::ParamsString;
 use serde::{
     Deserialize, Serialize,
-    de::{self, Expected},
+    de::{self},
 };
-use svalin_pki::{ArgonParams, Keypair};
+use svalin_pki::Keypair;
 use svalin_rpc::{
-    rpc::{
-        command::handler::{CommandHandler, TakeableCommandHandler},
-        peer::Peer,
-        server,
-        session::{self, Session},
-    },
+    rpc::{command::handler::TakeableCommandHandler, peer::Peer, session::Session},
     transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
     verifiers::skip_verify::SkipClientVerification,
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::server::user_store::UserStore;
+use crate::server::user_store::{UserStore, serde_paramsstring};
 
 #[derive(Serialize, Deserialize)]
 struct LoginAttempt {
@@ -71,6 +67,55 @@ impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for Nonce {
 struct StrongUsername {
     username: Vec<u8>,
     blinded: RistrettoPoint,
+}
+
+impl TryFrom<ClientMessage<'_, NONCE_LENGTH>> for StrongUsername {
+    type Error = MessageTransformError;
+    fn try_from(value: ClientMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
+        match value {
+            ClientMessage::StrongUsername { username, blinded } => Ok(StrongUsername {
+                username: username.to_vec(),
+                blinded,
+            }),
+            _ => Err(MessageTransformError::WrongInputVariant),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct ClientInfo {
+    /// J from the protocol definition
+    group: String,
+
+    /// X from the protocol definition
+    x_pub: RistrettoPoint,
+
+    /// the blinded salt used with the PBKDF
+    blinded_salt: RistrettoPoint,
+
+    /// the parameters for the PBKDF used - sigma from the protocol definition
+    #[serde(with = "serde_paramsstring")]
+    pbkdf_params: ParamsString,
+}
+
+impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for ClientInfo {
+    type Error = MessageTransformError;
+    fn try_from(value: ServerMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
+        match value {
+            ServerMessage::StrongAugmentationInfo {
+                group,
+                x_pub,
+                blinded_salt,
+                pbkdf_params,
+            } => Ok(ClientInfo {
+                group: group.to_string(),
+                x_pub,
+                blinded_salt,
+                pbkdf_params,
+            }),
+            _ => Err(MessageTransformError::WrongInputVariant),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -208,7 +253,9 @@ impl TakeableCommandHandler for LoginHandler {
                 )
                 .map_err(|err| anyhow!(err))?;
 
-            session.write_object(&client_info).await?;
+            session
+                .write_object(&ClientInfo::try_from(client_info)?)
+                .await?;
 
             // ===== CPace substep =====
             let (pake_server, public_key) = pake_server.generate_public_key(key_material);
@@ -236,6 +283,88 @@ impl TakeableCommandHandler for LoginHandler {
             todo!("do something with this key...")
         } else {
             Err(anyhow!("tried executing commandhandler with None"))
+        }
+    }
+}
+
+pub struct Login<'a> {
+    pub username: &'a [u8],
+    pub password: &'a [u8],
+    pub totp_secret: &'a totp_rs::TOTP,
+}
+
+#[async_trait]
+impl<'a> TakeableCommandDispatcher for Login<'a> {
+    type Output = ();
+
+    type Request = ();
+
+    fn key() -> String {
+        LoginHandler::key()
+    }
+
+    fn get_request(&self) -> Self::Request {
+        ()
+    }
+
+    async fn dispatch(
+        self,
+        session: &mut Option<Session>,
+        _: Self::Request,
+    ) -> Result<Self::Output> {
+        if let Some(session) = session.take() {
+            // Write the username to the session
+            session.write_object(&self.username).await?;
+
+            // ===== TLS Initialization =====
+            let (read, write, _) = session.destructure_transport();
+
+            let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
+
+            let tls_transport = TlsTransport::client(
+                CombinedTransport::new(read, write),
+                SkipServerVerification::new(),
+                &credentials,
+            )
+            .await?;
+
+            let (read, write) = tokio::io::split(tls_transport);
+            let session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+
+            // ===== SSID Establishment =====
+            let client = AuCPaceClient::<_, _, _, NONCE_LENGTH>::new(OsRng);
+
+            let (client, message) = client.begin();
+            session.write_object(&message).await?;
+
+            // Receive server nonce
+            let server_nonce: Nonce = session.read_object().await?;
+            let client = client.agree_ssid(server_nonce.0);
+
+            // ===== Augmentation Layer =====
+            let (client, message) =
+                client.start_augmentation_strong(self.username, self.password, &mut OsRng);
+            session
+                .write_object(&StrongUsername::try_from(message)?)
+                .await?;
+
+            // Receive augmentation info
+            let client_info: ClientInfo = session.read_object().await?;
+
+            // ===== CPace substep =====
+            // TODO: Get channel identifier from session
+            // TODO: Generate public key
+            // TODO: Send public key
+            // TODO: Receive server public key
+
+            // ===== Explicit Mutual Authentication =====
+            // TODO: Generate authenticator
+            // TODO: Send authenticator
+            // TODO: Receive server authenticator
+
+            Ok(())
+        } else {
+            Err(anyhow!("no session given"))
         }
     }
 }
