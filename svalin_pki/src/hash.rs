@@ -1,14 +1,90 @@
-use anyhow::{Ok, Result, anyhow};
-use argon2::{Argon2, Params};
+use anyhow::{Result, anyhow};
+use argon2::{Argon2, Params, password_hash::ParamsString};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tracing::debug;
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct ArgonParams {
+pub struct ArgonCost {
     m_cost: u32,
     t_cost: u32,
     p_cost: u32,
+}
+
+impl ArgonCost {
+    pub fn strong() -> Self {
+        Self {
+            m_cost: 128 * 1024,
+            t_cost: 2,
+            p_cost: 8,
+        }
+    }
+
+    pub fn basic() -> Self {
+        Self {
+            m_cost: 32 * 1024,
+            t_cost: 2,
+            p_cost: 4,
+        }
+    }
+
+    fn get_params(&self) -> Params {
+        Params::new(self.m_cost, self.t_cost, self.p_cost, None).unwrap()
+    }
+
+    pub fn get_argon_hasher<'a>(&self) -> Argon2<'a> {
+        Argon2::new(
+            argon2::Algorithm::Argon2id,
+            argon2::Version::V0x10,
+            self.get_params(),
+        )
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum ParamsStringParseError {
+    #[error("m_cost missing or invalid")]
+    MCostUnavailable,
+    #[error("t_cost missing or invalid")]
+    TCostUnavailable,
+    #[error("p_cost missing or invalid")]
+    PCostUnavailable,
+}
+
+impl TryFrom<ParamsString> for ArgonCost {
+    type Error = ParamsStringParseError;
+
+    fn try_from(value: ParamsString) -> std::result::Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
+}
+
+impl TryFrom<&ParamsString> for ArgonCost {
+    type Error = ParamsStringParseError;
+
+    fn try_from(value: &ParamsString) -> std::result::Result<Self, Self::Error> {
+        let m_cost = value
+            .get_decimal("m")
+            .ok_or(ParamsStringParseError::MCostUnavailable)?;
+        let t_cost = value
+            .get_decimal("t")
+            .ok_or(ParamsStringParseError::TCostUnavailable)?;
+        let p_cost = value
+            .get_decimal("p")
+            .ok_or(ParamsStringParseError::PCostUnavailable)?;
+
+        Ok(Self {
+            m_cost,
+            t_cost,
+            p_cost,
+        })
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ArgonParams {
+    cost: ArgonCost,
     salt: Vec<u8>,
 }
 
@@ -36,9 +112,7 @@ impl ArgonParams {
 
     fn strong_with_salt(salt: Vec<u8>) -> Self {
         Self {
-            m_cost: 128 * 1024,
-            t_cost: 2,
-            p_cost: 8,
+            cost: ArgonCost::strong(),
             salt: salt,
         }
     }
@@ -53,16 +127,13 @@ impl ArgonParams {
 
     fn basic_with_salt(salt: Vec<u8>) -> Self {
         Self {
-            m_cost: 32 * 1024,
-            t_cost: 2,
-            p_cost: 4,
+            cost: ArgonCost::basic(),
             salt,
         }
     }
 
     pub async fn derive_key(&self, secret: Vec<u8>) -> Result<[u8; 32]> {
-        let params = self.get_params();
-        let argon = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x10, params);
+        let argon = self.cost.get_argon_hasher();
 
         let salt_bytes = self.salt.as_slice().to_owned();
         debug!("spawning blocking task");
@@ -91,8 +162,8 @@ impl ArgonParams {
         Ok(PasswordHash { params: self, hash })
     }
 
-    pub fn get_params(&self) -> Params {
-        Params::new(self.m_cost, self.t_cost, self.p_cost, None).unwrap()
+    pub fn get_argon_hasher<'a>(&self) -> Argon2<'a> {
+        self.cost.get_argon_hasher()
     }
 }
 

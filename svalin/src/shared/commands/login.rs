@@ -1,21 +1,29 @@
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use aucpace::{AuCPaceServer, ClientMessage, ServerMessage};
+use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage, client};
 use curve25519_dalek::RistrettoPoint;
-use password_hash::ParamsString;
+use password_hash::{ParamsString, rand_core::OsRng};
 use serde::{
     Deserialize, Serialize,
     de::{self},
 };
-use svalin_pki::Keypair;
+use svalin_pki::{ArgonCost, Keypair, argon2::Argon2, sha2::Sha512};
 use svalin_rpc::{
-    rpc::{command::handler::TakeableCommandHandler, peer::Peer, session::Session},
+    rpc::{
+        command::{dispatcher::TakeableCommandDispatcher, handler::TakeableCommandHandler},
+        peer::Peer,
+        session::Session,
+    },
     transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
-    verifiers::skip_verify::SkipClientVerification,
+    verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
 };
+use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 
-use crate::server::user_store::{UserStore, serde_paramsstring};
+use crate::server::{
+    self,
+    user_store::{UserStore, serde_paramsstring},
+};
 
 #[derive(Serialize, Deserialize)]
 struct LoginAttempt {
@@ -95,7 +103,7 @@ struct ClientInfo {
 
     /// the parameters for the PBKDF used - sigma from the protocol definition
     #[serde(with = "serde_paramsstring")]
-    pbkdf_params: ParamsString,
+    hash_params: ParamsString,
 }
 
 impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for ClientInfo {
@@ -111,7 +119,7 @@ impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for ClientInfo {
                 group: group.to_string(),
                 x_pub,
                 blinded_salt,
-                pbkdf_params,
+                hash_params: pbkdf_params,
             }),
             _ => Err(MessageTransformError::WrongInputVariant),
         }
@@ -120,12 +128,24 @@ impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for ClientInfo {
 
 #[derive(Serialize, Deserialize)]
 struct PublicKey(RistrettoPoint);
+
 impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for PublicKey {
     type Error = MessageTransformError;
 
     fn try_from(value: ServerMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
         match value {
             ServerMessage::PublicKey(pubkey) => Ok(PublicKey(pubkey)),
+            _ => Err(MessageTransformError::WrongInputVariant),
+        }
+    }
+}
+
+impl TryFrom<ClientMessage<'_, NONCE_LENGTH>> for PublicKey {
+    type Error = MessageTransformError;
+
+    fn try_from(value: ClientMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
+        match value {
+            ClientMessage::PublicKey(pubkey) => Ok(PublicKey(pubkey)),
             _ => Err(MessageTransformError::WrongInputVariant),
         }
     }
@@ -142,6 +162,18 @@ impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for Authenticator {
         }
     }
 }
+
+impl TryFrom<ClientMessage<'_, NONCE_LENGTH>> for Authenticator {
+    type Error = MessageTransformError;
+
+    fn try_from(value: ClientMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
+        match value {
+            ClientMessage::Authenticator(authenticator) => Ok(Authenticator(authenticator)),
+            _ => Err(MessageTransformError::WrongInputVariant),
+        }
+    }
+}
+
 impl Serialize for Authenticator {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -233,9 +265,9 @@ impl TakeableCommandHandler for LoginHandler {
 
             let (pake_server, server_nonce) = pake_server.begin();
 
-            let server_nonce = Nonce::try_from(server_nonce)?;
-
-            session.write_object(&server_nonce).await?;
+            session
+                .write_object(&Nonce::try_from(server_nonce)?)
+                .await?;
 
             // ===== Augmentation Layer =====
             let client_nonce: Nonce = session.read_object().await?;
@@ -287,14 +319,14 @@ impl TakeableCommandHandler for LoginHandler {
     }
 }
 
-pub struct Login<'a> {
-    pub username: &'a [u8],
-    pub password: &'a [u8],
-    pub totp_secret: &'a totp_rs::TOTP,
+pub struct Login {
+    pub username: Vec<u8>,
+    pub password: Vec<u8>,
+    pub totp_secret: totp_rs::TOTP,
 }
 
 #[async_trait]
-impl<'a> TakeableCommandDispatcher for Login<'a> {
+impl TakeableCommandDispatcher for Login {
     type Output = ();
 
     type Request = ();
@@ -312,7 +344,7 @@ impl<'a> TakeableCommandDispatcher for Login<'a> {
         session: &mut Option<Session>,
         _: Self::Request,
     ) -> Result<Self::Output> {
-        if let Some(session) = session.take() {
+        if let Some(mut session) = session.take() {
             // Write the username to the session
             session.write_object(&self.username).await?;
 
@@ -328,11 +360,16 @@ impl<'a> TakeableCommandDispatcher for Login<'a> {
             )
             .await?;
 
+            let mut key_material = [0u8; 32];
+            let key_material = tls_transport
+                .derive_key(&mut key_material, b"login", &self.username)
+                .unwrap();
+
             let (read, write) = tokio::io::split(tls_transport);
-            let session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+            let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
 
             // ===== SSID Establishment =====
-            let client = AuCPaceClient::<_, _, _, NONCE_LENGTH>::new(OsRng);
+            let mut client = AuCPaceClient::<Sha512, Argon2, _, NONCE_LENGTH>::new(OsRng);
 
             let (client, message) = client.begin();
             session.write_object(&message).await?;
@@ -341,26 +378,69 @@ impl<'a> TakeableCommandDispatcher for Login<'a> {
             let server_nonce: Nonce = session.read_object().await?;
             let client = client.agree_ssid(server_nonce.0);
 
-            // ===== Augmentation Layer =====
-            let (client, message) =
-                client.start_augmentation_strong(self.username, self.password, &mut OsRng);
-            session
-                .write_object(&StrongUsername::try_from(message)?)
-                .await?;
+            let (username_send, username_recv) = oneshot::channel();
+            let (client_info_send, client_info_recv) = oneshot::channel();
 
-            // Receive augmentation info
+            // ===== Augmentation Layer =====
+            let blocking_handle = tokio::task::spawn_blocking(move || {
+                let username = self.username.clone();
+                let password = self.password.clone();
+                let (client, strong_username) =
+                    client.start_augmentation_strong(&username, &password, &mut OsRng);
+
+                username_send
+                    .send(StrongUsername::try_from(strong_username).map_err(|err| anyhow!(err))?)
+                    .map_err(|_| anyhow!("failed to send username"))?;
+
+                // Receive augmentation info
+                let client_info: ClientInfo = client_info_recv.blocking_recv()?;
+
+                // ===== CPace substep =====
+                let hasher = ArgonCost::try_from(client_info.hash_params)?.get_argon_hasher();
+
+                client
+                    .generate_cpace_alloc(
+                        client_info.x_pub,
+                        client_info.blinded_salt,
+                        hasher.params().clone(),
+                        hasher,
+                    )
+                    .map_err(|err| anyhow!(err))
+            });
+
+            session.write_object(&username_recv.await?).await?;
+
             let client_info: ClientInfo = session.read_object().await?;
 
-            // ===== CPace substep =====
-            // TODO: Get channel identifier from session
-            // TODO: Generate public key
-            // TODO: Send public key
-            // TODO: Receive server public key
+            client_info_send
+                .send(client_info)
+                .map_err(|_| anyhow!("failed to send client info"))?;
+
+            let client = blocking_handle.await??;
+
+            let (client, client_key) = client.generate_public_key(key_material, &mut OsRng);
+
+            session
+                .write_object(&PublicKey::try_from(client_key)?)
+                .await?;
+
+            let server_key: PublicKey = session.read_object().await?;
 
             // ===== Explicit Mutual Authentication =====
-            // TODO: Generate authenticator
-            // TODO: Send authenticator
-            // TODO: Receive server authenticator
+
+            let (client, client_authenticator) = client
+                .receive_server_pubkey(server_key.0)
+                .map_err(|err| anyhow!(err))?;
+
+            session
+                .write_object(&Authenticator::try_from(client_authenticator)?)
+                .await?;
+
+            let server_authenticator: Authenticator = session.read_object().await?;
+
+            let key = client
+                .receive_server_authenticator(server_authenticator.0)
+                .map_err(|err| anyhow!(err))?;
 
             Ok(())
         } else {

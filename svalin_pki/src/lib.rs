@@ -23,6 +23,7 @@ pub use perm_credentials::PermCredentials;
 use ring::rand::{SecureRandom, SystemRandom};
 
 pub use argon2;
+pub use sha2;
 
 #[cfg(test)]
 mod test;

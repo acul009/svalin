@@ -6,7 +6,7 @@ use aucpace::{AuCPaceClient, ClientMessage};
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::{ParamsString, rand_core::OsRng};
 use serde::{Deserialize, Serialize};
-use svalin_pki::{ArgonParams, Certificate, PermCredentials, argon2::Argon2};
+use svalin_pki::{ArgonCost, Certificate, PermCredentials, argon2::Argon2, sha2::Sha512};
 use svalin_rpc::rpc::{
     command::{
         dispatcher::CommandDispatcher,
@@ -148,15 +148,12 @@ impl AddUser {
         password: Vec<u8>,
         totp_secret: TOTP,
     ) -> Result<Self> {
-        let mut pace_client = AuCPaceClient::<sha2::Sha512, Argon2, OsRng, 16>::new(OsRng);
+        let mut pace_client = AuCPaceClient::<Sha512, Argon2, OsRng, 16>::new(OsRng);
+
+        let hasher = ArgonCost::strong().get_argon_hasher();
 
         let (username, secret_exponent, params, verifier) = match pace_client
-            .register_alloc_strong(
-                &username,
-                password.clone(),
-                ArgonParams::strong().get_params(),
-                Argon2::default(),
-            )
+            .register_alloc_strong(&username, password.clone(), hasher.params().clone(), hasher)
             .map_err(|err| anyhow!(err))?
         {
             ClientMessage::StrongRegistration {
@@ -169,6 +166,8 @@ impl AddUser {
                 return Err(anyhow!("unexpected message"));
             }
         };
+
+        debug!("hash params: {}", &params);
 
         debug!("requesting user to be added");
 
