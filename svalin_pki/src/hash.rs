@@ -136,7 +136,6 @@ impl ArgonParams {
         let argon = self.cost.get_argon_hasher();
 
         let salt_bytes = self.salt.as_slice().to_owned();
-        debug!("spawning blocking task");
 
         let result = tokio::task::spawn_blocking(move || {
             // debug!("running blocking task");
@@ -146,13 +145,9 @@ impl ArgonParams {
                 .map(move |_| hash)
                 .map_err(|err| anyhow!(err));
 
-            debug!("blocking computation ready");
-
             result
         })
         .await?;
-
-        debug!("blocking task completed");
 
         result
     }

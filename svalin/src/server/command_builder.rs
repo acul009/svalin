@@ -4,7 +4,7 @@ use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
     rpc::{
         command::handler::HandlerCollection,
-        server::{config_builder::RpcCommandBuilder, RpcServer},
+        server::{RpcServer, config_builder::RpcCommandBuilder},
     },
 };
 
@@ -14,6 +14,7 @@ use crate::{
         commands::{
             add_user::AddUserHandler,
             agent_list::AgentListHandler,
+            login::LoginHandler,
             public_server_status::{PublicStatus, PublicStatusHandler},
         },
         join_agent::add_agent::AddAgentHandler,
@@ -43,6 +44,7 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             .await
             .add(PingHandler)
             .add(PublicStatusHandler::new(PublicStatus::Ready))
+            .add(LoginHandler::new(self.user_store.clone()))
             .add(AddUserHandler::new(self.user_store.clone()))
             .add(join_manager.create_request_handler())
             .add(join_manager.create_accept_handler())

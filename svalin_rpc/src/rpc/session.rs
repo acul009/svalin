@@ -66,8 +66,6 @@ impl Session {
     where
         P: PermissionHandler,
     {
-        debug!("waiting for request header");
-
         let header: SessionRequestHeader = self
             .read_object()
             .await

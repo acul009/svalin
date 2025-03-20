@@ -8,9 +8,9 @@ use tracing::{debug, instrument};
 
 use crate::server::INIT_SERVER_SHUTDOWN_COUNTDOWN;
 use crate::shared::commands::add_user::AddUser;
-use crate::shared::commands::init;
 use crate::shared::commands::public_server_status::GetPutblicStatus;
 use crate::shared::commands::public_server_status::PublicStatus;
+use crate::shared::commands::{self, init};
 use crate::verifier::upstream_verifier::UpstreamVerifier;
 
 use super::Client;
@@ -129,7 +129,17 @@ impl Debug for Login {
 }
 
 impl Login {
-    pub async fn login(&self) -> Result<()> {
-        todo!()
+    pub async fn login(self, username: Vec<u8>, password: Vec<u8>, totp: String) -> Result<String> {
+        let stuff = self
+            .client
+            .upstream_connection()
+            .dispatch(commands::login::Login {
+                username,
+                password,
+                totp,
+            })
+            .await?;
+
+        Ok("lol".into())
     }
 }

@@ -1,4 +1,6 @@
-use anyhow::{Result, anyhow};
+use std::sync::Arc;
+
+use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage, client};
 use curve25519_dalek::RistrettoPoint;
@@ -10,7 +12,10 @@ use serde::{
 use svalin_pki::{ArgonCost, Keypair, argon2::Argon2, sha2::Sha512};
 use svalin_rpc::{
     rpc::{
-        command::{dispatcher::TakeableCommandDispatcher, handler::TakeableCommandHandler},
+        command::{
+            dispatcher::TakeableCommandDispatcher,
+            handler::{PermissionPrecursor, TakeableCommandHandler},
+        },
         peer::Peer,
         session::Session,
     },
@@ -19,10 +24,15 @@ use svalin_rpc::{
 };
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
+use tracing::debug;
+use tracing_subscriber::field::debug;
 
-use crate::server::{
-    self,
-    user_store::{UserStore, serde_paramsstring},
+use crate::{
+    permissions::Permission,
+    server::{
+        self,
+        user_store::{UserStore, serde_paramsstring},
+    },
 };
 
 #[derive(Serialize, Deserialize)]
@@ -36,17 +46,19 @@ pub struct LoginSuccess {
     pub encrypted_credentials: Vec<u8>,
 }
 
+impl From<&PermissionPrecursor<(), LoginHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<(), LoginHandler>) -> Self {
+        Permission::AnonymousOnly
+    }
+}
+
 pub struct LoginHandler {
-    user_store: UserStore,
-    fake_seed: Vec<u8>,
+    user_store: Arc<UserStore>,
 }
 
 impl LoginHandler {
-    pub fn new(user_store: UserStore, fake_seed: Vec<u8>) -> Self {
-        Self {
-            user_store,
-            fake_seed,
-        }
+    pub fn new(user_store: Arc<UserStore>) -> Self {
+        Self { user_store }
     }
 }
 
@@ -66,6 +78,17 @@ impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for Nonce {
     fn try_from(value: ServerMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
         match value {
             ServerMessage::Nonce(nonce) => Ok(Nonce(nonce)),
+            _ => Err(MessageTransformError::WrongInputVariant),
+        }
+    }
+}
+
+impl TryFrom<ClientMessage<'_, NONCE_LENGTH>> for Nonce {
+    type Error = MessageTransformError;
+
+    fn try_from(value: ClientMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
+        match value {
+            ClientMessage::Nonce(nonce) => Ok(Nonce(nonce)),
             _ => Err(MessageTransformError::WrongInputVariant),
         }
     }
@@ -231,63 +254,93 @@ impl TakeableCommandHandler for LoginHandler {
         _cancel: CancellationToken,
     ) -> Result<()> {
         if let Some(mut session) = session.take() {
-            let username: String = session.read_object().await?;
+            let username: Vec<u8> = session.read_object().await?;
+
+            debug!(
+                "received login request for user: {}",
+                String::from_utf8_lossy(&username)
+            );
 
             // ===== Establish TLS Connection and generate common secret =====
 
             let (read, write, _) = session.destructure_transport();
 
-            let temp_credentials = Keypair::generate().unwrap().to_self_signed_cert()?;
+            let temp_credentials = Keypair::generate()
+                .context("Failed to generate keypair")?
+                .to_self_signed_cert()
+                .context("Failed to generate temporary credentials")?;
 
             let tls_transport = TlsTransport::server(
                 CombinedTransport::new(read, write),
                 SkipClientVerification::new(),
                 &temp_credentials,
             )
-            .await?;
+            .await
+            .context("Failed to establish TLS connection")?;
 
             let mut key_material = [0u8; 32];
             let key_material = tls_transport
-                .derive_key(&mut key_material, b"login", username.as_bytes())
-                .unwrap();
+                .derive_key(&mut key_material, b"login", &username)
+                .context("Failed to derive key")?;
 
             let (read, write) = tokio::io::split(tls_transport);
 
             let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
 
+            debug!("server session recreated");
+
             // ===== Get User =====
 
-            let user = self.user_store.get_user_by_username(username.as_ref())?;
+            let user = self
+                .user_store
+                .get_user_by_username(username.as_ref())
+                .context("Failed to get user")?;
+
+            debug!("user retrieved");
 
             // ===== SSID Establishment =====
             let mut pake_server: AuCPaceServer<_, _, NONCE_LENGTH> =
                 aucpace::Server::new(Default::default());
 
+            debug!("sending server nonce");
+
             let (pake_server, server_nonce) = pake_server.begin();
 
             session
                 .write_object(&Nonce::try_from(server_nonce)?)
-                .await?;
+                .await
+                .context("Failed to write server nonce")?;
+
+            debug!("reading for client nonce");
 
             // ===== Augmentation Layer =====
-            let client_nonce: Nonce = session.read_object().await?;
+            let client_nonce: Nonce = session
+                .read_object()
+                .await
+                .context("Failed to read client nonce")?;
 
             let pake_server = pake_server.agree_ssid(client_nonce.0);
 
-            let strong_username: StrongUsername = session.read_object().await?;
+            debug!("reading for strong username");
+
+            let strong_username: StrongUsername = session
+                .read_object()
+                .await
+                .context("Failed to read strong username")?;
 
             let (pake_server, client_info) = pake_server
                 .generate_client_info_strong(
                     strong_username.username,
                     strong_username.blinded,
-                    &self.user_store,
+                    self.user_store.as_ref(),
                     password_hash::rand_core::OsRng,
                 )
                 .map_err(|err| anyhow!(err))?;
 
             session
                 .write_object(&ClientInfo::try_from(client_info)?)
-                .await?;
+                .await
+                .context("Failed to write client info")?;
 
             // ===== CPace substep =====
             let (pake_server, public_key) = pake_server.generate_public_key(key_material);
@@ -295,24 +348,35 @@ impl TakeableCommandHandler for LoginHandler {
 
             session.write_object(&server_public_key).await?;
 
-            let client_public_key: PublicKey = session.read_object().await?;
+            let client_public_key: PublicKey = session
+                .read_object()
+                .await
+                .context("Failed to read client public key")?;
 
             let pake_server = pake_server
                 .receive_client_pubkey(client_public_key.0)
-                .map_err(|err| anyhow!(err))?;
+                .map_err(|err| anyhow!(err))
+                .context("Failed to receive client public key")?;
 
             // ===== Explicit Mutual Authentication =====
 
-            let client_authenticator: Authenticator = session.read_object().await?;
+            let client_authenticator: Authenticator = session
+                .read_object()
+                .await
+                .context("Failed to read client authenticator")?;
             let (key, server_authenticator) = pake_server
                 .receive_client_authenticator(client_authenticator.0)
-                .map_err(|err| anyhow!(err))?;
+                .map_err(|err| anyhow!(err))
+                .context("Failed to receive client authenticator")?;
 
             let server_authenticator = Authenticator::try_from(server_authenticator)?;
 
-            session.write_object(&server_authenticator).await?;
+            session
+                .write_object(&server_authenticator)
+                .await
+                .context("Failed to write server authenticator")?;
 
-            todo!("do something with this key...")
+            Ok(())
         } else {
             Err(anyhow!("tried executing commandhandler with None"))
         }
@@ -322,7 +386,7 @@ impl TakeableCommandHandler for LoginHandler {
 pub struct Login {
     pub username: Vec<u8>,
     pub password: Vec<u8>,
-    pub totp_secret: totp_rs::TOTP,
+    pub totp: String,
 }
 
 #[async_trait]
@@ -348,31 +412,51 @@ impl TakeableCommandDispatcher for Login {
             // Write the username to the session
             session.write_object(&self.username).await?;
 
+            debug!(
+                "trying to log in as {}",
+                String::from_utf8_lossy(&self.username)
+            );
+
             // ===== TLS Initialization =====
             let (read, write, _) = session.destructure_transport();
 
-            let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
+            let credentials = Keypair::generate()
+                .context("Failed to generate keypair")?
+                .to_self_signed_cert()
+                .context("Failed to generate temporary credentials")?;
 
             let tls_transport = TlsTransport::client(
                 CombinedTransport::new(read, write),
                 SkipServerVerification::new(),
                 &credentials,
             )
-            .await?;
+            .await
+            .context("Failed to create TLS transport")?;
+
+            debug!("tls transport created");
 
             let mut key_material = [0u8; 32];
             let key_material = tls_transport
                 .derive_key(&mut key_material, b"login", &self.username)
-                .unwrap();
+                .context("Failed to derive key")?;
 
             let (read, write) = tokio::io::split(tls_transport);
             let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
 
+            debug!("session recreated");
+
             // ===== SSID Establishment =====
             let mut client = AuCPaceClient::<Sha512, Argon2, _, NONCE_LENGTH>::new(OsRng);
 
-            let (client, message) = client.begin();
-            session.write_object(&message).await?;
+            debug!("sending client nonce");
+
+            let (client, client_nonce) = client.begin();
+            session
+                .write_object(&Nonce::try_from(client_nonce)?)
+                .await
+                .context("Failed to write message")?;
+
+            debug!("receiving server nonce");
 
             // Receive server nonce
             let server_nonce: Nonce = session.read_object().await?;
@@ -380,6 +464,8 @@ impl TakeableCommandDispatcher for Login {
 
             let (username_send, username_recv) = oneshot::channel();
             let (client_info_send, client_info_recv) = oneshot::channel();
+
+            debug!("starting augmentation task");
 
             // ===== Augmentation Layer =====
             let blocking_handle = tokio::task::spawn_blocking(move || {
@@ -393,7 +479,9 @@ impl TakeableCommandDispatcher for Login {
                     .map_err(|_| anyhow!("failed to send username"))?;
 
                 // Receive augmentation info
-                let client_info: ClientInfo = client_info_recv.blocking_recv()?;
+                let client_info: ClientInfo = client_info_recv
+                    .blocking_recv()
+                    .context("Failed to receive client info")?;
 
                 // ===== CPace substep =====
                 let hasher = ArgonCost::try_from(client_info.hash_params)?.get_argon_hasher();
@@ -408,9 +496,19 @@ impl TakeableCommandDispatcher for Login {
                     .map_err(|err| anyhow!(err))
             });
 
-            session.write_object(&username_recv.await?).await?;
+            debug!("sending strong username");
 
-            let client_info: ClientInfo = session.read_object().await?;
+            session
+                .write_object(&username_recv.await?)
+                .await
+                .context("Failed to write username")?;
+
+            debug!("receiving client info");
+
+            let client_info: ClientInfo = session
+                .read_object()
+                .await
+                .context("Failed to read client info")?;
 
             client_info_send
                 .send(client_info)
@@ -418,15 +516,22 @@ impl TakeableCommandDispatcher for Login {
 
             let client = blocking_handle.await??;
 
+            debug!("sending client public key");
+
             let (client, client_key) = client.generate_public_key(key_material, &mut OsRng);
 
             session
                 .write_object(&PublicKey::try_from(client_key)?)
-                .await?;
+                .await
+                .context("Failed to write public key")?;
+
+            debug!("receiving server public key");
 
             let server_key: PublicKey = session.read_object().await?;
 
             // ===== Explicit Mutual Authentication =====
+
+            debug!("sending client authenticator");
 
             let (client, client_authenticator) = client
                 .receive_server_pubkey(server_key.0)
@@ -436,7 +541,12 @@ impl TakeableCommandDispatcher for Login {
                 .write_object(&Authenticator::try_from(client_authenticator)?)
                 .await?;
 
-            let server_authenticator: Authenticator = session.read_object().await?;
+            debug!("receiving server authenticator");
+
+            let server_authenticator: Authenticator = session
+                .read_object()
+                .await
+                .context("failed to read server authenticator")?;
 
             let key = client
                 .receive_server_authenticator(server_authenticator.0)

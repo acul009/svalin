@@ -51,11 +51,32 @@ async fn integration_tests() {
 
     let first_connect = Client::first_connect(host.clone()).await.unwrap();
 
+    let totp_secret = TOTP::default();
+    let username = "admin".to_string();
+    let password = "admin".to_string();
+
     match first_connect {
         crate::client::FirstConnect::Login(_) => unreachable!(),
         crate::client::FirstConnect::Init(init) => {
-            let totp_secret = TOTP::default();
-            init.init("admin".into(), "admin".into(), totp_secret)
+            init.init(username.clone(), password.clone(), totp_secret)
+                .await
+                .unwrap();
+        }
+    };
+
+    Client::remove_profile("admin@localhost:1234".into()).unwrap();
+
+    let second_connect = Client::first_connect(host.clone()).await.unwrap();
+
+    match second_connect {
+        crate::client::FirstConnect::Init(_) => unreachable!(),
+        crate::client::FirstConnect::Login(login) => {
+            login
+                .login(
+                    username.clone().into_bytes(),
+                    password.clone().into_bytes(),
+                    "".into(),
+                )
                 .await
                 .unwrap();
         }

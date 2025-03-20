@@ -1,6 +1,6 @@
 use std::{fmt::Debug, sync::Arc};
 
-use anyhow::{Ok, Result, anyhow};
+use anyhow::{Context, Ok, Result, anyhow};
 use aucpace::StrongDatabase;
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::ParamsString;
@@ -57,11 +57,11 @@ impl UserStore {
         self.scope.view(|b| {
             let usernames = b.get_bucket("usernames")?;
 
-            let public_key_user: Option<Vec<u8>> = usernames.get_object(username)?;
+            let public_key_user = usernames.get_kv(username);
 
             if let Some(public_key) = public_key_user {
                 let b = b.get_bucket("userdata")?;
-                user = b.get_object(&public_key)?;
+                user = b.get_object(public_key.value())?;
             }
 
             Ok(())
@@ -104,7 +104,7 @@ impl UserStore {
 
             let b = b.get_or_create_bucket("userdata")?;
             if b.get_kv(&fingerprint).is_some() {
-                return Err(anyhow!("User with uuid already exists"));
+                return Err(anyhow!("User with fingerprint already exists"));
             }
 
             b.put_object(fingerprint.to_owned(), &user)?;
