@@ -4,7 +4,10 @@ use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage, client};
 use curve25519_dalek::RistrettoPoint;
-use password_hash::{ParamsString, rand_core::OsRng};
+use password_hash::{
+    ParamsString,
+    rand_core::{OsRng, RngCore},
+};
 use serde::{
     Deserialize, Serialize,
     de::{self},
@@ -91,6 +94,14 @@ impl TryFrom<ClientMessage<'_, NONCE_LENGTH>> for Nonce {
             ClientMessage::Nonce(nonce) => Ok(Nonce(nonce)),
             _ => Err(MessageTransformError::WrongInputVariant),
         }
+    }
+}
+
+impl Nonce {
+    fn generate() -> Self {
+        let mut nonce = [0u8; NONCE_LENGTH];
+        password_hash::rand_core::OsRng.fill_bytes(&mut nonce);
+        Nonce(nonce)
     }
 }
 
@@ -254,12 +265,17 @@ impl TakeableCommandHandler for LoginHandler {
         _cancel: CancellationToken,
     ) -> Result<()> {
         if let Some(mut session) = session.take() {
-            let username: Vec<u8> = session.read_object().await?;
+            let tls_server_nonce = Nonce::generate();
 
-            debug!(
-                "received login request for user: {}",
-                String::from_utf8_lossy(&username)
-            );
+            session.write_object(&tls_server_nonce).await?;
+
+            let tls_client_nonce: Nonce = session.read_object().await?;
+
+            let tls_combined_nonce: Vec<u8> = tls_server_nonce
+                .0
+                .into_iter()
+                .chain(tls_client_nonce.0.into_iter())
+                .collect();
 
             // ===== Establish TLS Connection and generate common secret =====
 
@@ -280,7 +296,7 @@ impl TakeableCommandHandler for LoginHandler {
 
             let mut key_material = [0u8; 32];
             let key_material = tls_transport
-                .derive_key(&mut key_material, b"login", &username)
+                .derive_key(&mut key_material, b"login", &tls_combined_nonce)
                 .context("Failed to derive key")?;
 
             let (read, write) = tokio::io::split(tls_transport);
@@ -288,15 +304,6 @@ impl TakeableCommandHandler for LoginHandler {
             let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
 
             debug!("server session recreated");
-
-            // ===== Get User =====
-
-            let user = self
-                .user_store
-                .get_user_by_username(username.as_ref())
-                .context("Failed to get user")?;
-
-            debug!("user retrieved");
 
             // ===== SSID Establishment =====
             let mut pake_server: AuCPaceServer<_, _, NONCE_LENGTH> =
@@ -327,6 +334,8 @@ impl TakeableCommandHandler for LoginHandler {
                 .read_object()
                 .await
                 .context("Failed to read strong username")?;
+
+            let username = strong_username.username.clone();
 
             let (pake_server, client_info) = pake_server
                 .generate_client_info_strong(
@@ -409,13 +418,17 @@ impl TakeableCommandDispatcher for Login {
         _: Self::Request,
     ) -> Result<Self::Output> {
         if let Some(mut session) = session.take() {
-            // Write the username to the session
-            session.write_object(&self.username).await?;
+            let tls_client_nonce = Nonce::generate();
 
-            debug!(
-                "trying to log in as {}",
-                String::from_utf8_lossy(&self.username)
-            );
+            session.write_object(&tls_client_nonce).await?;
+
+            let tls_server_nonce: Nonce = session.read_object().await?;
+
+            let tls_combined_nonce: Vec<u8> = tls_server_nonce
+                .0
+                .into_iter()
+                .chain(tls_client_nonce.0.into_iter())
+                .collect();
 
             // ===== TLS Initialization =====
             let (read, write, _) = session.destructure_transport();
@@ -437,7 +450,7 @@ impl TakeableCommandDispatcher for Login {
 
             let mut key_material = [0u8; 32];
             let key_material = tls_transport
-                .derive_key(&mut key_material, b"login", &self.username)
+                .derive_key(&mut key_material, b"login", &tls_combined_nonce)
                 .context("Failed to derive key")?;
 
             let (read, write) = tokio::io::split(tls_transport);
