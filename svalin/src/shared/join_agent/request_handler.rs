@@ -159,6 +159,8 @@ impl TakeableCommandDispatcher for RequestJoin {
             let root: Certificate = session.read_object().await?;
             let upstream: Certificate = session.read_object().await?;
 
+            debug!("received all neccessary data to initialize agent");
+
             Ok(AgentInitPayload {
                 credentials: my_credentials,
                 address: self.address,

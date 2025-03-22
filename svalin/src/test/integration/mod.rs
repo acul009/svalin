@@ -109,7 +109,7 @@ async fn integration_tests() {
         confirm_send
             .send(confirm.confirm_code().to_owned())
             .unwrap();
-        debug!("waiting for user to confirm agent join");
+        debug!("agent waiting for confirmation");
         let agent = confirm.wait_for_confirm().await.unwrap();
         debug!("agent init complete!");
         debug!("starting up agent");
@@ -119,7 +119,7 @@ async fn integration_tests() {
 
     let client_confirm = client.add_agent_with_code(join_code).await.unwrap();
 
-    debug!("waiting for use to confirm agent join");
+    debug!("waiting to receive confirm code");
 
     client_confirm
         .confirm(confirm_recv.await.unwrap(), "test agent".into())
