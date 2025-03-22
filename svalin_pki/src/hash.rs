@@ -3,7 +3,6 @@ use argon2::{Argon2, Params, password_hash::ParamsString};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::debug;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ArgonCost {

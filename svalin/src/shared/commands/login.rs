@@ -1,9 +1,12 @@
-use std::sync::Arc;
+use std::{str, sync::Arc};
 
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage, client};
-use curve25519_dalek::RistrettoPoint;
+use curve25519_dalek::{
+    RistrettoPoint,
+    digest::{generic_array::GenericArray, typenum},
+};
 use password_hash::{
     ParamsString,
     rand_core::{OsRng, RngCore},
@@ -12,7 +15,7 @@ use serde::{
     Deserialize, Serialize,
     de::{self},
 };
-use svalin_pki::{ArgonCost, Keypair, argon2::Argon2, sha2::Sha512};
+use svalin_pki::{ArgonCost, EncryptedData, Keypair, argon2::Argon2, sha2::Sha512};
 use svalin_rpc::{
     rpc::{
         command::{
@@ -265,6 +268,9 @@ impl TakeableCommandHandler for LoginHandler {
         _cancel: CancellationToken,
     ) -> Result<()> {
         if let Some(mut session) = session.take() {
+            // TODO: Really important!!!
+            // implement rate limiting!!!
+
             let tls_server_nonce = Nonce::generate();
 
             session.write_object(&tls_server_nonce).await?;
@@ -384,6 +390,30 @@ impl TakeableCommandHandler for LoginHandler {
                 .write_object(&server_authenticator)
                 .await
                 .context("Failed to write server authenticator")?;
+
+            // ===== TOTP =====
+
+            let user = self
+                .user_store
+                .get_user_by_username(&username)?
+                .ok_or_else(|| anyhow!("failed to get user by username"))?;
+
+            let totp_encrypted: Vec<u8> =
+                session.read_object().await.context("Failed to read totp")?;
+
+            let totp = EncryptedData::decrypt_with_key(&totp_encrypted, key_to_array(key)).await?;
+            let totp = String::from_utf8(totp)?;
+
+            let totp_success = user.totp_secret.check_current(&totp)?;
+
+            session
+                .write_object(&totp_success)
+                .await
+                .context("Failed to write totp success")?;
+
+            if !totp_success {
+                return Err(anyhow!("failed to verify totp"));
+            }
 
             Ok(())
         } else {
@@ -565,9 +595,32 @@ impl TakeableCommandDispatcher for Login {
                 .receive_server_authenticator(server_authenticator.0)
                 .map_err(|err| anyhow!(err))?;
 
+            let totp =
+                EncryptedData::encrypt_with_key(self.totp.as_bytes(), key_to_array(key)).await?;
+
+            session
+                .write_object(&totp)
+                .await
+                .context("failed to write totp")?;
+
+            let totp_success: bool = session.read_object().await?;
+
+            if !totp_success {
+                return Err(anyhow!("TOTP failed"));
+            }
+
             Ok(())
         } else {
             Err(anyhow!("no session given"))
         }
     }
+}
+
+fn key_to_array(key: GenericArray<u8, typenum::U64>) -> [u8; 32] {
+    [
+        key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7], key[8], key[9], key[10],
+        key[11], key[12], key[13], key[14], key[15], key[16], key[17], key[18], key[19], key[20],
+        key[21], key[22], key[23], key[24], key[25], key[26], key[27], key[28], key[29], key[30],
+        key[31],
+    ]
 }

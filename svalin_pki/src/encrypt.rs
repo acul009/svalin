@@ -1,11 +1,12 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
 use ring::aead::{
-    Aad, BoundKey, Nonce, NonceSequence, OpeningKey, SealingKey, UnboundKey, AES_256_GCM,
-    CHACHA20_POLY1305, NONCE_LEN,
+    AES_256_GCM, Aad, BoundKey, CHACHA20_POLY1305, NONCE_LEN, Nonce, NonceSequence, OpeningKey,
+    SealingKey, UnboundKey,
 };
 use serde::{Deserialize, Serialize};
 use tracing::debug;
+use x509_parser::nom::Err;
 
 use crate::hash::ArgonParams;
 
@@ -26,7 +27,7 @@ impl From<EncryptionAlgorythm> for &'static ring::aead::Algorithm {
 
 #[derive(Serialize, Deserialize)]
 pub struct EncryptedData {
-    parameters: ArgonParams,
+    parameters: Option<ArgonParams>,
     ciphertext: Vec<u8>,
     alg: EncryptionAlgorythm,
 }
@@ -57,17 +58,21 @@ static DEFAULT_ALG: EncryptionAlgorythm = EncryptionAlgorythm::Chacha20Poly1305;
 
 impl EncryptedData {
     pub async fn encrypt_with_password(data: &[u8], password: Vec<u8>) -> Result<Vec<u8>> {
-        EncryptedData::encrypt_with_alg(data, password, DEFAULT_ALG).await
+        let parameters = ArgonParams::strong();
+        let encryption_key = parameters.derive_key(password).await?;
+        EncryptedData::encrypt_with_alg(data, encryption_key, DEFAULT_ALG, Some(parameters)).await
+    }
+
+    pub async fn encrypt_with_key(data: &[u8], encryption_key: [u8; 32]) -> Result<Vec<u8>> {
+        EncryptedData::encrypt_with_alg(data, encryption_key, DEFAULT_ALG, None).await
     }
 
     async fn encrypt_with_alg(
         data: &[u8],
-        password: Vec<u8>,
+        encryption_key: [u8; 32],
         alg: EncryptionAlgorythm,
+        parameters: Option<ArgonParams>,
     ) -> Result<Vec<u8>> {
-        let parameters = ArgonParams::basic();
-        let encryption_key = parameters.derive_key(password).await?;
-
         let ring_alg = alg.into();
 
         let unbound = UnboundKey::new(ring_alg, &encryption_key).map_err(|err| anyhow!(err))?;
@@ -93,13 +98,30 @@ impl EncryptedData {
     }
 
     pub async fn decrypt_with_password(cipherdata: &[u8], password: Vec<u8>) -> Result<Vec<u8>> {
-        let mut encrypted_data: EncryptedData = postcard::from_bytes(cipherdata)?;
+        let encrypted_data: EncryptedData = postcard::from_bytes(cipherdata)?;
+
+        let parameters = if let Some(parameters) = &encrypted_data.parameters {
+            parameters
+        } else {
+            return Err(anyhow!("encrypted data has no hash parameters"));
+        };
 
         debug!("deriving key");
-        let encryption_key = encrypted_data.parameters.derive_key(password).await?;
+        let encryption_key = parameters.derive_key(password).await?;
 
-        debug!("key derived");
+        Self::decrypt_helper(encrypted_data, encryption_key).await
+    }
 
+    pub async fn decrypt_with_key(cipherdata: &[u8], encryption_key: [u8; 32]) -> Result<Vec<u8>> {
+        let encrypted_data: EncryptedData = postcard::from_bytes(cipherdata)?;
+
+        Self::decrypt_helper(encrypted_data, encryption_key).await
+    }
+
+    async fn decrypt_helper(
+        mut encrypted_data: EncryptedData,
+        encryption_key: [u8; 32],
+    ) -> Result<Vec<u8>> {
         let ring_alg = encrypted_data.alg.into();
 
         let unbound = UnboundKey::new(ring_alg, &encryption_key).map_err(|err| anyhow!(err))?;

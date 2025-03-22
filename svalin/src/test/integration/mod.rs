@@ -58,7 +58,7 @@ async fn integration_tests() {
     match first_connect {
         crate::client::FirstConnect::Login(_) => unreachable!(),
         crate::client::FirstConnect::Init(init) => {
-            init.init(username.clone(), password.clone(), totp_secret)
+            init.init(username.clone(), password.clone(), totp_secret.clone())
                 .await
                 .unwrap();
         }
@@ -75,7 +75,7 @@ async fn integration_tests() {
                 .login(
                     username.clone().into_bytes(),
                     password.clone().into_bytes(),
-                    "".into(),
+                    totp_secret.generate_current().unwrap(),
                 )
                 .await
                 .unwrap();
