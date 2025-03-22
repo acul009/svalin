@@ -64,6 +64,8 @@ async fn integration_tests() {
         }
     };
 
+    // ===== TEST LOGIN =====
+
     Client::remove_profile("admin@localhost:1234".into()).unwrap();
 
     let second_connect = Client::first_connect(host.clone()).await.unwrap();
@@ -82,6 +84,8 @@ async fn integration_tests() {
         }
     };
 
+    // ===== TEST CLIENT =====
+
     let client = Client::open_profile("admin@localhost:1234".into(), "admin".as_bytes().to_owned())
         .await
         .unwrap();
@@ -91,7 +95,8 @@ async fn integration_tests() {
     let duration = client.ping_upstream().await.unwrap();
     debug!("ping duration: {:?}", duration);
 
-    // test_agent
+    // ===== TEST AGENT =====
+
     debug!("initializing agent!");
     let waiting = Agent::init(host.clone()).await.unwrap();
     let join_code = waiting.join_code().to_owned();
@@ -104,10 +109,12 @@ async fn integration_tests() {
         confirm_send
             .send(confirm.confirm_code().to_owned())
             .unwrap();
+        debug!("waiting for user to confirm agent join");
         let agent = confirm.wait_for_confirm().await.unwrap();
         debug!("agent init complete!");
         debug!("starting up agent");
         agent.run().await.unwrap();
+        debug!("agent has unexpectedly exited");
     });
 
     let client_confirm = client.add_agent_with_code(join_code).await.unwrap();
@@ -122,6 +129,10 @@ async fn integration_tests() {
     tokio::time::sleep(Duration::from_secs(5)).await;
 
     let device = client.device_list().first_key_value().unwrap().1.clone();
+
+    if !device.item().online_status {
+        panic!("Device is not online");
+    }
 
     let ping = device.ping().await.unwrap();
 
