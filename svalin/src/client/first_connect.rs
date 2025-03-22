@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use anyhow::{Context, Ok, Result};
+use svalin_pki::PermCredentials;
 use svalin_pki::verifier::KnownCertificateVerifier;
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
@@ -34,7 +35,7 @@ impl Client {
 
         let first_connect = match server_status {
             PublicStatus::WaitingForInit => FirstConnect::Init(Init { client, address }),
-            PublicStatus::Ready => FirstConnect::Login(Login { client }),
+            PublicStatus::Ready => FirstConnect::Login(Login { client, address }),
         };
 
         debug!("returning from first connect");
@@ -120,6 +121,7 @@ impl Init {
 
 pub struct Login {
     client: RpcClient,
+    address: String,
 }
 
 impl Debug for Login {
@@ -129,17 +131,30 @@ impl Debug for Login {
 }
 
 impl Login {
-    pub async fn login(self, username: Vec<u8>, password: Vec<u8>, totp: String) -> Result<String> {
-        let stuff = self
+    pub async fn login(self, username: String, password: Vec<u8>, totp: String) -> Result<String> {
+        let login_data = self
             .client
             .upstream_connection()
             .dispatch(commands::login::Login {
-                username,
-                password,
+                username: username.clone().into(),
+                password: password.clone(),
                 totp,
             })
             .await?;
 
-        Ok("lol".into())
+        let credentials =
+            PermCredentials::from_bytes(&login_data.encrypted_credentials, password.clone())
+                .await?;
+
+        Client::add_profile(
+            username,
+            self.address,
+            login_data.server_cert,
+            login_data.root_cert,
+            credentials,
+            password,
+        )
+        .await
+        .context("failed to save profile")
     }
 }

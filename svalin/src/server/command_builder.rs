@@ -24,7 +24,8 @@ use crate::{
 use super::{agent_store::AgentStore, user_store::UserStore};
 
 pub struct SvalinCommandBuilder {
-    pub root: svalin_pki::Certificate,
+    pub root_cert: svalin_pki::Certificate,
+    pub server_cert: svalin_pki::Certificate,
     pub agent_store: Arc<AgentStore>,
     pub user_store: Arc<UserStore>,
 }
@@ -33,7 +34,8 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
     type PH = ServerPermissionHandler;
 
     async fn build(self, server: &Arc<RpcServer>) -> anyhow::Result<HandlerCollection<Self::PH>> {
-        let permission_handler: ServerPermissionHandler = ServerPermissionHandler::new(self.root);
+        let permission_handler: ServerPermissionHandler =
+            ServerPermissionHandler::new(self.root_cert.clone());
 
         let commands = HandlerCollection::new(permission_handler);
 
@@ -44,7 +46,11 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             .await
             .add(PingHandler)
             .add(PublicStatusHandler::new(PublicStatus::Ready))
-            .add(LoginHandler::new(self.user_store.clone()))
+            .add(LoginHandler::new(
+                self.user_store.clone(),
+                self.root_cert.clone(),
+                self.server_cert.clone(),
+            ))
             .add(AddUserHandler::new(self.user_store.clone()))
             .add(join_manager.create_request_handler())
             .add(join_manager.create_accept_handler())

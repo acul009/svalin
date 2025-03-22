@@ -143,7 +143,8 @@ impl Server {
         let verifier = TlsOptionalWrapper::new(verifier);
 
         let command_builder = SvalinCommandBuilder {
-            root: root.clone(),
+            root_cert: root.clone(),
+            server_cert: credentials.get_certificate().clone(),
             user_store: user_store,
             agent_store: agent_store,
         };

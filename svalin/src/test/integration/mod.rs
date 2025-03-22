@@ -73,7 +73,7 @@ async fn integration_tests() {
         crate::client::FirstConnect::Login(login) => {
             login
                 .login(
-                    username.clone().into_bytes(),
+                    username.clone(),
                     password.clone().into_bytes(),
                     totp_secret.generate_current().unwrap(),
                 )
@@ -85,6 +85,8 @@ async fn integration_tests() {
     let client = Client::open_profile("admin@localhost:1234".into(), "admin".as_bytes().to_owned())
         .await
         .unwrap();
+
+    debug!("Login successful!");
 
     let duration = client.ping_upstream().await.unwrap();
     debug!("ping duration: {:?}", duration);

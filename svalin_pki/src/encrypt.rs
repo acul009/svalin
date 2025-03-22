@@ -4,9 +4,8 @@ use ring::aead::{
     AES_256_GCM, Aad, BoundKey, CHACHA20_POLY1305, NONCE_LEN, Nonce, NonceSequence, OpeningKey,
     SealingKey, UnboundKey,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tracing::debug;
-use x509_parser::nom::Err;
 
 use crate::hash::ArgonParams;
 
@@ -60,14 +59,22 @@ impl EncryptedData {
     pub async fn encrypt_with_password(data: &[u8], password: Vec<u8>) -> Result<Vec<u8>> {
         let parameters = ArgonParams::strong();
         let encryption_key = parameters.derive_key(password).await?;
-        EncryptedData::encrypt_with_alg(data, encryption_key, DEFAULT_ALG, Some(parameters)).await
+        EncryptedData::encrypt_with_alg(data, encryption_key, DEFAULT_ALG, Some(parameters))
     }
 
-    pub async fn encrypt_with_key(data: &[u8], encryption_key: [u8; 32]) -> Result<Vec<u8>> {
-        EncryptedData::encrypt_with_alg(data, encryption_key, DEFAULT_ALG, None).await
+    pub fn encrypt_object_with_key<T: Serialize>(
+        data: &T,
+        encryption_key: [u8; 32],
+    ) -> Result<Vec<u8>> {
+        let serialized = postcard::to_extend(data, Vec::new())?;
+        Self::encrypt_with_key(&serialized, encryption_key)
     }
 
-    async fn encrypt_with_alg(
+    pub fn encrypt_with_key(data: &[u8], encryption_key: [u8; 32]) -> Result<Vec<u8>> {
+        Self::encrypt_with_alg(data, encryption_key, DEFAULT_ALG, None)
+    }
+
+    fn encrypt_with_alg(
         data: &[u8],
         encryption_key: [u8; 32],
         alg: EncryptionAlgorythm,
@@ -109,16 +116,27 @@ impl EncryptedData {
         debug!("deriving key");
         let encryption_key = parameters.derive_key(password).await?;
 
-        Self::decrypt_helper(encrypted_data, encryption_key).await
+        Self::decrypt_helper(encrypted_data, encryption_key)
     }
 
-    pub async fn decrypt_with_key(cipherdata: &[u8], encryption_key: [u8; 32]) -> Result<Vec<u8>> {
+    pub fn decrypt_with_key(cipherdata: &[u8], encryption_key: [u8; 32]) -> Result<Vec<u8>> {
         let encrypted_data: EncryptedData = postcard::from_bytes(cipherdata)?;
 
-        Self::decrypt_helper(encrypted_data, encryption_key).await
+        Self::decrypt_helper(encrypted_data, encryption_key)
     }
 
-    async fn decrypt_helper(
+    pub fn decrypt_object_with_key<T: DeserializeOwned>(
+        cipherdata: &[u8],
+        encryption_key: [u8; 32],
+    ) -> Result<T> {
+        let decrypted_data = Self::decrypt_with_key(cipherdata, encryption_key)?;
+
+        postcard::from_bytes(&decrypted_data)
+            .map_err(|err| anyhow!(err))
+            .context("failed postcard decoding")
+    }
+
+    fn decrypt_helper(
         mut encrypted_data: EncryptedData,
         encryption_key: [u8; 32],
     ) -> Result<Vec<u8>> {

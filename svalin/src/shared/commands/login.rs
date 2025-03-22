@@ -2,7 +2,7 @@ use std::{str, sync::Arc};
 
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
-use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage, client};
+use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage};
 use curve25519_dalek::{
     RistrettoPoint,
     digest::{generic_array::GenericArray, typenum},
@@ -15,7 +15,9 @@ use serde::{
     Deserialize, Serialize,
     de::{self},
 };
-use svalin_pki::{ArgonCost, EncryptedData, Keypair, argon2::Argon2, sha2::Sha512};
+use svalin_pki::{
+    ArgonCost, Certificate, EncryptedData, Keypair, PermCredentials, argon2::Argon2, sha2::Sha512,
+};
 use svalin_rpc::{
     rpc::{
         command::{
@@ -31,25 +33,17 @@ use svalin_rpc::{
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
-use tracing_subscriber::field::debug;
 
 use crate::{
     permissions::Permission,
-    server::{
-        self,
-        user_store::{UserStore, serde_paramsstring},
-    },
+    server::user_store::{UserStore, serde_paramsstring},
 };
 
-#[derive(Serialize, Deserialize)]
-struct LoginAttempt {
-    password_hash: Vec<u8>,
-    current_totp: String,
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LoginSuccess {
     pub encrypted_credentials: Vec<u8>,
+    pub root_cert: Certificate,
+    pub server_cert: Certificate,
 }
 
 impl From<&PermissionPrecursor<(), LoginHandler>> for Permission {
@@ -60,11 +54,21 @@ impl From<&PermissionPrecursor<(), LoginHandler>> for Permission {
 
 pub struct LoginHandler {
     user_store: Arc<UserStore>,
+    root_cert: Certificate,
+    server_cert: Certificate,
 }
 
 impl LoginHandler {
-    pub fn new(user_store: Arc<UserStore>) -> Self {
-        Self { user_store }
+    pub fn new(
+        user_store: Arc<UserStore>,
+        root_cert: Certificate,
+        server_cert: Certificate,
+    ) -> Self {
+        Self {
+            user_store,
+            root_cert,
+            server_cert,
+        }
     }
 }
 
@@ -401,8 +405,8 @@ impl TakeableCommandHandler for LoginHandler {
             let totp_encrypted: Vec<u8> =
                 session.read_object().await.context("Failed to read totp")?;
 
-            let totp = EncryptedData::decrypt_with_key(&totp_encrypted, key_to_array(key)).await?;
-            let totp = String::from_utf8(totp)?;
+            let totp: String =
+                EncryptedData::decrypt_object_with_key(&totp_encrypted, key_to_array(key))?;
 
             let totp_success = user.totp_secret.check_current(&totp)?;
 
@@ -414,6 +418,20 @@ impl TakeableCommandHandler for LoginHandler {
             if !totp_success {
                 return Err(anyhow!("failed to verify totp"));
             }
+
+            let success = LoginSuccess {
+                encrypted_credentials: user.encrypted_credentials,
+                root_cert: self.root_cert.clone(),
+                server_cert: self.server_cert.clone(),
+            };
+
+            let encrypted_success =
+                EncryptedData::encrypt_object_with_key(&success, key_to_array(key))?;
+
+            session
+                .write_object(&encrypted_success)
+                .await
+                .context("Failed to write encrypted success")?;
 
             Ok(())
         } else {
@@ -430,7 +448,7 @@ pub struct Login {
 
 #[async_trait]
 impl TakeableCommandDispatcher for Login {
-    type Output = ();
+    type Output = LoginSuccess;
 
     type Request = ();
 
@@ -595,8 +613,7 @@ impl TakeableCommandDispatcher for Login {
                 .receive_server_authenticator(server_authenticator.0)
                 .map_err(|err| anyhow!(err))?;
 
-            let totp =
-                EncryptedData::encrypt_with_key(self.totp.as_bytes(), key_to_array(key)).await?;
+            let totp = EncryptedData::encrypt_object_with_key(&self.totp, key_to_array(key))?;
 
             session
                 .write_object(&totp)
@@ -609,7 +626,12 @@ impl TakeableCommandDispatcher for Login {
                 return Err(anyhow!("TOTP failed"));
             }
 
-            Ok(())
+            let encrypted_success: Vec<u8> = session.read_object().await?;
+
+            let success: LoginSuccess =
+                EncryptedData::decrypt_object_with_key(&encrypted_success, key_to_array(key))?;
+
+            Ok(success)
         } else {
             Err(anyhow!("no session given"))
         }
