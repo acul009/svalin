@@ -76,6 +76,8 @@ impl Server {
             Ok(())
         })?;
 
+        debug!("creating socket");
+
         let socket = RpcServer::create_socket(config.addr).context("failed to create socket")?;
 
         let base_config = match base_config {

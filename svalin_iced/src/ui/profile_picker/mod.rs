@@ -7,6 +7,7 @@ use iced::{
     widget::{button, column, container, row, stack, text, text_input},
 };
 use init_server::InitServer;
+use login::LoginDialog;
 use svalin::client::{Client, FirstConnect, Init, Login};
 
 use super::{
@@ -15,6 +16,7 @@ use super::{
 };
 
 mod init_server;
+mod login;
 
 enum State {
     Error(ErrorDisplayInfo<Arc<anyhow::Error>>),
@@ -23,6 +25,7 @@ enum State {
     Loading(String),
     AddProfile { host: String },
     InitServer(InitServer),
+    LoginDialog(LoginDialog),
 }
 
 pub struct ProfilePicker {
@@ -44,6 +47,7 @@ pub enum Message {
     Connect(String),
     Init(Arc<Init>),
     InitServer(init_server::Message),
+    LoginDialog(login::Message),
     Login(Arc<Login>),
     Profile(Arc<Client>),
 }
@@ -110,6 +114,23 @@ impl ProfilePicker {
                     Action::None
                 }
             }
+            Message::LoginDialog(message) => {
+                if let State::LoginDialog(login_dialog) = &mut self.state {
+                    let action = login_dialog.update(message);
+
+                    match action {
+                        login::Action::None => Action::None,
+                        login::Action::Exit(host) => {
+                            self.add_profile(host);
+                            Action::None
+                        }
+                        login::Action::OpenProfile(client) => Action::OpenProfile(client),
+                        login::Action::Run(task) => Action::Run(task.map(Message::LoginDialog)),
+                    }
+                } else {
+                    Action::None
+                }
+            }
             Message::Error(display_info) => {
                 self.state = State::Error(display_info);
                 Action::None
@@ -152,7 +173,7 @@ impl ProfilePicker {
                     ));
                 }
 
-                Action::None
+                Action::Run(Task::done(Message::Reset))
             }
             Message::CancelDelete => {
                 self.confirm_delete = None;
@@ -166,7 +187,7 @@ impl ProfilePicker {
                     self.state = State::Loading(t!("profile-picker.unlocking").to_string());
 
                     Action::Run(Task::future(async move {
-                        match Client::open_profile_string(profile, password).await {
+                        match Client::open_profile_string(profile, password.into_bytes()).await {
                             Ok(client) => Message::Profile(Arc::new(client)),
                             Err(err) => Message::Error(ErrorDisplayInfo::new(
                                 Arc::new(err),
@@ -204,8 +225,11 @@ impl ProfilePicker {
 
                 Action::Run(task.map(Message::InitServer))
             }
-            Message::Login(_login) => {
-                todo!()
+            Message::Login(login) => {
+                let (state, task) = LoginDialog::start(login);
+                self.state = State::LoginDialog(state);
+
+                Action::Run(task.map(Message::LoginDialog))
             }
             Message::Profile(client) => Action::OpenProfile(client),
         }
@@ -218,6 +242,7 @@ impl ProfilePicker {
     pub fn view(&self) -> Element<Message> {
         match &self.state {
             State::InitServer(init_server) => init_server.view().map(Message::InitServer),
+            State::LoginDialog(login_dialog) => login_dialog.view().map(Message::LoginDialog),
             State::Error(display_info) => display_info.view().on_close(Message::Reset).into(),
             State::Loading(message) => loading(message).expand().into(),
             State::SelectProfile(profiles) => {

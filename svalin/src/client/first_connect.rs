@@ -157,4 +157,8 @@ impl Login {
         .await
         .context("failed to save profile")
     }
+
+    pub fn address(&self) -> &str {
+        &self.address
+    }
 }

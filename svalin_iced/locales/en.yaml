@@ -22,6 +22,7 @@ profile-picker:
     unlock: Error while unlocking Profile
     delete: Error while deleting profile
     connect-to-server: Error while connecting to server
+    login: Error during login
   init-loading: initializing Server...
   unlocking: Unlocking Profile...
   connecting-to-server: Connecting to Server...
@@ -34,6 +35,8 @@ profile-picker:
     confirm-password: Confirm Password
     totp: 2FA Code
   copy-totp: Copy TOTP-Secret
+  login: Login
+  login-loading: Logging in...
 add-device:
   connecting: Connecting to Device...
   error:

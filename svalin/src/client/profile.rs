@@ -1,10 +1,10 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    verifier::{exact::ExactVerififier, KnownCertificateVerifier},
     Certificate, PermCredentials,
+    verifier::{KnownCertificateVerifier, exact::ExactVerififier},
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::{sync::watch, task::JoinSet};
@@ -163,8 +163,8 @@ impl Client {
         Ok(())
     }
 
-    pub async fn open_profile_string(profile_key: String, password: String) -> Result<Self> {
-        Self::open_profile(profile_key, password.into_bytes()).await
+    pub async fn open_profile_string(profile_key: String, password: Vec<u8>) -> Result<Self> {
+        Self::open_profile(profile_key, password).await
     }
 
     pub async fn open_profile(profile_key: String, password: Vec<u8>) -> Result<Self> {
