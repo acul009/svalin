@@ -1,6 +1,6 @@
 use std::{fmt::Debug, sync::Arc};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
@@ -8,9 +8,9 @@ use tracing::debug;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
+    Certificate, CertificateRequest,
     encrypt::EncryptedData,
     signed_message::{CanSign, CanVerify},
-    Certificate, CertificateRequest,
 };
 
 #[derive(Debug)]
@@ -102,7 +102,7 @@ impl PermCredentials {
         let certificate =
             Certificate::from_der(on_disk.raw_cert).context("failed to decode certificate")?;
 
-        debug!("decrypting credentials");
+        debug!("decrypting credentials with password");
 
         let decrypted_keypair =
             EncryptedData::decrypt_with_password(&on_disk.encrypted_keypair, password)

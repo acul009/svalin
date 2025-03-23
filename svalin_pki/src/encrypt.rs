@@ -113,7 +113,6 @@ impl EncryptedData {
             return Err(anyhow!("encrypted data has no hash parameters"));
         };
 
-        debug!("deriving key");
         let encryption_key = parameters.derive_key(password).await?;
 
         Self::decrypt_helper(encrypted_data, encryption_key)

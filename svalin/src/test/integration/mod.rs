@@ -126,9 +126,15 @@ async fn integration_tests() {
         .await
         .unwrap();
 
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    let mut device_list = client.watch_device_list();
 
-    let device = client.device_list().first_key_value().unwrap().1.clone();
+    // The first change is caused by the agent being added to the device list
+    device_list.changed().await.unwrap();
+    // The second change is caused by the agent connecting and therefore switching
+    // to online
+    device_list.changed().await.unwrap();
+
+    let device = device_list.borrow().first_key_value().unwrap().1.clone();
 
     if !device.item().online_status {
         panic!("Device is not online");

@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use marmelade::Scope;
 use serde::{Deserialize, Serialize};
-use svalin_pki::verifier::exact::ExactVerififier;
 use svalin_pki::verifier::KnownCertificateVerifier;
+use svalin_pki::verifier::exact::ExactVerififier;
 use svalin_pki::{Certificate, PermCredentials};
 use svalin_rpc::commands::deauthenticate::DeauthenticateHandler;
 use svalin_rpc::commands::e2e::E2EHandler;
@@ -43,10 +43,12 @@ impl Agent {
             .get_object("base_config")?
             .ok_or(anyhow!("agent not yet configured"))?;
 
-        debug!("decrypting credentials");
+        debug!("decrypting agent credentials");
 
         let credentials =
             Self::decrypt_credentials(config.encrypted_credentials, scope.clone()).await?;
+
+        debug!("building upstream verifier");
 
         let verifier = UpstreamVerifier::new(
             config.root_certificate.clone(),
@@ -164,6 +166,7 @@ impl Agent {
         }
     }
 
+    #[cfg(not(test))]
     fn get_general_config_dir_path() -> Result<PathBuf> {
         #[cfg(target_os = "windows")]
         {
@@ -213,6 +216,8 @@ impl Agent {
         if let Some(key_source) = key_source {
             let key = Self::source_to_key(key_source).await?;
 
+            debug!("Agent password loaded, decrypting...");
+
             PermCredentials::from_bytes(&encrypted_credentials, key).await
         } else {
             return Err(anyhow!("no keysource saved in DB"));
@@ -238,6 +243,9 @@ struct AgentConfig {
     encrypted_credentials: Vec<u8>,
 }
 
+/// The keysource enum is saved in the agent configuration and specifies how to
+/// load the key for decrypting the credentials This will enable the use of
+/// external key management systems should that be necessary one day
 #[derive(Serialize, Deserialize)]
 enum KeySource {
     BuiltIn(Vec<u8>),
