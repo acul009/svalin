@@ -20,7 +20,7 @@ pub use certificate_request::CertificateRequest;
 pub use encrypt::EncryptedData;
 pub use error::Error;
 pub use hash::*;
-pub use keypair::{Keypair, ToSelfSingedError};
+pub use keypair::{GenerateRequestError, Keypair, ToSelfSingedError};
 pub use perm_credentials::{CreateCredentialsError, DecodeCredentialsError, PermCredentials};
 use ring::rand::{SecureRandom, SystemRandom};
 

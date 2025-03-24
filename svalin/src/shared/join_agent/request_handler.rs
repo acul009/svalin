@@ -3,7 +3,10 @@ use std::time::Duration;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use rand::Rng;
-use svalin_pki::{Certificate, DeriveKeyError, Keypair, ToSelfSingedError};
+use svalin_pki::{
+    Certificate, CreateCredentialsError, DeriveKeyError, GenerateRequestError, Keypair,
+    ToSelfSingedError,
+};
 use svalin_rpc::{
     rpc::{
         command::{
@@ -93,6 +96,18 @@ pub enum RequestJoinError {
     ReadParamsError(SessionReadError),
     #[error("error deriving confirm key: {0}")]
     DeriveKeyError(DeriveKeyError),
+    #[error("error generating certificate request: {0}")]
+    GenerateRequestError(GenerateRequestError),
+    #[error("error sending request: {0}")]
+    SendRequestError(SessionWriteError),
+    #[error("error reading certificate: {0}")]
+    ReadCertificateError(SessionReadError),
+    #[error("error upgrading credentials: {0}")]
+    UpgradeError(CreateCredentialsError),
+    #[error("error reading upstream cert: {0}")]
+    ReadUpstreamCertError(SessionReadError),
+    #[error("error reading root cert: {0}")]
+    ReadRootCertError(SessionReadError),
 }
 
 pub struct RequestJoin {
@@ -201,15 +216,31 @@ impl TakeableCommandDispatcher for RequestJoin {
             self.confirm_code_channel.send(confirm_code).unwrap();
 
             let keypair = Keypair::generate();
-            let request = keypair.generate_request()?;
+            let request = keypair
+                .generate_request()
+                .map_err(RequestJoinError::GenerateRequestError)?;
             debug!("sending request: {}", request);
-            session.write_object(&request).await?;
+            session
+                .write_object(&request)
+                .await
+                .map_err(RequestJoinError::SendRequestError)?;
 
-            let my_cert: Certificate = session.read_object().await?;
-            let my_credentials = keypair.upgrade(my_cert)?;
+            let my_cert: Certificate = session
+                .read_object()
+                .await
+                .map_err(RequestJoinError::ReadCertificateError)?;
+            let my_credentials = keypair
+                .upgrade(my_cert)
+                .map_err(RequestJoinError::UpgradeError)?;
 
-            let root: Certificate = session.read_object().await?;
-            let upstream: Certificate = session.read_object().await?;
+            let root: Certificate = session
+                .read_object()
+                .await
+                .map_err(RequestJoinError::ReadRootCertError)?;
+            let upstream: Certificate = session
+                .read_object()
+                .await
+                .map_err(RequestJoinError::ReadUpstreamCertError)?;
 
             debug!("received all neccessary data to initialize agent");
 

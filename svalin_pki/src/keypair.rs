@@ -32,6 +32,16 @@ pub enum ToSelfSingedError {
     CreateCredentialsError(CreateCredentialsError),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum GenerateRequestError {
+    #[error("error parsing keypair: {0}")]
+    ParseKeypairError(rcgen::Error),
+    #[error("error parsing certificate: {0}")]
+    ParseCertificateError(rcgen::Error),
+    #[error("error serializing keypair: {0}")]
+    SerializeError(rcgen::Error),
+}
+
 impl Keypair {
     pub fn generate() -> Keypair {
         let rand = SystemRandom::new();
@@ -76,8 +86,9 @@ impl Keypair {
             .map_err(ToSelfSingedError::CreateCredentialsError)
     }
 
-    pub fn generate_request(&self) -> Result<String> {
-        let rc_keypair = rcgen::KeyPair::from_der(self.raw.as_ref())?;
+    pub fn generate_request(&self) -> Result<String, GenerateRequestError> {
+        let rc_keypair = rcgen::KeyPair::from_der(self.raw.as_ref())
+            .map_err(GenerateRequestError::ParseKeypairError)?;
         let mut params = rcgen::CertificateParams::new(vec![]);
         params.key_pair = Some(rc_keypair);
         params.alg = self.alg;
@@ -86,8 +97,11 @@ impl Keypair {
             .distinguished_name
             .push(DnType::CommonName, self.spki_hash());
 
-        let temp_cert = rcgen::Certificate::from_params(params)?;
-        Ok(temp_cert.serialize_request_pem()?)
+        let temp_cert = rcgen::Certificate::from_params(params)
+            .map_err(GenerateRequestError::ParseCertificateError)?;
+        Ok(temp_cert
+            .serialize_request_pem()
+            .map_err(GenerateRequestError::SerializeError)?)
     }
 
     /// This was recommended to me as a possible id by the rust crypto channel
