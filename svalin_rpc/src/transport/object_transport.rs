@@ -1,8 +1,7 @@
-use anyhow::{Context, Ok, Result};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Serialize, de::DeserializeOwned};
 
 use super::{
-    chunked_transport::{ChunkReader, ChunkWriter},
+    chunked_transport::{ChunkReader, ChunkReaderError, ChunkWriter, ChunkWriterError},
     session_transport::{SessionTransportReader, SessionTransportWriter},
 };
 
@@ -10,8 +9,12 @@ pub struct ObjectReader {
     read: ChunkReader,
 }
 
-pub struct ObjectWriter {
-    write: ChunkWriter,
+#[derive(Debug, thiserror::Error)]
+pub enum ObjectReaderError {
+    #[error("Failed to read chunk: {0}")]
+    ChunkReadError(#[from] ChunkReaderError),
+    #[error("Failed to deserialize object: {0}")]
+    DeserializeError(#[from] postcard::Error),
 }
 
 impl ObjectReader {
@@ -21,14 +24,10 @@ impl ObjectReader {
         }
     }
 
-    pub async fn read_object<U: DeserializeOwned>(&mut self) -> Result<U> {
-        let chunk = self
-            .read
-            .read_chunk()
-            .await
-            .context("failed reading chunk")?;
+    pub async fn read_object<U: DeserializeOwned>(&mut self) -> Result<U, ObjectReaderError> {
+        let chunk = self.read.read_chunk().await?;
 
-        let object: U = postcard::from_bytes(&chunk).context("failed deserializing")?;
+        let object: U = postcard::from_bytes(&chunk)?;
 
         Ok(object)
     }
@@ -42,6 +41,18 @@ impl ObjectReader {
     }
 }
 
+pub struct ObjectWriter {
+    write: ChunkWriter,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ObjectWriterError {
+    #[error("Failed to write chunk: {0}")]
+    ChunkWriteError(#[from] ChunkWriterError),
+    #[error("Failed to serialize object: {0}")]
+    SerializeError(#[from] postcard::Error),
+}
+
 impl ObjectWriter {
     pub(crate) fn new(write: Box<dyn SessionTransportWriter>) -> Self {
         Self {
@@ -49,7 +60,10 @@ impl ObjectWriter {
         }
     }
 
-    pub async fn write_object<U: Serialize>(&mut self, object: &U) -> Result<()> {
+    pub async fn write_object<U: Serialize>(
+        &mut self,
+        object: &U,
+    ) -> Result<(), ObjectWriterError> {
         let encoded = postcard::to_extend(&object, Vec::new())?;
 
         self.write.write_chunk(&encoded).await?;

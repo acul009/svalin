@@ -9,12 +9,15 @@ use crate::{
     permissions::PermissionHandler,
     rpc::command::handler::HandlerCollection,
     transport::{
-        object_transport::{ObjectReader, ObjectWriter},
+        object_transport::{ObjectReader, ObjectReaderError, ObjectWriter, ObjectWriterError},
         session_transport::{SessionTransportReader, SessionTransportWriter},
     },
 };
 
-use super::{command::dispatcher::TakeableCommandDispatcher, peer::Peer};
+use super::{
+    command::dispatcher::{DispatcherError, TakeableCommandDispatcher},
+    peer::Peer,
+};
 
 pub struct Session {
     read: ObjectReader,
@@ -43,6 +46,32 @@ pub enum SessionAction {
     Error(Session, anyhow::Error),
     Closed,
     Moved,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SessionReadError {
+    #[error("{0}")]
+    ObjectReaderError(#[from] ObjectReaderError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SessionWriteError {
+    #[error("{0}")]
+    ObjectWriterError(#[from] ObjectWriterError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SessionDispatchError<InnerError> {
+    #[error("error writing header: {0}")]
+    WriteHeaderError(SessionWriteError),
+    #[error("error writing request: {0}")]
+    WriteRequestError(SessionWriteError),
+    #[error("error reading response: {0}")]
+    ReadResponseError(SessionReadError),
+    #[error("session declined with code {code}: {message}")]
+    SessionDeclined { code: u32, message: String },
+    #[error("error running dispatcher: {0}")]
+    DispatcherError(#[from] DispatcherError<InnerError>),
 }
 
 impl Session {
@@ -89,19 +118,26 @@ impl Session {
     pub async fn dispatch<D: TakeableCommandDispatcher>(
         mut self,
         dispatcher: D,
-    ) -> Result<D::Output> {
+    ) -> Result<D::Output, SessionDispatchError<D::InnerError>> {
         let command_key = D::key();
 
         let header = SessionRequestHeader { command_key };
-        self.write_object(&header).await?;
+        self.write_object(&header)
+            .await
+            .map_err(SessionDispatchError::WriteHeaderError)?;
 
         let request = dispatcher.get_request();
-        self.write_object(&request).await?;
+        self.write_object(&request)
+            .await
+            .map_err(SessionDispatchError::WriteRequestError)?;
 
-        let response: SessionResponseHeader = self.read_object().await?;
+        let response: SessionResponseHeader = self
+            .read_object()
+            .await
+            .map_err(SessionDispatchError::ReadResponseError)?;
         match response {
             SessionResponseHeader::Decline { code, message } => {
-                return Err(anyhow!(format!("Error Code {}: {}", code, message)));
+                return Err(SessionDispatchError::SessionDeclined { code, message });
             }
             SessionResponseHeader::Accept => {
                 debug!("Peer accepted command: {}", D::key());
@@ -109,16 +145,13 @@ impl Session {
         };
 
         let mut opt = Some(self);
-        let result = dispatcher
-            .dispatch(&mut opt, request)
-            .await
-            .context("error while dispatcher was running");
+        let result = dispatcher.dispatch(&mut opt, request).await;
 
         if let Some(session) = opt {
             session.shutdown().await;
         }
 
-        result
+        result.map_err(SessionDispatchError::DispatcherError)
     }
 
     pub fn peer(&self) -> &Peer {
@@ -126,15 +159,20 @@ impl Session {
     }
 
     #[instrument(skip_all)]
-    pub async fn read_object<W: serde::de::DeserializeOwned>(&mut self) -> Result<W> {
+    pub async fn read_object<W: serde::de::DeserializeOwned>(
+        &mut self,
+    ) -> Result<W, SessionReadError> {
         // debug!("Reading: {}", std::any::type_name::<W>());
-        self.read.read_object().await
+        Ok(self.read.read_object().await?)
     }
 
     #[instrument(skip_all)]
-    pub async fn write_object<W: Serialize>(&mut self, object: &W) -> Result<()> {
+    pub async fn write_object<W: Serialize>(
+        &mut self,
+        object: &W,
+    ) -> Result<(), SessionWriteError> {
         // debug!("Writing: {}", std::any::type_name::<W>());
-        self.write.write_object(object).await
+        Ok(self.write.write_object(object).await?)
     }
 
     pub(crate) async fn shutdown(mut self) {
@@ -166,16 +204,4 @@ impl Session {
     ) {
         (self.read.borrow_reader(), self.write.borrow_writer())
     }
-}
-
-#[macro_export]
-macro_rules! write_object {
-    ($session:ident, $msg:ident) => {{
-        $session.write.write_object($msg).await;
-    }};
-}
-
-#[macro_export]
-macro_rules! read_object {
-    ($session:ident) => {{ $session.read.read_object().await }};
 }

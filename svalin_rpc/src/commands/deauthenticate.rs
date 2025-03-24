@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
@@ -7,7 +7,7 @@ use crate::{
     permissions::PermissionHandler,
     rpc::{
         command::{
-            dispatcher::TakeableCommandDispatcher,
+            dispatcher::{DispatcherError, TakeableCommandDispatcher},
             handler::{HandlerCollection, TakeableCommandHandler},
         },
         peer::Peer,
@@ -69,9 +69,13 @@ where
 #[derive(Default)]
 pub struct Deauthenticate;
 
+#[derive(Debug, thiserror::Error)]
+pub enum DeauthenticateError {}
+
 #[async_trait]
 impl TakeableCommandDispatcher for Deauthenticate {
     type Output = Session;
+    type InnerError = DeauthenticateError;
 
     type Request = ();
 
@@ -87,11 +91,11 @@ impl TakeableCommandDispatcher for Deauthenticate {
         self,
         session: &mut Option<Session>,
         _: Self::Request,
-    ) -> Result<Self::Output> {
+    ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session) = session.take() {
             Ok(session)
         } else {
-            Err(anyhow!("no session given"))
+            Err(DispatcherError::NoneSession)
         }
     }
 }

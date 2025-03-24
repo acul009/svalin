@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use std::error::Error;
+
+use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
@@ -23,15 +25,18 @@ pub trait ConnectionBase: Send + Sync + Clone {
     async fn closed(&self);
 }
 
-use super::command::dispatcher::TakeableCommandDispatcher;
+use super::command::dispatcher::{DispatcherError, TakeableCommandDispatcher};
 use super::peer::Peer;
+use super::session::SessionDispatchError;
 
 pub mod direct_connection;
 
 #[async_trait]
 pub trait Connection: Send + Sync + Clone {
     // async fn open_session(&self, command_key: String) -> Result<Session>;
-    async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>;
+    async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>
+    where
+        D::InnerError: Error + 'static;
     fn peer(&self) -> &Peer;
 }
 
@@ -58,12 +63,18 @@ where
     //     Ok(session)
     // }
 
-    async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output> {
+    async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>
+    where
+        D::InnerError: Error,
+    {
         let (read, write) = self.open_raw_session().await?;
 
         let session = Session::new(read, write, self.peer().clone());
 
-        session.dispatch(dispatcher).await
+        session
+            .dispatch(dispatcher)
+            .await
+            .map_err(|err| anyhow!(err.to_string()))
     }
 
     fn peer(&self) -> &Peer {

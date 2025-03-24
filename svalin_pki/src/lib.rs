@@ -15,6 +15,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Result, anyhow};
 pub use certificate::Certificate;
+pub use certificate::CertificateParseError;
 pub use certificate_request::CertificateRequest;
 pub use encrypt::EncryptedData;
 pub use error::Error;

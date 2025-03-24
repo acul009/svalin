@@ -3,8 +3,9 @@ use std::{pin::Pin, sync::Arc};
 use crate::rpc::peer::Peer;
 use crate::rustls;
 use crate::rustls::{client::danger::ServerCertVerifier, server::danger::ClientCertVerifier};
-use anyhow::{anyhow, Result};
-use svalin_pki::{Certificate, PermCredentials};
+use anyhow::{Result, anyhow};
+use quinn::rustls::pki_types::InvalidDnsNameError;
+use svalin_pki::{Certificate, CertificateParseError, PermCredentials};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::{TlsAcceptor, TlsStream};
 
@@ -18,6 +19,22 @@ where
     peer: Peer,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum TlsClientError {
+    #[error("error parsing key DER: {0}")]
+    ParseKeyDerError(String),
+    #[error("error creating config: {0}")]
+    CreateConfigError(rustls::Error),
+    #[error("error parsing hostname: {0}")]
+    ParseHostError(InvalidDnsNameError),
+    #[error("error creating connector: {0}")]
+    CreateConnectorError(std::io::Error),
+    #[error("peer did not provide a certificate")]
+    MissingCertificateError,
+    #[error("error parsing certificate: {0}")]
+    CertificateParseError(#[from] CertificateParseError),
+}
+
 impl<T> TlsTransport<T>
 where
     T: SessionTransport,
@@ -26,34 +43,39 @@ where
         base_transport: T,
         verifier: Arc<dyn ServerCertVerifier>,
         credentials: &PermCredentials,
-    ) -> Result<Self> {
+    ) -> Result<Self, TlsClientError> {
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
             credentials.get_certificate().to_der().to_owned(),
         )];
 
         let key_der =
             rustls::pki_types::PrivateKeyDer::try_from(credentials.get_key_bytes().to_owned())
-                .map_err(|err| anyhow!(err))?;
+                .map_err(|err| TlsClientError::ParseKeyDerError(err.to_string()))?;
 
         let config = rustls::ClientConfig::builder()
             .dangerous()
             .with_custom_certificate_verifier(verifier)
-            .with_client_auth_cert(cert_chain, key_der)?;
+            .with_client_auth_cert(cert_chain, key_der)
+            .map_err(TlsClientError::CreateConfigError)?;
 
         let connector = tokio_rustls::TlsConnector::from(Arc::new(config));
 
         // todo
-        let hostname = rustls::pki_types::ServerName::try_from("todo")?;
+        let hostname = rustls::pki_types::ServerName::try_from("todo")
+            .map_err(TlsClientError::ParseHostError)?;
 
-        let client = connector.connect(hostname, base_transport).await?;
+        let client = connector
+            .connect(hostname, base_transport)
+            .await
+            .map_err(TlsClientError::CreateConnectorError)?;
 
         let der = client
             .get_ref()
             .1
             .peer_certificates()
-            .ok_or(anyhow!("peer didn't provide a certificate"))?
+            .ok_or(TlsClientError::MissingCertificateError)?
             .first()
-            .ok_or(anyhow!("peer didn't provide a certificate"))?;
+            .ok_or(TlsClientError::MissingCertificateError)?;
 
         let cert = Certificate::from_der(der.to_vec())?;
 

@@ -1,6 +1,6 @@
-use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::Serialize;
+use thiserror::Error;
 
 use crate::rpc::session::Session;
 
@@ -9,6 +9,7 @@ use crate::rpc::session::Session;
 #[async_trait]
 pub trait CommandDispatcher: Send + Sync {
     type Output: Send;
+    type Error: Send;
 
     type Request: Send + Sync + Serialize;
 
@@ -16,7 +17,11 @@ pub trait CommandDispatcher: Send + Sync {
 
     fn get_request(&self) -> Self::Request;
 
-    async fn dispatch(self, session: &mut Session, request: Self::Request) -> Result<Self::Output>;
+    async fn dispatch(
+        self,
+        session: &mut Session,
+        request: Self::Request,
+    ) -> Result<Self::Output, Self::Error>;
 }
 
 /// Some dispatchers may require taking ownership of the session.
@@ -25,6 +30,7 @@ pub trait CommandDispatcher: Send + Sync {
 #[async_trait]
 pub trait TakeableCommandDispatcher: Send + Sync {
     type Output: Send;
+    type InnerError: Send;
 
     type Request: Send + Sync + Serialize;
 
@@ -36,7 +42,15 @@ pub trait TakeableCommandDispatcher: Send + Sync {
         self,
         session: &mut Option<Session>,
         request: Self::Request,
-    ) -> Result<Self::Output>;
+    ) -> Result<Self::Output, DispatcherError<Self::InnerError>>;
+}
+
+#[derive(Error, Debug)]
+pub enum DispatcherError<Error> {
+    #[error("tried dispatching command with None")]
+    NoneSession,
+    #[error("{0}")]
+    Other(#[from] Error),
 }
 
 #[async_trait]
@@ -45,6 +59,7 @@ where
     D: CommandDispatcher,
 {
     type Output = D::Output;
+    type InnerError = D::Error;
     type Request = D::Request;
 
     fn key() -> String {
@@ -59,12 +74,11 @@ where
         self,
         session: &mut Option<Session>,
         request: Self::Request,
-    ) -> Result<Self::Output> {
+    ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session) = session {
-            self.dispatch(session, request).await
-            // self.dispatch(session).await
+            Ok(self.dispatch(session, request).await?)
         } else {
-            Err(anyhow!("tried dispatching command with None"))
+            Err(DispatcherError::NoneSession)
         }
     }
 }

@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use quinn::rustls::server::danger::ClientCertVerifier;
 use svalin_pki::{
-    verifier::{exact::ExactVerififier, KnownCertificateVerifier},
     Certificate, PermCredentials,
+    verifier::{KnownCertificateVerifier, exact::ExactVerififier},
 };
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
@@ -14,13 +14,16 @@ use crate::{
     permissions::PermissionHandler,
     rpc::{
         command::{
-            dispatcher::TakeableCommandDispatcher,
+            dispatcher::{DispatcherError, TakeableCommandDispatcher},
             handler::{HandlerCollection, TakeableCommandHandler},
         },
         peer::Peer,
-        session::Session,
+        session::{Session, SessionDispatchError},
     },
-    transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
+    transport::{
+        combined_transport::CombinedTransport,
+        tls_transport::{TlsClientError, TlsTransport},
+    },
 };
 
 fn e2e_key() -> String {
@@ -95,6 +98,14 @@ where
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum E2EDispatchError<NestedError> {
+    #[error("error creating TLS client: {0}")]
+    TlsError(TlsClientError),
+    #[error("error dispatching nested command: {0}")]
+    NestedError(SessionDispatchError<NestedError>),
+}
+
 pub struct E2EDispatcher<'b, T> {
     pub peer: Certificate,
     pub credentials: &'b PermCredentials,
@@ -107,6 +118,7 @@ where
     D: TakeableCommandDispatcher,
 {
     type Output = D::Output;
+    type InnerError = E2EDispatchError<D::InnerError>;
 
     type Request = ();
 
@@ -122,7 +134,7 @@ where
         self,
         session: &mut Option<Session>,
         _: Self::Request,
-    ) -> Result<Self::Output> {
+    ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session_ready) = session.take() {
             debug!("encrypting session");
 
@@ -133,7 +145,8 @@ where
                 ExactVerififier::new(self.peer.clone()).to_tls_verifier(),
                 self.credentials,
             )
-            .await?;
+            .await
+            .map_err(E2EDispatchError::TlsError)?;
 
             let (read, write) = tokio::io::split(tls_transport);
 
@@ -143,9 +156,13 @@ where
                 Peer::Certificate(self.peer),
             );
 
-            session_ready.dispatch(self.nested_dispatch).await
+            session_ready
+                .dispatch(self.nested_dispatch)
+                .await
+                .map_err(E2EDispatchError::NestedError)
+                .map_err(DispatcherError::Other)
         } else {
-            Err(anyhow!("no session given"))
+            Err(DispatcherError::NoneSession)
         }
     }
 }

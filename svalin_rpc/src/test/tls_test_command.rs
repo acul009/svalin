@@ -2,12 +2,19 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::{
     rpc::{
-        command::{dispatcher::TakeableCommandDispatcher, handler::TakeableCommandHandler},
+        command::{
+            dispatcher::{DispatcherError, TakeableCommandDispatcher},
+            handler::TakeableCommandHandler,
+        },
         peer::Peer,
+        session::{SessionReadError, SessionWriteError},
     },
-    transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
+    transport::{
+        combined_transport::CombinedTransport,
+        tls_transport::{TlsClientError, TlsTransport},
+    },
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use svalin_pki::Keypair;
 use tokio_util::sync::CancellationToken;
@@ -68,11 +75,25 @@ impl TakeableCommandHandler for TlsTestCommandHandler {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum TlsTestClientError {
+    #[error("error during TLS client test: {0}")]
+    TlsClientError(#[from] TlsClientError),
+    #[error("error writing ping: {0}")]
+    WritePingError(#[from] SessionWriteError),
+    #[error("error reading pong: {0}")]
+    ReadPongError(#[from] SessionReadError),
+    #[error("error converting timestamp: {0}")]
+    ParseTimestampError(#[from] std::num::TryFromIntError),
+}
+
 pub struct TlsTest;
 
 #[async_trait]
 impl TakeableCommandDispatcher for TlsTest {
     type Output = ();
+
+    type InnerError = TlsTestClientError;
 
     type Request = ();
 
@@ -84,7 +105,11 @@ impl TakeableCommandDispatcher for TlsTest {
         ()
     }
 
-    async fn dispatch(self, session: &mut Option<Session>, _: Self::Request) -> Result<()> {
+    async fn dispatch(
+        self,
+        session: &mut Option<Session>,
+        _: Self::Request,
+    ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure_transport();
 
@@ -95,7 +120,8 @@ impl TakeableCommandDispatcher for TlsTest {
                 crate::verifiers::skip_verify::SkipServerVerification::new(),
                 &credentials,
             )
-            .await?;
+            .await
+            .map_err(TlsTestClientError::TlsClientError)?;
 
             let (read, write) = tokio::io::split(tls_transport);
 
@@ -106,23 +132,33 @@ impl TakeableCommandDispatcher for TlsTest {
                 .expect("Time went backwards")
                 .as_nanos();
 
-            session_ready.write_object(&ping).await?;
+            session_ready
+                .write_object(&ping)
+                .await
+                .map_err(TlsTestClientError::WritePingError)?;
 
-            let pong: u128 = session_ready.read_object().await?;
+            let pong: u128 = session_ready
+                .read_object()
+                .await
+                .map_err(TlsTestClientError::ReadPongError)?;
 
             let now: u128 = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("Time went backwards")
                 .as_nanos();
 
-            let diff = Duration::from_nanos((now - pong).try_into()?);
+            let diff = Duration::from_nanos(
+                (now - pong)
+                    .try_into()
+                    .map_err(TlsTestClientError::ParseTimestampError)?,
+            );
 
             println!("TLS-Ping: {:?}", diff);
 
             *session = Some(session_ready);
             Ok(())
         } else {
-            Err(anyhow!("no session given"))
+            Err(DispatcherError::NoneSession)
         }
     }
 }

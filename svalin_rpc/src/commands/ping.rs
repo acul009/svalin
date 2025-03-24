@@ -1,8 +1,11 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    num::TryFromIntError,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use crate::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
-    session::Session,
+    session::{Session, SessionReadError, SessionWriteError},
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -39,9 +42,20 @@ impl CommandHandler for PingHandler {
 
 pub struct Ping;
 
+#[derive(Debug, thiserror::Error)]
+pub enum PingError {
+    #[error("error writing ping: {0}")]
+    WritePingError(SessionWriteError),
+    #[error("error reading pong: {0}")]
+    ReadPongError(SessionReadError),
+    #[error("error converting timestamp: {0}")]
+    ConvertTimestampError(TryFromIntError),
+}
+
 #[async_trait]
 impl CommandDispatcher for Ping {
     type Output = Duration;
+    type Error = PingError;
 
     type Request = ();
 
@@ -53,7 +67,11 @@ impl CommandDispatcher for Ping {
         ()
     }
 
-    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<Duration> {
+    async fn dispatch(
+        self,
+        session: &mut Session,
+        _: Self::Request,
+    ) -> Result<Duration, Self::Error> {
         let ping = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
@@ -61,11 +79,17 @@ impl CommandDispatcher for Ping {
 
         debug!("sending ping");
 
-        session.write_object(&ping).await?;
+        session
+            .write_object(&ping)
+            .await
+            .map_err(PingError::WritePingError)?;
 
         debug!("ping sent, waiting for pong!");
 
-        let pong: u128 = session.read_object().await?;
+        let pong: u128 = session
+            .read_object()
+            .await
+            .map_err(PingError::ReadPongError)?;
 
         debug!("pong received");
 
@@ -74,7 +98,11 @@ impl CommandDispatcher for Ping {
             .expect("Time went backwards")
             .as_nanos();
 
-        let diff = Duration::from_nanos((now - pong).try_into()?);
+        let diff = Duration::from_nanos(
+            (now - pong)
+                .try_into()
+                .map_err(PingError::ConvertTimestampError)?,
+        );
 
         Ok(diff)
     }

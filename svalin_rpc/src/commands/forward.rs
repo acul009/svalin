@@ -3,12 +3,13 @@ use std::fmt::{Debug, Display};
 use std::sync::Arc;
 
 use crate::commands::{deauthenticate::Deauthenticate, e2e::E2EDispatcher};
-use crate::rpc::command::dispatcher::TakeableCommandDispatcher;
+use crate::rpc::command::dispatcher::{DispatcherError, TakeableCommandDispatcher};
 use crate::rpc::connection::Connection;
 use crate::rpc::peer::Peer;
+use crate::rpc::session::{SessionDispatchError, SessionReadError};
 use crate::rpc::{command::handler::CommandHandler, server::RpcServer, session::Session};
 use crate::transport::combined_transport::CombinedTransport;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
@@ -21,24 +22,13 @@ fn forward_key() -> String {
     "forward".to_owned()
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, thiserror::Error)]
 pub enum ForwardError {
+    #[error("The requested target is not currently available")]
     TargetNotConnected,
+    #[error("deauthentication failed")]
     DeauthFailure,
 }
-
-impl Display for ForwardError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ForwardError::TargetNotConnected => {
-                write!(f, "Requested Target is not currently available")
-            }
-            ForwardError::DeauthFailure => write!(f, "Deauthentication failed"),
-        }
-    }
-}
-
-impl Error for ForwardError {}
 
 pub struct ForwardHandler {
     server: Arc<RpcServer>,
@@ -103,7 +93,7 @@ impl CommandHandler for ForwardHandler {
                         .write_object::<Result<(), ForwardError>>(&Err(ForwardError::DeauthFailure))
                         .await?;
 
-                    Err(err)
+                    Err(err.into())
                 }
             },
             // TODO: check and return the actual error
@@ -125,12 +115,23 @@ pub struct ForwardDispatcher<'a, T> {
     pub nested_dispatch: T,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ForwardDispatchError<NestedError> {
+    #[error("error reading forward signal: {0}")]
+    AwaitForwardError(SessionReadError),
+    #[error("received forward error from server: {0}")]
+    ForwardError(#[from] ForwardError),
+    #[error("error dispatching nested command: {0}")]
+    NestedError(#[from] SessionDispatchError<NestedError>),
+}
+
 #[async_trait]
 impl<'a, D> TakeableCommandDispatcher for ForwardDispatcher<'a, D>
 where
     D: TakeableCommandDispatcher,
 {
     type Output = D::Output;
+    type InnerError = ForwardDispatchError<D::InnerError>;
 
     type Request = &'a Certificate;
 
@@ -146,19 +147,22 @@ where
         self,
         session: &mut Option<Session>,
         _target: Self::Request,
-    ) -> Result<Self::Output> {
+    ) -> Result<Self::Output, DispatcherError<ForwardDispatchError<D::InnerError>>> {
         if let Some(mut session) = session.take() {
             session
                 .read_object::<Result<(), ForwardError>>()
                 .await
-                .context("error during forward return signal")?
-                .context("server sent error during forward request")?;
+                .map_err(ForwardDispatchError::AwaitForwardError)?
+                .map_err(ForwardDispatchError::ForwardError)?;
 
-            session.dispatch(self.nested_dispatch).await
+            session
+                .dispatch(self.nested_dispatch)
+                .await
+                .map_err(ForwardDispatchError::NestedError)
+                .map_err(DispatcherError::Other)
         } else {
-            Err(anyhow!("tried dispatching command with None"))
+            Err(DispatcherError::NoneSession)
         }
-        // self.nested_dispatch.dispatch(session).await
     }
 }
 
@@ -186,7 +190,10 @@ impl<T> Connection for ForwardConnection<T>
 where
     T: Connection + Send,
 {
-    async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output> {
+    async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>
+    where
+        D::InnerError: Error + 'static,
+    {
         let dispatcher = ForwardDispatcher {
             target: &self.target,
             nested_dispatch: E2EDispatcher {
@@ -196,7 +203,10 @@ where
             },
         };
 
-        self.connection.dispatch(dispatcher).await
+        self.connection
+            .dispatch(dispatcher)
+            .await
+            .map_err(|err| anyhow!(err.to_string()))
     }
 
     fn peer(&self) -> &Peer {
