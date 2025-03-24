@@ -10,8 +10,8 @@ mod tls_test_command;
 use crate::{
     commands::ping::{Ping, PingHandler},
     permissions::{
-        anonymous_permission_handler::AnonymousPermissionHandler,
-        whitelist::WhitelistPermissionHandler, DummyPermission,
+        DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler,
+        whitelist::WhitelistPermissionHandler,
     },
     rpc::{
         client::RpcClient, command::handler::HandlerCollection, connection::Connection,
@@ -26,7 +26,6 @@ async fn ping_test() {
 
     let address = "127.0.0.1:1234";
     let credentials = svalin_pki::Keypair::generate()
-        .unwrap()
         .to_self_signed_cert()
         .unwrap();
 
@@ -75,7 +74,6 @@ async fn tls_test() {
 
     let address = "127.0.0.1:1235";
     let credentials = svalin_pki::Keypair::generate()
-        .unwrap()
         .to_self_signed_cert()
         .unwrap();
     let socket =
@@ -120,7 +118,6 @@ async fn perm_test() {
 
     let address = "127.0.0.1:1236";
     let credentials = svalin_pki::Keypair::generate()
-        .unwrap()
         .to_self_signed_cert()
         .unwrap();
     let socket =

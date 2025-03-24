@@ -3,14 +3,20 @@ use std::time::Duration;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use rand::Rng;
-use svalin_pki::{Certificate, Keypair};
+use svalin_pki::{Certificate, DeriveKeyError, Keypair, ToSelfSingedError};
 use svalin_rpc::{
     rpc::{
-        command::{dispatcher::TakeableCommandDispatcher, handler::TakeableCommandHandler},
+        command::{
+            dispatcher::{DispatcherError, TakeableCommandDispatcher},
+            handler::TakeableCommandHandler,
+        },
         peer::Peer,
-        session::Session,
+        session::{Session, SessionReadError, SessionWriteError},
     },
-    transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
+    transport::{
+        combined_transport::CombinedTransport,
+        tls_transport::{TlsClientError, TlsServerError, TlsTransport},
+    },
     verifiers::skip_verify::SkipClientVerification,
 };
 use tokio::sync::oneshot;
@@ -65,6 +71,30 @@ impl TakeableCommandHandler for JoinRequestHandler {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum RequestJoinError {
+    #[error("error reading join code: {0}")]
+    JoinCodeReadError(SessionReadError),
+    #[error("error sending join code through channel")]
+    ChannelSendError,
+    #[error("error reading join code from client: {0}")]
+    SecondJoinCodeReadError(SessionReadError),
+    #[error("error sending confirm status: {0}")]
+    SendConfirmStatusError(SessionWriteError),
+    #[error("confirm code did not match")]
+    ConfirmError,
+    #[error("error creating TLS client: {0}")]
+    TlsCreateClientError(TlsClientError),
+    #[error("error creating temp credentials: {0}")]
+    ToSelfSingedError(ToSelfSingedError),
+    #[error("error creating TLS server: {0}")]
+    TlsCreateServerError(TlsServerError),
+    #[error("error reading params: {0}")]
+    ReadParamsError(SessionReadError),
+    #[error("error deriving confirm key: {0}")]
+    DeriveKeyError(DeriveKeyError),
+}
+
 pub struct RequestJoin {
     pub address: String,
     pub join_code_channel: oneshot::Sender<String>,
@@ -74,6 +104,8 @@ pub struct RequestJoin {
 #[async_trait]
 impl TakeableCommandDispatcher for RequestJoin {
     type Output = AgentInitPayload;
+
+    type InnerError = RequestJoinError;
 
     type Request = ();
 
@@ -89,45 +121,60 @@ impl TakeableCommandDispatcher for RequestJoin {
         self,
         session: &mut Option<Session>,
         _: Self::Request,
-    ) -> Result<Self::Output> {
+    ) -> Result<Self::Output, DispatcherError<RequestJoinError>> {
         if let Some(mut session) = session.take() {
-            let join_code: String = session.read_object().await?;
+            let join_code: String = session
+                .read_object()
+                .await
+                .map_err(RequestJoinError::JoinCodeReadError)?;
 
             debug!("received join code from server: {join_code}");
 
             self.join_code_channel
                 .send(join_code.clone())
-                .map_err(|err| anyhow!(err))?;
+                .map_err(|_| RequestJoinError::ChannelSendError)?;
 
             debug!("waiting for client to confirm join code");
 
-            let join_code_confirm: String = session.read_object().await?;
+            let join_code_confirm: String = session
+                .read_object()
+                .await
+                .map_err(RequestJoinError::SecondJoinCodeReadError)?;
 
             debug!("received join code from client: {join_code_confirm}");
 
             if join_code != join_code_confirm {
                 debug!("join codes do not match!");
                 let answer: Result<(), ()> = Err(());
-                session.write_object(&answer).await?;
-                return Err(anyhow!("Invalid join code"));
+                session
+                    .write_object(&answer)
+                    .await
+                    .map_err(RequestJoinError::SendConfirmStatusError)?;
+                return Err(DispatcherError::Other(RequestJoinError::ConfirmError));
             } else {
                 debug!("join codes match!");
                 let answer: Result<(), ()> = Ok(());
-                session.write_object(&answer).await?;
+                session
+                    .write_object(&answer)
+                    .await
+                    .map_err(RequestJoinError::SendConfirmStatusError)?;
             }
 
             debug!("trying to establish tls connection");
 
             let (read, write, _) = session.destructure_transport();
 
-            let temp_credentials = Keypair::generate().unwrap().to_self_signed_cert()?;
+            let temp_credentials = Keypair::generate()
+                .to_self_signed_cert()
+                .map_err(RequestJoinError::ToSelfSingedError)?;
 
             let tls_transport = TlsTransport::server(
                 CombinedTransport::new(read, write),
                 SkipClientVerification::new(),
                 &temp_credentials,
             )
-            .await?;
+            .await
+            .map_err(RequestJoinError::TlsCreateServerError)?;
 
             let mut key_material = [0u8; 32];
             tls_transport
@@ -140,15 +187,20 @@ impl TakeableCommandDispatcher for RequestJoin {
 
             debug!("server tls connection established");
 
-            let params = session.read_object().await?;
+            let params = session
+                .read_object()
+                .await
+                .map_err(RequestJoinError::ReadParamsError)?;
 
-            let confirm_code = super::derive_confirm_code(params, &key_material).await?;
+            let confirm_code = super::derive_confirm_code(params, &key_material)
+                .await
+                .map_err(RequestJoinError::DeriveKeyError)?;
 
             debug!("generated confirm code: {confirm_code}");
 
             self.confirm_code_channel.send(confirm_code).unwrap();
 
-            let keypair = Keypair::generate()?;
+            let keypair = Keypair::generate();
             let request = keypair.generate_request()?;
             debug!("sending request: {}", request);
             session.write_object(&request).await?;
@@ -168,7 +220,7 @@ impl TakeableCommandDispatcher for RequestJoin {
                 upstream,
             })
         } else {
-            Err(anyhow!("tried dispatching command with None"))
+            Err(DispatcherError::NoneSession)
         }
     }
 }

@@ -8,7 +8,7 @@ use tracing::debug;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
-    Certificate, CertificateRequest,
+    Certificate, CertificateParseError, CertificateRequest,
     encrypt::EncryptedData,
     signed_message::{CanSign, CanVerify},
 };
@@ -56,8 +56,29 @@ struct CredentialOnDisk {
     raw_cert: Vec<u8>,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum CreateCredentialsError {
+    #[error("key rejected: {0}")]
+    KeyRejectError(ring::error::KeyRejected),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum DecodeCredentialsError {
+    #[error("error decoding credentials: {0}")]
+    DecodeStructError(#[from] postcard::Error),
+    #[error("error decoding keypair: {0}")]
+    ParseCertificateError(#[from] CertificateParseError),
+    #[error("error decrypting credentials: {0}")]
+    DecryptError(#[from] crate::encrypt::DecryptError),
+    #[error("error creating credentials: {0}")]
+    CreateCredentialsError(#[from] CreateCredentialsError),
+}
+
 impl PermCredentials {
-    pub(crate) fn new(raw_keypair: Vec<u8>, certificate: Certificate) -> Result<Self> {
+    pub(crate) fn new(
+        raw_keypair: Vec<u8>,
+        certificate: Certificate,
+    ) -> Result<Self, CreateCredentialsError> {
         // TODO: check if keypair and certificate belong together
 
         // println!("{:?}", keypair.public_key().as_ref());
@@ -68,8 +89,7 @@ impl PermCredentials {
         // }
 
         let keypair = Ed25519KeyPair::from_pkcs8(&raw_keypair)
-            .map_err(|err| anyhow!(err))
-            .context("failed to decode keypair")?;
+            .map_err(CreateCredentialsError::KeyRejectError)?;
 
         Ok(PermCredentials {
             data: Arc::new(PermCredentialData {
@@ -95,23 +115,25 @@ impl PermCredentials {
         Ok(encoded)
     }
 
-    pub async fn from_bytes(bytes: &[u8], password: Vec<u8>) -> Result<Self> {
-        let on_disk: CredentialOnDisk =
-            postcard::from_bytes(bytes).context("failed to decode postcard")?;
+    pub async fn from_bytes(
+        bytes: &[u8],
+        password: Vec<u8>,
+    ) -> Result<Self, DecodeCredentialsError> {
+        let on_disk: CredentialOnDisk = postcard::from_bytes(bytes)?;
 
-        let certificate =
-            Certificate::from_der(on_disk.raw_cert).context("failed to decode certificate")?;
+        let certificate = Certificate::from_der(on_disk.raw_cert)?;
 
         debug!("decrypting credentials with password");
 
         let decrypted_keypair =
             EncryptedData::decrypt_with_password(&on_disk.encrypted_keypair, password)
                 .await
-                .context("failed to decrypt keypair")?;
+                .map_err(DecodeCredentialsError::DecryptError)?;
 
         debug!("credentials decrypted");
 
         Self::new(decrypted_keypair, certificate)
+            .map_err(DecodeCredentialsError::CreateCredentialsError)
     }
 
     pub fn get_certificate(&self) -> &Certificate {
@@ -157,7 +179,7 @@ mod test {
 
     #[tokio::test]
     async fn test_on_disk_storage() {
-        let original = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
+        let original = Keypair::generate().to_self_signed_cert().unwrap();
 
         let rand = SystemRandom::new();
 

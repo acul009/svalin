@@ -1,7 +1,7 @@
-
 use crate::{
+    Certificate, CertificateParseError, PermCredentials,
+    perm_credentials::CreateCredentialsError,
     signed_message::{CanSign, CanVerify},
-    Certificate, PermCredentials,
 };
 use anyhow::Result;
 use rcgen::{DnType, ExtendedKeyUsagePurpose, KeyUsagePurpose, SignatureAlgorithm};
@@ -18,22 +18,37 @@ pub struct Keypair {
     alg: &'static SignatureAlgorithm,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ToSelfSingedError {
+    #[error("error parsing keypair: {0}")]
+    ParseKeypairError(rcgen::Error),
+    #[error("error creating certificate: {0}")]
+    CreateCertError(rcgen::Error),
+    #[error("error serializing keypair: {0}")]
+    SerializeError(rcgen::Error),
+    #[error("error parsing certificate: {0}")]
+    CertificateParseError(CertificateParseError),
+    #[error("error creating credentials: {0}")]
+    CreateCredentialsError(CreateCredentialsError),
+}
+
 impl Keypair {
-    pub fn generate() -> Result<Keypair> {
+    pub fn generate() -> Keypair {
         let rand = SystemRandom::new();
         let keypair_pkcs8 = ring::signature::Ed25519KeyPair::generate_pkcs8(&rand).unwrap();
         let raw = keypair_pkcs8.as_ref().to_owned();
         let keypair = ring::signature::Ed25519KeyPair::from_pkcs8(keypair_pkcs8.as_ref()).unwrap();
 
-        Ok(Keypair {
+        Keypair {
             keypair,
             raw,
             alg: &rcgen::PKCS_ED25519,
-        })
+        }
     }
 
-    pub fn to_self_signed_cert(self) -> Result<PermCredentials> {
-        let rc_keypair = rcgen::KeyPair::from_der(self.raw.as_ref())?;
+    pub fn to_self_signed_cert(self) -> Result<PermCredentials, ToSelfSingedError> {
+        let rc_keypair = rcgen::KeyPair::from_der(self.raw.as_ref())
+            .map_err(ToSelfSingedError::ParseKeypairError)?;
         let mut params = rcgen::CertificateParams::new(vec![]);
         params.key_pair = Some(rc_keypair);
         params.alg = self.alg;
@@ -48,12 +63,17 @@ impl Keypair {
             .distinguished_name
             .push(DnType::CommonName, self.spki_hash());
 
-        let ca_cert = rcgen::Certificate::from_params(params)?;
-        let ca_der = ca_cert.serialize_der()?;
+        let ca_cert =
+            rcgen::Certificate::from_params(params).map_err(ToSelfSingedError::CreateCertError)?;
+        let ca_der = ca_cert
+            .serialize_der()
+            .map_err(ToSelfSingedError::SerializeError)?;
 
-        let certificate = Certificate::from_der(ca_der)?;
+        let certificate =
+            Certificate::from_der(ca_der).map_err(ToSelfSingedError::CertificateParseError)?;
 
         self.upgrade(certificate)
+            .map_err(ToSelfSingedError::CreateCredentialsError)
     }
 
     pub fn generate_request(&self) -> Result<String> {
@@ -79,7 +99,10 @@ impl Keypair {
         spki_hash
     }
 
-    pub fn upgrade(self, certificate: Certificate) -> Result<PermCredentials> {
+    pub fn upgrade(
+        self,
+        certificate: Certificate,
+    ) -> Result<PermCredentials, CreateCredentialsError> {
         PermCredentials::new(self.raw, certificate)
     }
 
@@ -106,13 +129,13 @@ mod test {
     use ring::rand::{SecureRandom, SystemRandom};
 
     use crate::{
-        signed_message::{Sign, Verify},
         Keypair,
+        signed_message::{Sign, Verify},
     };
 
     #[test]
     fn test_sign() {
-        let credentials = Keypair::generate().unwrap();
+        let credentials = Keypair::generate();
         let rand = SystemRandom::new();
 
         let mut msg = [0u8; 1024];
@@ -127,7 +150,7 @@ mod test {
 
     #[test]
     fn tampered_sign() {
-        let credentials = Keypair::generate().unwrap();
+        let credentials = Keypair::generate();
         let rand = SystemRandom::new();
 
         let mut msg = [0u8; 1024];
@@ -147,7 +170,7 @@ mod test {
 
     #[test]
     fn create_self_signed() {
-        let credentials = Keypair::generate().unwrap();
+        let credentials = Keypair::generate();
         credentials.to_self_signed_cert().unwrap();
     }
 }

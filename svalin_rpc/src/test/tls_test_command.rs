@@ -50,7 +50,7 @@ impl TakeableCommandHandler for TlsTestCommandHandler {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure_transport();
 
-            let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
+            let credentials = Keypair::generate().to_self_signed_cert().unwrap();
 
             let tls_transport = TlsTransport::server(
                 CombinedTransport::new(read, write),
@@ -113,7 +113,7 @@ impl TakeableCommandDispatcher for TlsTest {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure_transport();
 
-            let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
+            let credentials = Keypair::generate().to_self_signed_cert().unwrap();
 
             let tls_transport = TlsTransport::client(
                 CombinedTransport::new(read, write),

@@ -2,8 +2,8 @@ use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    signed_message::{Sign, Verify},
     Certificate, Keypair,
+    signed_message::{Sign, Verify},
 };
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -14,8 +14,8 @@ struct SerializationTestStruct {
 
 #[test]
 fn test_certificate_serde_serialization() {
-    let credentials = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
-    let credentials2 = Keypair::generate().unwrap().to_self_signed_cert().unwrap();
+    let credentials = Keypair::generate().to_self_signed_cert().unwrap();
+    let credentials2 = Keypair::generate().to_self_signed_cert().unwrap();
 
     let test_struct = SerializationTestStruct {
         cert1: credentials.get_certificate().to_owned(),
@@ -31,7 +31,7 @@ fn test_certificate_serde_serialization() {
 
 #[test]
 pub fn cert_verify_message() {
-    let credentials = Keypair::generate().unwrap();
+    let credentials = Keypair::generate();
     let rand = SystemRandom::new();
 
     let mut msg = [0u8; 1024];
@@ -49,7 +49,7 @@ pub fn cert_verify_message() {
 
 #[test]
 pub fn serialization() {
-    let credentials = Keypair::generate().unwrap();
+    let credentials = Keypair::generate();
     let perm_creds = credentials.to_self_signed_cert().unwrap();
     let cert = perm_creds.get_certificate();
 
@@ -60,7 +60,7 @@ pub fn serialization() {
 
 #[test]
 pub fn serde_serialization() {
-    let credentials = Keypair::generate().unwrap();
+    let credentials = Keypair::generate();
     let perm_creds = credentials.to_self_signed_cert().unwrap();
     let cert = perm_creds.get_certificate();
 

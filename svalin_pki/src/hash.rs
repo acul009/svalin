@@ -87,6 +87,14 @@ pub struct ArgonParams {
     salt: Vec<u8>,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum DeriveKeyError {
+    #[error("error hashing password: {0}")]
+    HashError(argon2::Error),
+    #[error("error joining task: {0}")]
+    JoinError(tokio::task::JoinError),
+}
+
 impl ArgonParams {
     fn random_salt() -> Vec<u8> {
         rand::rng()
@@ -131,7 +139,7 @@ impl ArgonParams {
         }
     }
 
-    pub async fn derive_key(&self, secret: Vec<u8>) -> Result<[u8; 32]> {
+    pub async fn derive_key(&self, secret: Vec<u8>) -> Result<[u8; 32], DeriveKeyError> {
         let argon = self.cost.get_argon_hasher();
 
         let salt_bytes = self.salt.as_slice().to_owned();
@@ -142,11 +150,12 @@ impl ArgonParams {
             let result = argon
                 .hash_password_into(&secret, &salt_bytes, &mut hash)
                 .map(move |_| hash)
-                .map_err(|err| anyhow!(err));
+                .map_err(DeriveKeyError::HashError);
 
             result
         })
-        .await?;
+        .await
+        .map_err(DeriveKeyError::JoinError)?;
 
         result
     }

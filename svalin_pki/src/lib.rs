@@ -20,8 +20,8 @@ pub use certificate_request::CertificateRequest;
 pub use encrypt::EncryptedData;
 pub use error::Error;
 pub use hash::*;
-pub use keypair::Keypair;
-pub use perm_credentials::PermCredentials;
+pub use keypair::{Keypair, ToSelfSingedError};
+pub use perm_credentials::{CreateCredentialsError, DecodeCredentialsError, PermCredentials};
 use ring::rand::{SecureRandom, SystemRandom};
 
 pub use argon2;

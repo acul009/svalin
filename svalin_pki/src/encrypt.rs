@@ -55,6 +55,20 @@ impl NonceSequence for NonceCounter {
 
 static DEFAULT_ALG: EncryptionAlgorythm = EncryptionAlgorythm::Chacha20Poly1305;
 
+#[derive(Debug, thiserror::Error)]
+pub enum DecryptError {
+    #[error("error decoding encrypted data: {0}")]
+    UnmarshalError(#[from] postcard::Error),
+    #[error("missing hash parameters in encrypted data")]
+    MissingHashParameters,
+    #[error("error loading key into ring: {0}")]
+    CreateUnboundError(ring::error::Unspecified),
+    #[error("error decrypting data: {0}")]
+    UnsealError(ring::error::Unspecified),
+    #[error("error deriving encryption key: {0}")]
+    DeriveKeyError(#[from] crate::hash::DeriveKeyError),
+}
+
 impl EncryptedData {
     pub async fn encrypt_with_password(data: &[u8], password: Vec<u8>) -> Result<Vec<u8>> {
         let parameters = ArgonParams::strong();
@@ -104,13 +118,16 @@ impl EncryptedData {
             .context("failed postcard encoding")
     }
 
-    pub async fn decrypt_with_password(cipherdata: &[u8], password: Vec<u8>) -> Result<Vec<u8>> {
+    pub async fn decrypt_with_password(
+        cipherdata: &[u8],
+        password: Vec<u8>,
+    ) -> Result<Vec<u8>, DecryptError> {
         let encrypted_data: EncryptedData = postcard::from_bytes(cipherdata)?;
 
         let parameters = if let Some(parameters) = &encrypted_data.parameters {
             parameters
         } else {
-            return Err(anyhow!("encrypted data has no hash parameters"));
+            return Err(DecryptError::MissingHashParameters);
         };
 
         let encryption_key = parameters.derive_key(password).await?;
@@ -118,7 +135,10 @@ impl EncryptedData {
         Self::decrypt_helper(encrypted_data, encryption_key)
     }
 
-    pub fn decrypt_with_key(cipherdata: &[u8], encryption_key: [u8; 32]) -> Result<Vec<u8>> {
+    pub fn decrypt_with_key(
+        cipherdata: &[u8],
+        encryption_key: [u8; 32],
+    ) -> Result<Vec<u8>, DecryptError> {
         let encrypted_data: EncryptedData = postcard::from_bytes(cipherdata)?;
 
         Self::decrypt_helper(encrypted_data, encryption_key)
@@ -127,27 +147,25 @@ impl EncryptedData {
     pub fn decrypt_object_with_key<T: DeserializeOwned>(
         cipherdata: &[u8],
         encryption_key: [u8; 32],
-    ) -> Result<T> {
+    ) -> Result<T, DecryptError> {
         let decrypted_data = Self::decrypt_with_key(cipherdata, encryption_key)?;
 
-        postcard::from_bytes(&decrypted_data)
-            .map_err(|err| anyhow!(err))
-            .context("failed postcard decoding")
+        postcard::from_bytes(&decrypted_data).map_err(DecryptError::UnmarshalError)
     }
 
     fn decrypt_helper(
         mut encrypted_data: EncryptedData,
         encryption_key: [u8; 32],
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Vec<u8>, DecryptError> {
         let ring_alg = encrypted_data.alg.into();
 
-        let unbound = UnboundKey::new(ring_alg, &encryption_key).map_err(|err| anyhow!(err))?;
+        let unbound =
+            UnboundKey::new(ring_alg, &encryption_key).map_err(DecryptError::CreateUnboundError)?;
         let mut opening = OpeningKey::new(unbound, NonceCounter::new());
 
         let cleartext_len = opening
             .open_in_place(Aad::empty(), &mut encrypted_data.ciphertext)
-            .map_err(|err| anyhow!(err))
-            .context("failed ring unsealing")?
+            .map_err(DecryptError::UnsealError)?
             .len();
 
         encrypted_data.ciphertext.drain(cleartext_len..);

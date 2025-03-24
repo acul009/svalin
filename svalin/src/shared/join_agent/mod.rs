@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, PermCredentials};
+use svalin_pki::{Certificate, DeriveKeyError, PermCredentials};
 use svalin_rpc::rpc::{command::handler::PermissionPrecursor, session::Session};
 use tokio::task::AbortHandle;
 use tracing::field::debug;
@@ -133,7 +133,7 @@ impl From<&PermissionPrecursor<(), JoinAcceptHandler>> for Permission {
 async fn derive_confirm_code(
     params: svalin_pki::ArgonParams,
     derived_secret: &[u8; 32],
-) -> Result<String> {
+) -> Result<String, DeriveKeyError> {
     let hashed = params.derive_key(derived_secret.to_vec()).await?;
 
     let number = u64::from_be_bytes(hashed[0..8].try_into().unwrap());

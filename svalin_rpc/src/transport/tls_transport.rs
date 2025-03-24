@@ -35,6 +35,22 @@ pub enum TlsClientError {
     CertificateParseError(#[from] CertificateParseError),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum TlsServerError {
+    #[error("error parsing key DER: {0}")]
+    ParseKeyDerError(String),
+    #[error("error creating config: {0}")]
+    CreateConfigError(rustls::Error),
+    #[error("error parsing hostname: {0}")]
+    ParseHostError(InvalidDnsNameError),
+    #[error("error creating connector: {0}")]
+    AcceptConnectionError(std::io::Error),
+    #[error("peer did not provide a certificate")]
+    MissingCertificateError,
+    #[error("error parsing certificate: {0}")]
+    CertificateParseError(#[from] CertificateParseError),
+}
+
 impl<T> TlsTransport<T>
 where
     T: SessionTransport,
@@ -91,30 +107,34 @@ where
         base_transport: T,
         verifier: Arc<dyn ClientCertVerifier>,
         credentials: &PermCredentials,
-    ) -> Result<Self> {
+    ) -> Result<Self, TlsServerError> {
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
             credentials.get_certificate().to_der().to_owned(),
         )];
 
         let key_der =
             rustls::pki_types::PrivateKeyDer::try_from(credentials.get_key_bytes().to_owned())
-                .map_err(|err| anyhow!(err))?;
+                .map_err(|err| TlsServerError::ParseKeyDerError(err.to_string()))?;
 
         let config = rustls::ServerConfig::builder()
             .with_client_cert_verifier(verifier)
-            .with_single_cert(cert_chain, key_der)?;
+            .with_single_cert(cert_chain, key_der)
+            .map_err(TlsServerError::CreateConfigError)?;
 
         let acceptor = TlsAcceptor::from(Arc::new(config));
 
-        let server = acceptor.accept(base_transport).await?;
+        let server = acceptor
+            .accept(base_transport)
+            .await
+            .map_err(TlsServerError::AcceptConnectionError)?;
 
         let der = server
             .get_ref()
             .1
             .peer_certificates()
-            .ok_or(anyhow!("peer didn't provide a certificate"))?
+            .ok_or(TlsServerError::MissingCertificateError)?
             .first()
-            .ok_or(anyhow!("peer didn't provide a certificate"))?;
+            .ok_or(TlsServerError::MissingCertificateError)?;
 
         let cert = Certificate::from_der(der.to_vec())?;
 
