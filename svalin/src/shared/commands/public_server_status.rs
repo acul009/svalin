@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
-    session::Session,
+    session::{Session, SessionReadError},
 };
 use tokio_util::sync::CancellationToken;
 
@@ -45,10 +45,17 @@ impl CommandHandler for PublicStatusHandler {
 
 pub struct GetPutblicStatus;
 
+#[derive(Debug, thiserror::Error)]
+pub enum GetPutblicStatusError {
+    #[error("error reading status: {0}")]
+    ReadStatusError(SessionReadError),
+}
+
 #[async_trait]
 impl CommandDispatcher for GetPutblicStatus {
     type Output = PublicStatus;
     type Request = ();
+    type Error = GetPutblicStatusError;
 
     fn key() -> String {
         PublicStatusHandler::key()
@@ -58,8 +65,15 @@ impl CommandDispatcher for GetPutblicStatus {
         ()
     }
 
-    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<PublicStatus> {
-        let status = session.read_object().await?;
+    async fn dispatch(
+        self,
+        session: &mut Session,
+        _: Self::Request,
+    ) -> Result<PublicStatus, Self::Error> {
+        let status = session
+            .read_object()
+            .await
+            .map_err(GetPutblicStatusError::ReadStatusError)?;
 
         Ok(status)
     }

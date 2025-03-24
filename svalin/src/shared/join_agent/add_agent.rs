@@ -87,6 +87,7 @@ pub struct AddAgent<'a> {
 #[async_trait]
 impl<'a> CommandDispatcher for AddAgent<'a> {
     type Output = ();
+    type Error = anyhow::Error;
 
     type Request = &'a SignedObject<PublicAgentData>;
 

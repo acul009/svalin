@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_rpc::rpc::{
     command::{
-        dispatcher::TakeableCommandDispatcher,
+        dispatcher::{DispatcherError, TakeableCommandDispatcher},
         handler::{PermissionPrecursor, TakeableCommandHandler},
     },
     session::Session,
@@ -154,9 +154,12 @@ impl Drop for RemoteTerminal {
 
 pub struct RemoteTerminalDispatcher;
 
+pub enum RemoteTerminalDispatcherError {}
+
 #[async_trait]
 impl TakeableCommandDispatcher for RemoteTerminalDispatcher {
     type Output = RemoteTerminal;
+    type InnerError = RemoteTerminalDispatcherError;
     type Request = ();
 
     fn key() -> String {
@@ -171,7 +174,7 @@ impl TakeableCommandDispatcher for RemoteTerminalDispatcher {
         mut self,
         session: &mut Option<Session>,
         _: Self::Request,
-    ) -> Result<Self::Output> {
+    ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session) = session.take() {
             debug!("starting remote terminal");
 
@@ -213,7 +216,7 @@ impl TakeableCommandDispatcher for RemoteTerminalDispatcher {
                 joinset,
             })
         } else {
-            Err(anyhow!("tried dispatching command with None"))
+            Err(DispatcherError::NoneSession)
         }
     }
 }

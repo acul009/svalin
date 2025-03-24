@@ -74,6 +74,20 @@ pub enum DecodeCredentialsError {
     CreateCredentialsError(#[from] CreateCredentialsError),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ApproveRequestError {
+    #[error("error parsing keypair: {0}")]
+    KeypairParseError(rcgen::Error),
+    #[error("error creating ca-certificate params: {0}")]
+    CreateCaParamsError(rcgen::Error),
+    #[error("error creating ca-certificate: {0}")]
+    CreateCaError(rcgen::Error),
+    #[error("error signing certificate: {0}")]
+    SignCertError(rcgen::Error),
+    #[error("error parsing new certificate: {0}")]
+    ParseNewCertError(CertificateParseError),
+}
+
 impl PermCredentials {
     pub(crate) fn new(
         raw_keypair: Vec<u8>,
@@ -144,16 +158,26 @@ impl PermCredentials {
         &self.data.raw_keypair
     }
 
-    pub fn approve_request(&self, request: CertificateRequest) -> Result<Certificate> {
-        let ca_keypair = rcgen::KeyPair::from_der(&self.data.raw_keypair)?;
+    pub fn approve_request(
+        &self,
+        request: CertificateRequest,
+    ) -> Result<Certificate, ApproveRequestError> {
+        let ca_keypair = rcgen::KeyPair::from_der(&self.data.raw_keypair)
+            .map_err(ApproveRequestError::KeypairParseError)?;
         let ca_params =
-            rcgen::CertificateParams::from_ca_cert_der(self.data.certificate.to_der(), ca_keypair)?;
+            rcgen::CertificateParams::from_ca_cert_der(self.data.certificate.to_der(), ca_keypair)
+                .map_err(ApproveRequestError::CreateCaParamsError)?;
 
-        let ca = rcgen::Certificate::from_params(ca_params)?;
+        let ca = rcgen::Certificate::from_params(ca_params)
+            .map_err(ApproveRequestError::CreateCaError)?;
 
-        let new_cert_der = request.csr.serialize_der_with_signer(&ca)?;
+        let new_cert_der = request
+            .csr
+            .serialize_der_with_signer(&ca)
+            .map_err(ApproveRequestError::SignCertError)?;
 
-        let new_cert = Certificate::from_der(new_cert_der)?;
+        let new_cert =
+            Certificate::from_der(new_cert_der).map_err(ApproveRequestError::ParseNewCertError)?;
 
         Ok(new_cert)
     }

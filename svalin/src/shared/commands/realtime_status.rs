@@ -1,4 +1,4 @@
-use std::{pin::pin, time::Duration};
+use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -7,13 +7,10 @@ use svalin_rpc::rpc::{
         dispatcher::CommandDispatcher,
         handler::{CommandHandler, PermissionPrecursor},
     },
-    session::Session,
+    session::{Session, SessionReadError},
 };
 use svalin_sysctl::realtime::RealtimeStatus;
-use tokio::{
-    select,
-    sync::{oneshot, watch},
-};
+use tokio::{select, sync::watch};
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
@@ -65,10 +62,17 @@ pub struct SubscribeRealtimeStatus {
     pub cancel: CancellationToken,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum SubscribeRealtimeStatusError {
+    #[error("error reading update: {0}")]
+    ReadUpdateError(SessionReadError),
+}
+
 #[async_trait]
 impl CommandDispatcher for SubscribeRealtimeStatus {
     type Output = ();
     type Request = ();
+    type Error = SubscribeRealtimeStatusError;
 
     fn key() -> String {
         RealtimeStatusHandler::key()
@@ -78,7 +82,7 @@ impl CommandDispatcher for SubscribeRealtimeStatus {
         ()
     }
 
-    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<()> {
+    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<(), Self::Error> {
         loop {
             select! {
                 _ = self.cancel.cancelled() => {
@@ -93,7 +97,7 @@ impl CommandDispatcher for SubscribeRealtimeStatus {
                             }
                         }
                         Err(err) => {
-                            return Err(err);
+                            return Err(SubscribeRealtimeStatusError::ReadUpdateError(err));
                         }
                     };
                 },

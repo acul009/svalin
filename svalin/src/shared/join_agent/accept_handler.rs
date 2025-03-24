@@ -3,7 +3,10 @@ use async_trait::async_trait;
 use svalin_pki::{ArgonParams, Certificate, CertificateRequest, PermCredentials};
 use svalin_rpc::{
     rpc::{
-        command::{dispatcher::TakeableCommandDispatcher, handler::CommandHandler},
+        command::{
+            dispatcher::{DispatcherError, TakeableCommandDispatcher},
+            handler::CommandHandler,
+        },
         peer::Peer,
         session::Session,
     },
@@ -88,6 +91,7 @@ pub struct AcceptJoin<'a> {
 #[async_trait]
 impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
     type Output = Certificate;
+    type InnerError = anyhow::Error;
 
     type Request = ();
 
@@ -103,7 +107,7 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
         self,
         session: &mut Option<Session>,
         _: Self::Request,
-    ) -> Result<Self::Output> {
+    ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session) = session.take() {
             let confirm_code_result =
                 prepare_agent_enroll(session, self.join_code, self.credentials)
@@ -115,35 +119,54 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
                     let err_copy = anyhow!("{}", err);
                     self.waiting_for_confirm.send(Err(err)).unwrap();
 
-                    Err(err_copy)
+                    Err(err_copy.into())
                 }
                 Ok((confirm_code, mut session_e2e)) => {
                     self.waiting_for_confirm.send(Ok(())).unwrap();
 
-                    let remote_confirm_code = self.confirm_code_channel.await?;
+                    let remote_confirm_code = self
+                        .confirm_code_channel
+                        .await
+                        .map_err(|err| anyhow!(err))?;
 
                     debug!("received confirm code from user: {remote_confirm_code}");
 
                     if confirm_code != remote_confirm_code {
-                        return Err(anyhow!("Confirm Code did no match"));
+                        return Err(anyhow!("Confirm Code did no match").into());
                     }
 
                     debug!("Confirm Codes match!");
 
-                    let raw_request: String = session_e2e.read_object().await?;
+                    let raw_request: String = session_e2e
+                        .read_object()
+                        .await
+                        .map_err(|err| anyhow!(err))?;
                     debug!("received request: {}", raw_request);
-                    let request = CertificateRequest::from_string(raw_request)?;
-                    let agent_cert: Certificate = self.credentials.approve_request(request)?;
+                    let request =
+                        CertificateRequest::from_string(raw_request).map_err(|err| anyhow!(err))?;
+                    let agent_cert: Certificate = self
+                        .credentials
+                        .approve_request(request)
+                        .map_err(|err| anyhow!(err))?;
 
-                    session_e2e.write_object(&agent_cert).await?;
-                    session_e2e.write_object(self.root).await?;
-                    session_e2e.write_object(self.upstream).await?;
+                    session_e2e
+                        .write_object(&agent_cert)
+                        .await
+                        .map_err(|err| anyhow!(err))?;
+                    session_e2e
+                        .write_object(self.root)
+                        .await
+                        .map_err(|err| anyhow!(err))?;
+                    session_e2e
+                        .write_object(self.upstream)
+                        .await
+                        .map_err(|err| anyhow!(err))?;
 
                     Ok(agent_cert)
                 }
             }
         } else {
-            Err(anyhow!("tried dispatching command with None"))
+            Err(DispatcherError::NoneSession)
         }
     }
 }

@@ -16,12 +16,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Result, anyhow};
 pub use certificate::Certificate;
 pub use certificate::CertificateParseError;
-pub use certificate_request::CertificateRequest;
+pub use certificate_request::{CertificateRequest, CertificateRequestParseError};
 pub use encrypt::EncryptedData;
 pub use error::Error;
 pub use hash::*;
 pub use keypair::{GenerateRequestError, Keypair, ToSelfSingedError};
-pub use perm_credentials::{CreateCredentialsError, DecodeCredentialsError, PermCredentials};
+pub use perm_credentials::{
+    ApproveRequestError, CreateCredentialsError, DecodeCredentialsError, PermCredentials,
+};
 use ring::rand::{SecureRandom, SystemRandom};
 
 pub use argon2;
