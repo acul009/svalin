@@ -28,7 +28,7 @@ impl ArgonCost {
         }
     }
 
-    fn get_params(&self) -> Params {
+    pub fn get_params(&self) -> Params {
         Params::new(self.m_cost, self.t_cost, self.p_cost, None).unwrap()
     }
 

@@ -16,7 +16,7 @@ use serde::{
     de::{self},
 };
 use svalin_pki::{
-    ArgonCost, Certificate, DecryptError, EncryptError, EncryptedData, Keypair,
+    ArgonCost, ArgonParams, Certificate, DecryptError, EncryptError, EncryptedData, Keypair,
     ParamsStringParseError, ToSelfSingedError, argon2::Argon2, sha2::Sha512,
 };
 use svalin_rpc::{
@@ -359,8 +359,14 @@ impl TakeableCommandHandler for LoginHandler {
                 )
                 .map_err(|err| anyhow!(err))?;
 
+            let mut client_info = ClientInfo::try_from(client_info)?;
+            if client_info.hash_params.is_empty() {
+                client_info.hash_params = ArgonCost::strong().get_params().try_into()?;
+            }
+            debug!("hash params: {}", &client_info.hash_params);
+
             session
-                .write_object(&ClientInfo::try_from(client_info)?)
+                .write_object(&client_info)
                 .await
                 .context("Failed to write client info")?;
 
@@ -607,6 +613,7 @@ impl TakeableCommandDispatcher for Login {
             debug!("starting augmentation task");
 
             // ===== Augmentation Layer =====
+            // Running is a blocking task, so the hashing doesn't cause issues
             let blocking_handle = tokio::task::spawn_blocking(move || {
                 let username = self.username.clone();
                 let password = self.password.clone();

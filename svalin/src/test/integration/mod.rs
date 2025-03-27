@@ -64,9 +64,10 @@ async fn integration_tests() {
         }
     };
 
-    // ===== TEST LOGIN =====
-
+    // delete to test login
     Client::remove_profile("admin@localhost:1234".into()).unwrap();
+
+    // ===== TEST WRONG PASSWORD =====
 
     let second_connect = Client::first_connect(host.clone()).await.unwrap();
 
@@ -84,9 +85,29 @@ async fn integration_tests() {
         }
     };
 
+    // ===== TEST WRONG USERNAME =====
+
     let third_connect = Client::first_connect(host.clone()).await.unwrap();
 
     match third_connect {
+        crate::client::FirstConnect::Init(_) => unreachable!(),
+        crate::client::FirstConnect::Login(login) => {
+            login
+                .login(
+                    "wrong username".to_string(),
+                    password.clone().into_bytes(),
+                    totp_secret.generate_current().unwrap(),
+                )
+                .await
+                .unwrap_err();
+        }
+    };
+
+    // ===== TEST LOGIN =====
+
+    let fourth_connect = Client::first_connect(host.clone()).await.unwrap();
+
+    match fourth_connect {
         crate::client::FirstConnect::Init(_) => unreachable!(),
         crate::client::FirstConnect::Login(login) => {
             login
