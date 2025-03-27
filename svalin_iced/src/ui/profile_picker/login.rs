@@ -5,7 +5,7 @@ use iced::{
     Task,
     widget::{button, text, text_input},
 };
-use svalin::client::{Client, Login};
+use svalin::client::{Client, Login, LoginError};
 
 use crate::{
     Element,
@@ -24,6 +24,8 @@ pub enum Message {
     OpenProfile(Arc<Client>),
     Continue,
     Back,
+    WrongPassword,
+    InvalidTotp,
 }
 
 pub enum Action {
@@ -37,10 +39,13 @@ pub enum State {
     LoginForm,
     Loading(String),
     Error(ErrorDisplayInfo<Arc<anyhow::Error>>),
+    WrongPassword,
+    InvalidTotp,
 }
 
 pub struct LoginDialog {
     login: Option<Arc<Login>>,
+    address: String,
     state: State,
     username: String,
     password: String,
@@ -51,6 +56,7 @@ impl LoginDialog {
     pub fn start(login: Arc<Login>) -> (Self, Task<Message>) {
         (
             Self {
+                address: login.address().to_string(),
                 login: Some(login),
                 state: State::LoginForm,
                 username: String::new(),
@@ -79,6 +85,14 @@ impl LoginDialog {
                 self.state = State::Error(error);
                 Action::None
             }
+            Message::WrongPassword => {
+                self.state = State::WrongPassword;
+                Action::None
+            }
+            Message::InvalidTotp => {
+                self.state = State::InvalidTotp;
+                Action::None
+            }
             Message::OpenProfile(client) => Action::OpenProfile(client),
             Message::Continue => match &self.state {
                 State::LoginForm => match self.login.take() {
@@ -102,6 +116,8 @@ impl LoginDialog {
                         Action::Run(Task::future(async move {
                             let login_result = login.login(username, password.clone(), totp).await;
                             match login_result {
+                                Err(LoginError::WrongPassword) => Message::WrongPassword,
+                                Err(LoginError::InvalidTotp) => Message::InvalidTotp,
                                 Err(err) => Message::Error(ErrorDisplayInfo::new(
                                     Arc::new(anyhow!(err)),
                                     t!("profile-picker.error.login"),
@@ -122,11 +138,9 @@ impl LoginDialog {
                 _ => Action::None,
             },
             Message::Back => match &self.state {
-                State::LoginForm | State::Error(_) => Action::Exit(
-                    self.login
-                        .as_ref()
-                        .map_or("".to_string(), |login| login.address().to_string()),
-                ),
+                State::LoginForm | State::Error(_) | State::WrongPassword | State::InvalidTotp => {
+                    Action::Exit(self.address.clone())
+                }
                 _ => Action::None,
             },
         }
@@ -156,6 +170,14 @@ impl LoginDialog {
                 )
                 .primary_action(button(text(t!("generic.continue"))).on_press(Message::Continue))
                 .secondary_action(button(text(t!("generic.back"))).on_press(Message::Back))
+                .into(),
+            State::WrongPassword => form()
+                .title(t!("profile-picker.wrong-password"))
+                .primary_action(button(text(t!("generic.back"))).on_press(Message::Back))
+                .into(),
+            State::InvalidTotp => form()
+                .title(t!("profile-picker.invalid-totp"))
+                .primary_action(button(text(t!("generic.back"))).on_press(Message::Back))
                 .into(),
         }
     }

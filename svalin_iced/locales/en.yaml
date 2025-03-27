@@ -37,6 +37,8 @@ profile-picker:
   copy-totp: Copy TOTP-Secret
   login: Login
   login-loading: Logging in...
+  wrong-password: Wrong username or password!
+  invalid-totp: TOTP was invalid
 add-device:
   connecting: Connecting to Device...
   error:
