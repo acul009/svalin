@@ -1,5 +1,5 @@
 use futures_util::SinkExt;
-use iced::{Subscription, Task, stream::channel, widget::column};
+use iced::{Subscription, stream::channel, widget::column};
 use svalin::client::device::{Device, RemoteLiveData};
 use svalin_sysctl::realtime::RealtimeStatus;
 

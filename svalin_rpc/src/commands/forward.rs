@@ -1,22 +1,20 @@
-use std::error::Error;
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::sync::Arc;
 
 use crate::commands::{deauthenticate::Deauthenticate, e2e::E2EDispatcher};
 use crate::rpc::command::dispatcher::{DispatcherError, TakeableCommandDispatcher};
 use crate::rpc::connection::Connection;
 use crate::rpc::peer::Peer;
-use crate::rpc::session::{self, SessionDispatchError, SessionReadError};
+use crate::rpc::session::SessionReadError;
 use crate::rpc::{command::handler::CommandHandler, server::RpcServer, session::Session};
 use crate::transport::combined_transport::CombinedTransport;
 use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
-use anyhow::{Context, Result, anyhow};
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
 use tokio::io::AsyncWriteExt;
 use tokio::select;
-use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 

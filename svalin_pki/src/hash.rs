@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use argon2::{Argon2, Params, password_hash::ParamsString};
 use rand::Rng;
 use serde::{Deserialize, Serialize};

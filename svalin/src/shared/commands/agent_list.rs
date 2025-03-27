@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{

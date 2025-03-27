@@ -1,11 +1,11 @@
 use std::{fmt::Debug, sync::Arc};
 
-use anyhow::{Context, Ok, Result, anyhow};
+use anyhow::{Result, anyhow};
 use aucpace::StrongDatabase;
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::ParamsString;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{ArgonParams, Certificate, PasswordHash};
+use svalin_pki::Certificate;
 use totp_rs::TOTP;
 use tracing::{debug, instrument};
 

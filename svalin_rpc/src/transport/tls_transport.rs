@@ -3,7 +3,7 @@ use std::{pin::Pin, sync::Arc};
 use crate::rpc::peer::Peer;
 use crate::rustls;
 use crate::rustls::{client::danger::ServerCertVerifier, server::danger::ClientCertVerifier};
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use quinn::rustls::pki_types::InvalidDnsNameError;
 use svalin_pki::{Certificate, CertificateParseError, PermCredentials};
 use tokio::io::{AsyncRead, AsyncWrite};

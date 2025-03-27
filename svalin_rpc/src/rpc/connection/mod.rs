@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
@@ -47,7 +47,7 @@ pub trait Connection: Send + Sync + Clone {
     async fn closed(&self);
 }
 
-use super::command::dispatcher::{DispatcherError, TakeableCommandDispatcher};
+use super::command::dispatcher::TakeableCommandDispatcher;
 use super::peer::Peer;
 use super::session::SessionDispatchError;
 

@@ -16,7 +16,7 @@ use serde::{
     de::{self},
 };
 use svalin_pki::{
-    ArgonCost, ArgonParams, Certificate, DecryptError, EncryptError, EncryptedData, Keypair,
+    ArgonCost, Certificate, DecryptError, EncryptError, EncryptedData, Keypair,
     ParamsStringParseError, ToSelfSingedError, argon2::Argon2, sha2::Sha512,
 };
 use svalin_rpc::{

@@ -17,8 +17,7 @@ use crate::{
             dispatcher::{DispatcherError, TakeableCommandDispatcher},
             handler::{HandlerCollection, TakeableCommandHandler},
         },
-        peer::Peer,
-        session::{Session, SessionDispatchError},
+        session::Session,
     },
     transport::{
         combined_transport::CombinedTransport,
