@@ -1,11 +1,10 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::Result;
 
 use ring::aead::{
     AES_256_GCM, Aad, BoundKey, CHACHA20_POLY1305, NONCE_LEN, Nonce, NonceSequence, OpeningKey,
     SealingKey, UnboundKey,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use tracing::debug;
 
 use crate::hash::ArgonParams;
 
@@ -69,22 +68,43 @@ pub enum DecryptError {
     DeriveKeyError(#[from] crate::hash::DeriveKeyError),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum EncryptError {
+    #[error("error marshalling data: {0}")]
+    MarshalError(#[from] postcard::Error),
+    #[error("error deriving encryption key: {0}")]
+    DeriveKeyError(#[from] crate::hash::DeriveKeyError),
+    #[error("error loading key into ring: {0}")]
+    CreateUnboundError(ring::error::Unspecified),
+    #[error("error sealing data: {0}")]
+    SealError(ring::error::Unspecified),
+}
+
 impl EncryptedData {
-    pub async fn encrypt_with_password(data: &[u8], password: Vec<u8>) -> Result<Vec<u8>> {
+    pub async fn encrypt_with_password(
+        data: &[u8],
+        password: Vec<u8>,
+    ) -> Result<Vec<u8>, EncryptError> {
         let parameters = ArgonParams::strong();
-        let encryption_key = parameters.derive_key(password).await?;
+        let encryption_key = parameters
+            .derive_key(password)
+            .await
+            .map_err(EncryptError::DeriveKeyError)?;
         EncryptedData::encrypt_with_alg(data, encryption_key, DEFAULT_ALG, Some(parameters))
     }
 
     pub fn encrypt_object_with_key<T: Serialize>(
         data: &T,
         encryption_key: [u8; 32],
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Vec<u8>, EncryptError> {
         let serialized = postcard::to_extend(data, Vec::new())?;
         Self::encrypt_with_key(&serialized, encryption_key)
     }
 
-    pub fn encrypt_with_key(data: &[u8], encryption_key: [u8; 32]) -> Result<Vec<u8>> {
+    pub fn encrypt_with_key(
+        data: &[u8],
+        encryption_key: [u8; 32],
+    ) -> Result<Vec<u8>, EncryptError> {
         Self::encrypt_with_alg(data, encryption_key, DEFAULT_ALG, None)
     }
 
@@ -93,18 +113,18 @@ impl EncryptedData {
         encryption_key: [u8; 32],
         alg: EncryptionAlgorythm,
         parameters: Option<ArgonParams>,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Vec<u8>, EncryptError> {
         let ring_alg = alg.into();
 
-        let unbound = UnboundKey::new(ring_alg, &encryption_key).map_err(|err| anyhow!(err))?;
+        let unbound =
+            UnboundKey::new(ring_alg, &encryption_key).map_err(EncryptError::CreateUnboundError)?;
         let mut sealing = SealingKey::new(unbound, NonceCounter::new());
 
         let mut encrypted = data.to_owned();
 
         sealing
             .seal_in_place_append_tag(Aad::empty(), &mut encrypted)
-            .map_err(|err| anyhow!(err))
-            .context("failed ring sealing in place")?;
+            .map_err(EncryptError::SealError)?;
 
         let encrypted_data = EncryptedData {
             alg,
@@ -113,9 +133,7 @@ impl EncryptedData {
         };
 
         let packed = Vec::new();
-        postcard::to_extend(&encrypted_data, packed)
-            .map_err(|err| anyhow!(err))
-            .context("failed postcard encoding")
+        postcard::to_extend(&encrypted_data, packed).map_err(EncryptError::MarshalError)
     }
 
     pub async fn decrypt_with_password(

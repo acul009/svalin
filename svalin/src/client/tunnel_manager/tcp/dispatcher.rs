@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use svalin_rpc::{
     rpc::{
         command::{dispatcher::CommandDispatcher, handler::CommandHandler},
-        session::Session,
+        session::{Session, SessionReadError},
     },
     transport::combined_transport::CombinedTransport,
 };
@@ -17,9 +17,20 @@ pub struct TcpForwardDispatcher {
     pub active: watch::Receiver<bool>,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum TcpForwardDispatcherError {
+    #[error("error reading answer from relaying party: {0}")]
+    ReadAnswerError(SessionReadError),
+    #[error("error from relaying party: {0}")]
+    ForwardError(TcpForwardError),
+    #[error("error copying data: {0}")]
+    CopyError(std::io::Error),
+}
+
 #[async_trait]
 impl CommandDispatcher for TcpForwardDispatcher {
     type Output = ();
+    type Error = TcpForwardDispatcherError;
 
     type Request = String;
 
@@ -35,8 +46,12 @@ impl CommandDispatcher for TcpForwardDispatcher {
         mut self,
         session: &mut Session,
         _request: Self::Request,
-    ) -> Result<Self::Output> {
-        let _forward_active = session.read_object::<Result<(), TcpForwardError>>().await?;
+    ) -> Result<Self::Output, Self::Error> {
+        session
+            .read_object::<Result<(), TcpForwardError>>()
+            .await
+            .map_err(TcpForwardDispatcherError::ReadAnswerError)?
+            .map_err(TcpForwardDispatcherError::ForwardError)?;
 
         let (transport_read, transport_write) = session.borrow_transport();
         let mut transport = CombinedTransport::new(transport_read, transport_write);
@@ -44,7 +59,7 @@ impl CommandDispatcher for TcpForwardDispatcher {
         let copy_future = copy_bidirectional(&mut transport, &mut self.stream);
 
         select! {
-            copy_result = copy_future => {copy_result?; return Ok(())},
+            copy_result = copy_future => {copy_result.map_err(TcpForwardDispatcherError::CopyError)?; return Ok(())},
             _ = self.active.changed() => {
                 if !*self.active.borrow() {
                     return Ok(());

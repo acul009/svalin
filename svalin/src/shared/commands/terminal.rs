@@ -154,6 +154,7 @@ impl Drop for RemoteTerminal {
 
 pub struct RemoteTerminalDispatcher;
 
+#[derive(Debug, thiserror::Error)]
 pub enum RemoteTerminalDispatcherError {}
 
 #[async_trait]

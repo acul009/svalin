@@ -4,8 +4,8 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    get_current_timestamp, signed_object::SignedObject, verifier::exact::ExactVerififier,
-    Certificate, PermCredentials,
+    Certificate, PermCredentials, get_current_timestamp, signed_object::SignedObject,
+    verifier::exact::ExactVerififier,
 };
 use svalin_rpc::{
     commands::forward::ForwardConnection,
@@ -16,7 +16,7 @@ use svalin_rpc::{
         },
         connection::direct_connection::DirectConnection,
         server::RpcServer,
-        session::Session,
+        session::{Session, SessionReadError},
     },
 };
 use tokio::{select, sync::watch};
@@ -144,9 +144,18 @@ pub struct UpdateAgentList {
     pub tunnel_manager: TunnelManager,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum UpdateAgentListError {
+    #[error("failed to receive AgentListItemTransport: {0}")]
+    ReceiveItemError(SessionReadError),
+    #[error("failed to verify AgentListItemTransport: {0}")]
+    VerifyItemError(anyhow::Error),
+}
+
 #[async_trait]
 impl CommandDispatcher for UpdateAgentList {
     type Output = ();
+    type Error = UpdateAgentListError;
 
     type Request = ();
 
@@ -156,17 +165,18 @@ impl CommandDispatcher for UpdateAgentList {
 
     fn get_request(&self) -> Self::Request {}
 
-    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<()> {
+    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<(), Self::Error> {
         loop {
             let list_item_update: AgentListItemTransport = session
                 .read_object()
                 .await
-                .context("failed to receive AgentListItemTransport")?;
+                .map_err(UpdateAgentListError::ReceiveItemError)?;
 
             let public_data = list_item_update
                 .public_data
                 .verify(&self.verifier, get_current_timestamp())
-                .await?;
+                .await
+                .map_err(UpdateAgentListError::VerifyItemError)?;
 
             let item = AgentListItem {
                 online_status: list_item_update.online_status,

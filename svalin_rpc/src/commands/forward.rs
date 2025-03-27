@@ -192,7 +192,7 @@ where
 {
     async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>
     where
-        D::InnerError: Error + 'static,
+        D::InnerError: Display + 'static,
     {
         let dispatcher = ForwardDispatcher {
             target: &self.target,

@@ -208,7 +208,7 @@ impl Server {
             .add(InitHandler::new(send))
             .add(PublicStatusHandler::new(PublicStatus::WaitingForInit));
 
-        let temp_credentials = Keypair::generate()?.to_self_signed_cert()?;
+        let temp_credentials = Keypair::generate().to_self_signed_cert()?;
 
         debug!("starting up init server");
         let rpc = RpcServer::build()

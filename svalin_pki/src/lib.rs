@@ -17,7 +17,7 @@ use anyhow::{Result, anyhow};
 pub use certificate::Certificate;
 pub use certificate::CertificateParseError;
 pub use certificate_request::{CertificateRequest, CertificateRequestParseError};
-pub use encrypt::EncryptedData;
+pub use encrypt::{DecryptError, EncryptError, EncryptedData};
 pub use error::Error;
 pub use hash::*;
 pub use keypair::{GenerateRequestError, Keypair, ToSelfSingedError};

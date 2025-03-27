@@ -16,18 +16,22 @@ use serde::{
     de::{self},
 };
 use svalin_pki::{
-    ArgonCost, Certificate, EncryptedData, Keypair, PermCredentials, argon2::Argon2, sha2::Sha512,
+    ArgonCost, Certificate, DecryptError, EncryptError, EncryptedData, Keypair,
+    ParamsStringParseError, ToSelfSingedError, argon2::Argon2, sha2::Sha512,
 };
 use svalin_rpc::{
     rpc::{
         command::{
-            dispatcher::TakeableCommandDispatcher,
+            dispatcher::{DispatcherError, TakeableCommandDispatcher},
             handler::{PermissionPrecursor, TakeableCommandHandler},
         },
         peer::Peer,
-        session::Session,
+        session::{Session, SessionReadError, SessionWriteError},
     },
-    transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
+    transport::{
+        combined_transport::CombinedTransport,
+        tls_transport::{TlsClientError, TlsDeriveKeyError, TlsTransport},
+    },
     verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
 };
 use tokio::sync::oneshot;
@@ -292,7 +296,6 @@ impl TakeableCommandHandler for LoginHandler {
             let (read, write, _) = session.destructure_transport();
 
             let temp_credentials = Keypair::generate()
-                .context("Failed to generate keypair")?
                 .to_self_signed_cert()
                 .context("Failed to generate temporary credentials")?;
 
@@ -383,17 +386,28 @@ impl TakeableCommandHandler for LoginHandler {
                 .read_object()
                 .await
                 .context("Failed to read client authenticator")?;
-            let (key, server_authenticator) = pake_server
-                .receive_client_authenticator(client_authenticator.0)
-                .map_err(|err| anyhow!(err))
-                .context("Failed to receive client authenticator")?;
 
-            let server_authenticator = Authenticator::try_from(server_authenticator)?;
+            let client_auth_result =
+                pake_server.receive_client_authenticator(client_authenticator.0);
 
-            session
-                .write_object(&server_authenticator)
-                .await
-                .context("Failed to write server authenticator")?;
+            let key = match client_auth_result {
+                Ok((key, server_authenticator)) => {
+                    let server_authenticator = Authenticator::try_from(server_authenticator)?;
+                    session
+                        .write_object::<Result<_, ()>>(&Ok(server_authenticator))
+                        .await
+                        .context("Failed to write server authenticator")?;
+                    key
+                }
+                Err(err) => {
+                    session
+                        .write_object::<Result<Authenticator, ()>>(&Err(()))
+                        .await
+                        .context("Failed to inform client about authentication failure")?;
+
+                    return Err(anyhow!(err).context("failed to authenticate"));
+                }
+            };
 
             // ===== TOTP =====
 
@@ -446,9 +460,62 @@ pub struct Login {
     pub totp: String,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum LoginError {
+    #[error("error writing client nonce: {0}")]
+    WriteClientNonceError(SessionWriteError),
+    #[error("error reading server nonce: {0}")]
+    ReadServerNonceError(SessionReadError),
+    #[error("error creating temporary credentials: {0}")]
+    TempCredentialError(ToSelfSingedError),
+    #[error("error initializing TLS: {0}")]
+    TlsClientError(TlsClientError),
+    #[error("error deriving key: {0}")]
+    DeriveKeyError(TlsDeriveKeyError),
+    #[error("error transforming message: {0}")]
+    MessageTransformError(MessageTransformError),
+    #[error("error writing username: {0}")]
+    WriteUsernameError(SessionWriteError),
+    #[error("error reading client info: {0}")]
+    ReadClientInfoError(SessionReadError),
+    #[error("error receiving channel: {0}")]
+    ChannelRecvError(oneshot::error::RecvError),
+    #[error("error sending channel")]
+    ChannelSendError,
+    #[error("error joining task: {0}")]
+    JoinError(tokio::task::JoinError),
+    #[error("error parsing params: {0}")]
+    ParamsParseError(ParamsStringParseError),
+    #[error("error in aucpace: {0}")]
+    AucPaceError(aucpace::Error),
+    #[error("error writing client public key: {0}")]
+    ClientPublicKeyWriteError(SessionWriteError),
+    #[error("error reading server public key: {0}")]
+    ServerPublicKeyReadError(SessionReadError),
+    #[error("error writing client authenticator: {0}")]
+    ClientAuthenticatorWriteError(SessionWriteError),
+    #[error("error reading server authenticator: {0}")]
+    ServerAuthenticatorReadError(SessionReadError),
+    #[error("error encrypting data: {0}")]
+    EncryptError(EncryptError),
+    #[error("error decrypting data: {0}")]
+    DecryptError(DecryptError),
+    #[error("error writing totp: {0}")]
+    WriteTotpError(SessionWriteError),
+    #[error("error reading totp response: {0}")]
+    ReadTotpResponseError(SessionReadError),
+    #[error("totp incorrect")]
+    TotpIncorrect,
+    #[error("error reading success: {0}")]
+    ReadSuccessError(SessionReadError),
+    #[error("wrong password")]
+    WrongPassword,
+}
+
 #[async_trait]
 impl TakeableCommandDispatcher for Login {
     type Output = LoginSuccess;
+    type InnerError = LoginError;
 
     type Request = ();
 
@@ -464,13 +531,19 @@ impl TakeableCommandDispatcher for Login {
         self,
         session: &mut Option<Session>,
         _: Self::Request,
-    ) -> Result<Self::Output> {
+    ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(mut session) = session.take() {
             let tls_client_nonce = Nonce::generate();
 
-            session.write_object(&tls_client_nonce).await?;
+            session
+                .write_object(&tls_client_nonce)
+                .await
+                .map_err(LoginError::WriteClientNonceError)?;
 
-            let tls_server_nonce: Nonce = session.read_object().await?;
+            let tls_server_nonce: Nonce = session
+                .read_object()
+                .await
+                .map_err(LoginError::ReadServerNonceError)?;
 
             let tls_combined_nonce: Vec<u8> = tls_server_nonce
                 .0
@@ -482,9 +555,8 @@ impl TakeableCommandDispatcher for Login {
             let (read, write, _) = session.destructure_transport();
 
             let credentials = Keypair::generate()
-                .context("Failed to generate keypair")?
                 .to_self_signed_cert()
-                .context("Failed to generate temporary credentials")?;
+                .map_err(LoginError::TempCredentialError)?;
 
             let tls_transport = TlsTransport::client(
                 CombinedTransport::new(read, write),
@@ -492,14 +564,14 @@ impl TakeableCommandDispatcher for Login {
                 &credentials,
             )
             .await
-            .context("Failed to create TLS transport")?;
+            .map_err(LoginError::TlsClientError)?;
 
             debug!("tls transport created");
 
             let mut key_material = [0u8; 32];
             let key_material = tls_transport
                 .derive_key(&mut key_material, b"login", &tls_combined_nonce)
-                .context("Failed to derive key")?;
+                .map_err(LoginError::DeriveKeyError)?;
 
             let (read, write) = tokio::io::split(tls_transport);
             let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
@@ -513,14 +585,19 @@ impl TakeableCommandDispatcher for Login {
 
             let (client, client_nonce) = client.begin();
             session
-                .write_object(&Nonce::try_from(client_nonce)?)
+                .write_object(
+                    &Nonce::try_from(client_nonce).map_err(LoginError::MessageTransformError)?,
+                )
                 .await
-                .context("Failed to write message")?;
+                .map_err(LoginError::WriteClientNonceError)?;
 
             debug!("receiving server nonce");
 
             // Receive server nonce
-            let server_nonce: Nonce = session.read_object().await?;
+            let server_nonce: Nonce = session
+                .read_object()
+                .await
+                .map_err(LoginError::ReadServerNonceError)?;
             let client = client.agree_ssid(server_nonce.0);
 
             let (username_send, username_recv) = oneshot::channel();
@@ -536,16 +613,21 @@ impl TakeableCommandDispatcher for Login {
                     client.start_augmentation_strong(&username, &password, &mut OsRng);
 
                 username_send
-                    .send(StrongUsername::try_from(strong_username).map_err(|err| anyhow!(err))?)
-                    .map_err(|_| anyhow!("failed to send username"))?;
+                    .send(
+                        StrongUsername::try_from(strong_username)
+                            .map_err(LoginError::MessageTransformError)?,
+                    )
+                    .map_err(|_| LoginError::ChannelSendError)?;
 
                 // Receive augmentation info
                 let client_info: ClientInfo = client_info_recv
                     .blocking_recv()
-                    .context("Failed to receive client info")?;
+                    .map_err(LoginError::ChannelRecvError)?;
 
                 // ===== CPace substep =====
-                let hasher = ArgonCost::try_from(client_info.hash_params)?.get_argon_hasher();
+                let hasher = ArgonCost::try_from(client_info.hash_params)
+                    .map_err(LoginError::ParamsParseError)?
+                    .get_argon_hasher();
 
                 client
                     .generate_cpace_alloc(
@@ -554,41 +636,46 @@ impl TakeableCommandDispatcher for Login {
                         hasher.params().clone(),
                         hasher,
                     )
-                    .map_err(|err| anyhow!(err))
+                    .map_err(LoginError::AucPaceError)
             });
 
             debug!("sending strong username");
 
             session
-                .write_object(&username_recv.await?)
+                .write_object(&username_recv.await.map_err(LoginError::ChannelRecvError)?)
                 .await
-                .context("Failed to write username")?;
+                .map_err(LoginError::WriteUsernameError)?;
 
             debug!("receiving client info");
 
             let client_info: ClientInfo = session
                 .read_object()
                 .await
-                .context("Failed to read client info")?;
+                .map_err(LoginError::ReadClientInfoError)?;
 
             client_info_send
                 .send(client_info)
-                .map_err(|_| anyhow!("failed to send client info"))?;
+                .map_err(|_| LoginError::ChannelSendError)?;
 
-            let client = blocking_handle.await??;
+            let client = blocking_handle.await.map_err(LoginError::JoinError)??;
 
             debug!("sending client public key");
 
             let (client, client_key) = client.generate_public_key(key_material, &mut OsRng);
 
             session
-                .write_object(&PublicKey::try_from(client_key)?)
+                .write_object(
+                    &PublicKey::try_from(client_key).map_err(LoginError::MessageTransformError)?,
+                )
                 .await
-                .context("Failed to write public key")?;
+                .map_err(LoginError::ClientPublicKeyWriteError)?;
 
             debug!("receiving server public key");
 
-            let server_key: PublicKey = session.read_object().await?;
+            let server_key: PublicKey = session
+                .read_object()
+                .await
+                .map_err(LoginError::ServerPublicKeyReadError)?;
 
             // ===== Explicit Mutual Authentication =====
 
@@ -596,44 +683,57 @@ impl TakeableCommandDispatcher for Login {
 
             let (client, client_authenticator) = client
                 .receive_server_pubkey(server_key.0)
-                .map_err(|err| anyhow!(err))?;
+                .map_err(LoginError::AucPaceError)?;
 
             session
-                .write_object(&Authenticator::try_from(client_authenticator)?)
-                .await?;
+                .write_object(
+                    &Authenticator::try_from(client_authenticator)
+                        .map_err(LoginError::MessageTransformError)?,
+                )
+                .await
+                .map_err(LoginError::ClientAuthenticatorWriteError)?;
 
             debug!("receiving server authenticator");
 
-            let server_authenticator: Authenticator = session
-                .read_object()
+            let server_authenticator = session
+                .read_object::<Result<Authenticator, ()>>()
                 .await
-                .context("failed to read server authenticator")?;
+                .map_err(LoginError::ServerAuthenticatorReadError)?
+                .map_err(|_| LoginError::WrongPassword)?;
 
             let key = client
                 .receive_server_authenticator(server_authenticator.0)
-                .map_err(|err| anyhow!(err))?;
+                .map_err(LoginError::AucPaceError)?;
 
-            let totp = EncryptedData::encrypt_object_with_key(&self.totp, key_to_array(key))?;
+            let totp = EncryptedData::encrypt_object_with_key(&self.totp, key_to_array(key))
+                .map_err(LoginError::EncryptError)?;
 
             session
                 .write_object(&totp)
                 .await
-                .context("failed to write totp")?;
+                .map_err(LoginError::WriteTotpError)?;
 
-            let totp_success: bool = session.read_object().await?;
+            let totp_success: bool = session
+                .read_object()
+                .await
+                .map_err(LoginError::ReadTotpResponseError)?;
 
             if !totp_success {
-                return Err(anyhow!("TOTP failed"));
+                return Err(LoginError::TotpIncorrect.into());
             }
 
-            let encrypted_success: Vec<u8> = session.read_object().await?;
+            let encrypted_success: Vec<u8> = session
+                .read_object()
+                .await
+                .map_err(LoginError::ReadSuccessError)?;
 
             let success: LoginSuccess =
-                EncryptedData::decrypt_object_with_key(&encrypted_success, key_to_array(key))?;
+                EncryptedData::decrypt_object_with_key(&encrypted_success, key_to_array(key))
+                    .map_err(LoginError::DecryptError)?;
 
             Ok(success)
         } else {
-            Err(anyhow!("no session given"))
+            Err(DispatcherError::NoneSession)
         }
     }
 }

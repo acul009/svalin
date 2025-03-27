@@ -218,7 +218,7 @@ impl Agent {
 
             debug!("Agent password loaded, decrypting...");
 
-            PermCredentials::from_bytes(&encrypted_credentials, key).await
+            Ok(PermCredentials::from_bytes(&encrypted_credentials, key).await?)
         } else {
             return Err(anyhow!("no keysource saved in DB"));
         }

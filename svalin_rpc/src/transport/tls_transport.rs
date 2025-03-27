@@ -51,6 +51,12 @@ pub enum TlsServerError {
     CertificateParseError(#[from] CertificateParseError),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum TlsDeriveKeyError {
+    #[error("error deriving key: {0}")]
+    RustlsError(#[from] rustls::Error),
+}
+
 impl<T> TlsTransport<T>
 where
     T: SessionTransport,
@@ -146,7 +152,12 @@ where
         })
     }
 
-    pub fn derive_key<B>(&self, buffer: B, label: &[u8], context: &[u8]) -> Result<B>
+    pub fn derive_key<B>(
+        &self,
+        buffer: B,
+        label: &[u8],
+        context: &[u8],
+    ) -> Result<B, TlsDeriveKeyError>
     where
         B: AsMut<[u8]>,
     {

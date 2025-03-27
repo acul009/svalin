@@ -12,7 +12,7 @@ use svalin_rpc::rpc::{
         dispatcher::CommandDispatcher,
         handler::{CommandHandler, PermissionPrecursor},
     },
-    session::Session,
+    session::{Session, SessionReadError},
 };
 use tokio_util::sync::CancellationToken;
 use totp_rs::TOTP;
@@ -30,7 +30,7 @@ pub struct AddUserRequest {
     encrypted_credentials: Vec<u8>,
     totp_secret: TOTP,
     current_totp: String,
-    /// The username of whoever is registering
+    /// The username of the user being added
     username: Vec<u8>,
 
     /// The salt used when computing the verifier
@@ -192,10 +192,19 @@ impl AddUser {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum AddUserDispatcherError {
+    #[error("failed to receive response from server: {0}")]
+    ReadResponseError(SessionReadError),
+    #[error("error from server: {0}")]
+    FromServer(AddUserError),
+}
+
 #[async_trait]
 impl CommandDispatcher for AddUser {
     type Output = ();
     type Request = AddUserRequest;
+    type Error = AddUserDispatcherError;
 
     fn key() -> String {
         AddUserHandler::key()
@@ -205,14 +214,17 @@ impl CommandDispatcher for AddUser {
         self.request.clone()
     }
 
-    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<()> {
+    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<(), Self::Error> {
         debug!("waiting on confirmation for new user");
 
-        let success: Result<(), AddUserError> = session.read_object().await?;
+        let success: Result<(), AddUserError> = session
+            .read_object()
+            .await
+            .map_err(AddUserDispatcherError::ReadResponseError)?;
 
         debug!("received answer");
 
-        success?;
+        success.map_err(AddUserDispatcherError::FromServer)?;
 
         debug!("user confirmed as successfully added");
 

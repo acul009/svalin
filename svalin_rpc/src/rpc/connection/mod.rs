@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::fmt::Display;
 
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
@@ -25,9 +26,8 @@ pub trait ConnectionBase: Send + Sync + Clone {
     async fn closed(&self);
 }
 
-use super::command::dispatcher::{DispatcherError, TakeableCommandDispatcher};
+use super::command::dispatcher::TakeableCommandDispatcher;
 use super::peer::Peer;
-use super::session::SessionDispatchError;
 
 pub mod direct_connection;
 
@@ -36,7 +36,7 @@ pub trait Connection: Send + Sync + Clone {
     // async fn open_session(&self, command_key: String) -> Result<Session>;
     async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>
     where
-        D::InnerError: Error + 'static;
+        D::InnerError: Display + 'static;
     fn peer(&self) -> &Peer;
 }
 
@@ -65,7 +65,7 @@ where
 
     async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>
     where
-        D::InnerError: Error,
+        D::InnerError: Display,
     {
         let (read, write) = self.open_raw_session().await?;
 
