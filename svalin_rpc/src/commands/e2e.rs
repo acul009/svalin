@@ -22,6 +22,7 @@ use crate::{
     },
     transport::{
         combined_transport::CombinedTransport,
+        session_transport::{SessionTransportReader, SessionTransportWriter},
         tls_transport::{TlsClientError, TlsTransport},
     },
 };
@@ -99,26 +100,23 @@ where
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum E2EDispatchError<NestedError> {
+pub enum E2EDispatchError {
     #[error("error creating TLS client: {0}")]
     TlsError(TlsClientError),
-    #[error("error dispatching nested command: {0}")]
-    NestedError(SessionDispatchError<NestedError>),
 }
 
-pub struct E2EDispatcher<'b, T> {
+pub struct E2EDispatcher<'b> {
     pub peer: Certificate,
     pub credentials: &'b PermCredentials,
-    pub nested_dispatch: T,
 }
 
 #[async_trait]
-impl<'b, D> TakeableCommandDispatcher for E2EDispatcher<'b, D>
-where
-    D: TakeableCommandDispatcher,
-{
-    type Output = D::Output;
-    type InnerError = E2EDispatchError<D::InnerError>;
+impl<'b> TakeableCommandDispatcher for E2EDispatcher<'b> {
+    type Output = (
+        Box<dyn SessionTransportReader>,
+        Box<dyn SessionTransportWriter>,
+    );
+    type InnerError = E2EDispatchError;
 
     type Request = ();
 
@@ -150,17 +148,7 @@ where
 
             let (read, write) = tokio::io::split(tls_transport);
 
-            let session_ready = Session::new(
-                Box::new(read),
-                Box::new(write),
-                Peer::Certificate(self.peer),
-            );
-
-            session_ready
-                .dispatch(self.nested_dispatch)
-                .await
-                .map_err(E2EDispatchError::NestedError)
-                .map_err(DispatcherError::Other)
+            Ok((Box::new(read), Box::new(write)))
         } else {
             Err(DispatcherError::NoneSession)
         }

@@ -461,7 +461,7 @@ pub struct Login {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum LoginError {
+pub enum LoginDispatcherError {
     #[error("error writing client nonce: {0}")]
     WriteClientNonceError(SessionWriteError),
     #[error("error reading server nonce: {0}")]
@@ -504,8 +504,8 @@ pub enum LoginError {
     WriteTotpError(SessionWriteError),
     #[error("error reading totp response: {0}")]
     ReadTotpResponseError(SessionReadError),
-    #[error("totp incorrect")]
-    TotpIncorrect,
+    #[error("totp invalid")]
+    InvalidTotp,
     #[error("error reading success: {0}")]
     ReadSuccessError(SessionReadError),
     #[error("wrong password")]
@@ -515,7 +515,7 @@ pub enum LoginError {
 #[async_trait]
 impl TakeableCommandDispatcher for Login {
     type Output = LoginSuccess;
-    type InnerError = LoginError;
+    type InnerError = LoginDispatcherError;
 
     type Request = ();
 
@@ -538,12 +538,12 @@ impl TakeableCommandDispatcher for Login {
             session
                 .write_object(&tls_client_nonce)
                 .await
-                .map_err(LoginError::WriteClientNonceError)?;
+                .map_err(LoginDispatcherError::WriteClientNonceError)?;
 
             let tls_server_nonce: Nonce = session
                 .read_object()
                 .await
-                .map_err(LoginError::ReadServerNonceError)?;
+                .map_err(LoginDispatcherError::ReadServerNonceError)?;
 
             let tls_combined_nonce: Vec<u8> = tls_server_nonce
                 .0
@@ -556,7 +556,7 @@ impl TakeableCommandDispatcher for Login {
 
             let credentials = Keypair::generate()
                 .to_self_signed_cert()
-                .map_err(LoginError::TempCredentialError)?;
+                .map_err(LoginDispatcherError::TempCredentialError)?;
 
             let tls_transport = TlsTransport::client(
                 CombinedTransport::new(read, write),
@@ -564,14 +564,14 @@ impl TakeableCommandDispatcher for Login {
                 &credentials,
             )
             .await
-            .map_err(LoginError::TlsClientError)?;
+            .map_err(LoginDispatcherError::TlsClientError)?;
 
             debug!("tls transport created");
 
             let mut key_material = [0u8; 32];
             let key_material = tls_transport
                 .derive_key(&mut key_material, b"login", &tls_combined_nonce)
-                .map_err(LoginError::DeriveKeyError)?;
+                .map_err(LoginDispatcherError::DeriveKeyError)?;
 
             let (read, write) = tokio::io::split(tls_transport);
             let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
@@ -586,10 +586,11 @@ impl TakeableCommandDispatcher for Login {
             let (client, client_nonce) = client.begin();
             session
                 .write_object(
-                    &Nonce::try_from(client_nonce).map_err(LoginError::MessageTransformError)?,
+                    &Nonce::try_from(client_nonce)
+                        .map_err(LoginDispatcherError::MessageTransformError)?,
                 )
                 .await
-                .map_err(LoginError::WriteClientNonceError)?;
+                .map_err(LoginDispatcherError::WriteClientNonceError)?;
 
             debug!("receiving server nonce");
 
@@ -597,7 +598,7 @@ impl TakeableCommandDispatcher for Login {
             let server_nonce: Nonce = session
                 .read_object()
                 .await
-                .map_err(LoginError::ReadServerNonceError)?;
+                .map_err(LoginDispatcherError::ReadServerNonceError)?;
             let client = client.agree_ssid(server_nonce.0);
 
             let (username_send, username_recv) = oneshot::channel();
@@ -615,18 +616,18 @@ impl TakeableCommandDispatcher for Login {
                 username_send
                     .send(
                         StrongUsername::try_from(strong_username)
-                            .map_err(LoginError::MessageTransformError)?,
+                            .map_err(LoginDispatcherError::MessageTransformError)?,
                     )
-                    .map_err(|_| LoginError::ChannelSendError)?;
+                    .map_err(|_| LoginDispatcherError::ChannelSendError)?;
 
                 // Receive augmentation info
                 let client_info: ClientInfo = client_info_recv
                     .blocking_recv()
-                    .map_err(LoginError::ChannelRecvError)?;
+                    .map_err(LoginDispatcherError::ChannelRecvError)?;
 
                 // ===== CPace substep =====
                 let hasher = ArgonCost::try_from(client_info.hash_params)
-                    .map_err(LoginError::ParamsParseError)?
+                    .map_err(LoginDispatcherError::ParamsParseError)?
                     .get_argon_hasher();
 
                 client
@@ -636,28 +637,34 @@ impl TakeableCommandDispatcher for Login {
                         hasher.params().clone(),
                         hasher,
                     )
-                    .map_err(LoginError::AucPaceError)
+                    .map_err(LoginDispatcherError::AucPaceError)
             });
 
             debug!("sending strong username");
 
             session
-                .write_object(&username_recv.await.map_err(LoginError::ChannelRecvError)?)
+                .write_object(
+                    &username_recv
+                        .await
+                        .map_err(LoginDispatcherError::ChannelRecvError)?,
+                )
                 .await
-                .map_err(LoginError::WriteUsernameError)?;
+                .map_err(LoginDispatcherError::WriteUsernameError)?;
 
             debug!("receiving client info");
 
             let client_info: ClientInfo = session
                 .read_object()
                 .await
-                .map_err(LoginError::ReadClientInfoError)?;
+                .map_err(LoginDispatcherError::ReadClientInfoError)?;
 
             client_info_send
                 .send(client_info)
-                .map_err(|_| LoginError::ChannelSendError)?;
+                .map_err(|_| LoginDispatcherError::ChannelSendError)?;
 
-            let client = blocking_handle.await.map_err(LoginError::JoinError)??;
+            let client = blocking_handle
+                .await
+                .map_err(LoginDispatcherError::JoinError)??;
 
             debug!("sending client public key");
 
@@ -665,17 +672,18 @@ impl TakeableCommandDispatcher for Login {
 
             session
                 .write_object(
-                    &PublicKey::try_from(client_key).map_err(LoginError::MessageTransformError)?,
+                    &PublicKey::try_from(client_key)
+                        .map_err(LoginDispatcherError::MessageTransformError)?,
                 )
                 .await
-                .map_err(LoginError::ClientPublicKeyWriteError)?;
+                .map_err(LoginDispatcherError::ClientPublicKeyWriteError)?;
 
             debug!("receiving server public key");
 
             let server_key: PublicKey = session
                 .read_object()
                 .await
-                .map_err(LoginError::ServerPublicKeyReadError)?;
+                .map_err(LoginDispatcherError::ServerPublicKeyReadError)?;
 
             // ===== Explicit Mutual Authentication =====
 
@@ -683,53 +691,53 @@ impl TakeableCommandDispatcher for Login {
 
             let (client, client_authenticator) = client
                 .receive_server_pubkey(server_key.0)
-                .map_err(LoginError::AucPaceError)?;
+                .map_err(LoginDispatcherError::AucPaceError)?;
 
             session
                 .write_object(
                     &Authenticator::try_from(client_authenticator)
-                        .map_err(LoginError::MessageTransformError)?,
+                        .map_err(LoginDispatcherError::MessageTransformError)?,
                 )
                 .await
-                .map_err(LoginError::ClientAuthenticatorWriteError)?;
+                .map_err(LoginDispatcherError::ClientAuthenticatorWriteError)?;
 
             debug!("receiving server authenticator");
 
             let server_authenticator = session
                 .read_object::<Result<Authenticator, ()>>()
                 .await
-                .map_err(LoginError::ServerAuthenticatorReadError)?
-                .map_err(|_| LoginError::WrongPassword)?;
+                .map_err(LoginDispatcherError::ServerAuthenticatorReadError)?
+                .map_err(|_| LoginDispatcherError::WrongPassword)?;
 
             let key = client
                 .receive_server_authenticator(server_authenticator.0)
-                .map_err(LoginError::AucPaceError)?;
+                .map_err(LoginDispatcherError::AucPaceError)?;
 
             let totp = EncryptedData::encrypt_object_with_key(&self.totp, key_to_array(key))
-                .map_err(LoginError::EncryptError)?;
+                .map_err(LoginDispatcherError::EncryptError)?;
 
             session
                 .write_object(&totp)
                 .await
-                .map_err(LoginError::WriteTotpError)?;
+                .map_err(LoginDispatcherError::WriteTotpError)?;
 
             let totp_success: bool = session
                 .read_object()
                 .await
-                .map_err(LoginError::ReadTotpResponseError)?;
+                .map_err(LoginDispatcherError::ReadTotpResponseError)?;
 
             if !totp_success {
-                return Err(LoginError::TotpIncorrect.into());
+                return Err(LoginDispatcherError::InvalidTotp.into());
             }
 
             let encrypted_success: Vec<u8> = session
                 .read_object()
                 .await
-                .map_err(LoginError::ReadSuccessError)?;
+                .map_err(LoginDispatcherError::ReadSuccessError)?;
 
             let success: LoginSuccess =
                 EncryptedData::decrypt_object_with_key(&encrypted_success, key_to_array(key))
-                    .map_err(LoginError::DecryptError)?;
+                    .map_err(LoginDispatcherError::DecryptError)?;
 
             Ok(success)
         } else {

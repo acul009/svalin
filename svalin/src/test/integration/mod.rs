@@ -76,6 +76,22 @@ async fn integration_tests() {
             login
                 .login(
                     username.clone(),
+                    b"wrong password".to_vec(),
+                    totp_secret.generate_current().unwrap(),
+                )
+                .await
+                .unwrap_err();
+        }
+    };
+
+    let third_connect = Client::first_connect(host.clone()).await.unwrap();
+
+    match third_connect {
+        crate::client::FirstConnect::Init(_) => unreachable!(),
+        crate::client::FirstConnect::Login(login) => {
+            login
+                .login(
+                    username.clone(),
                     password.clone().into_bytes(),
                     totp_secret.generate_current().unwrap(),
                 )

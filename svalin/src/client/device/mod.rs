@@ -1,9 +1,9 @@
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use svalin_rpc::{
     commands::{forward::ForwardConnection, ping::Ping},
-    rpc::connection::{direct_connection::DirectConnection, Connection},
+    rpc::connection::{Connection, direct_connection::DirectConnection},
 };
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::watch;
@@ -96,7 +96,11 @@ impl Device {
     }
 
     pub async fn ping(&self) -> Result<Duration> {
-        self.data.connection.dispatch(Ping).await
+        self.data
+            .connection
+            .dispatch(Ping)
+            .await
+            .map_err(|err| anyhow!(err))
     }
 
     pub fn item(&self) -> watch::Ref<'_, AgentListItem> {
@@ -123,6 +127,7 @@ impl Device {
             .connection
             .dispatch(RemoteTerminalDispatcher)
             .await
+            .map_err(|err| anyhow!(err))
     }
 }
 

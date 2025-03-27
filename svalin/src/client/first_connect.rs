@@ -1,14 +1,18 @@
 use std::fmt::Debug;
 
-use anyhow::{Context, Ok, Result};
-use svalin_pki::PermCredentials;
+use anyhow::{Context, Result};
 use svalin_pki::verifier::KnownCertificateVerifier;
+use svalin_pki::{DecodeCredentialsError, PermCredentials};
+use svalin_rpc::rpc::command::dispatcher::DispatcherError;
+use svalin_rpc::rpc::connection::ConnectionDispatchError;
+use svalin_rpc::rpc::session::SessionDispatchError;
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tracing::{debug, instrument};
 
 use crate::server::INIT_SERVER_SHUTDOWN_COUNTDOWN;
 use crate::shared::commands::add_user::AddUser;
+use crate::shared::commands::login::LoginDispatcherError;
 use crate::shared::commands::public_server_status::GetPutblicStatus;
 use crate::shared::commands::public_server_status::PublicStatus;
 use crate::shared::commands::{self, init};
@@ -130,8 +134,27 @@ impl Debug for Login {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum LoginError {
+    #[error("failed to dispatch login command")]
+    DispatchError(#[from] ConnectionDispatchError<commands::login::LoginDispatcherError>),
+    #[error("wrong password")]
+    WrongPassword,
+    #[error("invalid totp")]
+    InvalidTotp,
+    #[error("failed to decode credentials")]
+    DecodeCredentialsError(#[from] DecodeCredentialsError),
+    #[error("failed to add profile")]
+    AddProfileError(#[from] anyhow::Error),
+}
+
 impl Login {
-    pub async fn login(self, username: String, password: Vec<u8>, totp: String) -> Result<String> {
+    pub async fn login(
+        self,
+        username: String,
+        password: Vec<u8>,
+        totp: String,
+    ) -> Result<String, LoginError> {
         let login_data = self
             .client
             .upstream_connection()
@@ -140,13 +163,22 @@ impl Login {
                 password: password.clone(),
                 totp,
             })
-            .await?;
+            .await
+            .map_err(|err| match err {
+                ConnectionDispatchError::DispatchError(SessionDispatchError::DispatcherError(
+                    DispatcherError::Other(LoginDispatcherError::WrongPassword),
+                )) => LoginError::WrongPassword,
+                ConnectionDispatchError::DispatchError(SessionDispatchError::DispatcherError(
+                    DispatcherError::Other(LoginDispatcherError::InvalidTotp),
+                )) => LoginError::InvalidTotp,
+                _ => LoginError::DispatchError(err),
+            })?;
 
         let credentials =
             PermCredentials::from_bytes(&login_data.encrypted_credentials, password.clone())
                 .await?;
 
-        Client::add_profile(
+        let profile = Client::add_profile(
             username,
             self.address,
             login_data.server_cert,
@@ -155,7 +187,9 @@ impl Login {
             password,
         )
         .await
-        .context("failed to save profile")
+        .context("failed to save profile")?;
+
+        Ok(profile)
     }
 
     pub fn address(&self) -> &str {

@@ -6,15 +6,17 @@ use crate::commands::{deauthenticate::Deauthenticate, e2e::E2EDispatcher};
 use crate::rpc::command::dispatcher::{DispatcherError, TakeableCommandDispatcher};
 use crate::rpc::connection::Connection;
 use crate::rpc::peer::Peer;
-use crate::rpc::session::{SessionDispatchError, SessionReadError};
+use crate::rpc::session::{self, SessionDispatchError, SessionReadError};
 use crate::rpc::{command::handler::CommandHandler, server::RpcServer, session::Session};
 use crate::transport::combined_transport::CombinedTransport;
+use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, PermCredentials};
 use tokio::io::AsyncWriteExt;
 use tokio::select;
+use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
@@ -110,28 +112,25 @@ impl CommandHandler for ForwardHandler {
     }
 }
 
-pub struct ForwardDispatcher<'a, T> {
+pub struct ForwardDispatcher<'a> {
     pub target: &'a Certificate,
-    pub nested_dispatch: T,
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ForwardDispatchError<NestedError> {
+pub enum ForwardDispatchError {
     #[error("error reading forward signal: {0}")]
     AwaitForwardError(SessionReadError),
     #[error("received forward error from server: {0}")]
     ForwardError(#[from] ForwardError),
-    #[error("error dispatching nested command: {0}")]
-    NestedError(#[from] SessionDispatchError<NestedError>),
 }
 
 #[async_trait]
-impl<'a, D> TakeableCommandDispatcher for ForwardDispatcher<'a, D>
-where
-    D: TakeableCommandDispatcher,
-{
-    type Output = D::Output;
-    type InnerError = ForwardDispatchError<D::InnerError>;
+impl<'a> TakeableCommandDispatcher for ForwardDispatcher<'a> {
+    type Output = (
+        Box<dyn SessionTransportReader>,
+        Box<dyn SessionTransportWriter>,
+    );
+    type InnerError = ForwardDispatchError;
 
     type Request = &'a Certificate;
 
@@ -147,7 +146,7 @@ where
         self,
         session: &mut Option<Session>,
         _target: Self::Request,
-    ) -> Result<Self::Output, DispatcherError<ForwardDispatchError<D::InnerError>>> {
+    ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(mut session) = session.take() {
             session
                 .read_object::<Result<(), ForwardError>>()
@@ -155,11 +154,9 @@ where
                 .map_err(ForwardDispatchError::AwaitForwardError)?
                 .map_err(ForwardDispatchError::ForwardError)?;
 
-            session
-                .dispatch(self.nested_dispatch)
-                .await
-                .map_err(ForwardDispatchError::NestedError)
-                .map_err(DispatcherError::Other)
+            let (read, write, _) = session.destructure_transport();
+
+            Ok((read, write))
         } else {
             Err(DispatcherError::NoneSession)
         }
@@ -190,26 +187,52 @@ impl<T> Connection for ForwardConnection<T>
 where
     T: Connection + Send,
 {
-    async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>
-    where
-        D::InnerError: Display + 'static,
-    {
+    // async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) ->
+    // Result<D::Output> where
+    //     D::InnerError: Display + 'static,
+    // {
+    //     let dispatcher = ForwardDispatcher {
+    //         target: &self.target,
+    //         nested_dispatch: E2EDispatcher {
+    //             peer: self.target.clone(),
+    //             credentials: &self.credentials,
+    //             nested_dispatch: dispatcher,
+    //         },
+    //     };
+
+    //     self.connection
+    //         .dispatch(dispatcher)
+    //         .await
+    //         .map_err(|err| anyhow!(err.to_string()))
+    // }
+
+    async fn open_raw_session(
+        &self,
+    ) -> Result<(
+        Box<dyn SessionTransportReader>,
+        Box<dyn SessionTransportWriter>,
+    )> {
         let dispatcher = ForwardDispatcher {
             target: &self.target,
-            nested_dispatch: E2EDispatcher {
-                peer: self.target.clone(),
-                credentials: &self.credentials,
-                nested_dispatch: dispatcher,
-            },
         };
 
-        self.connection
-            .dispatch(dispatcher)
-            .await
-            .map_err(|err| anyhow!(err.to_string()))
+        let (read, write) = self.connection.dispatch(dispatcher).await?;
+
+        let unencrypted = Session::new(read, write, self.peer().clone());
+
+        let dispatcher = E2EDispatcher {
+            peer: self.target.clone(),
+            credentials: &self.credentials,
+        };
+
+        let (read, write) = unencrypted.dispatch(dispatcher).await?;
+
+        Ok((read, write))
     }
 
     fn peer(&self) -> &Peer {
         &self.as_peer
     }
+
+    async fn closed(&self) {}
 }

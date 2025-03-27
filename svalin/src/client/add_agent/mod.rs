@@ -1,12 +1,14 @@
 use std::fmt::Debug;
 
-use crate::shared::join_agent::{accept_handler::AcceptJoin, add_agent::AddAgent, PublicAgentData};
+use crate::shared::join_agent::{PublicAgentData, accept_handler::AcceptJoin, add_agent::AddAgent};
 
 use super::Client;
 
-use anyhow::Result;
-use svalin_pki::{signed_object::SignedObject, Certificate, PermCredentials};
-use svalin_rpc::rpc::connection::{direct_connection::DirectConnection, Connection};
+use anyhow::{Result, anyhow};
+use svalin_pki::{Certificate, PermCredentials, signed_object::SignedObject};
+use svalin_rpc::rpc::connection::{
+    Connection, ConnectionDispatchError, direct_connection::DirectConnection,
+};
 use tokio::sync::oneshot;
 use tracing::debug;
 
@@ -22,7 +24,8 @@ impl Client {
 
         let (confirm_code_send, confirm_code_recv) = oneshot::channel::<String>();
 
-        let (result_send, result_recv) = oneshot::channel::<Result<Certificate>>();
+        let (result_send, result_recv) =
+            oneshot::channel::<Result<Certificate, ConnectionDispatchError<anyhow::Error>>>();
 
         tokio::spawn(async move {
             let result = connection
@@ -53,7 +56,7 @@ impl Client {
 pub struct WaitingForConfirmCode {
     connection: DirectConnection,
     confirm_code_send: oneshot::Sender<String>,
-    result_revc: oneshot::Receiver<Result<Certificate>>,
+    result_revc: oneshot::Receiver<Result<Certificate, ConnectionDispatchError<anyhow::Error>>>,
     credentials: PermCredentials,
 }
 
@@ -66,7 +69,7 @@ impl Debug for WaitingForConfirmCode {
 impl WaitingForConfirmCode {
     pub async fn confirm(self, confirm_code: String, agent_name: String) -> Result<()> {
         self.confirm_code_send.send(confirm_code).unwrap();
-        let certificate = self.result_revc.await??;
+        let certificate = self.result_revc.await?.map_err(|err| anyhow!(err))?;
 
         debug!("agent certificate successfully created and sent");
 
@@ -78,7 +81,10 @@ impl WaitingForConfirmCode {
             &self.credentials,
         )?;
 
-        self.connection.dispatch(AddAgent { agent: &agent }).await?;
+        self.connection
+            .dispatch(AddAgent { agent: &agent })
+            .await
+            .map_err(|err| anyhow!(err))?;
 
         debug!("agent is registered on server");
 

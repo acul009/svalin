@@ -238,9 +238,7 @@ impl Client {
                     })
                     .await
                 {
-                    for err in err.chain() {
-                        error!("error while keeping agent list in sync: {:?}", err);
-                    }
+                    error!("error while keeping agent list in sync: {:?}", err);
                 }
             });
 

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 pub mod device;
 mod first_connect;
@@ -46,7 +46,11 @@ impl Client {
     }
 
     pub async fn ping_upstream(&self) -> Result<Duration> {
-        self.rpc.upstream_connection().dispatch(Ping).await
+        self.rpc
+            .upstream_connection()
+            .dispatch(Ping)
+            .await
+            .map_err(|err| anyhow!(err))
     }
 
     pub fn device_list(&self) -> watch::Ref<BTreeMap<Certificate, Device>> {

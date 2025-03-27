@@ -1,6 +1,6 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use quinn::{rustls::pki_types::CertificateDer, VarInt};
+use quinn::{VarInt, rustls::pki_types::CertificateDer};
 use svalin_pki::Certificate;
 use tracing::debug;
 
@@ -9,7 +9,7 @@ use crate::{
     transport::session_transport::{SessionTransportReader, SessionTransportWriter},
 };
 
-use super::{ConnectionBase, ServeableConnectionBase};
+use super::{Connection, ServeableConnectionBase};
 
 #[derive(Debug, Clone)]
 pub struct DirectConnection {
@@ -18,7 +18,7 @@ pub struct DirectConnection {
 }
 
 #[async_trait]
-impl ConnectionBase for DirectConnection {
+impl Connection for DirectConnection {
     async fn open_raw_session(
         &self,
     ) -> Result<(

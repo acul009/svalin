@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+use anyhow::anyhow;
 use dispatcher::TcpForwardDispatcher;
 use svalin_rpc::rpc::connection::Connection;
 use thiserror::Error;
@@ -75,7 +76,7 @@ impl TcpTunnelConfig {
 
                                 tokio::spawn(async move {
                                     if let Err(err) = connection.dispatch(dispatcher).await {
-                                        let err = err.context("error running tcp tunnel");
+                                        let err = anyhow!(err).context("error running tcp tunnel");
                                         tracing::error!("{:#}", err);
                                     }
                                 });

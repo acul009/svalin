@@ -3,13 +3,13 @@ use std::fmt::Debug;
 use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
+use quinn::EndpointConfig;
 use quinn::crypto::rustls::QuicServerConfig;
 use quinn::rustls::crypto::CryptoProvider;
-use quinn::EndpointConfig;
 use svalin_pki::{Certificate, PermCredentials};
 use tokio::select;
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::{Mutex, broadcast};
 use tokio::time::error::Elapsed;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
@@ -17,7 +17,7 @@ use tokio_util::task::TaskTracker;
 use tracing::{debug, error};
 
 use crate::permissions::PermissionHandler;
-use crate::rpc::connection::{ConnectionBase, ServeableConnection};
+use crate::rpc::connection::{Connection, ServeableConnection};
 use crate::rpc::peer::Peer;
 use crate::rustls::{self, server::danger::ClientCertVerifier};
 

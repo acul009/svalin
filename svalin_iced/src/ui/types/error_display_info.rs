@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::ui::widgets::{error_display, error_display::ErrorDisplay};
 
 #[derive(Debug, Clone)]
@@ -7,10 +9,10 @@ pub struct ErrorDisplayInfo<E> {
 }
 
 impl<E> ErrorDisplayInfo<E> {
-    pub fn new(error: E, context: impl Into<String>) -> Self {
+    pub fn new(error: E, context: impl Display) -> Self {
         Self {
             error,
-            context: context.into(),
+            context: context.to_string(),
         }
     }
 

@@ -102,8 +102,8 @@ impl LoginDialog {
                         Action::Run(Task::future(async move {
                             let login_result = login.login(username, password.clone(), totp).await;
                             match login_result {
-                                Err(e) => Message::Error(ErrorDisplayInfo::new(
-                                    e.into(),
+                                Err(err) => Message::Error(ErrorDisplayInfo::new(
+                                    Arc::new(anyhow!(err)),
                                     t!("profile-picker.error.login"),
                                 )),
                                 Ok(new_profile) => {

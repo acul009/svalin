@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::fmt::Display;
 
 use anyhow::{Context, Result, anyhow};
@@ -12,8 +11,16 @@ use crate::permissions::PermissionHandler;
 use crate::rpc::{command::handler::HandlerCollection, session::Session};
 use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
 
+#[derive(Debug, thiserror::Error)]
+pub enum ConnectionDispatchError<DError> {
+    #[error("failed to open session: {0}")]
+    OpenSessionError(#[from] anyhow::Error),
+    #[error("failed to dispatch command: {0}")]
+    DispatchError(#[from] SessionDispatchError<DError>),
+}
+
 #[async_trait]
-pub trait ConnectionBase: Send + Sync + Clone {
+pub trait Connection: Send + Sync + Clone {
     async fn open_raw_session(
         &self,
     ) -> Result<(
@@ -21,49 +28,10 @@ pub trait ConnectionBase: Send + Sync + Clone {
         Box<dyn SessionTransportWriter>,
     )>;
 
-    fn peer(&self) -> &Peer;
-
-    async fn closed(&self);
-}
-
-use super::command::dispatcher::TakeableCommandDispatcher;
-use super::peer::Peer;
-
-pub mod direct_connection;
-
-#[async_trait]
-pub trait Connection: Send + Sync + Clone {
-    // async fn open_session(&self, command_key: String) -> Result<Session>;
-    async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>
-    where
-        D::InnerError: Display + 'static;
-    fn peer(&self) -> &Peer;
-}
-
-#[async_trait]
-impl<T> Connection for T
-where
-    T: ConnectionBase,
-{
-    // async fn open_session(&self, command_key: String) -> Result<Session> {
-    //     debug!("creating transport");
-
-    //     let (read, write) = self.open_raw_session().await?;
-
-    //     debug!("transport created, pass to session");
-
-    //     let mut session = Session::new(read, write, Peer::Anonymous);
-
-    //     debug!("requesting session");
-
-    //     session.request_session(command_key).await?;
-
-    //     debug!("session request successful");
-
-    //     Ok(session)
-    // }
-
-    async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) -> Result<D::Output>
+    async fn dispatch<D: TakeableCommandDispatcher>(
+        &self,
+        dispatcher: D,
+    ) -> Result<D::Output, ConnectionDispatchError<D::InnerError>>
     where
         D::InnerError: Display,
     {
@@ -71,19 +39,22 @@ where
 
         let session = Session::new(read, write, self.peer().clone());
 
-        session
-            .dispatch(dispatcher)
-            .await
-            .map_err(|err| anyhow!(err.to_string()))
+        Ok(session.dispatch(dispatcher).await?)
     }
 
-    fn peer(&self) -> &Peer {
-        self.peer()
-    }
+    fn peer(&self) -> &Peer;
+
+    async fn closed(&self);
 }
 
+use super::command::dispatcher::{DispatcherError, TakeableCommandDispatcher};
+use super::peer::Peer;
+use super::session::SessionDispatchError;
+
+pub mod direct_connection;
+
 #[async_trait]
-pub trait ServeableConnectionBase: ConnectionBase {
+pub trait ServeableConnectionBase: Connection {
     async fn accept_raw_session(
         &self,
     ) -> Result<(
