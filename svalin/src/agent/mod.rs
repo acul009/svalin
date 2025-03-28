@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
-use marmelade::Scope;
 use serde::{Deserialize, Serialize};
 use svalin_pki::verifier::KnownCertificateVerifier;
 use svalin_pki::verifier::exact::ExactVerififier;
@@ -30,23 +29,25 @@ pub struct Agent {
     credentials: PermCredentials,
 }
 
+const BASE_CONFIG_KEY: &[u8] = b"base_config";
+
 impl Agent {
     #[instrument]
     pub async fn open() -> Result<Agent> {
         debug!("opening agent configuration");
 
-        let db = Self::open_marmelade()?;
+        let tree = Self::open_db()?;
 
-        let scope = db.scope("default".into())?;
+        let raw_config = tree
+            .get(BASE_CONFIG_KEY)?
+            .ok_or_else(|| anyhow!("agent not yet configured"))?;
 
-        let config: AgentConfig = scope
-            .get_object("base_config")?
-            .ok_or(anyhow!("agent not yet configured"))?;
+        let config: AgentConfig = postcard::from_bytes(&raw_config)?;
 
         debug!("decrypting agent credentials");
 
         let credentials =
-            Self::decrypt_credentials(config.encrypted_credentials, scope.clone()).await?;
+            Self::decrypt_credentials(config.encrypted_credentials, tree.clone()).await?;
 
         debug!("building upstream verifier");
 
@@ -111,38 +112,32 @@ impl Agent {
     }
 
     pub async fn init_with(data: AgentInitPayload) -> Result<()> {
-        let db = Self::open_marmelade()?;
-
-        let scope = db.scope("default".into())?;
+        let tree = Self::open_db()?;
 
         let config = AgentConfig {
             root_certificate: data.root,
             upstream_certificate: data.upstream,
-            encrypted_credentials: Self::encrypt_credentials(data.credentials, scope.clone())
+            encrypted_credentials: Self::encrypt_credentials(data.credentials, tree.clone())
                 .await?,
             upstream_address: data.address,
         };
 
-        scope.update(|b| {
-            let current = b.get_kv("base_config");
+        if tree.get(BASE_CONFIG_KEY)?.is_some() {
+            return Err(anyhow!("Profile already exists"));
+        }
 
-            if current.is_some() {
-                return Err(anyhow!("Profile already exists"));
-            }
+        tree.insert(BASE_CONFIG_KEY, postcard::to_extend(&config, Vec::new())?)?;
 
-            b.put_object("base_config", &config)?;
-
-            Ok(())
-        })?;
+        tree.flush_async().await?;
 
         Ok(())
     }
 
-    fn open_marmelade() -> Result<marmelade::DB> {
+    fn open_db() -> Result<sled::Tree> {
         let mut path = Self::get_config_dir_path()?;
-        path.push("client.jammdb");
+        path.push("client.sled");
 
-        Ok(marmelade::DB::open(path)?)
+        Ok(sled::open(path)?.open_tree("default")?)
     }
 
     fn get_config_dir_path() -> Result<PathBuf> {
@@ -188,18 +183,25 @@ impl Agent {
         }
     }
 
-    async fn encrypt_credentials(credentials: PermCredentials, scope: Scope) -> Result<Vec<u8>> {
-        let key_source: Option<KeySource> = scope.get_object("credential_key")?;
+    async fn encrypt_credentials(
+        credentials: PermCredentials,
+        tree: sled::Tree,
+    ) -> Result<Vec<u8>> {
+        let db_key = "credential_key";
+
+        let key_source = tree
+            .get(db_key)?
+            .map(|key_source| postcard::from_bytes::<KeySource>(&key_source));
 
         let key_source = match key_source {
-            Some(k) => k,
             None => {
-                let key = KeySource::BuiltIn(Vec::from(svalin_pki::generate_key()?));
+                let key_source = KeySource::BuiltIn(svalin_pki::generate_key()?.to_vec());
 
-                scope.put_object("credential_key".into(), &key)?;
+                tree.insert(db_key, postcard::to_extend(&key_source, Vec::new())?)?;
 
-                key
+                key_source
             }
+            Some(key_source) => key_source?,
         };
 
         let key = Self::source_to_key(key_source).await?;
@@ -209,19 +211,17 @@ impl Agent {
 
     async fn decrypt_credentials(
         encrypted_credentials: Vec<u8>,
-        scope: Scope,
+        tree: sled::Tree,
     ) -> Result<PermCredentials> {
-        let key_source: Option<KeySource> = scope.get_object("credential_key")?;
+        let key_source = tree
+            .get("credential_key")?
+            .ok_or(anyhow!("no keysource saved in db"))?;
 
-        if let Some(key_source) = key_source {
-            let key = Self::source_to_key(key_source).await?;
+        let key_source = postcard::from_bytes(&key_source)?;
 
-            debug!("Agent password loaded, decrypting...");
-
-            Ok(PermCredentials::from_bytes(&encrypted_credentials, key).await?)
-        } else {
-            return Err(anyhow!("no keysource saved in DB"));
-        }
+        let key = Self::source_to_key(key_source).await?;
+        debug!("Agent password loaded, decrypting...");
+        Ok(PermCredentials::from_bytes(&encrypted_credentials, key).await?)
     }
 
     async fn source_to_key(source: KeySource) -> Result<Vec<u8>> {

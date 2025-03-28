@@ -1,31 +1,25 @@
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tokio::sync::oneshot;
 use tracing::debug;
 
+use crate::agent::BASE_CONFIG_KEY;
 use crate::shared::commands::public_server_status::GetPutblicStatus;
-use crate::shared::join_agent::request_handler::RequestJoin;
 use crate::shared::join_agent::AgentInitPayload;
+use crate::shared::join_agent::request_handler::RequestJoin;
 
 use super::Agent;
 
 impl Agent {
     pub async fn init(address: String) -> Result<WaitingForInit> {
-        let db = Self::open_marmelade()?;
+        let tree = Self::open_db()?;
 
-        let scope = db.scope("default".into())?;
-        scope.view(|b| {
-            let current = b.get_kv("base_config");
-
-            if current.is_some() {
-                return Err(anyhow!("Profile already exists"));
-            }
-
-            Ok(())
-        })?;
+        if tree.get(BASE_CONFIG_KEY)?.is_some() {
+            return Err(anyhow!("Agent already initialized"));
+        }
 
         debug!("try connecting to {address}");
 

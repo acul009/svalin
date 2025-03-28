@@ -5,8 +5,9 @@ use aucpace::StrongDatabase;
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::ParamsString;
 use serde::{Deserialize, Serialize};
+use sled::transaction::TransactionError;
 use svalin_pki::Certificate;
-use totp_rs::TOTP;
+use totp_rs::{TOTP, qrcodegen_image::image::EncodableLayout};
 use tracing::{debug, instrument};
 
 #[derive(Serialize, Deserialize)]
@@ -28,46 +29,57 @@ pub struct StoredUser {
     pub verifier: RistrettoPoint,
 }
 
+const USER_DATA_PREFIX: &[u8] = b"users/data/";
+const USER_NAMES_PREFIX: &[u8] = b"users/names/";
+
 #[derive(Debug)]
 pub struct UserStore {
-    scope: marmelade::Scope,
+    tree: sled::Tree,
 }
 
 impl UserStore {
-    pub fn open(scope: marmelade::Scope) -> Arc<Self> {
-        Arc::new(Self { scope })
+    pub fn open(tree: sled::Tree) -> Arc<Self> {
+        Arc::new(Self { tree })
     }
 
     pub fn get_user(&self, fingerprint: &[u8; 32]) -> Result<Option<StoredUser>> {
-        let mut user: Option<StoredUser> = None;
+        let mut key = USER_DATA_PREFIX.to_vec();
+        key.extend(fingerprint);
 
-        self.scope.view(|b| {
-            let b = b.get_bucket("userdata")?;
-            user = b.get_object(fingerprint)?;
+        let user = self
+            .tree
+            .get(key)?
+            .map(|user| postcard::from_bytes::<StoredUser>(&user));
 
-            Ok(())
-        })?;
-
-        Ok(user)
+        match user {
+            Some(user) => Ok(Some(user?)),
+            None => Ok(None),
+        }
     }
 
     pub fn get_user_by_username(&self, username: &[u8]) -> Result<Option<StoredUser>> {
-        let mut user: Option<StoredUser> = None;
+        let user_data = self
+            .tree
+            .transaction::<_, _, anyhow::Error>(|tx| {
+                let mut username_key = USER_NAMES_PREFIX.to_vec();
+                username_key.extend(username);
 
-        self.scope.view(|b| {
-            let usernames = b.get_bucket("usernames")?;
+                match tx.get(username_key)? {
+                    None => Ok(None),
+                    Some(fingerprint) => {
+                        let mut key = USER_DATA_PREFIX.to_vec();
+                        key.extend(fingerprint.as_bytes());
 
-            let public_key_user = usernames.get_kv(username);
+                        Ok(tx.get(key)?)
+                    }
+                }
+            })
+            .map_err(|err| anyhow!(err))?;
 
-            if let Some(public_key) = public_key_user {
-                let b = b.get_bucket("userdata")?;
-                user = b.get_object(public_key.value())?;
-            }
-
-            Ok(())
-        })?;
-
-        Ok(user)
+        match user_data {
+            None => Ok(None),
+            Some(data) => Ok(Some(postcard::from_bytes(data.as_bytes())?)),
+        }
     }
 
     #[instrument(skip_all)]
@@ -93,28 +105,27 @@ impl UserStore {
 
         debug!("requesting user update transaction");
 
-        self.scope.update(move |b| {
-            let fingerprint = user.certificate.fingerprint().to_vec();
+        let fingerprint = user.certificate.fingerprint().to_vec();
 
-            let usernames = b.get_or_create_bucket("usernames")?;
+        let mut key = USER_DATA_PREFIX.to_vec();
+        key.extend(&fingerprint);
 
-            if usernames.get_kv(&user.username).is_some() {
-                return Err(anyhow!("Username already in use"));
-            }
+        let mut username_key = USER_NAMES_PREFIX.to_vec();
+        username_key.extend(&user.username);
 
-            let b = b.get_or_create_bucket("userdata")?;
-            if b.get_kv(&fingerprint).is_some() {
-                return Err(anyhow!("User with fingerprint already exists"));
-            }
+        let userdata = postcard::to_extend(&user, Vec::new())?;
 
-            b.put_object(fingerprint.to_owned(), &user)?;
+        self.tree
+            .transaction::<_, _, anyhow::Error>(|tx| {
+                tx.insert(key.clone(), userdata.clone())?;
 
-            usernames.put(user.username.clone(), fingerprint)?;
+                tx.insert(username_key.clone(), fingerprint.clone())?;
 
-            Ok(())
-        })?;
+                Ok(())
+            })
+            .map_err(|err| anyhow!(err))?;
 
-        debug!("user successfully added");
+        self.tree.flush_async();
 
         Ok(())
     }

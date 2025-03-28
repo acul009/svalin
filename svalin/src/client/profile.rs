@@ -45,19 +45,20 @@ impl Profile {
 }
 
 impl Client {
-    pub fn get_profiles() -> Result<Vec<String>> {
-        let db = Self::open_marmelade()?;
+    pub fn list_profiles() -> Result<Vec<String>> {
+        let db = Self::open_db()?;
 
-        let profiles = db.list_scopes()?;
-
-        Ok(profiles)
+        db.tree_names()
+            .into_iter()
+            .map(|name| String::from_utf8(name.to_vec()).map_err(|err| anyhow!(err)))
+            .collect()
     }
 
-    fn open_marmelade() -> Result<marmelade::DB> {
+    fn open_db() -> Result<sled::Db> {
         let mut path = Self::get_config_dir_path()?;
-        path.push("client.jammdb");
+        path.push("client.sled");
 
-        let db = marmelade::DB::open(path)?;
+        let db = sled::open(path)?;
         Ok(db)
     }
 
@@ -129,7 +130,7 @@ impl Client {
     ) -> Result<String> {
         let raw_credentials = credentials.to_bytes(password).await?;
 
-        let scope = format!("{username}@{upstream_address}");
+        let profile_name = format!("{username}@{upstream_address}");
 
         let profile = Profile::new(
             username,
@@ -139,27 +140,20 @@ impl Client {
             raw_credentials,
         );
 
-        let db = Self::open_marmelade().context("Failed to open marmelade")?;
+        if Self::list_profiles()?.contains(&profile_name) {
+            return Err(anyhow!("profile already exists"));
+        }
 
-        db.scope(scope.clone())
-            .context("Failed to create profile scope")?
-            .update(|b| {
-                let current = b.get_kv("profile");
-                if current.is_some() {
-                    return Err(anyhow!("Profile already exists"));
-                }
+        let db = Self::open_db()?;
+        let tree = db.open_tree(&profile_name)?;
+        tree.insert("profile", postcard::to_extend(&profile, Vec::new())?)?;
 
-                b.put_object("profile", &profile)?;
-
-                Ok(())
-            })?;
-
-        Ok(scope)
+        Ok(profile_name)
     }
 
     pub fn remove_profile(profile_key: &str) -> Result<()> {
-        let db = Self::open_marmelade()?;
-        db.delete_scope(profile_key)?;
+        let db = Self::open_db()?;
+        db.drop_tree(profile_key)?;
         Ok(())
     }
 
@@ -168,9 +162,7 @@ impl Client {
     }
 
     pub async fn open_profile(profile_key: String, password: Vec<u8>) -> Result<Self> {
-        let db = Self::open_marmelade()?;
-
-        let available_scopes = db.list_scopes()?;
+        let available_scopes = Self::list_profiles()?;
 
         debug!("Available scopes: {:?}", available_scopes);
 
@@ -179,20 +171,16 @@ impl Client {
         }
 
         debug!("Opening profile {}", profile_key);
-
-        let mut profile: Option<Profile> = None;
-
-        let scope = db.scope(profile_key)?;
-
-        scope.view(|b| {
-            profile = b.get_object("profile")?;
-
-            Ok(())
-        })?;
+        let db = Self::open_db()?;
+        let tree = db.open_tree(profile_key)?;
+        let profile = tree
+            .get("profile")?
+            .map(|profile| postcard::from_bytes::<Profile>(&profile));
 
         debug!("Data from profile ready");
 
         if let Some(profile) = profile {
+            let profile = profile?;
             debug!("unlocking profile");
             let identity = PermCredentials::from_bytes(&profile.raw_credentials, password).await?;
 
@@ -238,7 +226,7 @@ impl Client {
                     })
                     .await
                 {
-                    error!("error while keeping agent list in sync: {:?}", err);
+                    error!("error while keeping agent list in sync: {}", err);
                 }
             });
 

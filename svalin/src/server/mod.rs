@@ -42,7 +42,7 @@ pub mod user_store;
 #[derive(Debug)]
 pub struct ServerConfig {
     addr: SocketAddr,
-    scope: marmelade::Scope,
+    tree: sled::Tree,
     cancelation_token: CancellationToken,
 }
 
@@ -68,20 +68,16 @@ impl Server {
     }
 
     async fn start(config: ServerConfig) -> Result<Self> {
-        let mut base_config: Option<BaseConfig> = None;
-
-        config.scope.view(|b| {
-            base_config = b.get_object("base_config")?;
-
-            Ok(())
-        })?;
+        let base_config = config.tree.get("base_config")?.map(|config| {
+            postcard::from_bytes::<BaseConfig>(&config).context("failed to parse base config")
+        });
 
         debug!("creating socket");
 
         let socket = RpcServer::create_socket(config.addr).context("failed to create socket")?;
 
         let base_config = match base_config {
-            Some(conf) => conf,
+            Some(conf) => conf?,
             None => {
                 // initialize
 
@@ -97,7 +93,7 @@ impl Server {
                 // Sleep until the init server has shut down and released the Port
                 tokio::time::sleep(INIT_SERVER_SHUTDOWN_COUNTDOWN).await;
 
-                let key = Server::get_encryption_key(&config.scope)?;
+                let key = Server::get_encryption_key(&config.tree)?;
 
                 let pseudo_data_seed: Vec<u8> = rand::rng()
                     .sample_iter(rand::distr::StandardUniform)
@@ -110,11 +106,11 @@ impl Server {
                     pseudo_data_seed,
                 };
 
-                config.scope.update(|b| {
-                    b.put_object("base_config", &conf)?;
+                config
+                    .tree
+                    .insert("base_config", postcard::to_extend(&conf, Vec::new())?)?;
 
-                    Ok(())
-                })?;
+                config.tree.flush_async().await?;
 
                 conf
             }
@@ -124,13 +120,13 @@ impl Server {
 
         let credentials = PermCredentials::from_bytes(
             &base_config.credentials,
-            Server::get_encryption_key(&config.scope)?,
+            Server::get_encryption_key(&config.tree)?,
         )
         .await?;
 
-        let user_store = UserStore::open(config.scope.subscope("users".into())?);
+        let user_store = UserStore::open(config.tree.clone());
 
-        let agent_store = AgentStore::open(config.scope.subscope("agents".into())?, root.clone());
+        let agent_store = AgentStore::open(config.tree.clone(), root.clone());
 
         let helper = VerificationHelper::new(root.clone(), user_store.clone());
 
@@ -165,31 +161,21 @@ impl Server {
         Ok(Self { config, rpc, tasks })
     }
 
-    fn get_encryption_key(scope: &marmelade::Scope) -> Result<Vec<u8>> {
-        let mut saved_key: Option<Vec<u8>> = None;
+    fn get_encryption_key(tree: &sled::Tree) -> Result<Vec<u8>> {
+        let key = "server_encryption_key";
+        let saved_encryption_key = tree.get(key)?.map(|v| v.to_vec());
 
-        scope.view(|b| {
-            if let Some(raw) = b.get_kv("server_encryption_key") {
-                saved_key = Some(raw.value().to_vec());
-            }
-
-            Ok(())
-        })?;
-
-        if let Some(key) = saved_key {
+        if let Some(key) = saved_encryption_key {
             Ok(key)
         } else {
-            let key: Vec<u8> = rand::rng()
+            let encryption_key: Vec<u8> = rand::rng()
                 .sample_iter(rand::distr::StandardUniform)
                 .take(32)
                 .collect();
 
-            scope.update(|b| {
-                b.put("server_encryption_key", key.clone())?;
-                Ok(())
-            })?;
+            tree.insert(key, encryption_key.clone())?;
 
-            Ok(key)
+            Ok(encryption_key)
         }
     }
 
@@ -238,7 +224,15 @@ impl Server {
         let result1 = self.rpc.close(timeout_duration).await;
 
         self.tasks.close();
+
         let result2 = timeout(timeout_duration, self.tasks.wait()).await;
+
+        self.config
+            .tree
+            .flush_async()
+            .await
+            .err()
+            .map(|err| error!("{}", err));
 
         match result1 {
             Err(e) => Err(e),

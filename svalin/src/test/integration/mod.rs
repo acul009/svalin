@@ -20,23 +20,24 @@ async fn integration_tests() {
 
     // delete test dbs
     let _ = std::fs::remove_file("./client.jammdb");
+    let _ = std::fs::remove_dir_all("./client.sled");
     let _ = std::fs::remove_file("./server_test.jammdb");
+    let _ = std::fs::remove_dir_all("./server_test.sled");
     let _ = std::fs::remove_file("./agent.jammdb");
+    let _ = std::fs::remove_dir_all("./agent.sled");
 
     let addr = "0.0.0.0:1234".to_socket_addrs().unwrap().next().unwrap();
-    // delete the test db
-    let db = marmelade::DB::open("./server_test.jammdb").expect("failed to open client db");
+    let tree = sled::open("./server_test.sled")
+        .expect("failed to open server db")
+        .open_tree("default")
+        .expect("failed to open default tree");
 
     let (send_server, recv_server) = oneshot::channel();
 
     tokio::spawn(async move {
         let server = Server::build()
             .addr(addr)
-            .scope(
-                db.scope("default".into())
-                    .context("Failed to prepare server")
-                    .unwrap(),
-            )
+            .tree(tree)
             .cancel(CancellationToken::new())
             .start_server()
             .await

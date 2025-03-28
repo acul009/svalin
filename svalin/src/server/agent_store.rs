@@ -2,20 +2,21 @@ use std::sync::Arc;
 
 use anyhow::{Ok, Result};
 use futures::future::try_join_all;
-use marmelade::Scope;
 use svalin_pki::{
-    get_current_timestamp,
+    Certificate, get_current_timestamp,
     signed_object::{SignedObject, VerifiedObject},
     verifier::exact::ExactVerififier,
-    Certificate,
 };
 use tokio::sync::broadcast;
+use totp_rs::qrcodegen_image::image::EncodableLayout;
 
 use crate::shared::join_agent::PublicAgentData;
 
+const AGENT_PREFIX: &[u8] = b"agents/";
+
 #[derive(Debug)]
 pub struct AgentStore {
-    scope: Scope,
+    tree: sled::Tree,
     broadcast: broadcast::Sender<AgentUpdate>,
     verifier: ExactVerififier,
 }
@@ -26,10 +27,10 @@ pub enum AgentUpdate {
 }
 
 impl AgentStore {
-    pub fn open(scope: Scope, root: Certificate) -> Arc<Self> {
+    pub fn open(tree: sled::Tree, root: Certificate) -> Arc<Self> {
         let (broadcast, _) = broadcast::channel(10);
         Arc::new(Self {
-            scope,
+            tree,
             broadcast,
             verifier: ExactVerififier::new(root),
         })
@@ -39,24 +40,26 @@ impl AgentStore {
         &self,
         fingerprint: &[u8; 32],
     ) -> Result<Option<SignedObject<PublicAgentData>>> {
-        let mut agent: Option<SignedObject<PublicAgentData>> = None;
-        self.scope.view(|b| {
-            agent = b.get_object(&fingerprint[..])?;
+        let mut key = AGENT_PREFIX.to_vec();
+        key.extend(fingerprint);
 
-            Ok(())
-        })?;
+        let agent = self
+            .tree
+            .get(&key)?
+            .map(|agent| postcard::from_bytes::<SignedObject<PublicAgentData>>(&agent));
 
-        if let Some(agent) = agent {
-            Ok(Some(
-                // TODO: if the agent is invalid it should probably be removed and the a security
-                // alert should be raised
-                agent
-                    .verify(&self.verifier, get_current_timestamp())
-                    .await?
-                    .pack_owned(),
-            ))
-        } else {
-            Ok(agent)
+        match agent {
+            None => Ok(None),
+            Some(agent) => {
+                let agent = agent?;
+
+                Ok(Some(
+                    agent
+                        .verify(&self.verifier, get_current_timestamp())
+                        .await?
+                        .pack_owned(),
+                ))
+            }
         }
     }
 
@@ -65,12 +68,11 @@ impl AgentStore {
             .verify(&self.verifier, get_current_timestamp())
             .await?;
 
-        self.scope.update(|b| {
-            let key = agent.cert.fingerprint().to_vec();
-            b.put_object(key, agent.pack())?;
+        let mut key = AGENT_PREFIX.to_vec();
+        key.extend(agent.cert.fingerprint());
 
-            Ok(())
-        })?;
+        self.tree
+            .insert(key, postcard::to_extend(&agent.pack(), Vec::new())?)?;
 
         self.broadcast.send(AgentUpdate::Add(Arc::new(agent)))?;
 
@@ -78,19 +80,14 @@ impl AgentStore {
     }
 
     pub async fn list_agents(&self) -> Result<Vec<VerifiedObject<PublicAgentData>>> {
-        let mut agents: Vec<SignedObject<PublicAgentData>> = Vec::new();
+        try_join_all(self.tree.scan_prefix(AGENT_PREFIX).map(|v| async move {
+            let (_, agent) = v?;
+            let agent = postcard::from_bytes::<SignedObject<PublicAgentData>>(agent.as_bytes())?;
 
-        self.scope.view(|b| {
-            agents = b.list_objects()?;
-
-            Ok(())
-        })?;
-
-        try_join_all(
-            agents
-                .into_iter()
-                .map(|v| v.verify(&self.verifier, get_current_timestamp())),
-        )
+            Ok(agent
+                .verify(&self.verifier, get_current_timestamp())
+                .await?)
+        }))
         .await
     }
 

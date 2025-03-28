@@ -7,14 +7,14 @@ use super::{Server, ServerConfig};
 
 pub struct ServerConfigBuilder<A, B, C> {
     addr: A,
-    scope: B,
+    tree: B,
     cancel: C,
 }
 
 pub(super) fn new() -> ServerConfigBuilder<(), (), ()> {
     ServerConfigBuilder {
         addr: (),
-        scope: (),
+        tree: (),
         cancel: (),
     }
 }
@@ -23,15 +23,15 @@ impl<A, B, C> ServerConfigBuilder<A, B, C> {
     pub fn addr(self, addr: SocketAddr) -> ServerConfigBuilder<SocketAddr, B, C> {
         ServerConfigBuilder {
             addr: addr,
-            scope: self.scope,
+            tree: self.tree,
             cancel: self.cancel,
         }
     }
 
-    pub fn scope(self, scope: marmelade::Scope) -> ServerConfigBuilder<A, marmelade::Scope, C> {
+    pub fn tree(self, tree: sled::Tree) -> ServerConfigBuilder<A, sled::Tree, C> {
         ServerConfigBuilder {
             addr: self.addr,
-            scope: scope,
+            tree,
             cancel: self.cancel,
         }
     }
@@ -39,13 +39,13 @@ impl<A, B, C> ServerConfigBuilder<A, B, C> {
     pub fn cancel(self, cancel: CancellationToken) -> ServerConfigBuilder<A, B, CancellationToken> {
         ServerConfigBuilder {
             addr: self.addr,
-            scope: self.scope,
+            tree: self.tree,
             cancel: cancel,
         }
     }
 }
 
-impl ServerConfigBuilder<SocketAddr, marmelade::Scope, CancellationToken> {
+impl ServerConfigBuilder<SocketAddr, sled::Tree, CancellationToken> {
     pub async fn start_server(self) -> Result<Server> {
         let config = self.to_config();
 
@@ -55,7 +55,7 @@ impl ServerConfigBuilder<SocketAddr, marmelade::Scope, CancellationToken> {
     fn to_config(self) -> ServerConfig {
         ServerConfig {
             addr: self.addr,
-            scope: self.scope,
+            tree: self.tree,
             cancelation_token: self.cancel,
         }
     }

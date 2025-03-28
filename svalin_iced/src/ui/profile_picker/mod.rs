@@ -141,7 +141,7 @@ impl ProfilePicker {
                 Action::None
             }
             Message::Reset => {
-                let profiles = Client::get_profiles().unwrap_or_else(|_| Vec::new());
+                let profiles = Client::list_profiles().unwrap_or_else(|_| Vec::new());
 
                 if profiles.is_empty() {
                     self.add_profile(String::new());

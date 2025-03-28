@@ -45,7 +45,10 @@ async fn run() {
     match app.command {
         Command::Server { address } => {
             if let Ok(addr) = address.parse() {
-                let db = marmelade::DB::open("./server.jammdb").expect("failed to open client db");
+                let tree = sled::open("./server.sled")
+                    .expect("failed to open server db")
+                    .open_tree("default")
+                    .expect("failed to open default tree");
 
                 let mutex = Arc::new(Mutex::<Option<Server>>::new(None));
                 let mutex2 = mutex.clone();
@@ -58,7 +61,7 @@ async fn run() {
                     // start_server
                     let server = Server::build()
                         .addr(addr)
-                        .scope(db.scope("default".into()).unwrap())
+                        .tree(tree)
                         .cancel(cancel2)
                         .start_server()
                         .await

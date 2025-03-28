@@ -17,7 +17,6 @@ svalin_pki = { path = "../svalin_pki" }
 svalin_rpc = { path = "../svalin_rpc" }
 svalin_sysctl = { path = "../svalin_sysctl" }
 svalin_macros = { path = "../svalin_macros" }
-marmelade = { path = "../marmelade", features = ["postcard"] }
 tokio = { version = "1.43.0", features = ["full", "test-util"] }
 rand = "0.9.0"
 totp-rs = { version = "5.6.0", features = [
@@ -40,6 +39,8 @@ curve25519-dalek = { version = "4.1.3", features = [
     "digest",
     "rand_core",
 ] }
+sled = "0.34.7"
+postcard = { version = "1.1.1", features = ["use-std"] }
 
 [package.metadata.deb]
 depends = "libc6 (>= 2.31)"
