@@ -125,7 +125,7 @@ impl UserStore {
             })
             .map_err(|err| anyhow!(err))?;
 
-        self.tree.flush_async();
+        self.tree.flush_async().await?;
 
         Ok(())
     }

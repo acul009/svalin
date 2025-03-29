@@ -13,6 +13,7 @@ use svalin_rpc::rpc::command::handler::HandlerCollection;
 use tracing::{debug, instrument};
 
 mod init;
+mod update;
 
 use crate::client::tunnel_manager::tcp::handler::TcpForwardHandler;
 use crate::permissions::agent_permission_handler::AgentPermissionHandler;
