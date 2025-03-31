@@ -1,9 +1,9 @@
 use std::{borrow::Cow, sync::LazyLock};
 
 use iced::{
+    Element, Length,
     alignment::{Horizontal, Vertical},
     widget::{column, container, text},
-    Element, Length,
 };
 
 pub struct Loading<'a> {
@@ -62,7 +62,7 @@ impl<'a, Message: Clone + 'static> From<Loading<'a>> for Element<'a, Message> {
             prepared = prepared.height(height);
         }
 
-        if let Some(width) = loading.height {
+        if let Some(width) = loading.width {
             prepared = prepared.width(width);
         }
 
@@ -86,6 +86,7 @@ impl StyleSheet for iced::Theme {
 
 // stolen from the iced examples
 // Show a circular progress indicator.
+use iced::Point;
 use iced::advanced::layout;
 use iced::advanced::renderer;
 use iced::advanced::widget::tree::{self, Tree};
@@ -95,7 +96,6 @@ use iced::mouse;
 use iced::time::Instant;
 use iced::widget::canvas;
 use iced::window::{self, RedrawRequest};
-use iced::Point;
 use iced::{Background, Color, Event, Radians, Rectangle, Renderer, Size, Vector};
 
 use std::f32::consts::PI;
@@ -366,8 +366,8 @@ where
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
-        use advanced::graphics::geometry::Renderer as _;
         use advanced::Renderer as _;
+        use advanced::graphics::geometry::Renderer as _;
         let state = tree.state.downcast_ref::<State>();
         let bounds = layout.bounds();
         let custom_style = <Theme as StyleSheet>::appearance(theme, &self.style);
@@ -462,7 +462,7 @@ pub trait StyleSheet {
 }
 
 use lyon_algorithms::measure::PathMeasurements;
-use lyon_algorithms::path::{builder::NoAttributes, path::BuilderImpl, Path};
+use lyon_algorithms::path::{Path, builder::NoAttributes, path::BuilderImpl};
 
 pub static EMPHASIZED: LazyLock<Easing> = LazyLock::new(|| {
     Easing::builder()

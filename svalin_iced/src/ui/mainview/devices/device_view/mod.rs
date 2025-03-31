@@ -6,6 +6,7 @@ use iced::{
 };
 use svalin::{client::device::Device, shared::commands::agent_list::AgentListItem};
 use tunnel_opener::TunnelOpener;
+use update_installer::UpdateInstaller;
 
 use crate::{
     ui::{MapOpt, widgets::header},
@@ -14,12 +15,14 @@ use crate::{
 
 mod device_status;
 mod tunnel_opener;
+mod update_installer;
 // mod remote_terminal;
 
 #[derive(Debug, Clone)]
 pub enum Message {
     Back,
     Status(device_status::Message),
+    UpdateInstaller(update_installer::Message),
     TunnelOpener(tunnel_opener::Message),
     ItemUpdate,
 }
@@ -35,12 +38,13 @@ pub struct DeviceView {
     device: Device,
     item: AgentListItem,
     status: DeviceStatus,
+    update_installer: UpdateInstaller,
     tunnel_opener: TunnelOpener,
     recipe: WatchRecipe<String, AgentListItem, Message>,
 }
 
 impl DeviceView {
-    pub fn new(device: Device) -> DeviceView {
+    pub fn new(device: Device) -> (DeviceView, Task<Message>) {
         let item = device.item().clone();
         let status = DeviceStatus::new(device.clone());
 
@@ -51,14 +55,19 @@ impl DeviceView {
         );
 
         let tunnel_opener = TunnelOpener::new(device.clone());
+        let (update_installer, task) = UpdateInstaller::start(device.clone());
 
-        DeviceView {
-            device,
-            status,
-            item,
-            recipe,
-            tunnel_opener,
-        }
+        (
+            DeviceView {
+                device,
+                item,
+                status,
+                update_installer,
+                recipe,
+                tunnel_opener,
+            },
+            task.map(Message::UpdateInstaller),
+        )
     }
 
     pub fn update(&mut self, message: Message) -> Action {
@@ -67,6 +76,9 @@ impl DeviceView {
                 self.status.update(message);
                 Action::None
             }
+            Message::UpdateInstaller(message) => match self.update_installer.update(message) {
+                update_installer::Action::None => Action::None,
+            },
             Message::TunnelOpener(message) => {
                 let action = self.tunnel_opener.update(message);
 
@@ -91,6 +103,7 @@ impl DeviceView {
             column![
                 self.status.view().map(Message::Status),
                 self.tunnel_opener.view().map(Message::TunnelOpener),
+                self.update_installer.view().map(Message::UpdateInstaller),
             ]
             .height(Length::Shrink),
         )

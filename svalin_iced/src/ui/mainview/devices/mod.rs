@@ -103,10 +103,10 @@ impl Devices {
                 _ => Action::None,
             },
             Message::ShowDevice(device) => {
-                let device_view = DeviceView::new(device);
+                let (device_view, task) = DeviceView::new(device);
 
                 self.state = State::DeviceView(device_view);
-                Action::None
+                Action::Run(task.map(Message::DeviceView))
             }
             Message::ShowList => {
                 self.state = State::List;

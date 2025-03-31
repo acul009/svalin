@@ -10,13 +10,16 @@ use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 
-use crate::shared::{
-    commands::{
-        agent_list::AgentListItem,
-        realtime_status::SubscribeRealtimeStatus,
-        terminal::{RemoteTerminal, RemoteTerminalDispatcher},
+use crate::{
+    agent::update::UpdateInfo,
+    shared::{
+        commands::{
+            agent_list::AgentListItem,
+            realtime_status::SubscribeRealtimeStatus,
+            terminal::{RemoteTerminal, RemoteTerminalDispatcher},
+        },
+        lazy_watch::{self, LazyWatch},
     },
-    lazy_watch::{self, LazyWatch},
 };
 
 use super::tunnel_manager::{TunnelConfig, TunnelCreateError, TunnelManager};
@@ -126,6 +129,14 @@ impl Device {
         self.data
             .connection
             .dispatch(RemoteTerminalDispatcher)
+            .await
+            .map_err(|err| anyhow!(err))
+    }
+
+    pub async fn check_for_update(&self) -> Result<UpdateInfo> {
+        self.data
+            .connection
+            .dispatch(todo!())
             .await
             .map_err(|err| anyhow!(err))
     }
