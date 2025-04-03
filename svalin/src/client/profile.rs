@@ -220,6 +220,7 @@ impl Client {
             let list_clone = client.device_list.clone();
             let sync_connection = client.rpc.upstream_connection();
             let tunnel_manager = client.tunnel_manager.clone();
+            let cancel = client.cancel.clone();
 
             client.background_tasks.spawn(async move {
                 debug!("subscribing to upstream agent list");
@@ -230,6 +231,7 @@ impl Client {
                         list: list_clone,
                         verifier: ExactVerififier::new(profile.root_certificate),
                         tunnel_manager,
+                        cancel,
                     })
                     .await
                 {

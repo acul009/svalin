@@ -142,6 +142,7 @@ pub struct UpdateAgentList {
     pub list: watch::Sender<BTreeMap<Certificate, Device>>,
     pub verifier: ExactVerififier,
     pub tunnel_manager: TunnelManager,
+    pub cancel: CancellationToken,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -166,39 +167,50 @@ impl CommandDispatcher for UpdateAgentList {
     fn get_request(&self) -> Self::Request {}
 
     async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<(), Self::Error> {
-        loop {
-            let list_item_update: AgentListItemTransport = session
-                .read_object()
-                .await
-                .map_err(UpdateAgentListError::ReceiveItemError)?;
+        let result = self
+            .cancel
+            .run_until_cancelled(async move {
+                loop {
+                    let list_item_update: AgentListItemTransport = session
+                        .read_object()
+                        .await
+                        .map_err(UpdateAgentListError::ReceiveItemError)?;
 
-            let public_data = list_item_update
-                .public_data
-                .verify(&self.verifier, get_current_timestamp())
-                .await
-                .map_err(UpdateAgentListError::VerifyItemError)?;
+                    let public_data = list_item_update
+                        .public_data
+                        .verify(&self.verifier, get_current_timestamp())
+                        .await
+                        .map_err(UpdateAgentListError::VerifyItemError)?;
 
-            let item = AgentListItem {
-                online_status: list_item_update.online_status,
-                public_data: public_data.unpack(),
-            };
+                    let item = AgentListItem {
+                        online_status: list_item_update.online_status,
+                        public_data: public_data.unpack(),
+                    };
 
-            self.list.send_modify(|list| {
-                if let Some(device) = list.get(&item.public_data.cert) {
-                    device.update(item);
-                } else {
-                    let device_connection = ForwardConnection::new(
-                        self.base_connection.clone(),
-                        self.credentials.clone(),
-                        item.public_data.cert.clone(),
-                    );
+                    self.list.send_modify(|list| {
+                        if let Some(device) = list.get(&item.public_data.cert) {
+                            device.update(item);
+                        } else {
+                            let device_connection = ForwardConnection::new(
+                                self.base_connection.clone(),
+                                self.credentials.clone(),
+                                item.public_data.cert.clone(),
+                            );
 
-                    let cert = item.public_data.cert.clone();
-                    let device = Device::new(device_connection, item, self.tunnel_manager.clone());
+                            let cert = item.public_data.cert.clone();
+                            let device =
+                                Device::new(device_connection, item, self.tunnel_manager.clone());
 
-                    list.insert(cert, device);
+                            list.insert(cert, device);
+                        }
+                    });
                 }
-            });
+            })
+            .await;
+
+        match result {
+            Some(result) => result,
+            None => Ok(()),
         }
     }
 }
