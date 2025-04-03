@@ -6,6 +6,7 @@ use svalin_rpc::{
     },
     permissions::PermissionHandler,
     rpc::command::handler::PermissionPrecursor,
+    rustls::server::danger::ClientCertVerifier,
 };
 
 use crate::shared::commands::public_server_status::PublicStatusHandler;
@@ -39,8 +40,10 @@ impl From<&PermissionPrecursor<ForwardHandler>> for Permission {
     }
 }
 
-impl<Nested: PermissionHandler, Verifier> From<&PermissionPrecursor<E2EHandler<Nested, Verifier>>>
-    for Permission
+impl<Nested, Verifier> From<&PermissionPrecursor<E2EHandler<Nested, Verifier>>> for Permission
+where
+    Nested: PermissionHandler,
+    Verifier: ClientCertVerifier + 'static,
 {
     fn from(_value: &PermissionPrecursor<E2EHandler<Nested, Verifier>>) -> Self {
         Permission::AnonymousOnly
