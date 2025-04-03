@@ -1,8 +1,8 @@
 use std::{collections::HashMap, fmt::Debug, marker::PhantomData, sync::Arc};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use tokio::sync::{RwLock, RwLockWriteGuard};
 use tokio_util::sync::CancellationToken;
 
@@ -85,8 +85,11 @@ where
 /// This struct is used as a basis to enable conversion to a permission.
 /// The RPC-System itself doesn't provide the permission itself, nor the means
 /// to check if a Peer has it.
-pub struct PermissionPrecursor<R, H> {
-    request: R,
+pub struct PermissionPrecursor<H>
+where
+    H: TakeableCommandHandler,
+{
+    request: H::Request,
     handler: PhantomData<H>,
 }
 
@@ -102,7 +105,7 @@ where
     H: TakeableCommandHandler,
     H::Request: DeserializeOwned,
     P: PermissionHandler,
-    P::Permission: for<'a> From<&'a PermissionPrecursor<H::Request, Self>> + Send + Sync,
+    P::Permission: for<'a> From<&'a PermissionPrecursor<Self>> + Send + Sync,
 {
     async fn handle_with_permission(
         &self,
@@ -224,7 +227,7 @@ impl<'a, P> ChainCommandAdder<'a, P> {
     where
         P: PermissionHandler,
         T: TakeableCommandHandler + 'static,
-        P::Permission: for<'b> From<&'b PermissionPrecursor<T::Request, T>> + Send + Sync,
+        P::Permission: for<'b> From<&'b PermissionPrecursor<T>> + Send + Sync,
     {
         self.lock.insert(T::key(), Arc::new(command));
         self

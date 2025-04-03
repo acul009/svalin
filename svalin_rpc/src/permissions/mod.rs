@@ -2,7 +2,10 @@ use std::{error::Error, fmt::Display, future::Future};
 
 use anyhow::Result;
 
-use crate::rpc::{command::handler::PermissionPrecursor, peer::Peer};
+use crate::rpc::{
+    command::handler::{PermissionPrecursor, TakeableCommandHandler},
+    peer::Peer,
+};
 
 pub mod anonymous_permission_handler;
 pub mod whitelist;
@@ -45,8 +48,11 @@ impl Error for PermissionCheckError {}
 #[derive(Default, Clone)]
 pub struct DummyPermission;
 
-impl<R, H> From<&PermissionPrecursor<R, H>> for DummyPermission {
-    fn from(_value: &PermissionPrecursor<R, H>) -> Self {
+impl<H> From<&PermissionPrecursor<H>> for DummyPermission
+where
+    H: TakeableCommandHandler,
+{
+    fn from(_value: &PermissionPrecursor<H>) -> Self {
         Self
     }
 }

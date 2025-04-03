@@ -24,8 +24,8 @@ pub enum TerminalPacket {
 
 pub struct RemoteTerminalHandler;
 
-impl From<&PermissionPrecursor<(), RemoteTerminalHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<(), RemoteTerminalHandler>) -> Self {
+impl From<&PermissionPrecursor<RemoteTerminalHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<RemoteTerminalHandler>) -> Self {
         Permission::RootOnlyPlaceholder
     }
 }

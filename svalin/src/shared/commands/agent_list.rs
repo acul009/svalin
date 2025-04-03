@@ -46,8 +46,8 @@ pub struct AgentListHandler {
     server: Arc<RpcServer>,
 }
 
-impl From<&PermissionPrecursor<(), AgentListHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<(), AgentListHandler>) -> Self {
+impl From<&PermissionPrecursor<AgentListHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<AgentListHandler>) -> Self {
         Permission::RootOnlyPlaceholder
     }
 }

@@ -36,8 +36,8 @@ pub struct AddAgentHandler {
     store: Arc<AgentStore>,
 }
 
-impl From<&PermissionPrecursor<SignedObject<PublicAgentData>, AddAgentHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<SignedObject<PublicAgentData>, AddAgentHandler>) -> Self {
+impl From<&PermissionPrecursor<AddAgentHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<AddAgentHandler>) -> Self {
         Permission::RootOnlyPlaceholder
     }
 }

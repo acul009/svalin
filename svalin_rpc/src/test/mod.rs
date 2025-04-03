@@ -49,9 +49,14 @@ async fn ping_test() {
 
     debug!("trying to connect client");
 
-    let client = RpcClient::connect(address, None, SkipServerVerification::new())
-        .await
-        .unwrap();
+    let client = RpcClient::connect(
+        address,
+        None,
+        SkipServerVerification::new(),
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
 
     debug!("client connected");
 
@@ -99,9 +104,14 @@ async fn tls_test() {
 
     debug!("trying to connect client");
 
-    let client = RpcClient::connect(address, None, SkipServerVerification::new())
-        .await
-        .unwrap();
+    let client = RpcClient::connect(
+        address,
+        None,
+        SkipServerVerification::new(),
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
 
     debug!("client connected");
 
@@ -143,9 +153,14 @@ async fn perm_test() {
 
     debug!("trying to connect client");
 
-    let client = RpcClient::connect(address, None, SkipServerVerification::new())
-        .await
-        .unwrap();
+    let client = RpcClient::connect(
+        address,
+        None,
+        SkipServerVerification::new(),
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
 
     debug!("client connected");
 

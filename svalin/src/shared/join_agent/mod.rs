@@ -118,14 +118,14 @@ impl ServerJoinManager {
     }
 }
 
-impl From<&PermissionPrecursor<(), JoinRequestHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<(), JoinRequestHandler>) -> Self {
+impl From<&PermissionPrecursor<JoinRequestHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<JoinRequestHandler>) -> Self {
         Permission::AnonymousOnly
     }
 }
 
-impl From<&PermissionPrecursor<(), JoinAcceptHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<(), JoinAcceptHandler>) -> Self {
+impl From<&PermissionPrecursor<JoinAcceptHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<JoinAcceptHandler>) -> Self {
         Permission::RootOnlyPlaceholder
     }
 }

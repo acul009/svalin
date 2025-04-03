@@ -50,8 +50,8 @@ pub struct LoginSuccess {
     pub server_cert: Certificate,
 }
 
-impl From<&PermissionPrecursor<(), LoginHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<(), LoginHandler>) -> Self {
+impl From<&PermissionPrecursor<LoginHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<LoginHandler>) -> Self {
         Permission::AnonymousOnly
     }
 }

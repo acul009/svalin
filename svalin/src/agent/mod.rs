@@ -15,7 +15,7 @@ use tokio::time::error::Elapsed;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument};
 use update::Updater;
-use update::installation_info::InstallationInfoHandler;
+use update::request_installation_info::InstallationInfoHandler;
 
 mod init;
 pub mod update;

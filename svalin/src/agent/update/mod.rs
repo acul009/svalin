@@ -9,7 +9,8 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-pub mod installation_info;
+pub mod request_available_version;
+pub mod request_installation_info;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum UpdateChannel {

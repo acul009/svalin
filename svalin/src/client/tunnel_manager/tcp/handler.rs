@@ -10,7 +10,7 @@ use svalin_rpc::{
 };
 use thiserror::Error;
 use tokio::{
-    io::{copy_bidirectional, AsyncWriteExt},
+    io::{AsyncWriteExt, copy_bidirectional},
     net::TcpStream,
     select,
 };
@@ -28,8 +28,8 @@ pub enum TcpForwardError {
     Generic,
 }
 
-impl From<&PermissionPrecursor<String, TcpForwardHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<String, TcpForwardHandler>) -> Self {
+impl From<&PermissionPrecursor<TcpForwardHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<TcpForwardHandler>) -> Self {
         Permission::RootOnlyPlaceholder
     }
 }

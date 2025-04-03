@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::error;
 
 use crate::{
-    agent::update::{InstallationInfo, installation_info::InstallationInfoDispatcher},
+    agent::update::{InstallationInfo, request_installation_info::InstallationInfoDispatcher},
     shared::{
         commands::{
             agent_list::AgentListItem,

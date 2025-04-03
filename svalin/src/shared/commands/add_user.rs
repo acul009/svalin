@@ -44,8 +44,8 @@ pub struct AddUserRequest {
     verifier: RistrettoPoint,
 }
 
-impl From<&PermissionPrecursor<AddUserRequest, AddUserHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<AddUserRequest, AddUserHandler>) -> Self {
+impl From<&PermissionPrecursor<AddUserHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<AddUserHandler>) -> Self {
         Permission::RootOnlyPlaceholder
     }
 }

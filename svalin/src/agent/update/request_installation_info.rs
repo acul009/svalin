@@ -15,9 +15,9 @@ use crate::{client::device::RemoteLiveData, permissions::Permission};
 
 use super::{InstallationInfo, Updater};
 
-impl From<&PermissionPrecursor<(), InstallationInfoHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<(), InstallationInfoHandler>) -> Self {
-        return Permission::RootOnlyPlaceholder;
+impl From<&PermissionPrecursor<InstallationInfoHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<InstallationInfoHandler>) -> Self {
+        Permission::RootOnlyPlaceholder
     }
 }
 

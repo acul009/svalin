@@ -19,8 +19,8 @@ use crate::{client::device::RemoteLiveData, permissions::Permission};
 #[derive(Default)]
 pub struct RealtimeStatusHandler;
 
-impl From<&PermissionPrecursor<(), RealtimeStatusHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<(), RealtimeStatusHandler>) -> Self {
+impl From<&PermissionPrecursor<RealtimeStatusHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<RealtimeStatusHandler>) -> Self {
         Permission::RootOnlyPlaceholder
     }
 }
