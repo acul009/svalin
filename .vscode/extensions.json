@@ -1,6 +1,7 @@
 {
     "recommendations": [
         "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
         "lokalise.i18n-ally"
     ]
 }

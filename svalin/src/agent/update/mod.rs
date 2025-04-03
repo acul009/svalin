@@ -156,7 +156,7 @@ impl Updater {
         }
         #[cfg(not(windows))]
         {
-            let status = process::Command::new("dpkg")
+            let status = tokio::process::Command::new("dpkg")
                 .arg("--version")
                 .status()
                 .await?;

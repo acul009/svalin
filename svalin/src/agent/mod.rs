@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::verifier::KnownCertificateVerifier;
 use svalin_pki::verifier::exact::ExactVerififier;
@@ -40,7 +40,7 @@ impl Agent {
     pub async fn open(cancel: CancellationToken) -> Result<Agent> {
         debug!("opening agent configuration");
 
-        let tree = Self::open_db()?;
+        let tree = Self::open_db().context("failed to open DB")?;
 
         let raw_config = tree
             .get(BASE_CONFIG_KEY)?

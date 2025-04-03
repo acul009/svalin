@@ -95,7 +95,7 @@ impl UpdateInstaller {
                 .spacing(10)
                 .padding(10);
 
-                if install_info.install_method.supports_update() || true {
+                if install_info.install_method.supports_update() {
                     col = col.push(
                         row![
                             container(combo_box(
