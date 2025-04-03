@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use svalin_pki::verifier::KnownCertificateVerifier;
@@ -8,6 +9,7 @@ use svalin_rpc::rpc::connection::ConnectionDispatchError;
 use svalin_rpc::rpc::session::SessionDispatchError;
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument};
 
 use crate::server::INIT_SERVER_SHUTDOWN_COUNTDOWN;
@@ -25,8 +27,13 @@ impl Client {
     pub async fn first_connect(address: String) -> Result<FirstConnect> {
         debug!("try connecting to {address}");
 
-        let client = RpcClient::connect(&address, None, SkipServerVerification::new()).await?;
-
+        let client = RpcClient::connect(
+            &address,
+            None,
+            SkipServerVerification::new(),
+            CancellationToken::new(),
+        )
+        .await?;
         debug!("successfully connected");
 
         let conn = client.upstream_connection();
@@ -79,16 +86,21 @@ impl Init {
             .await
             .context("failed to initialize server certificate")?;
 
-        self.client.close();
+        self.client.close(Duration::from_secs(1)).await?;
 
         tokio::time::sleep(INIT_SERVER_SHUTDOWN_COUNTDOWN).await;
 
         let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert.clone())
             .to_tls_verifier();
 
-        let client = RpcClient::connect(&self.address, Some(&root), verifier)
-            .await
-            .context("failed to connect to server after certificate initialization")?;
+        let client = RpcClient::connect(
+            &self.address,
+            Some(&root),
+            verifier,
+            CancellationToken::new(),
+        )
+        .await
+        .context("failed to connect to server after certificate initialization")?;
         let connection = client.upstream_connection();
 
         debug!("connected to server with certificate");

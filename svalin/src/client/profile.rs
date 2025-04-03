@@ -8,6 +8,7 @@ use svalin_pki::{
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::{sync::watch, task::JoinSet};
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
@@ -192,8 +193,13 @@ impl Client {
             .to_tls_verifier();
 
             debug!("connecting to server");
-            let rpc =
-                RpcClient::connect(&profile.upstream_address, Some(&identity), verifier).await?;
+            let rpc = RpcClient::connect(
+                &profile.upstream_address,
+                Some(&identity),
+                verifier,
+                CancellationToken::new(),
+            )
+            .await?;
 
             debug!("connected to server");
 
@@ -207,7 +213,8 @@ impl Client {
                 credentials: identity.clone(),
                 device_list: watch::channel(BTreeMap::new()).0,
                 tunnel_manager,
-                background_tasks: JoinSet::new(),
+                background_tasks: TaskTracker::new(),
+                cancel: CancellationToken::new(),
             };
 
             let list_clone = client.device_list.clone();

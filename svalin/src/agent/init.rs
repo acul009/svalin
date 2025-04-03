@@ -4,6 +4,7 @@ use anyhow::{Result, anyhow};
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tokio::sync::oneshot;
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 use crate::agent::BASE_CONFIG_KEY;
@@ -23,7 +24,13 @@ impl Agent {
 
         debug!("try connecting to {address}");
 
-        let client = RpcClient::connect(&address, None, SkipServerVerification::new()).await?;
+        let client = RpcClient::connect(
+            &address,
+            None,
+            SkipServerVerification::new(),
+            CancellationToken::new(),
+        )
+        .await?;
 
         debug!("successfully connected");
 
@@ -139,7 +146,7 @@ impl WaitForConfirm {
 
         tokio::time::sleep(Duration::from_secs(3)).await;
 
-        let agent = Agent::open().await?;
+        let agent = Agent::open(CancellationToken::new()).await?;
 
         Ok(agent)
     }

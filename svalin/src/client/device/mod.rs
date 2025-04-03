@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::error;
 
 use crate::{
-    agent::update::UpdateInfo,
+    agent::update::{InstallationInfo, installation_info::InstallationInfoDispatcher},
     shared::{
         commands::{
             agent_list::AgentListItem,
@@ -133,12 +133,25 @@ impl Device {
             .map_err(|err| anyhow!(err))
     }
 
-    pub async fn check_for_update(&self) -> Result<UpdateInfo> {
-        self.data
-            .connection
-            .dispatch(todo!())
-            .await
-            .map_err(|err| anyhow!(err))
+    pub fn subscribe_install_info(&self) -> watch::Receiver<RemoteLiveData<InstallationInfo>> {
+        let (send, recv) = watch::channel(RemoteLiveData::Pending);
+        let connection = self.data.connection.clone();
+
+        tokio::spawn(async move {
+            let result = connection
+                .dispatch(InstallationInfoDispatcher { send: send.clone() })
+                .await;
+
+            match result {
+                Ok(()) => {}
+                Err(err) => {
+                    let _ = send.send(RemoteLiveData::Unavailable);
+                    error!("error while subscribing to installation info: {err}")
+                }
+            }
+        });
+
+        recv
     }
 }
 

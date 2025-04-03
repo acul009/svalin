@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
@@ -10,7 +11,11 @@ use svalin_rpc::commands::e2e::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::command::handler::HandlerCollection;
+use tokio::time::error::Elapsed;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument};
+use update::Updater;
+use update::installation_info::InstallationInfoHandler;
 
 mod init;
 pub mod update;
@@ -24,17 +29,15 @@ use crate::verifier::upstream_verifier::UpstreamVerifier;
 
 pub struct Agent {
     rpc: RpcClient,
-    upstream_address: String,
-    upstream_certificate: Certificate,
     root_certificate: Certificate,
     credentials: PermCredentials,
+    cancel: CancellationToken,
 }
-
 const BASE_CONFIG_KEY: &[u8] = b"base_config";
 
 impl Agent {
     #[instrument]
-    pub async fn open() -> Result<Agent> {
+    pub async fn open(cancel: CancellationToken) -> Result<Agent> {
         debug!("opening agent configuration");
 
         let tree = Self::open_db()?;
@@ -60,8 +63,13 @@ impl Agent {
 
         debug!("trying to connect to server");
 
-        let rpc =
-            RpcClient::connect(&config.upstream_address, Some(&credentials), verifier).await?;
+        let rpc = RpcClient::connect(
+            &config.upstream_address,
+            Some(&credentials),
+            verifier,
+            cancel.clone(),
+        )
+        .await?;
 
         debug!("connection to server established");
 
@@ -69,8 +77,7 @@ impl Agent {
             credentials: credentials,
             root_certificate: config.root_certificate,
             rpc: rpc,
-            upstream_address: config.upstream_address,
-            upstream_certificate: config.upstream_certificate,
+            cancel,
         })
     }
 
@@ -83,13 +90,16 @@ impl Agent {
 
         let e2e_commands = HandlerCollection::new(permission_handler.clone());
 
+        let updater = Updater::new(self.cancel.clone()).await?;
+
         e2e_commands
             .chain()
             .await
             .add(PingHandler)
             .add(RealtimeStatusHandler)
             .add(RemoteTerminalHandler)
-            .add(TcpForwardHandler);
+            .add(TcpForwardHandler)
+            .add(InstallationInfoHandler::new(updater));
 
         let public_commands = HandlerCollection::new(permission_handler.clone());
 
@@ -231,8 +241,11 @@ impl Agent {
         }
     }
 
-    pub fn close(self) {
-        self.rpc.close()
+    pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {
+        self.cancel.cancel();
+        let result1 = self.rpc.close(timeout_duration).await;
+
+        result1
     }
 }
 

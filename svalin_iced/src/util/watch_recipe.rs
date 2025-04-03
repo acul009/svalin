@@ -2,7 +2,7 @@ use std::fmt;
 use std::{borrow::Cow, hash::Hash};
 
 use core::pin::Pin;
-use core::task::{ready, Context, Poll};
+use core::task::{Context, Poll, ready};
 use futures::Stream;
 use futures_util::StreamExt;
 use iced::advanced::{graphics::futures::boxed_stream, subscription::Recipe};
@@ -43,6 +43,10 @@ where
             watcher,
             message,
         }
+    }
+
+    pub fn borrow(&self) -> watch::Ref<'_, T> {
+        self.watcher.borrow()
     }
 }
 

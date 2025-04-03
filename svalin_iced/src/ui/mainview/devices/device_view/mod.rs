@@ -44,7 +44,7 @@ pub struct DeviceView {
 }
 
 impl DeviceView {
-    pub fn new(device: Device) -> (DeviceView, Task<Message>) {
+    pub fn new(device: Device) -> DeviceView {
         let item = device.item().clone();
         let status = DeviceStatus::new(device.clone());
 
@@ -55,19 +55,16 @@ impl DeviceView {
         );
 
         let tunnel_opener = TunnelOpener::new(device.clone());
-        let (update_installer, task) = UpdateInstaller::start(device.clone());
+        let update_installer = UpdateInstaller::start(device.clone());
 
-        (
-            DeviceView {
-                device,
-                item,
-                status,
-                update_installer,
-                recipe,
-                tunnel_opener,
-            },
-            task.map(Message::UpdateInstaller),
-        )
+        DeviceView {
+            device,
+            item,
+            status,
+            update_installer,
+            recipe,
+            tunnel_opener,
+        }
     }
 
     pub fn update(&mut self, message: Message) -> Action {
@@ -130,6 +127,9 @@ impl DeviceView {
     pub fn subscription(&self) -> iced::Subscription<Message> {
         Subscription::batch(vec![
             self.status.subscription().map(Message::Status),
+            self.update_installer
+                .subscription()
+                .map(Message::UpdateInstaller),
             from_recipe(self.recipe.clone()),
         ])
     }

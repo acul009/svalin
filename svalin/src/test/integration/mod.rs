@@ -182,7 +182,7 @@ async fn integration_tests() {
 
     debug!("ping through forward connection: {}µs", ping.as_micros());
 
-    client.close();
+    client.close(Duration::from_secs(1)).await.unwrap();
 
     debug!("closing server");
 

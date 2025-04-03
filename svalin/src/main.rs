@@ -55,6 +55,7 @@ async fn run() {
 
                 let cancel = CancellationToken::new();
                 let cancel2 = cancel.clone();
+                let cancel3 = cancel.clone();
 
                 tokio::spawn(async move {
                     // This needs to be in a seperate task since the init server will block on
@@ -70,18 +71,22 @@ async fn run() {
                     *mutex2.lock().unwrap() = Some(server);
                 });
 
-                // Wait for shutdown signal
-                tokio::signal::ctrl_c().await.unwrap();
+                tokio::spawn(async move {
+                    // Wait for shutdown signal
+                    tokio::signal::ctrl_c().await.unwrap();
 
+                    cancel3.cancel();
+                });
+
+                cancel.cancelled().await;
                 println!("Shutting down server...");
-                cancel.cancel();
 
                 let server = mutex.lock().unwrap().take();
 
                 if let Some(server) = server {
                     server.close(Duration::from_secs(5)).await.unwrap();
                 } else {
-                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    panic!("server Mutex was empty")
                 }
             }
         }
@@ -102,11 +107,29 @@ async fn run() {
                 println!("Confirm-Code: {}", waiting_for_confirm.confirm_code());
                 let agent = waiting_for_confirm.wait_for_confirm().await.unwrap();
                 println!("initialisation complete!");
-                agent.close();
+                agent.close(Duration::from_secs(1)).await.unwrap();
             }
             None => {
-                let agent = Agent::open().await.unwrap();
-                agent.run().await.unwrap();
+                let cancel = CancellationToken::new();
+                let cancel2 = cancel.clone();
+                let agent = Arc::new(Agent::open(cancel.clone()).await.unwrap());
+                let agent2 = agent.clone();
+
+                tokio::spawn(async move {
+                    agent2.run().await.unwrap();
+                });
+
+                tokio::spawn(async move {
+                    // Wait for shutdown signal
+                    tokio::signal::ctrl_c().await.unwrap();
+
+                    cancel2.cancel();
+                });
+
+                cancel.cancelled().await;
+                println!("Shutting down agent");
+
+                agent.close(Duration::from_secs(1)).await.unwrap();
             }
         },
     }

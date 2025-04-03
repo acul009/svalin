@@ -18,7 +18,10 @@ use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
 use tokio::sync::watch;
-use tokio::task::JoinSet;
+use tokio::time::error::Elapsed;
+use tokio::time::timeout;
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 use tunnel_manager::TunnelManager;
 
 /// flutter_rust_bridge:opaque
@@ -31,7 +34,8 @@ pub struct Client {
     device_list: watch::Sender<BTreeMap<Certificate, Device>>,
     tunnel_manager: TunnelManager,
     // TODO: These should not be required here, but should be created and canceled as needed
-    background_tasks: JoinSet<()>,
+    background_tasks: TaskTracker,
+    cancel: CancellationToken,
 }
 
 impl Debug for Client {
@@ -65,7 +69,17 @@ impl Client {
         &self.tunnel_manager
     }
 
-    pub fn close(&self) {
-        self.rpc.close()
+    pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {
+        self.cancel.cancel();
+        self.background_tasks.close();
+
+        let result = timeout(timeout_duration, self.background_tasks.wait()).await;
+
+        let result2 = self.rpc.close(timeout_duration).await;
+
+        match result {
+            Err(e) => Err(e),
+            Ok(()) => result2,
+        }
     }
 }

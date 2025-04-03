@@ -1,20 +1,23 @@
 use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
 
 use crate::{permissions::PermissionHandler, rustls};
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{Ok, Result, anyhow};
 use quinn::{
-    crypto::rustls::QuicClientConfig, rustls::crypto::CryptoProvider, TransportConfig, VarInt,
+    TransportConfig, VarInt, crypto::rustls::QuicClientConfig, rustls::crypto::CryptoProvider,
 };
 use svalin_pki::PermCredentials;
-use tokio_util::sync::CancellationToken;
+use tokio::time::{error::Elapsed, timeout};
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use super::{
     command::handler::HandlerCollection,
-    connection::{direct_connection::DirectConnection, ServeableConnection},
+    connection::{ServeableConnection, direct_connection::DirectConnection},
 };
 
 pub struct RpcClient {
     connection: DirectConnection,
+    cancel: CancellationToken,
+    tasks: TaskTracker,
 }
 
 impl RpcClient {
@@ -22,6 +25,7 @@ impl RpcClient {
         address: &str,
         identity: Option<&PermCredentials>,
         verifier: Arc<dyn rustls::client::danger::ServerCertVerifier>,
+        cancel: CancellationToken,
     ) -> Result<RpcClient> {
         if CryptoProvider::get_default().is_none() {
             let _ = quinn::rustls::crypto::ring::default_provider().install_default();
@@ -77,6 +81,8 @@ impl RpcClient {
 
         Ok(Self {
             connection: direct_connection,
+            cancel,
+            tasks: TaskTracker::new(),
         })
     }
 
@@ -84,8 +90,16 @@ impl RpcClient {
         self.connection.clone()
     }
 
-    pub fn close(&self) {
-        self.connection.close(0u32.into(), b"");
+    pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {
+        self.cancel.cancel();
+        self.tasks.close();
+
+        let result = timeout(timeout_duration, self.tasks.wait()).await;
+
+        self.connection
+            .close(0u32.into(), b"graceful shutdown, goodbye");
+
+        result
     }
 
     pub async fn serve<P>(&self, commands: HandlerCollection<P>) -> Result<()>
@@ -94,7 +108,7 @@ impl RpcClient {
     {
         // Todo: implement canceling and graceful shutdown
         self.upstream_connection()
-            .serve(commands, CancellationToken::new())
+            .serve(commands, self.cancel.clone())
             .await
     }
 }
