@@ -8,10 +8,13 @@ use svalin_rpc::{
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::{
-    agent::update::{InstallationInfo, request_installation_info::InstallationInfoDispatcher},
+    agent::update::{
+        InstallationInfo, UpdateChannel, request_available_version::AvailableVersionDispatcher,
+        request_installation_info::InstallationInfoDispatcher,
+    },
     shared::commands::{
         agent_list::AgentListItem,
         realtime_status::SubscribeRealtimeStatus,
@@ -92,12 +95,16 @@ impl Device {
         self.data.item.borrow()
     }
 
-    pub fn watch_item(&self) -> watch::Receiver<AgentListItem> {
+    pub fn subscribe_item(&self) -> watch::Receiver<AgentListItem> {
         self.data.item.subscribe()
     }
 
     pub fn subscribe_realtime(&self) -> watch::Receiver<RemoteLiveData<RealtimeStatus>> {
         self.data.realtime.subscribe()
+    }
+
+    pub fn subscribe_install_info(&self) -> watch::Receiver<RemoteLiveData<InstallationInfo>> {
+        self.data.install_info.subscribe()
     }
 
     pub async fn open_tunnel(&self, config: TunnelConfig) -> Result<(), TunnelCreateError> {
@@ -115,8 +122,19 @@ impl Device {
             .map_err(|err| anyhow!(err))
     }
 
-    pub fn subscribe_install_info(&self) -> watch::Receiver<RemoteLiveData<InstallationInfo>> {
-        self.data.install_info.subscribe()
+    pub async fn check_update(&self, channel: UpdateChannel) -> Result<String> {
+        let update = self
+            .data
+            .connection
+            .dispatch(AvailableVersionDispatcher { channel })
+            .await
+            .map_err(|err| anyhow!(err));
+
+        if let Ok(version) = &update {
+            debug!("version: {}", version);
+        };
+
+        update
     }
 }
 

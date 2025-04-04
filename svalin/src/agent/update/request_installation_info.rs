@@ -36,7 +36,7 @@ impl CommandHandler for InstallationInfoHandler {
     type Request = ();
 
     fn key() -> String {
-        "check-update".to_string()
+        "get-install-info".to_string()
     }
 
     async fn handle(

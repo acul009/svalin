@@ -50,7 +50,7 @@ impl DeviceView {
 
         let recipe = WatchRecipe::new(
             format!("device-{:x?}", item.public_data.cert.fingerprint()),
-            device.watch_item(),
+            device.subscribe_item(),
             Message::ItemUpdate,
         );
 
@@ -71,10 +71,14 @@ impl DeviceView {
         match message {
             Message::Status(message) => {
                 self.status.update(message);
+
                 Action::None
             }
             Message::UpdateInstaller(message) => match self.update_installer.update(message) {
                 update_installer::Action::None => Action::None,
+                update_installer::Action::Run(task) => {
+                    Action::Run(task.map(Message::UpdateInstaller))
+                }
             },
             Message::TunnelOpener(message) => {
                 let action = self.tunnel_opener.update(message);

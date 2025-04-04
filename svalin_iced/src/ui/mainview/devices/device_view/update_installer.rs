@@ -16,16 +16,25 @@ pub enum Message {
     Refresh,
     Channel(UpdateChannel),
     StartUpdate,
+    PossibleUpdate(Option<String>),
 }
 
 pub enum Action {
     None,
+    Run(Task<Message>),
+}
+
+enum PossibleUpdate {
+    None,
+    Loading,
+    Version(String),
 }
 
 pub struct UpdateInstaller {
     device: Device,
     data: RemoteLiveData<InstallationInfo>,
     recipe: WatchRecipe<String, RemoteLiveData<InstallationInfo>, Message>,
+    possible_update: PossibleUpdate,
     channels: combo_box::State<UpdateChannel>,
     selected_channel: Option<UpdateChannel>,
 }
@@ -47,6 +56,7 @@ impl UpdateInstaller {
             recipe,
             channels: combo_box::State::new(vec![UpdateChannel::Alpha]),
             selected_channel: None,
+            possible_update: PossibleUpdate::None,
         };
         update_installer
     }
@@ -59,7 +69,21 @@ impl UpdateInstaller {
                 Action::None
             }
             Message::Channel(channel) => {
-                self.selected_channel = Some(channel);
+                self.selected_channel = Some(channel.clone());
+
+                let device = self.device.clone();
+                self.possible_update = PossibleUpdate::Loading;
+
+                Action::Run(Task::future(async move {
+                    let version = device.check_update(channel).await;
+                    Message::PossibleUpdate(version.ok())
+                }))
+            }
+            Message::PossibleUpdate(possible_update) => {
+                match possible_update {
+                    None => self.possible_update = PossibleUpdate::None,
+                    Some(version) => self.possible_update = PossibleUpdate::Version(version),
+                }
 
                 Action::None
             }
@@ -96,21 +120,35 @@ impl UpdateInstaller {
                 .padding(10);
 
                 if install_info.install_method.supports_update() {
-                    col = col.push(
-                        row![
-                            container(combo_box(
-                                &self.channels,
-                                "",
-                                self.selected_channel.as_ref(),
-                                Message::Channel
-                            ))
-                            .width(200),
-                            button(text(t!("device.update.start"))).on_press_maybe(
-                                self.selected_channel.as_ref().map(|_| Message::StartUpdate)
-                            )
-                        ]
-                        .spacing(10),
-                    )
+                    col = col
+                        .push(
+                            row![
+                                container(combo_box(
+                                    &self.channels,
+                                    "",
+                                    self.selected_channel.as_ref(),
+                                    Message::Channel
+                                ))
+                                .width(200),
+                                button(text(t!("device.update.start"))).on_press_maybe(
+                                    self.selected_channel.as_ref().map(|_| Message::StartUpdate)
+                                )
+                            ]
+                            .spacing(10),
+                        )
+                        .push_maybe(match &self.possible_update {
+                            PossibleUpdate::None => None,
+                            PossibleUpdate::Loading => {
+                                Some(Element::from(container(loading("").height(40))))
+                            }
+                            PossibleUpdate::Version(version) => Some(Element::from(
+                                row![
+                                    container(text("device.update.possible-version")).width(200),
+                                    text(version.as_str())
+                                ]
+                                .spacing(10),
+                            )),
+                        })
                 } else {
                     col = col.push(text(t!("device.update.unsupported")))
                 }

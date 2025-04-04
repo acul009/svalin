@@ -42,8 +42,8 @@ impl CommandHandler for RealtimeStatusHandler {
         debug!("realtime status requested");
         loop {
             let status = RealtimeStatus::get().await;
-            debug!("sending realtime status");
-            debug!("cpu: {:?}", status.cpu);
+            // debug!("sending realtime status");
+            // debug!("cpu: {:?}", status.cpu);
 
             session.write_object(&status).await?;
 
@@ -91,7 +91,7 @@ impl CommandDispatcher for SubscribeRealtimeStatus {
                 status  = session.read_object::<RealtimeStatus>() => {
                     match status {
                         Ok(status) => {
-                            debug!("received realtime status");
+                            // debug!("received realtime status");
                             if let Err(_) = self.send.send(RemoteLiveData::Ready(status)) {
                                 return Ok(());
                             }

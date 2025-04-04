@@ -8,6 +8,7 @@ use tokio::{
     sync::watch,
 };
 use tokio_util::sync::CancellationToken;
+use tracing::debug;
 
 pub mod request_available_version;
 pub mod request_installation_info;
@@ -137,8 +138,8 @@ impl Updater {
         })
     }
 
-    fn get_current_version() -> &'static str {
-        clap::crate_version!()
+    fn get_current_version() -> String {
+        format!("v{}", clap::crate_version!())
     }
 
     async fn get_install_method() -> Result<InstallMethod, UpdaterError> {
@@ -177,6 +178,8 @@ impl Updater {
             return Err(UpdaterError::UnsupportedInstallMethod);
         }
 
+        debug!("install type supports updating");
+
         match install_method {
             InstallMethod::Dpkg => Self::get_github_channel_version(channel).await,
             InstallMethod::Unknown => unreachable!(),
@@ -201,13 +204,18 @@ impl Updater {
     }
 
     async fn get_github_releases() -> Result<Vec<GithubRelease>, UpdaterError> {
+        let url = format!("https://api.github.com/repos/{GITHUB_REPO}/releases");
+
         // Get the newest releases
-        let releases: Vec<GithubRelease> = reqwest::get(format!(
-            "https://api.github.com/repos/{GITHUB_REPO}/releases"
-        ))
-        .await?
-        .json()
-        .await?;
+        let releases: Vec<GithubRelease> = reqwest::Client::new()
+            .get(url)
+            .header("User-Agent", "Svalin")
+            .send()
+            .await?
+            .json()
+            .await?;
+
+        // debug!("releases: {:?}", releases);
 
         Ok(releases)
     }

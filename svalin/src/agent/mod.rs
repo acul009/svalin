@@ -15,6 +15,7 @@ use tokio::time::error::Elapsed;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument};
 use update::Updater;
+use update::request_available_version::AvailableVersionHandler;
 use update::request_installation_info::InstallationInfoHandler;
 
 mod init;
@@ -99,7 +100,8 @@ impl Agent {
             .add(RealtimeStatusHandler)
             .add(RemoteTerminalHandler)
             .add(TcpForwardHandler)
-            .add(InstallationInfoHandler::new(updater));
+            .add(InstallationInfoHandler::new(updater.clone()))
+            .add(AvailableVersionHandler::new(updater));
 
         let public_commands = HandlerCollection::new(permission_handler.clone());
 
