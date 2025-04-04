@@ -135,7 +135,7 @@ impl Devices {
                     .fold(column!(), |col, device| {
                         let device = device.1.clone();
                         let name = device.item().public_data.name.clone();
-                        let color = match device.item().online_status {
+                        let color = match device.item().is_online {
                             true => Color::from_rgb8(0, 255, 0),
                             false => Color::from_rgb8(255, 0, 0),
                         };

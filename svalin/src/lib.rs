@@ -4,10 +4,10 @@ pub use tracing_subscriber;
 // TODO: refactor module locations
 pub mod agent;
 pub mod client;
+pub mod permissions;
 pub mod server;
 pub mod shared;
-
-pub mod permissions;
+pub mod util;
 pub mod verifier;
 
 #[cfg(test)]

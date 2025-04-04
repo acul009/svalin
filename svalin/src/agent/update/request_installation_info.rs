@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use svalin_rpc::rpc::{
     command::{
-        dispatcher::{DispatcherError, TakeableCommandDispatcher},
+        dispatcher::CommandDispatcher,
         handler::{CommandHandler, PermissionPrecursor},
     },
     session::{Session, SessionReadError},
@@ -75,10 +75,10 @@ pub enum InstallationInfoError {
 }
 
 #[async_trait]
-impl TakeableCommandDispatcher for InstallationInfoDispatcher {
+impl CommandDispatcher for InstallationInfoDispatcher {
     type Request = ();
     type Output = ();
-    type InnerError = InstallationInfoError;
+    type Error = InstallationInfoError;
 
     fn key() -> String {
         InstallationInfoHandler::key()
@@ -90,29 +90,24 @@ impl TakeableCommandDispatcher for InstallationInfoDispatcher {
 
     async fn dispatch(
         self,
-        session: &mut Option<Session>,
+        session: &mut Session,
         _request: Self::Request,
-    ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
-        if let Some(mut session) = session.take() {
-            tokio::spawn(async move {
-                let send = self.send;
-                loop {
-                    tokio::select! {
-                        _ = send.closed() => break,
-                        installation_info = session.read_object::<InstallationInfo>() => {
-                            if let Ok(installation_info) = installation_info {
-                                let _ = send.send(RemoteLiveData::Ready(installation_info));
-                            } else {
-                                break;
-                            }
-                        }
+    ) -> Result<Self::Output, Self::Error> {
+        let send = self.send;
+        loop {
+            tokio::select! {
+                _ = send.closed() => break,
+                installation_info = session.read_object::<InstallationInfo>() => {
+                    if let Ok(installation_info) = installation_info {
+                        let _ = send.send(RemoteLiveData::Ready(installation_info));
+                    } else {
+                        let _ = send.send(RemoteLiveData::Unavailable);
+                        break;
                     }
                 }
-            });
-
-            Ok(())
-        } else {
-            Err(DispatcherError::NoneSession)
+            }
         }
+
+        Ok(())
     }
 }

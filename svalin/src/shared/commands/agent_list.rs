@@ -32,7 +32,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct AgentListItem {
     pub public_data: PublicAgentData,
-    pub online_status: bool,
+    pub is_online: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -167,6 +167,7 @@ impl CommandDispatcher for UpdateAgentList {
     fn get_request(&self) -> Self::Request {}
 
     async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<(), Self::Error> {
+        let cancel2 = self.cancel.clone();
         let result = self
             .cancel
             .run_until_cancelled(async move {
@@ -183,7 +184,7 @@ impl CommandDispatcher for UpdateAgentList {
                         .map_err(UpdateAgentListError::VerifyItemError)?;
 
                     let item = AgentListItem {
-                        online_status: list_item_update.online_status,
+                        is_online: list_item_update.online_status,
                         public_data: public_data.unpack(),
                     };
 
@@ -198,8 +199,12 @@ impl CommandDispatcher for UpdateAgentList {
                             );
 
                             let cert = item.public_data.cert.clone();
-                            let device =
-                                Device::new(device_connection, item, self.tunnel_manager.clone());
+                            let device = Device::new(
+                                device_connection,
+                                item,
+                                self.tunnel_manager.clone(),
+                                cancel2.clone(),
+                            );
 
                             list.insert(cert, device);
                         }

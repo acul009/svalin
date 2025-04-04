@@ -46,7 +46,7 @@ pub struct DeviceView {
 impl DeviceView {
     pub fn new(device: Device) -> DeviceView {
         let item = device.item().clone();
-        let status = DeviceStatus::new(device.clone());
+        let status = DeviceStatus::new(&device);
 
         let recipe = WatchRecipe::new(
             format!("device-{:x?}", item.public_data.cert.fingerprint()),

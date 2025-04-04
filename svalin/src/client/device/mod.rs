@@ -12,14 +12,12 @@ use tracing::error;
 
 use crate::{
     agent::update::{InstallationInfo, request_installation_info::InstallationInfoDispatcher},
-    shared::{
-        commands::{
-            agent_list::AgentListItem,
-            realtime_status::SubscribeRealtimeStatus,
-            terminal::{RemoteTerminal, RemoteTerminalDispatcher},
-        },
-        lazy_watch::{self, LazyWatch},
+    shared::commands::{
+        agent_list::AgentListItem,
+        realtime_status::SubscribeRealtimeStatus,
+        terminal::{RemoteTerminal, RemoteTerminalDispatcher},
     },
+    util::smart_subscriber::{SmartSubscriber, SubscriberStarter},
 };
 
 use super::tunnel_manager::{TunnelConfig, TunnelCreateError, TunnelManager};
@@ -30,32 +28,6 @@ pub enum RemoteLiveData<T> {
     Pending,
     Ready(T),
 }
-
-impl<T> RemoteLiveData<T> {
-    pub fn is_pending(&self) -> bool {
-        match self {
-            RemoteLiveData::Pending => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_unavailable(&self) -> bool {
-        match self {
-            Self::Unavailable => true,
-            _ => false,
-        }
-    }
-
-    pub fn get_ready(self) -> Option<T> {
-        match self {
-            Self::Ready(data) => Some(data),
-            _ => None,
-        }
-    }
-}
-
-pub type RealtimeStatusReceiver =
-    lazy_watch::Receiver<RemoteLiveData<RealtimeStatus>, RealtimeStatusWatchHandler>;
 
 #[derive(Clone)]
 pub struct Device {
@@ -72,7 +44,8 @@ struct DeviceData {
     connection: ForwardConnection<DirectConnection>,
     tunnel_manager: TunnelManager,
     item: watch::Sender<AgentListItem>,
-    realtime: LazyWatch<RemoteLiveData<RealtimeStatus>, RealtimeStatusWatchHandler>,
+    realtime: SmartSubscriber<RealtimeStarter>,
+    install_info: SmartSubscriber<InstallInfoStarter>,
 }
 
 impl Device {
@@ -80,21 +53,30 @@ impl Device {
         connection: ForwardConnection<DirectConnection>,
         item: AgentListItem,
         tunnel_manager: TunnelManager,
+        cancel: CancellationToken,
     ) -> Self {
         return Self {
             data: Arc::new(DeviceData {
                 connection: connection.clone(),
                 tunnel_manager,
                 item: watch::channel(item).0,
-                realtime: LazyWatch::new(
-                    RemoteLiveData::Unavailable,
-                    RealtimeStatusWatchHandler::new(connection),
+                realtime: SmartSubscriber::new(
+                    RealtimeStarter {
+                        connection: connection.clone(),
+                    },
+                    cancel.clone(),
                 ),
+                install_info: SmartSubscriber::new(InstallInfoStarter { connection }, cancel),
             }),
         };
     }
 
     pub(crate) fn update(&self, new_item: AgentListItem) {
+        if new_item.is_online {
+            self.data.realtime.restart_if_offline();
+            self.data.install_info.restart_if_offline();
+        }
+
         self.data.item.send_replace(new_item);
     }
 
@@ -114,7 +96,7 @@ impl Device {
         self.data.item.subscribe()
     }
 
-    pub fn subscribe_realtime(&self) -> RealtimeStatusReceiver {
+    pub fn subscribe_realtime(&self) -> watch::Receiver<RemoteLiveData<RealtimeStatus>> {
         self.data.realtime.subscribe()
     }
 
@@ -134,68 +116,70 @@ impl Device {
     }
 
     pub fn subscribe_install_info(&self) -> watch::Receiver<RemoteLiveData<InstallationInfo>> {
-        let (send, recv) = watch::channel(RemoteLiveData::Pending);
-        let connection = self.data.connection.clone();
-
-        tokio::spawn(async move {
-            let result = connection
-                .dispatch(InstallationInfoDispatcher { send: send.clone() })
-                .await;
-
-            match result {
-                Ok(()) => {}
-                Err(err) => {
-                    let _ = send.send(RemoteLiveData::Unavailable);
-                    error!("error while subscribing to installation info: {err}")
-                }
-            }
-        });
-
-        recv
+        self.data.install_info.subscribe()
     }
 }
 
-pub struct RealtimeStatusWatchHandler {
+struct InstallInfoStarter {
     connection: ForwardConnection<DirectConnection>,
-    cancel: Option<CancellationToken>,
 }
 
-impl RealtimeStatusWatchHandler {
-    fn new(connection: ForwardConnection<DirectConnection>) -> Self {
-        Self {
-            connection,
-            cancel: None,
+impl SubscriberStarter for InstallInfoStarter {
+    type Item = RemoteLiveData<InstallationInfo>;
+
+    fn default(&self) -> Self::Item {
+        RemoteLiveData::Unavailable
+    }
+
+    fn start(
+        &self,
+        send: watch::Sender<Self::Item>,
+        _cancel: CancellationToken,
+    ) -> impl Future<Output = ()> + Send + 'static {
+        let connection = self.connection.clone();
+        let _ = send.send(RemoteLiveData::Pending);
+
+        async move {
+            let send2 = send.clone();
+            if let Err(err) = connection
+                .dispatch(InstallationInfoDispatcher { send })
+                .await
+            {
+                let _ = send2.send(RemoteLiveData::Unavailable);
+                error!("error while requesting InstallationInfo: {err}");
+            }
         }
     }
 }
 
-impl lazy_watch::Handler for RealtimeStatusWatchHandler {
-    type T = RemoteLiveData<RealtimeStatus>;
+struct RealtimeStarter {
+    connection: ForwardConnection<DirectConnection>,
+}
 
-    fn start(&mut self, send: &watch::Sender<Self::T>) {
-        let connection = self.connection.clone();
-        let _ = send.send(RemoteLiveData::Pending);
-        let cancel = CancellationToken::new();
-        self.cancel = Some(cancel.clone());
-        let send = send.clone();
+impl SubscriberStarter for RealtimeStarter {
+    type Item = RemoteLiveData<RealtimeStatus>;
 
-        tokio::spawn(async move {
-            if let Err(err) = connection
-                .dispatch(SubscribeRealtimeStatus {
-                    send: send.clone(),
-                    cancel: cancel,
-                })
-                .await
-            {
-                let _ = send.send(RemoteLiveData::Unavailable);
-                error!("error while receiving RealtimeStatus: {err}");
-            };
-        });
+    fn default(&self) -> Self::Item {
+        RemoteLiveData::Unavailable
     }
 
-    fn stop(&mut self) {
-        if let Some(cancel) = self.cancel.take() {
-            cancel.cancel();
+    fn start(
+        &self,
+        send: watch::Sender<Self::Item>,
+        cancel: CancellationToken,
+    ) -> impl Future<Output = ()> + Send + 'static {
+        let connection = self.connection.clone();
+        let _ = send.send(RemoteLiveData::Pending);
+
+        async move {
+            let send2 = send.clone();
+            if let Err(err) = connection
+                .dispatch(SubscribeRealtimeStatus { cancel, send })
+                .await
+            {
+                let _ = send2.send(RemoteLiveData::Unavailable);
+                error!("error while requesting InstallationInfo: {err}");
+            }
         }
     }
 }

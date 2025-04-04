@@ -1,33 +1,37 @@
-use futures_util::SinkExt;
-use iced::{Subscription, stream::channel, widget::column};
+use iced::{advanced::subscription::from_recipe, widget::column};
 use svalin::client::device::{Device, RemoteLiveData};
 use svalin_sysctl::realtime::RealtimeStatus;
 
-use crate::ui::widgets::realtime;
+use crate::{ui::widgets::realtime, util::watch_recipe::WatchRecipe};
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Realtime(RemoteLiveData<RealtimeStatus>),
+    Refresh,
 }
 
 pub struct DeviceStatus {
-    device: Device,
+    recipe: WatchRecipe<String, RemoteLiveData<RealtimeStatus>, Message>,
     realtime: RemoteLiveData<RealtimeStatus>,
 }
 
 impl DeviceStatus {
-    pub fn new(device: Device) -> Self {
+    pub fn new(device: &Device) -> Self {
         Self {
-            device,
             realtime: RemoteLiveData::Pending,
+            recipe: WatchRecipe::new(
+                format!(
+                    "realtime-{:x?}",
+                    device.item().public_data.cert.fingerprint()
+                ),
+                device.subscribe_realtime(),
+                Message::Refresh,
+            ),
         }
     }
 
     pub fn update(&mut self, message: Message) {
         match message {
-            Message::Realtime(remote_live_data) => {
-                self.realtime = remote_live_data;
-            }
+            Message::Refresh => self.realtime = self.recipe.borrow().clone(),
         }
     }
 
@@ -36,27 +40,6 @@ impl DeviceStatus {
     }
 
     pub fn subscription(&self) -> iced::Subscription<Message> {
-        let device = self.device.clone();
-        Subscription::run_with_id(
-            format!(
-                "realtime-{:x?}",
-                self.device.item().public_data.cert.fingerprint()
-            ),
-            channel(1, move |mut output| async move {
-                let mut subscription = device.subscribe_realtime();
-
-                output
-                    .send(Message::Realtime(subscription.current_owned()))
-                    .await
-                    .unwrap();
-
-                while let Ok(()) = subscription.changed().await {
-                    output
-                        .send(Message::Realtime(subscription.current_owned()))
-                        .await
-                        .unwrap();
-                }
-            }),
-        )
+        from_recipe(self.recipe.clone())
     }
 }
