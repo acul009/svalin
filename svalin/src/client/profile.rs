@@ -7,7 +7,7 @@ use svalin_pki::{
     verifier::{KnownCertificateVerifier, exact::ExactVerififier},
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
-use tokio::{sync::watch, task::JoinSet};
+use tokio::sync::watch;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
@@ -205,7 +205,7 @@ impl Client {
 
             let tunnel_manager = TunnelManager::new();
 
-            let mut client = Self {
+            let client = Self {
                 rpc,
                 _upstream_address: profile.upstream_address,
                 upstream_certificate: profile.upstream_certificate,

@@ -5,7 +5,6 @@ use aucpace::StrongDatabase;
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::ParamsString;
 use serde::{Deserialize, Serialize};
-use sled::transaction::TransactionError;
 use svalin_pki::Certificate;
 use totp_rs::{TOTP, qrcodegen_image::image::EncodableLayout};
 use tracing::{debug, instrument};

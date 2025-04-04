@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
@@ -50,22 +50,13 @@ impl From<&PermissionPrecursor<AddUserHandler>> for Permission {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-enum AddUserError {
+#[derive(Serialize, Deserialize, Debug, thiserror::Error)]
+pub enum AddUserError {
+    #[error("TOTP and Secret didn't match")]
     TotpMismatch,
+    #[error("An undisclosed Error occured")]
     Generic,
 }
-
-impl Display for AddUserError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AddUserError::TotpMismatch => write!(f, "TOTP and Secret didn't match"),
-            AddUserError::Generic => write!(f, "An undisclosed Error occured"),
-        }
-    }
-}
-
-impl std::error::Error for AddUserError {}
 
 #[derive(Debug)]
 pub struct AddUserHandler {

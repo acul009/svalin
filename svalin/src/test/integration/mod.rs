@@ -1,6 +1,5 @@
 use std::{panic, process, time::Duration};
 
-use anyhow::Context;
 use std::net::ToSocketAddrs;
 use test_log::test;
 use tokio::sync::oneshot;
@@ -174,7 +173,7 @@ async fn integration_tests() {
 
     let device = device_list.borrow().first_key_value().unwrap().1.clone();
 
-    if !device.item().online_status {
+    if !device.item().is_online {
         panic!("Device is not online");
     }
 

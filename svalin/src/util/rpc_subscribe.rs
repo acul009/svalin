@@ -1,6 +1,5 @@
 use serde::{Serialize, de::DeserializeOwned};
-use svalin_rpc::rpc::command::handler::CommandHandler;
-use tokio::sync::{broadcast, watch};
+use tokio::sync::broadcast;
 
 pub trait Patchable: Serialize + DeserializeOwned {
     type Patch: Serialize + DeserializeOwned;

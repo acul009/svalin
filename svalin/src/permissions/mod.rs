@@ -1,4 +1,3 @@
-use svalin_pki::Certificate;
 use svalin_rpc::{
     commands::{
         deauthenticate::DeauthenticateHandler, e2e::E2EHandler, forward::ForwardHandler,
