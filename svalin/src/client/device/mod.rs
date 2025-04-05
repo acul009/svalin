@@ -130,11 +130,11 @@ impl Device {
             .await
             .map_err(|err| anyhow!(err));
 
-        if let Ok(version) = &update {
-            debug!("version: {}", version);
-        };
-
         update
+    }
+
+    pub async fn start_update(&self) -> Result<()> {
+        self.data.connection.dispatch()
     }
 }
 

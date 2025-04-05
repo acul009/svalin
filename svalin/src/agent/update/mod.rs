@@ -1,5 +1,6 @@
-use std::{fmt::Display, io, sync::Arc};
+use std::{fmt::Display, io, process::exit, sync::Arc, time::Duration};
 
+use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{self},
@@ -8,10 +9,13 @@ use tokio::{
     sync::watch,
 };
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
+use tracing::{debug, error};
+
+use super::Agent;
 
 pub mod request_available_version;
 pub mod request_installation_info;
+pub mod start_agent_update;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum UpdateChannel {
@@ -98,6 +102,7 @@ pub struct Updater {
     /// The agent is meant to be run as a service, so it's started back up again
     /// with the new version.
     shutdown_token: CancellationToken,
+    agent: Arc<Agent>,
 }
 
 const GITHUB_REPO: &str = "acul009/svalin";
@@ -115,12 +120,16 @@ struct GithubAsset {
 }
 
 impl Updater {
-    pub async fn new(shutdown_token: CancellationToken) -> Result<Arc<Self>, UpdaterError> {
+    pub async fn new(
+        shutdown_token: CancellationToken,
+        agent: Arc<Agent>,
+    ) -> Result<Arc<Self>, UpdaterError> {
         let install_info = Self::get_install_info().await?;
         Ok(Arc::new(Self {
             watch: watch::Sender::new(install_info),
             update_lock: tokio::sync::Mutex::new(()),
             shutdown_token,
+            agent,
         }))
     }
 
@@ -239,7 +248,10 @@ impl Updater {
 
         if update_result.is_ok() {
             // send signal to shut down agent
-            self.shutdown_token.cancel();
+            self.agent.close(Duration::from_secs(3)).map_err(|err| {
+                error!("timeout during shutdown, forcing shutdown to update now! {err}");
+                exit(0);
+            });
         }
 
         update_result

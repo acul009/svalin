@@ -88,6 +88,7 @@ impl UpdateInstaller {
                 Action::None
             }
             Message::StartUpdate => {
+                self.device.check_update(channel)
                 // TODO
                 Action::None
             }
