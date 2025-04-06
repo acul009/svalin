@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use iced::{
     Task,
     advanced::subscription::from_recipe,
@@ -9,7 +11,11 @@ use svalin::{
     client::device::{Device, RemoteLiveData},
 };
 
-use crate::{Element, ui::widgets::loading, util::watch_recipe::WatchRecipe};
+use crate::{
+    Element,
+    ui::{types::error_display_info::ErrorDisplayInfo, widgets::loading},
+    util::watch_recipe::WatchRecipe,
+};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -17,6 +23,9 @@ pub enum Message {
     Channel(UpdateChannel),
     StartUpdate,
     PossibleUpdate(Option<String>),
+    Noop,
+    Error(ErrorDisplayInfo<Arc<anyhow::Error>>),
+    CloseError,
 }
 
 pub enum Action {
@@ -37,6 +46,7 @@ pub struct UpdateInstaller {
     possible_update: PossibleUpdate,
     channels: combo_box::State<UpdateChannel>,
     selected_channel: Option<UpdateChannel>,
+    error: Option<ErrorDisplayInfo<Arc<anyhow::Error>>>,
 }
 
 impl UpdateInstaller {
@@ -57,12 +67,14 @@ impl UpdateInstaller {
             channels: combo_box::State::new(vec![UpdateChannel::Alpha]),
             selected_channel: None,
             possible_update: PossibleUpdate::None,
+            error: None,
         };
         update_installer
     }
 
     pub fn update(&mut self, message: Message) -> Action {
         match message {
+            Message::Noop => Action::None,
             Message::Refresh => {
                 self.data = self.recipe.borrow().clone();
 
@@ -88,8 +100,31 @@ impl UpdateInstaller {
                 Action::None
             }
             Message::StartUpdate => {
-                self.device.check_update(channel)
-                // TODO
+                let channel = match &self.selected_channel {
+                    None => return Action::None,
+                    Some(channel) => channel.clone(),
+                };
+
+                let device = self.device.clone();
+
+                Action::Run(Task::future(async move {
+                    let result = device.start_update(channel).await;
+
+                    match result {
+                        Ok(_) => Message::Noop,
+                        Err(err) => Message::Error(ErrorDisplayInfo::new(
+                            Arc::new(err),
+                            t!("device.update.error-during-update"),
+                        )),
+                    }
+                }))
+            }
+            Message::CloseError => {
+                self.error = None;
+                Action::None
+            }
+            Message::Error(error) => {
+                self.error = Some(error);
                 Action::None
             }
         }
@@ -104,6 +139,10 @@ impl UpdateInstaller {
                 .height(200)
                 .into(),
             RemoteLiveData::Ready(install_info) => {
+                if install_info.currently_updating {
+                    return loading(t!("device.update.updating")).height(200).into();
+                }
+
                 let mut col = column![
                     row![
                         container(text(t!("device.update.current-version") + ":")).width(200),
@@ -161,6 +200,14 @@ impl UpdateInstaller {
         container(card(text(t!("device.update.title")), content))
             .padding(30)
             .into()
+    }
+
+    pub fn dialog(&self) -> Option<Element<Message>> {
+        if let Some(error) = &self.error {
+            Some(error.view().on_close(Message::CloseError).into())
+        } else {
+            None
+        }
     }
 
     pub fn subscription(&self) -> iced::Subscription<Message> {

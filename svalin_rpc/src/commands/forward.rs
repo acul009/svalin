@@ -122,7 +122,6 @@ pub enum ForwardDispatchError {
     ForwardError(#[from] ForwardError),
 }
 
-#[async_trait]
 impl<'a> TakeableCommandDispatcher for ForwardDispatcher<'a> {
     type Output = (
         Box<dyn SessionTransportReader>,
@@ -136,14 +135,13 @@ impl<'a> TakeableCommandDispatcher for ForwardDispatcher<'a> {
         forward_key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        self.target
+    fn get_request(&self) -> &Self::Request {
+        &self.target
     }
 
     async fn dispatch(
         self,
         session: &mut Option<Session>,
-        _target: Self::Request,
     ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(mut session) = session.take() {
             session

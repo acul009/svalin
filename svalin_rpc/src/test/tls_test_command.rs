@@ -89,7 +89,6 @@ pub enum TlsTestClientError {
 
 pub struct TlsTest;
 
-#[async_trait]
 impl TakeableCommandDispatcher for TlsTest {
     type Output = ();
 
@@ -101,14 +100,13 @@ impl TakeableCommandDispatcher for TlsTest {
         tls_test_key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        ()
+    fn get_request(&self) -> &Self::Request {
+        &()
     }
 
     async fn dispatch(
         self,
         session: &mut Option<Session>,
-        _: Self::Request,
     ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure_transport();

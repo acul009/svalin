@@ -1,6 +1,5 @@
-use std::{fmt::Display, io, process::exit, sync::Arc, time::Duration};
+use std::{fmt::Display, io, sync::Arc};
 
-use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{self},
@@ -10,8 +9,6 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
-
-use super::Agent;
 
 pub mod request_available_version;
 pub mod request_installation_info;
@@ -81,8 +78,8 @@ pub struct InstallationInfo {
 pub enum UpdaterError {
     #[error(transparent)]
     IoError(#[from] io::Error),
-    #[error("already updating, lock error: {0}")]
-    AlreadyUpdating(#[from] tokio::sync::TryLockError),
+    #[error("already updating...")]
+    AlreadyUpdating,
     #[error("unable to install update: unsupported install method")]
     UnsupportedInstallMethod,
     #[error("error in crate reqwest: {0}")]
@@ -102,7 +99,6 @@ pub struct Updater {
     /// The agent is meant to be run as a service, so it's started back up again
     /// with the new version.
     shutdown_token: CancellationToken,
-    agent: Arc<Agent>,
 }
 
 const GITHUB_REPO: &str = "acul009/svalin";
@@ -120,16 +116,12 @@ struct GithubAsset {
 }
 
 impl Updater {
-    pub async fn new(
-        shutdown_token: CancellationToken,
-        agent: Arc<Agent>,
-    ) -> Result<Arc<Self>, UpdaterError> {
+    pub async fn new(shutdown_token: CancellationToken) -> Result<Arc<Self>, UpdaterError> {
         let install_info = Self::get_install_info().await?;
         Ok(Arc::new(Self {
             watch: watch::Sender::new(install_info),
             update_lock: tokio::sync::Mutex::new(()),
             shutdown_token,
-            agent,
         }))
     }
 
@@ -230,12 +222,32 @@ impl Updater {
     }
 
     pub async fn update_to(&self, channel: &UpdateChannel) -> Result<(), UpdaterError> {
-        let _lock = self.update_lock.try_lock()?;
+        let _lock = match self.update_lock.try_lock() {
+            Ok(lock) => lock,
+            Err(_) => return Err(UpdaterError::AlreadyUpdating),
+        };
+
+        let update_result = self.update_to_innter(channel).await;
+
+        if update_result.is_err() {
+            self.watch.send_modify(|install_info| {
+                install_info.currently_updating = false;
+            });
+        }
+
+        update_result
+    }
+
+    async fn update_to_innter(&self, channel: &UpdateChannel) -> Result<(), UpdaterError> {
         let mut install_info = self.watch.borrow().clone();
         let install_method = install_info.install_method.clone();
 
         if !install_info.install_method.supports_update() {
             return Err(UpdaterError::UnsupportedInstallMethod);
+        }
+
+        if install_info.currently_updating {
+            return Err(UpdaterError::AlreadyUpdating);
         }
 
         install_info.currently_updating = true;
@@ -247,11 +259,7 @@ impl Updater {
         };
 
         if update_result.is_ok() {
-            // send signal to shut down agent
-            self.agent.close(Duration::from_secs(3)).map_err(|err| {
-                error!("timeout during shutdown, forcing shutdown to update now! {err}");
-                exit(0);
-            });
+            self.shutdown_token.cancel();
         }
 
         update_result
@@ -287,6 +295,8 @@ impl Updater {
             .arg("/tmp/svalin_update/svalin.deb")
             .status()
             .await?;
+
+        let _ = fs::remove_dir_all("/tmp/svalin_update").await;
 
         if install_result.success() {
             Ok(())

@@ -8,12 +8,13 @@ use svalin_rpc::{
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::{
     agent::update::{
         InstallationInfo, UpdateChannel, request_available_version::AvailableVersionDispatcher,
         request_installation_info::InstallationInfoDispatcher,
+        start_agent_update::StartUpdateDispatcher,
     },
     shared::commands::{
         agent_list::AgentListItem,
@@ -123,18 +124,19 @@ impl Device {
     }
 
     pub async fn check_update(&self, channel: UpdateChannel) -> Result<String> {
-        let update = self
-            .data
+        self.data
             .connection
             .dispatch(AvailableVersionDispatcher { channel })
             .await
-            .map_err(|err| anyhow!(err));
-
-        update
+            .map_err(|err| anyhow!(err))
     }
 
-    pub async fn start_update(&self) -> Result<()> {
-        self.data.connection.dispatch()
+    pub async fn start_update(&self, channel: UpdateChannel) -> Result<()> {
+        self.data
+            .connection
+            .dispatch(StartUpdateDispatcher { channel })
+            .await
+            .map_err(|err| anyhow!(err))
     }
 }
 

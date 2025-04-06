@@ -23,7 +23,7 @@ use crate::{
     server::user_store::{UserStore, serde_paramsstring},
 };
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct AddUserRequest {
     certificate: Certificate,
     // username: String,
@@ -191,7 +191,6 @@ pub enum AddUserDispatcherError {
     FromServer(AddUserError),
 }
 
-#[async_trait]
 impl CommandDispatcher for AddUser {
     type Output = ();
     type Request = AddUserRequest;
@@ -201,11 +200,11 @@ impl CommandDispatcher for AddUser {
         AddUserHandler::key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        self.request.clone()
+    fn get_request(&self) -> &Self::Request {
+        &self.request
     }
 
-    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<(), Self::Error> {
+    async fn dispatch(self, session: &mut Session) -> Result<(), Self::Error> {
         debug!("waiting on confirmation for new user");
 
         let success: Result<(), AddUserError> = session

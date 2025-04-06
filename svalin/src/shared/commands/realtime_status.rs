@@ -68,7 +68,6 @@ pub enum SubscribeRealtimeStatusError {
     ReadUpdateError(SessionReadError),
 }
 
-#[async_trait]
 impl CommandDispatcher for SubscribeRealtimeStatus {
     type Output = ();
     type Request = ();
@@ -78,11 +77,11 @@ impl CommandDispatcher for SubscribeRealtimeStatus {
         RealtimeStatusHandler::key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        ()
+    fn get_request(&self) -> &Self::Request {
+        &()
     }
 
-    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<(), Self::Error> {
+    async fn dispatch(self, session: &mut Session) -> Result<(), Self::Error> {
         loop {
             select! {
                 _ = self.cancel.cancelled() => {

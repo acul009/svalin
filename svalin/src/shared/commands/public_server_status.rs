@@ -51,7 +51,6 @@ pub enum GetPutblicStatusError {
     ReadStatusError(SessionReadError),
 }
 
-#[async_trait]
 impl CommandDispatcher for GetPutblicStatus {
     type Output = PublicStatus;
     type Request = ();
@@ -61,15 +60,11 @@ impl CommandDispatcher for GetPutblicStatus {
         PublicStatusHandler::key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        ()
+    fn get_request(&self) -> &Self::Request {
+        &()
     }
 
-    async fn dispatch(
-        self,
-        session: &mut Session,
-        _: Self::Request,
-    ) -> Result<PublicStatus, Self::Error> {
+    async fn dispatch(self, session: &mut Session) -> Result<PublicStatus, Self::Error> {
         let status = session
             .read_object()
             .await

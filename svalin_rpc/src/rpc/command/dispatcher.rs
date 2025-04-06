@@ -6,7 +6,6 @@ use crate::rpc::session::Session;
 
 /// This is the default trait meant to be used to control the client side logic
 /// of a command After executing the command, the session is properly closed
-#[async_trait]
 pub trait CommandDispatcher: Send + Sync {
     type Output: Send;
     type Error: Send;
@@ -15,19 +14,17 @@ pub trait CommandDispatcher: Send + Sync {
 
     fn key() -> String;
 
-    fn get_request(&self) -> Self::Request;
+    fn get_request(&self) -> &Self::Request;
 
-    async fn dispatch(
+    fn dispatch(
         self,
         session: &mut Session,
-        request: Self::Request,
-    ) -> Result<Self::Output, Self::Error>;
+    ) -> impl Future<Output = Result<Self::Output, Self::Error>> + Send;
 }
 
 /// Some dispatchers may require taking ownership of the session.
 /// This trait is meant to enable that.
 /// If the session isn't taken, it will be properly closed
-#[async_trait]
 pub trait TakeableCommandDispatcher: Send + Sync {
     type Output: Send;
     type InnerError: Send;
@@ -36,13 +33,12 @@ pub trait TakeableCommandDispatcher: Send + Sync {
 
     fn key() -> String;
 
-    fn get_request(&self) -> Self::Request;
+    fn get_request(&self) -> &Self::Request;
 
-    async fn dispatch(
+    fn dispatch(
         self,
         session: &mut Option<Session>,
-        request: Self::Request,
-    ) -> Result<Self::Output, DispatcherError<Self::InnerError>>;
+    ) -> impl Future<Output = Result<Self::Output, DispatcherError<Self::InnerError>>> + Send;
 }
 
 #[derive(Error, Debug)]
@@ -53,7 +49,6 @@ pub enum DispatcherError<Error> {
     Other(#[from] Error),
 }
 
-#[async_trait]
 impl<D> TakeableCommandDispatcher for D
 where
     D: CommandDispatcher,
@@ -66,17 +61,16 @@ where
         Self::key()
     }
 
-    fn get_request(&self) -> Self::Request {
+    fn get_request(&self) -> &Self::Request {
         self.get_request()
     }
 
     async fn dispatch(
         self,
         session: &mut Option<Session>,
-        request: Self::Request,
     ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session) = session {
-            Ok(self.dispatch(session, request).await?)
+            Ok(self.dispatch(session).await?)
         } else {
             Err(DispatcherError::NoneSession)
         }

@@ -70,7 +70,6 @@ pub enum AvailableVersionError {
     ReadError(#[from] SessionReadError),
 }
 
-#[async_trait]
 impl CommandDispatcher for AvailableVersionDispatcher {
     type Request = UpdateChannel;
     type Error = AvailableVersionError;
@@ -80,15 +79,11 @@ impl CommandDispatcher for AvailableVersionDispatcher {
         AvailableVersionHandler::key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        self.channel.clone()
+    fn get_request(&self) -> &Self::Request {
+        &self.channel
     }
 
-    async fn dispatch(
-        self,
-        session: &mut Session,
-        _request: Self::Request,
-    ) -> Result<Self::Output, Self::Error> {
+    async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {
         Ok(session.read_object().await?)
     }
 }

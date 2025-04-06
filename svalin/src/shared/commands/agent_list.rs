@@ -153,7 +153,6 @@ pub enum UpdateAgentListError {
     VerifyItemError(anyhow::Error),
 }
 
-#[async_trait]
 impl CommandDispatcher for UpdateAgentList {
     type Output = ();
     type Error = UpdateAgentListError;
@@ -164,9 +163,11 @@ impl CommandDispatcher for UpdateAgentList {
         AgentListHandler::key()
     }
 
-    fn get_request(&self) -> Self::Request {}
+    fn get_request(&self) -> &Self::Request {
+        &()
+    }
 
-    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<(), Self::Error> {
+    async fn dispatch(self, session: &mut Session) -> Result<(), Self::Error> {
         let cancel2 = self.cancel.clone();
         let result = self
             .cancel

@@ -116,7 +116,6 @@ pub struct RequestJoin {
     pub confirm_code_channel: oneshot::Sender<String>,
 }
 
-#[async_trait]
 impl TakeableCommandDispatcher for RequestJoin {
     type Output = AgentInitPayload;
 
@@ -128,14 +127,13 @@ impl TakeableCommandDispatcher for RequestJoin {
         JoinRequestHandler::key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        ()
+    fn get_request(&self) -> &Self::Request {
+        &()
     }
 
     async fn dispatch(
         self,
         session: &mut Option<Session>,
-        _: Self::Request,
     ) -> Result<Self::Output, DispatcherError<RequestJoinError>> {
         if let Some(mut session) = session.take() {
             let join_code: String = session

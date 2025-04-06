@@ -88,7 +88,6 @@ pub struct AcceptJoin<'a> {
     pub upstream: &'a Certificate,
 }
 
-#[async_trait]
 impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
     type Output = Certificate;
     type InnerError = anyhow::Error;
@@ -99,14 +98,13 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
         JoinAcceptHandler::key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        ()
+    fn get_request(&self) -> &Self::Request {
+        &()
     }
 
     async fn dispatch(
         self,
         session: &mut Option<Session>,
-        _: Self::Request,
     ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session) = session.take() {
             let confirm_code_result =

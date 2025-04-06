@@ -52,7 +52,6 @@ pub enum PingError {
     ConvertTimestampError(TryFromIntError),
 }
 
-#[async_trait]
 impl CommandDispatcher for Ping {
     type Output = Duration;
     type Error = PingError;
@@ -63,15 +62,11 @@ impl CommandDispatcher for Ping {
         ping_key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        ()
+    fn get_request(&self) -> &Self::Request {
+        &()
     }
 
-    async fn dispatch(
-        self,
-        session: &mut Session,
-        _: Self::Request,
-    ) -> Result<Duration, Self::Error> {
+    async fn dispatch(self, session: &mut Session) -> Result<Duration, Self::Error> {
         let ping = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")

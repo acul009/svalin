@@ -518,7 +518,6 @@ pub enum LoginDispatcherError {
     WrongPassword,
 }
 
-#[async_trait]
 impl TakeableCommandDispatcher for Login {
     type Output = LoginSuccess;
     type InnerError = LoginDispatcherError;
@@ -529,14 +528,13 @@ impl TakeableCommandDispatcher for Login {
         LoginHandler::key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        ()
+    fn get_request(&self) -> &Self::Request {
+        &()
     }
 
     async fn dispatch(
         self,
         session: &mut Option<Session>,
-        _: Self::Request,
     ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(mut session) = session.take() {
             let tls_client_nonce = Nonce::generate();

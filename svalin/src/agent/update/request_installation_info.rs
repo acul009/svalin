@@ -74,7 +74,6 @@ pub enum InstallationInfoError {
     ReadError(#[from] SessionReadError),
 }
 
-#[async_trait]
 impl CommandDispatcher for InstallationInfoDispatcher {
     type Request = ();
     type Output = ();
@@ -84,15 +83,11 @@ impl CommandDispatcher for InstallationInfoDispatcher {
         InstallationInfoHandler::key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        ()
+    fn get_request(&self) -> &Self::Request {
+        &()
     }
 
-    async fn dispatch(
-        self,
-        session: &mut Session,
-        _request: Self::Request,
-    ) -> Result<Self::Output, Self::Error> {
+    async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {
         let send = self.send;
         loop {
             tokio::select! {

@@ -109,7 +109,6 @@ pub struct E2EDispatcher<'b> {
     pub credentials: &'b PermCredentials,
 }
 
-#[async_trait]
 impl<'b> TakeableCommandDispatcher for E2EDispatcher<'b> {
     type Output = (
         Box<dyn SessionTransportReader>,
@@ -123,14 +122,13 @@ impl<'b> TakeableCommandDispatcher for E2EDispatcher<'b> {
         e2e_key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        ()
+    fn get_request(&self) -> &Self::Request {
+        &()
     }
 
     async fn dispatch(
         self,
         session: &mut Option<Session>,
-        _: Self::Request,
     ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session_ready) = session.take() {
             debug!("encrypting session");

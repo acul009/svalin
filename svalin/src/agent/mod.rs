@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow};
@@ -39,7 +38,7 @@ const BASE_CONFIG_KEY: &[u8] = b"base_config";
 
 impl Agent {
     #[instrument]
-    pub async fn open(cancel: CancellationToken) -> Result<Arc<Agent>> {
+    pub async fn open(cancel: CancellationToken) -> Result<Agent> {
         debug!("opening agent configuration");
 
         let tree = Self::open_db().context("failed to open DB").unwrap();
@@ -75,24 +74,24 @@ impl Agent {
 
         debug!("connection to server established");
 
-        Ok(Arc::new(Agent {
+        Ok(Agent {
             credentials: credentials,
             root_certificate: config.root_certificate,
             rpc: rpc,
             cancel,
-        }))
+        })
     }
 
     pub fn certificate(&self) -> &Certificate {
         self.credentials.get_certificate()
     }
 
-    pub async fn run(self: &Arc<Self>) -> Result<()> {
+    pub async fn run(&self) -> Result<()> {
         let permission_handler = AgentPermissionHandler::new(self.root_certificate.clone());
 
         let e2e_commands = HandlerCollection::new(permission_handler.clone());
 
-        let updater = Updater::new(self.cancel.clone(), self.clone()).await?;
+        let updater = Updater::new(self.cancel.clone()).await?;
 
         e2e_commands
             .chain()

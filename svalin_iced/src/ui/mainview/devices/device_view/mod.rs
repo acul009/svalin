@@ -125,7 +125,17 @@ impl DeviceView {
     }
 
     pub fn dialog(&self) -> Option<crate::Element<Message>> {
-        self.tunnel_opener.dialog().mapopt(Message::TunnelOpener)
+        if let Some(dialog) = self.tunnel_opener.dialog().mapopt(Message::TunnelOpener) {
+            Some(dialog)
+        } else if let Some(dialog) = self
+            .update_installer
+            .dialog()
+            .mapopt(Message::UpdateInstaller)
+        {
+            Some(dialog)
+        } else {
+            None
+        }
     }
 
     pub fn subscription(&self) -> iced::Subscription<Message> {

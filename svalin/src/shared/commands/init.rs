@@ -94,7 +94,6 @@ pub enum InitError {
     WriteConfirmError(SessionWriteError),
 }
 
-#[async_trait]
 impl CommandDispatcher for Init {
     type Output = (PermCredentials, Certificate);
     type Request = Certificate;
@@ -104,15 +103,11 @@ impl CommandDispatcher for Init {
         InitHandler::key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        self.root.get_certificate().clone()
+    fn get_request(&self) -> &Self::Request {
+        self.root.get_certificate()
     }
 
-    async fn dispatch(
-        self,
-        session: &mut Session,
-        _: Self::Request,
-    ) -> Result<Self::Output, Self::Error> {
+    async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {
         debug!("sending init request");
 
         let raw_request: String = session

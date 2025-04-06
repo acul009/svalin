@@ -72,7 +72,6 @@ pub struct Deauthenticate;
 #[derive(Debug, thiserror::Error)]
 pub enum DeauthenticateError {}
 
-#[async_trait]
 impl TakeableCommandDispatcher for Deauthenticate {
     type Output = Session;
     type InnerError = DeauthenticateError;
@@ -83,14 +82,13 @@ impl TakeableCommandDispatcher for Deauthenticate {
         deauth_key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        ()
+    fn get_request(&self) -> &Self::Request {
+        &()
     }
 
     async fn dispatch(
         self,
         session: &mut Option<Session>,
-        _: Self::Request,
     ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session) = session.take() {
             Ok(session)

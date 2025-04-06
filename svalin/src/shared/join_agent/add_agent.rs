@@ -84,22 +84,21 @@ pub struct AddAgent<'a> {
     pub agent: &'a SignedObject<PublicAgentData>,
 }
 
-#[async_trait]
 impl<'a> CommandDispatcher for AddAgent<'a> {
     type Output = ();
     type Error = anyhow::Error;
 
     type Request = &'a SignedObject<PublicAgentData>;
 
-    fn get_request(&self) -> Self::Request {
-        self.agent
+    fn get_request(&self) -> &Self::Request {
+        &self.agent
     }
 
     fn key() -> String {
         AddAgentHandler::key()
     }
 
-    async fn dispatch(self, session: &mut Session, _: Self::Request) -> Result<Self::Output> {
+    async fn dispatch(self, session: &mut Session) -> Result<Self::Output> {
         session.read_object::<Result<(), AddAgentError>>().await??;
 
         Ok(())

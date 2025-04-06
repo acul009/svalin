@@ -1,5 +1,4 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use svalin_rpc::{
     rpc::{
         command::{dispatcher::CommandDispatcher, handler::CommandHandler},
@@ -27,7 +26,6 @@ pub enum TcpForwardDispatcherError {
     CopyError(std::io::Error),
 }
 
-#[async_trait]
 impl CommandDispatcher for TcpForwardDispatcher {
     type Output = ();
     type Error = TcpForwardDispatcherError;
@@ -38,15 +36,11 @@ impl CommandDispatcher for TcpForwardDispatcher {
         TcpForwardHandler::key()
     }
 
-    fn get_request(&self) -> Self::Request {
-        self.target.clone()
+    fn get_request(&self) -> &Self::Request {
+        &self.target
     }
 
-    async fn dispatch(
-        mut self,
-        session: &mut Session,
-        _request: Self::Request,
-    ) -> Result<Self::Output, Self::Error> {
+    async fn dispatch(mut self, session: &mut Session) -> Result<Self::Output, Self::Error> {
         session
             .read_object::<Result<(), TcpForwardError>>()
             .await
