@@ -4,15 +4,17 @@ use crate::Element;
 use iced::{
     Length, Task,
     alignment::Vertical,
+    padding,
     widget::{button, column, container, row, stack, text, text_input},
 };
 use init_server::InitServer;
 use login::LoginDialog;
 use svalin::client::{Client, FirstConnect, Init, Login};
+use svalin_pki::sha2::digest::typenum::Le;
 
 use super::{
     types::error_display_info::ErrorDisplayInfo,
-    widgets::{dialog, form, loading},
+    widgets::{dialog, form, icon, loading},
 };
 
 mod init_server;
@@ -252,19 +254,25 @@ impl ProfilePicker {
                             .on_press(Message::SelectProfile(p.clone()))
                             .width(Length::Fill)
                             .height(Length::Fill),
-                        button(text("🗑️").height(Length::Fill).center())
+                        button(icon::delete().size(20).height(Length::Fill).center())
                             .on_press(Message::DeleteProfile(p.clone()))
-                            .width(50)
+                            .width(60)
                             .height(Length::Fill)
                     ]
-                    .height(60)
+                    .padding(10)
+                    .spacing(10)
+                    .height(80)
                     .into()
                 }));
 
                 let overlay = container(
-                    button(text(t!("profile-picker.add")))
-                        .padding(10)
-                        .on_press(Message::AddProfile(String::new())),
+                    button(
+                        row![icon::add().size(30), text(t!("profile-picker.add"))]
+                            .align_y(Vertical::Center)
+                            .spacing(10)
+                            .padding([0, 10]),
+                    )
+                    .on_press(Message::AddProfile(String::new())),
                 )
                 .align_bottom(Length::Fill)
                 .align_right(Length::Fill)

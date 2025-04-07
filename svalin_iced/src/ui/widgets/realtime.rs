@@ -1,6 +1,6 @@
 use iced::{
-    widget::{column, container, row, text},
     Length, Padding,
+    widget::{column, container, row, text},
 };
 use iced_aw::card;
 use svalin::client::device::RemoteLiveData;
@@ -23,11 +23,15 @@ impl<'a> RealtimeDisplay<'a> {
 impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Message> {
     fn from(value: RealtimeDisplay) -> Self {
         let content: Element<Message> = match value.realtime {
-            RemoteLiveData::Unavailable => text(t!("realtime.live-unavailable"))
-                .width(Length::Fill)
-                .center()
+            RemoteLiveData::Unavailable => {
+                container(text(t!("realtime.live-unavailable")).center())
+                    .padding(20)
+                    .width(Length::Fill)
+                    .into()
+            }
+            RemoteLiveData::Pending => container(loading(t!("realtime.connecting")))
+                .height(200)
                 .into(),
-            RemoteLiveData::Pending => loading(t!("realtime.connecting")).into(),
             RemoteLiveData::Ready(realtime) => column![
                 card(
                     text(t!("realtime.cpu")),
@@ -43,17 +47,19 @@ impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Mes
                 .padding(10.into()),
                 card(
                     text(t!("realtime.memory")),
-                    column![percent_display(
-                        0.0..=(realtime.memory.total as f32),
-                        realtime.memory.used as f32
-                    )
-                    .label(t!("realtime.ram"))
-                    .subinfo(text!(
-                        "{} / {} M",
-                        realtime.memory.used / 1024 / 1024,
-                        realtime.memory.total / 1024 / 1024
-                    ))
-                    .bar()]
+                    column![
+                        percent_display(
+                            0.0..=(realtime.memory.total as f32),
+                            realtime.memory.used as f32
+                        )
+                        .label(t!("realtime.ram"))
+                        .subinfo(text!(
+                            "{} / {} M",
+                            realtime.memory.used / 1024 / 1024,
+                            realtime.memory.total / 1024 / 1024
+                        ))
+                        .bar()
+                    ]
                     .push_maybe(if realtime.swap.total > 0 {
                         Some(
                             percent_display(

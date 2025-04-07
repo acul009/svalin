@@ -1,0 +1,11 @@
+# fonts/example-icons.toml
+module = "ui::widgets::icon"
+
+[glyphs]
+edit = "fontawesome-pencil"
+save = "fontawesome-floppy"
+delete = "fontawesome-trash"
+add = "entypo-plus"
+device = "fontawesome-desktop"
+tunnel = "entypo-switch"
+back = "fontawesome-left-open"

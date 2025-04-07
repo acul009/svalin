@@ -111,6 +111,9 @@ impl TunnelUi {
     }
 
     pub fn view(&self) -> crate::Element<Message> {
+        if self.tunnels.is_empty() {
+            return container(text(t!("tunnel.no_tunnels"))).padding(20).into();
+        }
         column(self.tunnels.iter().map(|(item, tunnels)| {
             column![
                 container(text(&item.public_data.name))

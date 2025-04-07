@@ -11,7 +11,10 @@ use iced::{
 use svalin::client::{Client, device::Device};
 use svalin_pki::Certificate;
 
-use crate::{ui::MapOpt, util::watch_recipe::WatchRecipe};
+use crate::{
+    ui::{MapOpt, widgets::icon},
+    util::watch_recipe::WatchRecipe,
+};
 
 mod add_device;
 mod device_view;
@@ -122,17 +125,20 @@ impl Devices {
             State::DeviceView(device_view) => device_view.view().map(Message::DeviceView),
             State::List => stack![
                 container(
-                    button(text(t!("device_list.add")))
-                        .padding(10)
-                        .on_press(Message::NewDevice),
+                    button(
+                        row![icon::add().size(30), text(t!("device_list.add"))]
+                            .align_y(Vertical::Center)
+                            .spacing(10)
+                            .padding([0, 10])
+                    )
+                    .on_press(Message::NewDevice)
                 )
                 .align_bottom(Length::Fill)
                 .align_right(Length::Fill)
                 .padding(30),
-                self.client
-                    .device_list()
-                    .iter()
-                    .fold(column!(), |col, device| {
+                self.client.device_list().iter().fold(
+                    column!().padding(10).spacing(10),
+                    |col, device| {
                         let device = device.1.clone();
                         let name = device.item().public_data.name.clone();
                         let color = match device.item().is_online {
@@ -143,21 +149,24 @@ impl Devices {
                         col.push(
                             button(
                                 row![
-                                    text("X")
-                                        .width(50)
-                                        .height(Length::Fill)
-                                        .style(move |_| { text::Style { color: Some(color) } })
-                                        .center(),
-                                    text(name).height(Length::Fill).align_y(Vertical::Center)
+                                    icon::device()
+                                        .size(30)
+                                        .width(60)
+                                        .style(move |_| { text::Style { color: Some(color) } }),
+                                    text(name)
                                 ]
+                                .align_y(Vertical::Center)
                                 .width(Length::Fill)
-                                .height(Length::Fill),
+                                .height(Length::Fill)
+                                .padding([0, 10])
+                                .spacing(10),
                             )
-                            .on_press(Message::ShowDevice(device))
                             .height(50)
-                            .width(Length::Fill),
+                            .width(Length::Fill)
+                            .on_press(Message::ShowDevice(device)),
                         )
-                    })
+                    }
+                )
             ]
             .into(),
         }

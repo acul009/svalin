@@ -8,7 +8,7 @@ use iced::{
 use svalin::client::Client;
 use tunnel::TunnelUi;
 
-use super::MapOpt;
+use super::{MapOpt, widgets::icon};
 
 mod devices;
 mod tunnel;
@@ -104,12 +104,9 @@ impl MainView {
         .unwrap_or_else(|| iced::widget::horizontal_space().into());
 
         let actions = row![
-            button(text("T").center().height(Length::Fill))
-                .on_press(Message::Context(Context::Tunnel))
+            button(icon::tunnel().size(30).center())
                 .height(Length::Fill)
-                .width(40),
-            button(text("2").center().height(Length::Fill))
-                .on_press(Message::Context(Context::Test))
+                .on_press(Message::Context(Context::Tunnel))
                 .height(Length::Fill)
                 .width(40),
         ]

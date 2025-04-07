@@ -70,5 +70,17 @@ tunnel:
   input:
     remote_host: Remote Host and Port
   open: Open
+  no_tunnels: There are no open tunnels yet!
 device_list:
   add: Add Device
+device:
+  update:
+    loading-status: Loading update status...
+    status-unavailable: Update Status unavailable!
+    updating: Device is currently updating...
+    current-version: Agent Version
+    method: Installation Method
+    start: Update Now
+    available-version: Available Update
+    unsupported: This installation Method does not support remote updates.
+    title: Agent Update

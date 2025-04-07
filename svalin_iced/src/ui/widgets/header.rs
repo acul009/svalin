@@ -1,9 +1,11 @@
 use iced::{
-    widget::{self, button, row, text},
     Length,
+    widget::{self, button, row, text},
 };
 
 use crate::Element;
+
+use super::icon;
 
 pub struct Header<'a, Message> {
     content: Element<'a, Message>,
@@ -36,11 +38,16 @@ impl<'a, Message: Clone + 'static> From<Header<'a, Message>> for Element<'a, Mes
         let mut row = match header.on_back {
             None => row!(),
             Some(on_back) => row![
-                button(text("<").width(Length::Fill).height(Length::Fill).center())
-                    .on_press(on_back)
-                    .height(Length::Fill)
-                    .width(40),
-                widget::vertical_rule(2)
+                button(
+                    icon::back()
+                        .size(20)
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .center()
+                )
+                .on_press(on_back)
+                .height(Length::Fill)
+                .width(40),
             ]
             .padding(5)
             .spacing(5),

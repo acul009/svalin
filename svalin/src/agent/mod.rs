@@ -91,7 +91,9 @@ impl Agent {
 
         let e2e_commands = HandlerCollection::new(permission_handler.clone());
 
-        let updater = Updater::new(self.cancel.clone()).await?;
+        let updater = Updater::new(self.cancel.clone())
+            .await
+            .context("error creating updater")?;
 
         e2e_commands
             .chain()
@@ -121,7 +123,10 @@ impl Agent {
             .await
             .add(DeauthenticateHandler::new(public_commands));
 
-        self.rpc.serve(server_commands).await
+        self.rpc
+            .serve(server_commands)
+            .await
+            .context("error serving rpc")
     }
 
     pub async fn init_with(data: AgentInitPayload) -> Result<()> {

@@ -1,4 +1,4 @@
-use ui::UI;
+use ui::{UI, widgets::icon};
 
 pub mod ui;
 pub mod util;
@@ -16,6 +16,7 @@ fn main() {
     iced::daemon(UI::title, UI::update, UI::view)
         .subscription(UI::subscription)
         .theme(|_, _| iced::Theme::Dark)
+        .font(icon::FONT)
         .antialiasing(true)
         .run_with(UI::start)
         .unwrap();

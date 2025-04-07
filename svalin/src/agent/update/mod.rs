@@ -1,4 +1,4 @@
-use std::{fmt::Display, io, sync::Arc};
+use std::{error::Error, fmt::Display, io, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -158,14 +158,17 @@ impl Updater {
         }
         #[cfg(not(windows))]
         {
-            let status = tokio::process::Command::new("dpkg")
+            match tokio::process::Command::new("dpkg")
                 .arg("--version")
                 .status()
-                .await?;
-
-            // Todo: check if it was actually installed via dpkg
-
-            Ok(status.success())
+                .await
+            {
+                Ok(status) => Ok(status.success()),
+                Err(err) => match err.kind() {
+                    io::ErrorKind::NotFound => Ok(false),
+                    _ => Err(err.into()),
+                },
+            }
         }
     }
 

@@ -183,7 +183,8 @@ impl UpdateInstaller {
                             }
                             PossibleUpdate::Version(version) => Some(Element::from(
                                 row![
-                                    container(text("device.update.possible-version")).width(200),
+                                    container(text(t!("device.update.available-version") + ":"))
+                                        .width(200),
                                     text(version.as_str())
                                 ]
                                 .spacing(10),

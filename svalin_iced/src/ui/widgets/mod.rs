@@ -9,6 +9,7 @@ pub mod dialog;
 pub mod error_display;
 pub mod form;
 pub mod header;
+pub mod icon;
 pub mod loading;
 pub mod percent_display;
 pub mod progress_circle;

@@ -33,3 +33,6 @@ tokio-util = "0.7.13"
 futures = "0.3.31"
 uuid = "1.15.1"
 rust-i18n = "3.1.3"
+
+[build-dependencies]
+iced_fontello = "0.13"
