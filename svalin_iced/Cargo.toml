@@ -15,7 +15,7 @@ frozen_term = { path = "../frozen_term" }
 
 anyhow = "1.0.96"
 futures-util = "0.3.31"
-tokio = { version = "1.43.0", features = ["full"] }
+tokio = { version = "1.43.1", features = ["full"] }
 totp-rs = { version = "5.6.0", features = ["qr", "gen_secret"] }
 lyon_algorithms = "1.0.5"
 iced = { version = "0.13.1", features = [

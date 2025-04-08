@@ -11,7 +11,7 @@ async-trait = "0.1.86"
 futures = "0.3.31"
 postcard = "1.1.1"
 serde = "1.0.218"
-tokio = { version = "1.43.0", features = ["full"] }
+tokio = { version = "1.43.1", features = ["full"] }
 svalin_macros = { path = "../svalin_macros" }
 svalin_pki = { path = "../svalin_pki", features = ["rustls"] }
 quinn = { version = "0.11.6", features = ["ring"] }

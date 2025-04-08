@@ -19,7 +19,7 @@ serde = "1.0.218"
 spki = { version = "0.7.3", features = ["alloc", "fingerprint", "sha2", "std"] }
 thiserror = "2.0.11"
 time = "0.3.37"
-tokio = { version = "1.43.0", features = ["full", "test-util"] }
+tokio = { version = "1.43.1", features = ["full", "test-util"] }
 tracing = "0.1.41"
 x509-parser = { version = "0.16.0", features = ["ring", "validate", "verify"] }
 zeroize = { version = "1.8.1", features = ["aarch64", "derive", "std"] }
