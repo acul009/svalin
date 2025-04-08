@@ -3,12 +3,23 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use svalin_rpc::rpc::{
-    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    command::{
+        dispatcher::CommandDispatcher,
+        handler::{CommandHandler, PermissionPrecursor},
+    },
     session::{Session, SessionReadError},
 };
 use tokio_util::sync::CancellationToken;
 
+use crate::permissions::Permission;
+
 use super::{UpdateChannel, Updater};
+
+impl From<&PermissionPrecursor<StartUpdateHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<StartUpdateHandler>) -> Self {
+        Permission::RootOnlyPlaceholder
+    }
+}
 
 pub struct StartUpdateHandler {
     updater: Arc<Updater>,

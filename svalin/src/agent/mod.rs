@@ -17,6 +17,7 @@ use tracing::{debug, instrument};
 use update::Updater;
 use update::request_available_version::AvailableVersionHandler;
 use update::request_installation_info::InstallationInfoHandler;
+use update::start_agent_update::StartUpdateHandler;
 
 mod init;
 pub mod update;
@@ -103,7 +104,8 @@ impl Agent {
             .add(RemoteTerminalHandler)
             .add(TcpForwardHandler)
             .add(InstallationInfoHandler::new(updater.clone()))
-            .add(AvailableVersionHandler::new(updater));
+            .add(AvailableVersionHandler::new(updater.clone()))
+            .add(StartUpdateHandler::new(updater));
 
         let public_commands = HandlerCollection::new(permission_handler.clone());
 
