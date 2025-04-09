@@ -143,7 +143,7 @@ impl UpdateInstaller {
                 .into(),
             RemoteLiveData::Ready(install_info) => {
                 if install_info.currently_updating {
-                    loading(t!("device.update.updating")).height(200).into();
+                    return loading(t!("device.update.updating")).height(200).into();
                 }
 
                 let mut col = column![
