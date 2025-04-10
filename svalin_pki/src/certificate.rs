@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use serde::de::Visitor;
-use serde::{de, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de};
 use spki::FingerprintBytes;
 use thiserror::Error;
 use x509_parser::error::X509Error;
@@ -125,6 +125,7 @@ impl Certificate {
     }
 
     pub fn fingerprint(&self) -> FingerprintBytes {
+        // Todo: use rcgen::Certificate::key_identifier instead
         let hash = ring::digest::digest(&ring::digest::SHA512_256, &self.data.der);
 
         hash.as_ref()[0..32].try_into().unwrap()

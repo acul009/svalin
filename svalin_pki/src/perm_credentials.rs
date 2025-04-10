@@ -1,41 +1,25 @@
 use std::{fmt::Debug, sync::Arc};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
-use ring::signature::{Ed25519KeyPair, KeyPair};
+use ring::signature::Ed25519KeyPair;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::ZeroizeOnDrop;
 
 use crate::{
-    Certificate, CertificateParseError, CertificateRequest,
-    encrypt::EncryptedData,
+    Certificate, CertificateParseError, CertificateRequest, Keypair,
+    keypair::DecodeKeypairError,
     signed_message::{CanSign, CanVerify},
 };
 
 #[derive(Debug)]
 struct PermCredentialData {
-    keypair: Ed25519KeyPair, // Actualy is used below in a trait, compiler is just stupid
-    raw_keypair: Vec<u8>,
+    keypair: Keypair,
     certificate: Certificate,
 }
 
 impl ZeroizeOnDrop for PermCredentialData {}
-
-impl Drop for PermCredentialData {
-    fn drop(&mut self) {
-        self.zeroize();
-    }
-}
-
-impl Zeroize for PermCredentialData {
-    fn zeroize(&mut self) {
-        self.raw_keypair.zeroize();
-
-        // cannot zeroize ring keypair :(
-        // self.keypair.zeroize();
-    }
-}
 
 #[derive(Clone)]
 pub struct PermCredentials {
@@ -66,10 +50,10 @@ pub enum CreateCredentialsError {
 pub enum DecodeCredentialsError {
     #[error("error decoding credentials: {0}")]
     DecodeStructError(#[from] postcard::Error),
-    #[error("error decoding keypair: {0}")]
+    #[error("error parsing certificate: {0}")]
     ParseCertificateError(#[from] CertificateParseError),
-    #[error("error decrypting credentials: {0}")]
-    DecryptError(#[from] crate::encrypt::DecryptError),
+    #[error("error parsing keypair: {0}")]
+    DecodeKeypairError(#[from] DecodeKeypairError),
     #[error("error creating credentials: {0}")]
     CreateCredentialsError(#[from] CreateCredentialsError),
 }
@@ -90,7 +74,7 @@ pub enum ApproveRequestError {
 
 impl PermCredentials {
     pub(crate) fn new(
-        raw_keypair: Vec<u8>,
+        keypair: Keypair,
         certificate: Certificate,
     ) -> Result<Self, CreateCredentialsError> {
         // TODO: check if keypair and certificate belong together
@@ -102,23 +86,16 @@ impl PermCredentials {
         //     bail!(crate::Error::KeyMismatch)
         // }
 
-        let keypair = Ed25519KeyPair::from_pkcs8(&raw_keypair)
-            .map_err(CreateCredentialsError::KeyRejectError)?;
-
         Ok(PermCredentials {
             data: Arc::new(PermCredentialData {
                 keypair,
-                raw_keypair,
                 certificate,
             }),
         })
     }
 
     pub async fn to_bytes(&self, password: Vec<u8>) -> Result<Vec<u8>> {
-        let encrypted_keypair =
-            EncryptedData::encrypt_with_password(&self.data.raw_keypair, password)
-                .await
-                .context("Failed to encrypt keypair")?;
+        let encrypted_keypair = self.data.keypair.to_bytes(password).await?;
         let on_disk = CredentialOnDisk {
             encrypted_keypair,
             raw_cert: self.data.certificate.to_der().to_owned(),
@@ -139,10 +116,7 @@ impl PermCredentials {
 
         debug!("decrypting credentials with password");
 
-        let decrypted_keypair =
-            EncryptedData::decrypt_with_password(&on_disk.encrypted_keypair, password)
-                .await
-                .map_err(DecodeCredentialsError::DecryptError)?;
+        let decrypted_keypair = Keypair::from_bytes(&on_disk.encrypted_keypair, password).await?;
 
         debug!("credentials decrypted");
 
@@ -154,30 +128,29 @@ impl PermCredentials {
         &self.data.certificate
     }
 
-    pub fn get_key_bytes(&self) -> &[u8] {
-        &self.data.raw_keypair
+    pub fn get_der_key_bytes(&self) -> &[u8] {
+        &self.data.keypair.get_der_key_bytes()
     }
 
     pub fn approve_request(
         &self,
         request: CertificateRequest,
     ) -> Result<Certificate, ApproveRequestError> {
-        let ca_keypair = rcgen::KeyPair::from_der(&self.data.raw_keypair)
-            .map_err(ApproveRequestError::KeypairParseError)?;
         let ca_params =
-            rcgen::CertificateParams::from_ca_cert_der(self.data.certificate.to_der(), ca_keypair)
+            rcgen::CertificateParams::from_ca_cert_der(&self.data.certificate.to_der().into())
                 .map_err(ApproveRequestError::CreateCaParamsError)?;
 
-        let ca = rcgen::Certificate::from_params(ca_params)
+        let ca = ca_params
+            .self_signed(self.data.keypair.rcgen())
             .map_err(ApproveRequestError::CreateCaError)?;
 
-        let new_cert_der = request
+        let rcgen_cert = request
             .csr
-            .serialize_der_with_signer(&ca)
+            .signed_by(&ca, self.data.keypair.rcgen())
             .map_err(ApproveRequestError::SignCertError)?;
 
-        let new_cert =
-            Certificate::from_der(new_cert_der).map_err(ApproveRequestError::ParseNewCertError)?;
+        let new_cert = Certificate::from_der(rcgen_cert.der().to_vec())
+            .map_err(ApproveRequestError::ParseNewCertError)?;
 
         Ok(new_cert)
     }
@@ -185,13 +158,13 @@ impl PermCredentials {
 
 impl CanSign for PermCredentials {
     fn borrow_keypair(&self) -> &Ed25519KeyPair {
-        &self.data.keypair
+        &self.data.keypair.borrow_keypair()
     }
 }
 
 impl CanVerify for PermCredentials {
     fn borrow_public_key(&self) -> &[u8] {
-        self.data.keypair.public_key().as_ref()
+        self.data.keypair.borrow_public_key()
     }
 }
 
@@ -223,7 +196,10 @@ mod test {
             .await
             .unwrap();
 
-        assert_eq!(copy.data.raw_keypair, original.data.raw_keypair);
+        assert_eq!(
+            copy.data.keypair.spki_hash(),
+            original.data.keypair.spki_hash()
+        );
         assert_eq!(copy.data.certificate, original.data.certificate);
     }
 }

@@ -1,8 +1,8 @@
 use anyhow::Result;
-use rcgen::CertificateSigningRequest;
+use rcgen::CertificateSigningRequestParams;
 
 pub struct CertificateRequest {
-    pub(crate) csr: CertificateSigningRequest,
+    pub(crate) csr: CertificateSigningRequestParams,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -13,10 +13,10 @@ pub enum CertificateRequestParseError {
 
 impl CertificateRequest {
     pub fn from_string(string: String) -> Result<Self, CertificateRequestParseError> {
-        let csr = CertificateSigningRequest::from_pem(&string)
+        let csr = CertificateSigningRequestParams::from_pem(&string)
             .map_err(CertificateRequestParseError::ParseError)?;
 
-        // Todo: verify subject format and check if UUID is in use
+        // Todo: verify subject format and check if key based id is in use
 
         Ok(Self { csr })
     }

@@ -1,6 +1,6 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
-use ring::signature::{Ed25519KeyPair, VerificationAlgorithm, ED25519};
+use ring::signature::{ED25519, Ed25519KeyPair, VerificationAlgorithm};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

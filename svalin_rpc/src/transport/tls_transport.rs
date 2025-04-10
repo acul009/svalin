@@ -71,7 +71,7 @@ where
         )];
 
         let key_der =
-            rustls::pki_types::PrivateKeyDer::try_from(credentials.get_key_bytes().to_owned())
+            rustls::pki_types::PrivateKeyDer::try_from(credentials.get_der_key_bytes().to_owned())
                 .map_err(|err| TlsClientError::ParseKeyDerError(err.to_string()))?;
 
         let config = rustls::ClientConfig::builder()
@@ -119,7 +119,7 @@ where
         )];
 
         let key_der =
-            rustls::pki_types::PrivateKeyDer::try_from(credentials.get_key_bytes().to_owned())
+            rustls::pki_types::PrivateKeyDer::try_from(credentials.get_der_key_bytes().to_owned())
                 .map_err(|err| TlsServerError::ParseKeyDerError(err.to_string()))?;
 
         let config = rustls::ServerConfig::builder()
