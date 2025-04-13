@@ -45,11 +45,6 @@ async fn run() {
     match app.command {
         Command::Server { address } => {
             if let Ok(addr) = address.parse() {
-                let tree = sled::open("./server.sled")
-                    .expect("failed to open server db")
-                    .open_tree("default")
-                    .expect("failed to open default tree");
-
                 let mutex = Arc::new(Mutex::<Option<Server>>::new(None));
                 let mutex2 = mutex.clone();
 
@@ -62,7 +57,6 @@ async fn run() {
                     // start_server
                     let server = Server::build()
                         .addr(addr)
-                        .tree(tree)
                         .cancel(cancel2)
                         .start_server()
                         .await

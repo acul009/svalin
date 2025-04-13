@@ -350,14 +350,19 @@ impl TakeableCommandHandler for LoginHandler {
 
             let username = strong_username.username.clone();
 
-            let (pake_server, client_info) = pake_server
-                .generate_client_info_strong(
-                    strong_username.username,
-                    strong_username.blinded,
-                    self.user_store.as_ref(),
-                    password_hash::rand_core::OsRng,
-                )
-                .map_err(|err| anyhow!(err))?;
+            let user_store = self.user_store.clone();
+
+            let (pake_server, client_info) = tokio::task::spawn_blocking(move || {
+                pake_server
+                    .generate_client_info_strong(
+                        strong_username.username,
+                        strong_username.blinded,
+                        user_store.as_ref(),
+                        password_hash::rand_core::OsRng,
+                    )
+                    .map_err(|err| anyhow!(err))
+            })
+            .await??;
 
             let mut client_info = ClientInfo::try_from(client_info)?;
             if client_info.hash_params.is_empty() {
@@ -419,7 +424,8 @@ impl TakeableCommandHandler for LoginHandler {
 
             let user = self
                 .user_store
-                .get_user_by_username(&username)?
+                .get_user_by_username(&username)
+                .await?
                 .ok_or_else(|| anyhow!("failed to get user by username"))?;
 
             let totp_encrypted: Vec<u8> =

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO agents (fingerprint, data) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "94270a9a48d9eebdfe1ac58cd5c6c011bbd0a5151637dd89797b98c3d03fbcb4"
+}

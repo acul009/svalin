@@ -171,7 +171,7 @@ impl TakeableCommandDispatcher for RemoteTerminalDispatcher {
     }
 
     async fn dispatch(
-        mut self,
+        self,
         session: &mut Option<Session>,
     ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session) = session.take() {
@@ -210,7 +210,7 @@ impl TakeableCommandDispatcher for RemoteTerminalDispatcher {
             });
 
             Ok(RemoteTerminal {
-                input: input,
+                input,
                 output: tokio::sync::Mutex::new(output_recv),
                 joinset,
             })

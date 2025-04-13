@@ -168,7 +168,7 @@ impl Keypair {
             alg: self.alg.clone(),
         };
 
-        let mut bytes = postcard::to_allocvec(&saved)?;
+        let mut bytes = postcard::to_stdvec(&saved)?;
 
         let encrypted_keypair = EncryptedData::encrypt_with_password(&bytes, password)
             .await

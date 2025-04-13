@@ -5,47 +5,35 @@ use tokio_util::sync::CancellationToken;
 
 use super::{Server, ServerConfig};
 
-pub struct ServerConfigBuilder<A, B, C> {
+pub struct ServerConfigBuilder<A, B> {
     addr: A,
-    tree: B,
-    cancel: C,
+    cancel: B,
 }
 
-pub(super) fn new() -> ServerConfigBuilder<(), (), ()> {
+pub(super) fn new() -> ServerConfigBuilder<(), ()> {
     ServerConfigBuilder {
         addr: (),
-        tree: (),
         cancel: (),
     }
 }
 
-impl<A, B, C> ServerConfigBuilder<A, B, C> {
-    pub fn addr(self, addr: SocketAddr) -> ServerConfigBuilder<SocketAddr, B, C> {
+impl<A, B> ServerConfigBuilder<A, B> {
+    pub fn addr(self, addr: SocketAddr) -> ServerConfigBuilder<SocketAddr, B> {
         ServerConfigBuilder {
-            addr: addr,
-            tree: self.tree,
+            addr,
             cancel: self.cancel,
         }
     }
 
-    pub fn tree(self, tree: sled::Tree) -> ServerConfigBuilder<A, sled::Tree, C> {
+    pub fn cancel(self, cancel: CancellationToken) -> ServerConfigBuilder<A, CancellationToken> {
         ServerConfigBuilder {
             addr: self.addr,
-            tree,
-            cancel: self.cancel,
-        }
-    }
-
-    pub fn cancel(self, cancel: CancellationToken) -> ServerConfigBuilder<A, B, CancellationToken> {
-        ServerConfigBuilder {
-            addr: self.addr,
-            tree: self.tree,
-            cancel: cancel,
+            cancel,
         }
     }
 }
 
-impl ServerConfigBuilder<SocketAddr, sled::Tree, CancellationToken> {
+impl ServerConfigBuilder<SocketAddr, CancellationToken> {
     pub async fn start_server(self) -> Result<Server> {
         let config = self.to_config();
 
@@ -55,7 +43,6 @@ impl ServerConfigBuilder<SocketAddr, sled::Tree, CancellationToken> {
     fn to_config(self) -> ServerConfig {
         ServerConfig {
             addr: self.addr,
-            tree: self.tree,
             cancelation_token: self.cancel,
         }
     }

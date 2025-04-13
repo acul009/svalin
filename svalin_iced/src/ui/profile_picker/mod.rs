@@ -4,13 +4,11 @@ use crate::Element;
 use iced::{
     Length, Task,
     alignment::Vertical,
-    padding,
     widget::{button, column, container, row, stack, text, text_input},
 };
 use init_server::InitServer;
 use login::LoginDialog;
 use svalin::client::{Client, FirstConnect, Init, Login};
-use svalin_pki::sha2::digest::typenum::Le;
 
 use super::{
     types::error_display_info::ErrorDisplayInfo,
@@ -52,6 +50,8 @@ pub enum Message {
     LoginDialog(login::Message),
     Login(Arc<Login>),
     Profile(Arc<Client>),
+    Profiles(Vec<String>),
+    None,
 }
 
 pub enum Action {
@@ -97,6 +97,7 @@ impl ProfilePicker {
 
     pub fn update(&mut self, message: Message) -> Action {
         match message {
+            Message::None => Action::None,
             Message::InitServer(message) => {
                 if let State::InitServer(init_server) = &mut self.state {
                     let action = init_server.update(message);
@@ -142,9 +143,16 @@ impl ProfilePicker {
 
                 Action::None
             }
-            Message::Reset => {
-                let profiles = Client::list_profiles().unwrap_or_else(|_| Vec::new());
-
+            Message::Reset => Action::Run(Task::future(async move {
+                match Client::list_profiles().await {
+                    Ok(profiles) => Message::Profiles(profiles),
+                    Err(err) => Message::Error(ErrorDisplayInfo::new(
+                        Arc::new(err),
+                        t!("profile-picker.error.list"),
+                    )),
+                }
+            })),
+            Message::Profiles(profiles) => {
                 if profiles.is_empty() {
                     self.add_profile(String::new());
                 } else {
@@ -168,14 +176,16 @@ impl ProfilePicker {
             Message::ConfirmDelete(profile) => {
                 self.confirm_delete = None;
 
-                if let Err(error) = Client::remove_profile(&profile) {
-                    self.state = State::Error(ErrorDisplayInfo::new(
-                        Arc::new(error),
-                        t!("profile-picker.error.delete"),
-                    ));
-                }
-
-                Action::Run(Task::done(Message::Reset))
+                Action::Run(Task::future(async move {
+                    if let Err(error) = Client::remove_profile(&profile).await {
+                        Message::Error(ErrorDisplayInfo::new(
+                            Arc::new(error),
+                            t!("profile-picker.error.delete"),
+                        ))
+                    } else {
+                        Message::None
+                    }
+                }))
             }
             Message::CancelDelete => {
                 self.confirm_delete = None;
@@ -189,7 +199,7 @@ impl ProfilePicker {
                     self.state = State::Loading(t!("profile-picker.unlocking").to_string());
 
                     Action::Run(Task::future(async move {
-                        match Client::open_profile_string(profile, password.into_bytes()).await {
+                        match Client::open_profile(&profile, password.into_bytes()).await {
                             Ok(client) => Message::Profile(Arc::new(client)),
                             Err(err) => Message::Error(ErrorDisplayInfo::new(
                                 Arc::new(err),

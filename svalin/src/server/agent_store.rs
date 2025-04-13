@@ -2,21 +2,19 @@ use std::sync::Arc;
 
 use anyhow::{Ok, Result};
 use futures::future::try_join_all;
+use sqlx::SqlitePool;
 use svalin_pki::{
     Certificate, get_current_timestamp,
     signed_object::{SignedObject, VerifiedObject},
     verifier::exact::ExactVerififier,
 };
 use tokio::sync::broadcast;
-use totp_rs::qrcodegen_image::image::EncodableLayout;
 
 use crate::shared::join_agent::PublicAgentData;
 
-const AGENT_PREFIX: &[u8] = b"agents/";
-
 #[derive(Debug)]
 pub struct AgentStore {
-    tree: sled::Tree,
+    pool: SqlitePool,
     broadcast: broadcast::Sender<AgentUpdate>,
     verifier: ExactVerififier,
 }
@@ -27,10 +25,10 @@ pub enum AgentUpdate {
 }
 
 impl AgentStore {
-    pub fn open(tree: sled::Tree, root: Certificate) -> Arc<Self> {
+    pub fn open(pool: SqlitePool, root: Certificate) -> Arc<Self> {
         let (broadcast, _) = broadcast::channel(10);
         Arc::new(Self {
-            tree,
+            pool,
             broadcast,
             verifier: ExactVerififier::new(root),
         })
@@ -40,18 +38,16 @@ impl AgentStore {
         &self,
         fingerprint: &[u8; 32],
     ) -> Result<Option<SignedObject<PublicAgentData>>> {
-        let mut key = AGENT_PREFIX.to_vec();
-        key.extend(fingerprint);
+        let fingerprint = fingerprint.to_vec();
 
-        let agent = self
-            .tree
-            .get(&key)?
-            .map(|agent| postcard::from_bytes::<SignedObject<PublicAgentData>>(&agent));
+        let agent_data = sqlx::query!("SELECT data FROM agents WHERE fingerprint = ?", fingerprint)
+            .fetch_optional(&self.pool)
+            .await?;
 
-        match agent {
+        match agent_data {
             None => Ok(None),
-            Some(agent) => {
-                let agent = agent?;
+            Some(agent_data) => {
+                let agent: SignedObject<PublicAgentData> = postcard::from_bytes(&agent_data.data)?;
 
                 Ok(Some(
                     agent
@@ -68,11 +64,16 @@ impl AgentStore {
             .verify(&self.verifier, get_current_timestamp())
             .await?;
 
-        let mut key = AGENT_PREFIX.to_vec();
-        key.extend(agent.cert.fingerprint());
+        let fingerprint = agent.cert.fingerprint().to_vec();
+        let agent_data = postcard::to_stdvec(agent.pack())?;
 
-        self.tree
-            .insert(key, postcard::to_extend(&agent.pack(), Vec::new())?)?;
+        sqlx::query!(
+            "INSERT INTO agents (fingerprint, data) VALUES (?, ?)",
+            fingerprint,
+            agent_data
+        )
+        .execute(&self.pool)
+        .await?;
 
         self.broadcast.send(AgentUpdate::Add(Arc::new(agent)))?;
 
@@ -80,13 +81,14 @@ impl AgentStore {
     }
 
     pub async fn list_agents(&self) -> Result<Vec<VerifiedObject<PublicAgentData>>> {
-        try_join_all(self.tree.scan_prefix(AGENT_PREFIX).map(|v| async move {
-            let (_, agent) = v?;
-            let agent = postcard::from_bytes::<SignedObject<PublicAgentData>>(agent.as_bytes())?;
+        let agent_data = sqlx::query!("SELECT data FROM agents")
+            .fetch_all(&self.pool)
+            .await?;
 
-            Ok(agent
-                .verify(&self.verifier, get_current_timestamp())
-                .await?)
+        try_join_all(agent_data.into_iter().map(|row| async move {
+            let agent: SignedObject<PublicAgentData> = postcard::from_bytes(&row.data)?;
+
+            agent.verify(&self.verifier, get_current_timestamp()).await
         }))
         .await
     }

@@ -13,10 +13,7 @@ use svalin::{
 
 use crate::{
     Element,
-    ui::{
-        types::error_display_info::ErrorDisplayInfo,
-        widgets::{dialog, loading},
-    },
+    ui::{types::error_display_info::ErrorDisplayInfo, widgets::loading},
     util::watch_recipe::WatchRecipe,
 };
 

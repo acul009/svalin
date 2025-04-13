@@ -1,4 +1,6 @@
 target/
 *.jammdb
 *.sled
+*.sqlite
 flamegraph.svg
+svalin/test_data

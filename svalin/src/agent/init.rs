@@ -1,13 +1,12 @@
 use std::time::Duration;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
-use crate::agent::BASE_CONFIG_KEY;
 use crate::shared::commands::public_server_status::GetPutblicStatus;
 use crate::shared::join_agent::AgentInitPayload;
 use crate::shared::join_agent::request_handler::RequestJoin;
@@ -16,10 +15,8 @@ use super::Agent;
 
 impl Agent {
     pub async fn init(address: String) -> Result<WaitingForInit> {
-        let tree = Self::open_db()?;
-
-        if tree.get(BASE_CONFIG_KEY)?.is_some() {
-            return Err(anyhow!("Agent already initialized"));
+        if Self::get_config().await?.is_some() {
+            return Err(anyhow!("Agent is already initialized"));
         }
 
         debug!("try connecting to {address}");
@@ -142,11 +139,15 @@ impl WaitForConfirm {
     pub async fn wait_for_confirm(self) -> Result<Agent> {
         let init_data = self.success_channel.await?;
 
-        Agent::init_with(init_data).await?;
+        Agent::init_with(init_data)
+            .await
+            .context("error saving init data")?;
 
         tokio::time::sleep(Duration::from_secs(3)).await;
 
-        let agent = Agent::open(CancellationToken::new()).await?;
+        let agent = Agent::open(CancellationToken::new())
+            .await
+            .context("error opening agent after init")?;
 
         Ok(agent)
     }

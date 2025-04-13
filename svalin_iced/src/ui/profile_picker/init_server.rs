@@ -224,7 +224,7 @@ impl InitServer {
                                         )),
                                         Ok(profile) => {
                                             let client = match Client::open_profile(
-                                                profile,
+                                                &profile,
                                                 password.into(),
                                             )
                                             .await

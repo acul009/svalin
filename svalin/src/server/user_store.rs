@@ -1,12 +1,13 @@
 use std::{fmt::Debug, sync::Arc};
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use aucpace::StrongDatabase;
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::ParamsString;
 use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
 use svalin_pki::Certificate;
-use totp_rs::{TOTP, qrcodegen_image::image::EncodableLayout};
+use totp_rs::TOTP;
 use tracing::{debug, instrument};
 
 #[derive(Serialize, Deserialize)]
@@ -28,56 +29,34 @@ pub struct StoredUser {
     pub verifier: RistrettoPoint,
 }
 
-const USER_DATA_PREFIX: &[u8] = b"users/data/";
-const USER_NAMES_PREFIX: &[u8] = b"users/names/";
-
 #[derive(Debug)]
 pub struct UserStore {
-    tree: sled::Tree,
+    pool: sqlx::SqlitePool,
 }
 
 impl UserStore {
-    pub fn open(tree: sled::Tree) -> Arc<Self> {
-        Arc::new(Self { tree })
+    pub fn open(pool: SqlitePool) -> Arc<Self> {
+        Arc::new(Self { pool })
     }
 
-    pub fn get_user(&self, fingerprint: &[u8; 32]) -> Result<Option<StoredUser>> {
-        let mut key = USER_DATA_PREFIX.to_vec();
-        key.extend(fingerprint);
-
-        let user = self
-            .tree
-            .get(key)?
-            .map(|user| postcard::from_bytes::<StoredUser>(&user));
-
-        match user {
-            Some(user) => Ok(Some(user?)),
+    pub async fn get_user(&self, fingerprint: &[u8; 32]) -> Result<Option<StoredUser>> {
+        let fingerprint = fingerprint.to_vec();
+        let user_data = sqlx::query!("SELECT data FROM users WHERE fingerprint = ?", fingerprint)
+            .fetch_optional(&self.pool)
+            .await?;
+        match user_data {
             None => Ok(None),
+            Some(user_data) => Ok(Some(postcard::from_bytes(&user_data.data)?)),
         }
     }
 
-    pub fn get_user_by_username(&self, username: &[u8]) -> Result<Option<StoredUser>> {
-        let user_data = self
-            .tree
-            .transaction::<_, _, anyhow::Error>(|tx| {
-                let mut username_key = USER_NAMES_PREFIX.to_vec();
-                username_key.extend(username);
-
-                match tx.get(username_key)? {
-                    None => Ok(None),
-                    Some(fingerprint) => {
-                        let mut key = USER_DATA_PREFIX.to_vec();
-                        key.extend(fingerprint.as_bytes());
-
-                        Ok(tx.get(key)?)
-                    }
-                }
-            })
-            .map_err(|err| anyhow!(err))?;
-
+    pub async fn get_user_by_username(&self, username: &[u8]) -> Result<Option<StoredUser>> {
+        let user_data = sqlx::query!("SELECT data FROM users WHERE username = ?", username)
+            .fetch_optional(&self.pool)
+            .await?;
         match user_data {
             None => Ok(None),
-            Some(data) => Ok(Some(postcard::from_bytes(data.as_bytes())?)),
+            Some(user_data) => Ok(Some(postcard::from_bytes(&user_data.data)?)),
         }
     }
 
@@ -106,25 +85,16 @@ impl UserStore {
 
         let fingerprint = user.certificate.fingerprint().to_vec();
 
-        let mut key = USER_DATA_PREFIX.to_vec();
-        key.extend(&fingerprint);
-
-        let mut username_key = USER_NAMES_PREFIX.to_vec();
-        username_key.extend(&user.username);
-
         let userdata = postcard::to_extend(&user, Vec::new())?;
 
-        self.tree
-            .transaction::<_, _, anyhow::Error>(|tx| {
-                tx.insert(key.clone(), userdata.clone())?;
-
-                tx.insert(username_key.clone(), fingerprint.clone())?;
-
-                Ok(())
-            })
-            .map_err(|err| anyhow!(err))?;
-
-        self.tree.flush_async().await?;
+        sqlx::query!(
+            "INSERT INTO users (fingerprint, username, data) VALUES (?, ?, ?)",
+            fingerprint,
+            user.username,
+            userdata
+        )
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }
@@ -139,8 +109,8 @@ impl StrongDatabase for UserStore {
         &self,
         username: &[u8],
     ) -> Option<(Self::PasswordVerifier, Self::Exponent, ParamsString)> {
-        let user = self
-            .get_user_by_username(username)
+        let user = tokio::runtime::Handle::current()
+            .block_on(self.get_user_by_username(username))
             .map_err(|err| tracing::error!("{}", err))
             .ok()??;
 

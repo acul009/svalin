@@ -214,6 +214,25 @@ impl<'de> Visitor<'de> for CertificateVisitor {
     {
         self.visit_byte_buf(v.to_vec())
     }
+
+    fn visit_borrowed_bytes<E>(self, v: &'de [u8]) -> std::result::Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        self.visit_byte_buf(v.to_vec())
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        let mut der = Vec::new();
+        while let Some(byte) = seq.next_element::<u8>()? {
+            der.push(byte);
+        }
+
+        self.visit_byte_buf(der)
+    }
 }
 
 impl Ord for Certificate {
@@ -233,5 +252,34 @@ impl Eq for Certificate {}
 impl Hash for Certificate {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.data.der.hash(state);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::Keypair;
+
+    #[test]
+    fn test_certificate_serialization() {
+        let cert = Keypair::generate()
+            .to_self_signed_cert()
+            .unwrap()
+            .get_certificate()
+            .clone();
+        let serialized = postcard::to_stdvec(&cert).unwrap();
+        let deserialized = postcard::from_bytes(&serialized).unwrap();
+        assert_eq!(cert, deserialized);
+    }
+
+    #[test]
+    fn test_certificate_serialization_json() {
+        let cert = Keypair::generate()
+            .to_self_signed_cert()
+            .unwrap()
+            .get_certificate()
+            .clone();
+        let serialized = serde_json::to_vec_pretty(&cert).unwrap();
+        let deserialized = serde_json::from_slice(&serialized).unwrap();
+        assert_eq!(cert, deserialized);
     }
 }

@@ -20,23 +20,14 @@ async fn integration_tests() {
     // delete test dbs
     let _ = std::fs::remove_file("./client.jammdb");
     let _ = std::fs::remove_dir_all("./client.sled");
-    let _ = std::fs::remove_file("./server_test.jammdb");
-    let _ = std::fs::remove_dir_all("./server_test.sled");
-    let _ = std::fs::remove_file("./agent.jammdb");
-    let _ = std::fs::remove_dir_all("./agent.sled");
+    let _ = std::fs::remove_dir_all("./test_data");
 
     let addr = "0.0.0.0:1234".to_socket_addrs().unwrap().next().unwrap();
-    let tree = sled::open("./server_test.sled")
-        .expect("failed to open server db")
-        .open_tree("default")
-        .expect("failed to open default tree");
-
     let (send_server, recv_server) = oneshot::channel();
 
     tokio::spawn(async move {
         let server = Server::build()
             .addr(addr)
-            .tree(tree)
             .cancel(CancellationToken::new())
             .start_server()
             .await
@@ -65,7 +56,9 @@ async fn integration_tests() {
     };
 
     // delete to test login
-    Client::remove_profile("admin@localhost:1234".into()).unwrap();
+    Client::remove_profile("admin@localhost:1234".into())
+        .await
+        .unwrap();
 
     // ===== TEST WRONG PASSWORD =====
 

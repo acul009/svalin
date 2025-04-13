@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display, io, sync::Arc};
+use std::{fmt::Display, io, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 use tokio::{

@@ -1,6 +1,6 @@
-use std::{collections::BTreeMap, path::PathBuf};
+use std::collections::BTreeMap;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
     Certificate, PermCredentials,
@@ -13,7 +13,7 @@ use tracing::{debug, error};
 
 use crate::{
     client::tunnel_manager::TunnelManager, shared::commands::agent_list::UpdateAgentList,
-    verifier::upstream_verifier::UpstreamVerifier,
+    util::location::Location, verifier::upstream_verifier::UpstreamVerifier,
 };
 
 use super::Client;
@@ -43,82 +43,38 @@ impl Profile {
             raw_credentials,
         }
     }
+
+    pub fn name(&self) -> String {
+        format!("{}@{}", self.username, self.upstream_address)
+    }
 }
 
 impl Client {
-    pub fn list_profiles() -> Result<Vec<String>> {
-        let db = Self::open_db()?;
-
-        db.tree_names()
-            .into_iter()
-            .map(|name| String::from_utf8(name.to_vec()).map_err(|err| anyhow!(err)))
-            .collect()
+    async fn data_dir() -> Result<Location> {
+        Location::user_data_dir()?
+            .push("client")
+            .ensure_exists()
+            .await
     }
 
-    fn open_db() -> Result<sled::Db> {
-        let mut path = Self::get_config_dir_path()?;
-        path.push("client.sled");
-
-        let db = sled::open(path)?;
-        Ok(db)
+    async fn profile_dir(profile_name: &str) -> Result<Location> {
+        Ok(Self::data_dir().await?.push(profile_name))
     }
 
-    fn get_config_dir_path() -> Result<PathBuf> {
-        #[cfg(test)]
-        {
-            Ok(std::env::current_dir()?)
-        }
+    pub async fn list_profiles() -> Result<Vec<String>> {
+        let location = Self::data_dir().await?;
 
-        #[cfg(not(test))]
-        {
-            let path = Self::get_general_config_dir_path()?;
+        let mut folders = tokio::fs::read_dir(&location).await?;
 
-            // check if config dir exists
-            if !path.exists() {
-                std::fs::create_dir_all(&path)?;
-            }
+        let mut profiles = Vec::new();
 
-            Ok(path)
-        }
-    }
-
-    fn get_general_config_dir_path() -> Result<PathBuf> {
-        #[cfg(target_os = "windows")]
-        {
-            let appdata = std::env::var("APPDATA")
-                .context("Failed to retrieve APPDATA environment variable")?;
-
-            let path = PathBuf::from(appdata);
-
-            Ok(path)
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            match std::env::var_os("XDG_CONFIG_HOME") {
-                Some(xdg_config_home) => {
-                    let mut config_dir = PathBuf::from(xdg_config_home);
-                    config_dir.push("svalin");
-                    config_dir.push("client");
-                    Ok(config_dir)
-                }
-                None => {
-                    // If XDG_CONFIG_HOME is not set, use the default ~/.config directory
-                    match std::env::var_os("HOME") {
-                        Some(home_dir) => {
-                            let mut config_dir = PathBuf::from(home_dir);
-                            config_dir.push(".config");
-                            config_dir.push("svalin");
-                            config_dir.push("client");
-                            Ok(config_dir)
-                        }
-                        None => Err(anyhow!(
-                            "Neither XDG_CONFIG_HOME nor HOME environment variables are set."
-                        )),
-                    }
-                }
+        while let Some(entry) = folders.next_entry().await? {
+            if entry.file_type().await?.is_dir() {
+                profiles.push(entry.file_name().to_string_lossy().into_owned());
             }
         }
+
+        Ok(profiles)
     }
 
     pub async fn add_profile(
@@ -131,8 +87,6 @@ impl Client {
     ) -> Result<String> {
         let raw_credentials = credentials.to_bytes(password).await?;
 
-        let profile_name = format!("{username}@{upstream_address}");
-
         let profile = Profile::new(
             username,
             upstream_address,
@@ -141,47 +95,57 @@ impl Client {
             raw_credentials,
         );
 
-        if Self::list_profiles()?.contains(&profile_name) {
+        let profile_name = profile.name();
+
+        if Self::list_profiles().await?.contains(&profile_name) {
             return Err(anyhow!("profile already exists"));
         }
 
-        let db = Self::open_db()?;
-        let tree = db.open_tree(&profile_name)?;
-        tree.insert("profile", postcard::to_extend(&profile, Vec::new())?)?;
+        Self::save_profile(&profile).await?;
 
         Ok(profile_name)
     }
 
-    pub fn remove_profile(profile_key: &str) -> Result<()> {
-        let db = Self::open_db()?;
-        db.drop_tree(profile_key)?;
+    async fn save_profile(profile: &Profile) -> Result<()> {
+        let location = Self::profile_dir(&profile.name())
+            .await?
+            .ensure_exists()
+            .await?
+            .push("profile.json");
+
+        let json = serde_json::to_string_pretty(profile)?;
+        tokio::fs::write(location, json).await?;
+
         Ok(())
     }
 
-    pub async fn open_profile_string(profile_key: String, password: Vec<u8>) -> Result<Self> {
-        Self::open_profile(profile_key, password).await
+    async fn get_profile(profile_name: &str) -> Result<Option<Profile>> {
+        let location = Self::profile_dir(profile_name).await?.push("profile.json");
+
+        if tokio::fs::try_exists(&location).await? {
+            let json = tokio::fs::read_to_string(location).await?;
+            let profile = serde_json::from_str(&json)?;
+
+            Ok(Some(profile))
+        } else {
+            Ok(None)
+        }
     }
 
-    pub async fn open_profile(profile_key: String, password: Vec<u8>) -> Result<Self> {
-        let available_scopes = Self::list_profiles()?;
+    pub async fn remove_profile(profile_name: &str) -> Result<()> {
+        let location = Self::profile_dir(profile_name).await?;
 
-        debug!("Available scopes: {:?}", available_scopes);
+        tokio::fs::remove_dir_all(location).await?;
 
-        if !available_scopes.contains(&profile_key) {
-            return Err(anyhow!("Profile not found"));
-        }
+        Ok(())
+    }
 
-        debug!("Opening profile {}", profile_key);
-        let db = Self::open_db()?;
-        let tree = db.open_tree(profile_key)?;
-        let profile = tree
-            .get("profile")?
-            .map(|profile| postcard::from_bytes::<Profile>(&profile));
+    pub async fn open_profile(profile_key: &str, password: Vec<u8>) -> Result<Self> {
+        let profile = Self::get_profile(&profile_key).await?;
 
         debug!("Data from profile ready");
 
         if let Some(profile) = profile {
-            let profile = profile?;
             debug!("unlocking profile");
             let identity = PermCredentials::from_bytes(&profile.raw_credentials, password).await?;
 
@@ -241,7 +205,7 @@ impl Client {
 
             Ok(client)
         } else {
-            Err(anyhow!("Profile is empty - database is inconsistent"))
+            Err(anyhow!("Profile is empty"))
         }
     }
 }

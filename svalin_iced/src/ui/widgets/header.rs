@@ -1,6 +1,6 @@
 use iced::{
     Length,
-    widget::{self, button, row, text},
+    widget::{button, row},
 };
 
 use crate::Element;

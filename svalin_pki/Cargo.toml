@@ -23,3 +23,6 @@ tokio = { version = "1.44.2", features = ["full", "test-util"] }
 tracing = "0.1.41"
 x509-parser = { version = "0.17.0", features = ["ring", "validate", "verify"] }
 zeroize = { version = "1.8.1", features = ["aarch64", "derive", "std"] }
+
+[dev-dependencies]
+serde_json = { version = "1.0.140"}

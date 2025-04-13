@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow};
@@ -27,6 +26,8 @@ use crate::permissions::agent_permission_handler::AgentPermissionHandler;
 use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::commands::terminal::RemoteTerminalHandler;
 use crate::shared::join_agent::AgentInitPayload;
+use crate::util::key_storage::KeySource;
+use crate::util::location::Location;
 use crate::verifier::upstream_verifier::UpstreamVerifier;
 
 pub struct Agent {
@@ -35,25 +36,24 @@ pub struct Agent {
     credentials: PermCredentials,
     cancel: CancellationToken,
 }
-const BASE_CONFIG_KEY: &[u8] = b"base_config";
 
 impl Agent {
     #[instrument]
     pub async fn open(cancel: CancellationToken) -> Result<Agent> {
         debug!("opening agent configuration");
 
-        let tree = Self::open_db().context("failed to open DB").unwrap();
-
-        let raw_config = tree
-            .get(BASE_CONFIG_KEY)?
-            .ok_or_else(|| anyhow!("agent not yet configured"))?;
-
-        let config: AgentConfig = postcard::from_bytes(&raw_config)?;
+        let config = Self::get_config()
+            .await
+            .context("error loading config")?
+            .ok_or_else(|| anyhow!("agent is not yet initialized"))?;
 
         debug!("decrypting agent credentials");
 
-        let credentials =
-            Self::decrypt_credentials(config.encrypted_credentials, tree.clone()).await?;
+        let credentials = config
+            .key_source
+            .decrypt_credentials(&config.encrypted_credentials)
+            .await
+            .context("error decrypting credentials")?;
 
         debug!("building upstream verifier");
 
@@ -71,14 +71,15 @@ impl Agent {
             verifier,
             cancel.clone(),
         )
-        .await?;
+        .await
+        .context("error connecting rpc")?;
 
         debug!("connection to server established");
 
         Ok(Agent {
-            credentials: credentials,
+            credentials,
             root_certificate: config.root_certificate,
-            rpc: rpc,
+            rpc,
             cancel,
         })
     }
@@ -132,122 +133,51 @@ impl Agent {
     }
 
     pub async fn init_with(data: AgentInitPayload) -> Result<()> {
-        let tree = Self::open_db()?;
+        let key_source = KeySource::generate_builtin()?;
 
         let config = AgentConfig {
             root_certificate: data.root,
             upstream_certificate: data.upstream,
-            encrypted_credentials: Self::encrypt_credentials(data.credentials, tree.clone())
-                .await?,
+            encrypted_credentials: key_source.encrypt_credentials(&data.credentials).await?,
             upstream_address: data.address,
+            key_source,
         };
 
-        if tree.get(BASE_CONFIG_KEY)?.is_some() {
-            return Err(anyhow!("Profile already exists"));
+        if Self::get_config().await?.is_some() {
+            return Err(anyhow!("Agent configuration already exists"));
         }
 
-        tree.insert(BASE_CONFIG_KEY, postcard::to_extend(&config, Vec::new())?)?;
-
-        tree.flush_async().await?;
+        Self::save_config(&config).await?;
 
         Ok(())
     }
 
-    fn open_db() -> Result<sled::Tree> {
-        let mut path = Self::get_config_dir_path()?;
-        path.push("client.sled");
-
-        Ok(sled::open(path)?.open_tree("default")?)
+    async fn data_dir() -> Result<Location> {
+        Location::system_data_dir()?
+            .push("agent")
+            .ensure_exists()
+            .await
     }
 
-    fn get_config_dir_path() -> Result<PathBuf> {
-        #[cfg(test)]
-        {
-            Ok(std::env::current_dir()?)
-        }
+    async fn config_path() -> Result<Location> {
+        Ok(Self::data_dir().await?.push("config.json"))
+    }
 
-        #[cfg(not(test))]
-        {
-            let mut path = Self::get_general_config_dir_path()?;
-
-            path.push("agent");
-
-            // check if config dir exists
-            if !path.exists() {
-                std::fs::create_dir_all(&path)?;
-            }
-
-            Ok(path)
+    async fn get_config() -> Result<Option<AgentConfig>> {
+        let location = Self::config_path().await?;
+        if tokio::fs::try_exists(&location).await? {
+            let config = tokio::fs::read(&location).await?;
+            Ok(Some(serde_json::from_slice(&config)?))
+        } else {
+            Ok(None)
         }
     }
 
-    #[cfg(not(test))]
-    fn get_general_config_dir_path() -> Result<PathBuf> {
-        #[cfg(target_os = "windows")]
-        {
-            use anyhow::Context;
-
-            let appdata = std::env::var("PROGRAMDATA")
-                .context("Failed to retrieve PROGRAMMDATA environment variable")?;
-
-            let mut path = PathBuf::from(appdata);
-
-            path.push("svalin");
-
-            Ok(path)
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            Ok(PathBuf::from("/var/lib/svalin/agent"))
-        }
-    }
-
-    async fn encrypt_credentials(
-        credentials: PermCredentials,
-        tree: sled::Tree,
-    ) -> Result<Vec<u8>> {
-        let db_key = "credential_key";
-
-        let key_source = tree
-            .get(db_key)?
-            .map(|key_source| postcard::from_bytes::<KeySource>(&key_source));
-
-        let key_source = match key_source {
-            None => {
-                let key_source = KeySource::BuiltIn(svalin_pki::generate_key()?.to_vec());
-
-                tree.insert(db_key, postcard::to_extend(&key_source, Vec::new())?)?;
-
-                key_source
-            }
-            Some(key_source) => key_source?,
-        };
-
-        let key = Self::source_to_key(key_source).await?;
-
-        credentials.to_bytes(key).await
-    }
-
-    async fn decrypt_credentials(
-        encrypted_credentials: Vec<u8>,
-        tree: sled::Tree,
-    ) -> Result<PermCredentials> {
-        let key_source = tree
-            .get("credential_key")?
-            .ok_or(anyhow!("no keysource saved in db"))?;
-
-        let key_source = postcard::from_bytes(&key_source)?;
-
-        let key = Self::source_to_key(key_source).await?;
-        debug!("Agent password loaded, decrypting...");
-        Ok(PermCredentials::from_bytes(&encrypted_credentials, key).await?)
-    }
-
-    async fn source_to_key(source: KeySource) -> Result<Vec<u8>> {
-        match source {
-            KeySource::BuiltIn(k) => Ok(k),
-        }
+    async fn save_config(config: &AgentConfig) -> Result<()> {
+        let location = Self::config_path().await?;
+        let config = serde_json::to_vec_pretty(config)?;
+        tokio::fs::write(&location, config).await?;
+        Ok(())
     }
 
     pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {
@@ -264,12 +194,5 @@ struct AgentConfig {
     upstream_certificate: Certificate,
     root_certificate: Certificate,
     encrypted_credentials: Vec<u8>,
-}
-
-/// The keysource enum is saved in the agent configuration and specifies how to
-/// load the key for decrypting the credentials This will enable the use of
-/// external key management systems should that be necessary one day
-#[derive(Serialize, Deserialize)]
-enum KeySource {
-    BuiltIn(Vec<u8>),
+    key_source: KeySource,
 }

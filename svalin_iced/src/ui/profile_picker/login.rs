@@ -123,7 +123,7 @@ impl LoginDialog {
                                     t!("profile-picker.error.login"),
                                 )),
                                 Ok(new_profile) => {
-                                    match Client::open_profile_string(new_profile, password).await {
+                                    match Client::open_profile(&new_profile, password).await {
                                         Ok(client) => Message::OpenProfile(Arc::new(client)),
                                         Err(e) => Message::Error(ErrorDisplayInfo::new(
                                             e.into(),

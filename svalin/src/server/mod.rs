@@ -6,6 +6,7 @@ use command_builder::SvalinCommandBuilder;
 use config_builder::ServerConfigBuilder;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use sqlx::{SqlitePool, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
 use svalin_pki::{Certificate, Keypair, PermCredentials, verifier::KnownCertificateVerifier};
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},
@@ -24,6 +25,7 @@ use crate::{
         init::InitHandler,
         public_server_status::{PublicStatus, PublicStatusHandler},
     },
+    util::{key_storage::KeySource, location::Location},
     verifier::{
         server_storage_verifier::ServerStorageVerifier, tls_optional_wrapper::TlsOptionalWrapper,
         verification_helper::VerificationHelper,
@@ -42,7 +44,6 @@ pub mod user_store;
 #[derive(Debug)]
 pub struct ServerConfig {
     addr: SocketAddr,
-    tree: sled::Tree,
     cancelation_token: CancellationToken,
 }
 
@@ -52,6 +53,7 @@ pub const INIT_SERVER_SHUTDOWN_COUNTDOWN: Duration = Duration::from_secs(1);
 pub struct Server {
     rpc: Arc<RpcServer>,
     config: ServerConfig,
+    pool: SqlitePool,
     tasks: TaskTracker,
 }
 
@@ -59,25 +61,75 @@ pub struct Server {
 struct BaseConfig {
     root_cert: Certificate,
     credentials: Vec<u8>,
+    key_source: KeySource,
     pseudo_data_seed: Vec<u8>,
 }
 
 impl Server {
-    pub fn build() -> ServerConfigBuilder<(), (), ()> {
+    pub fn build() -> ServerConfigBuilder<(), ()> {
         config_builder::new()
     }
 
+    async fn data_dir() -> Result<Location> {
+        Location::system_data_dir()?
+            .push("server")
+            .ensure_exists()
+            .await
+    }
+
+    async fn base_config_path() -> Result<Location> {
+        Ok(Self::data_dir().await?.push("base_config.json"))
+    }
+
+    async fn get_base_config() -> Result<Option<BaseConfig>> {
+        let location = Self::base_config_path().await?;
+        if tokio::fs::try_exists(&location).await? {
+            let config = tokio::fs::read(&location).await?;
+            Ok(Some(serde_json::from_slice(&config)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn save_base_config(config: &BaseConfig) -> Result<()> {
+        let location = Self::base_config_path().await?;
+        let config = serde_json::to_vec_pretty(config)?;
+        tokio::fs::write(&location, config).await?;
+        Ok(())
+    }
+
+    async fn open_db() -> Result<SqlitePool> {
+        let location = Self::data_dir().await?.push("db.sqlite");
+        let url = format!("{}", &location);
+
+        debug!("database_url: {}", &url);
+
+        if !tokio::fs::try_exists(location.as_path()).await? {
+            sqlx::Sqlite::create_database(&url).await?;
+        }
+
+        let pool = SqlitePoolOptions::new().connect(&url).await?;
+
+        sqlx::migrate!("migrations/server").run(&pool).await?;
+
+        Ok(pool)
+    }
+
     async fn start(config: ServerConfig) -> Result<Self> {
-        let base_config = config.tree.get("base_config")?.map(|config| {
-            postcard::from_bytes::<BaseConfig>(&config).context("failed to parse base config")
-        });
+        let base_config = Self::get_base_config()
+            .await
+            .context("error opening config")?;
+
+        debug!("opening DB");
+
+        let pool = Self::open_db().await.context("error opening db")?;
 
         debug!("creating socket");
 
         let socket = RpcServer::create_socket(config.addr).context("failed to create socket")?;
 
         let base_config = match base_config {
-            Some(conf) => conf?,
+            Some(conf) => conf,
             None => {
                 // initialize
 
@@ -93,24 +145,21 @@ impl Server {
                 // Sleep until the init server has shut down and released the Port
                 tokio::time::sleep(INIT_SERVER_SHUTDOWN_COUNTDOWN).await;
 
-                let key = Server::get_encryption_key(&config.tree)?;
-
                 let pseudo_data_seed: Vec<u8> = rand::rng()
                     .sample_iter(rand::distr::StandardUniform)
                     .take(32)
                     .collect();
 
+                let key_source = KeySource::generate_builtin()?;
+
                 let conf = BaseConfig {
                     root_cert: root,
-                    credentials: credentials.to_bytes(key).await?,
+                    credentials: key_source.encrypt_credentials(&credentials).await?,
                     pseudo_data_seed,
+                    key_source,
                 };
 
-                config
-                    .tree
-                    .insert("base_config", postcard::to_extend(&conf, Vec::new())?)?;
-
-                config.tree.flush_async().await?;
+                Self::save_base_config(&conf).await?;
 
                 conf
             }
@@ -118,15 +167,14 @@ impl Server {
 
         let root = base_config.root_cert;
 
-        let credentials = PermCredentials::from_bytes(
-            &base_config.credentials,
-            Server::get_encryption_key(&config.tree)?,
-        )
-        .await?;
+        let credentials = base_config
+            .key_source
+            .decrypt_credentials(&base_config.credentials)
+            .await?;
 
-        let user_store = UserStore::open(config.tree.clone());
+        let user_store = UserStore::open(pool.clone());
 
-        let agent_store = AgentStore::open(config.tree.clone(), root.clone());
+        let agent_store = AgentStore::open(pool.clone(), root.clone());
 
         let helper = VerificationHelper::new(root.clone(), user_store.clone());
 
@@ -143,8 +191,8 @@ impl Server {
         let command_builder = SvalinCommandBuilder {
             root_cert: root.clone(),
             server_cert: credentials.get_certificate().clone(),
-            user_store: user_store,
-            agent_store: agent_store,
+            user_store,
+            agent_store,
         };
 
         let tasks = TaskTracker::new();
@@ -158,25 +206,12 @@ impl Server {
             .start_server(socket)
             .await?;
 
-        Ok(Self { config, rpc, tasks })
-    }
-
-    fn get_encryption_key(tree: &sled::Tree) -> Result<Vec<u8>> {
-        let key = "server_encryption_key";
-        let saved_encryption_key = tree.get(key)?.map(|v| v.to_vec());
-
-        if let Some(key) = saved_encryption_key {
-            Ok(key)
-        } else {
-            let encryption_key: Vec<u8> = rand::rng()
-                .sample_iter(rand::distr::StandardUniform)
-                .take(32)
-                .collect();
-
-            tree.insert(key, encryption_key.clone())?;
-
-            Ok(encryption_key)
-        }
+        Ok(Self {
+            config,
+            rpc,
+            tasks,
+            pool,
+        })
     }
 
     async fn init_server(
@@ -227,12 +262,7 @@ impl Server {
 
         let result2 = timeout(timeout_duration, self.tasks.wait()).await;
 
-        self.config
-            .tree
-            .flush_async()
-            .await
-            .err()
-            .map(|err| error!("{}", err));
+        self.pool.close().await;
 
         match result1 {
             Err(e) => Err(e),
