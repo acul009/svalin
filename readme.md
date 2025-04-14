@@ -4,13 +4,13 @@
 
 > [!WARNING]
 > **This repository is not yet ready for production use.**
-> 
+>
 > A lot of this code is still being heavily worked, is missing security checks and has not been reviewed.
-> 
+>
 > The current focus is getting this behemoth of a project working in any state.
-> 
+>
 > Once the programm is usable, it's going to be time to slowly but surely improve everything.
-> 
+>
 > Feel free to browse the codebase and create issues for any problems you see.
 >
 > If you have questions or suggestions, you're also welcome to create an issue :)
@@ -109,7 +109,7 @@ Pre-Flight-Checklist:
 - [X] add graceful shutdown
 - [X] create a debian package
 - [X] create a docker image
-- [ ] add logic for login ( don't forget fake hashing parameters )
+- [X] add logic for login ( don't forget fake hashing parameters )
 - [ ] add remote terminal
 
 Svalin currently has 2 executables:
@@ -128,7 +128,8 @@ You'll find the executables and packages under the Releases section.
 
 ### Installing the server
 
-The server does not yet have an official installation method. A Debian package will come soon.
+Currently the server can be installed via a debian package.
+I would recommend using the docker image instead, but I'll need a bit more time before publishing one.
 
 You can start the server with the following command: `svalin server 0.0.0.0:<PORT>`
 Make sure the client and agents can reach the udp port you specified.
@@ -224,6 +225,12 @@ This crate contains the code for certificate generation and encryption.
 
 ### TBRHL (Transaction Based Rolling Hash Ledger)
 
+> [!Note]
+> I am not a cryptography expert, you might even say I'm the opposite.
+>
+> This is the best I can currently come up with.
+> I'm happy for any feedback or potentially better frameworks.
+
 This primitive (yet to be completed) is planned to be the base for svalin's integrity system.
 
 It's a log of transactions where each transaction contains the hash of the last one and is then signed by the entity creating the transaction.
@@ -312,7 +319,7 @@ You might be interested in this crate if you want to build something similar to 
 - [ ] Network Security System and Alerting
 - [ ] IPv6 Support
 - [ ] Group Configuration Managment
-- [ ] 
+- [ ]
 
 ## Svalin Network Architecture
 

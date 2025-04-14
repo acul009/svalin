@@ -1,25 +1,52 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use iced::{
     Task,
     widget::{center, text},
     window,
 };
+use svalin::shared::commands::terminal::RemoteTerminal;
+use terminal::TerminalWindow;
 
 use crate::Element;
 
+pub mod terminal;
+
+#[derive(Debug, Clone)]
 pub enum Message {
     Forwarded {
         id: window::Id,
-        message: WrappedMessage,
+        message: WindowMessage,
     },
+    None,
 }
 
 pub struct WindowHelper {
-    windows: BTreeMap<window::Id, WindowContent>,
+    windows: HashMap<window::Id, WindowContent>,
 }
 
 impl WindowHelper {
+    pub fn new() -> Self {
+        Self {
+            windows: HashMap::new(),
+        }
+    }
+
+    pub fn add_terminal(&mut self, terminal: RemoteTerminal) -> Task<Message> {
+        let (id, task) = Self::new_window();
+        
+        let terminal = TerminalWindow::
+        
+    }
+
+    fn new_window() -> (window::Id, Task<Message>) {
+        let (id, task) = window::open(window::Settings {
+            ..Default::default()
+        });
+
+        (id, task.map(|_| Message::None))
+    }
+
     pub fn view(&self, id: window::Id) -> Element<Message> {
         if let Some(window) = self.windows.get(&id) {
             window
@@ -46,22 +73,49 @@ impl WindowHelper {
             }
         }
     }
+
+    pub fn title(&self, window_id: window::Id) -> String {
+        if let Some(window) = self.windows.get(&window_id) {
+            window.title()
+        } else {
+            String::from("Window Error")
+        }
+    }
 }
 
-enum WrappedMessage {}
+#[derive(Debug, Clone)]
+pub enum WindowMessage {
+    Terminal(terminal::Message),
+}
 
-enum WindowContent {}
+pub enum WindowContent {
+    Terminal(terminal::TerminalWindow),
+    Todo,
+}
 
 impl WindowContent {
-    pub fn view(&self) -> Element<WrappedMessage> {
+    fn view(&self) -> Element<WindowMessage> {
         match self {
-            _ => todo!(),
+            Self::Terminal(terminal) => terminal.view().map(WindowMessage::Terminal),
+            Self::Todo => todo!(),
         }
     }
 
-    pub fn update(&mut self, message: WrappedMessage) -> Task<WrappedMessage> {
+    fn update(&mut self, message: WindowMessage) -> Task<WindowMessage> {
+        match message {
+            WindowMessage::Terminal(message) => {
+                if let Self::Terminal(terminal) = self {
+                    terminal.update(message);
+                }
+                Task::none()
+            }
+        }
+    }
+
+    pub fn title(&self) -> String {
         match self {
-            _ => todo!(),
+            Self::Terminal(terminal) => terminal.title(),
+            Self::Todo => String::from("Todo"),
         }
     }
 }

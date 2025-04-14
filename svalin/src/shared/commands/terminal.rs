@@ -116,28 +116,36 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
 }
 
 pub struct RemoteTerminal {
+    cancel: CancellationToken,
     input: mpsc::Sender<TerminalPacket>,
-    output: tokio::sync::Mutex<mpsc::Receiver<Vec<u8>>>,
+    output: mpsc::Receiver<Vec<u8>>,
     joinset: JoinSet<()>,
 }
 
 impl RemoteTerminal {
-    pub async fn write(&self, content: String) {
-        debug!("writing to remote terminal: {content}");
-        if let Err(err) = self.input.send(TerminalPacket::Input(content.into())).await {
-            tracing::error!("{err}");
-        }
+    pub async fn sender(&self) -> mpsc::Sender<TerminalPacket> {
+        self.input.clone()
     }
 
-    pub async fn resize(&self, size: TerminalSize) {
-        if let Err(err) = self.input.send(TerminalPacket::Resize(size)).await {
-            tracing::error!("{err}");
-        }
-    }
+    // pub async fn write(&self, content: Vec<u8>) {
+    //     debug!(
+    //         "writing to remote terminal: {}",
+    //         String::from_utf8_lossy(&content)
+    //     );
+    //     if let Err(err) = self.input.send(TerminalPacket::Input(content)).await {
+    //         tracing::error!("{err}");
+    //     }
+    // }
 
-    pub async fn read(&self) -> Result<Option<String>> {
-        match self.output.lock().await.recv().await {
-            Some(chunk) => Ok(Some(String::from_utf8(chunk)?)),
+    // pub async fn resize(&self, size: TerminalSize) {
+    //     if let Err(err) = self.input.send(TerminalPacket::Resize(size)).await {
+    //         tracing::error!("{err}");
+    //     }
+    // }
+
+    pub async fn read(&mut self) -> Result<Option<Vec<u8>>> {
+        match self.output.recv().await {
+            Some(chunk) => Ok(Some(chunk)),
             None => Ok(None),
         }
     }

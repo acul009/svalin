@@ -7,6 +7,7 @@ use iced::{
 use mainview::MainView;
 use profile_picker::ProfilePicker;
 use widgets::scaffold;
+use window_helper::WindowHelper;
 
 use crate::Element;
 
@@ -29,11 +30,13 @@ pub enum Message {
     Tab,
     ProfilePicker(profile_picker::Message),
     MainView(mainview::Message),
+    WindowHelper(window_helper::Message),
 }
 
 pub struct UI {
     screen: Screen,
     main_window_id: window::Id,
+    window_helper: WindowHelper,
 }
 
 impl UI {
@@ -51,6 +54,7 @@ impl UI {
             Self {
                 screen: Screen::ProfilePicker(screen),
                 main_window_id: id,
+                window_helper: WindowHelper::new(),
             },
             task,
         )
@@ -89,11 +93,19 @@ impl UI {
                 }
                 _ => Task::none(),
             },
+            Message::WindowHelper(message) => self
+                .window_helper
+                .update(message)
+                .map(Message::WindowHelper),
         }
     }
 
-    pub fn title(&self, _window_id: window::Id) -> String {
-        t!("app-title").to_string()
+    pub fn title(&self, window_id: window::Id) -> String {
+        if window_id == self.main_window_id {
+            t!("app-title").to_string()
+        } else {
+            self.window_helper.title(window_id)
+        }
     }
 
     pub fn view(&self, window_id: window::Id) -> Element<Message> {
@@ -128,7 +140,9 @@ impl UI {
                 .context_maybe(context)
                 .into()
         } else {
-            center(text("TODO")).into()
+            self.window_helper
+                .view(window_id)
+                .map(Message::WindowHelper)
         }
     }
 
