@@ -14,7 +14,7 @@ use tokio::{select, sync::watch};
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
-use crate::{client::device::RemoteLiveData, permissions::Permission};
+use crate::{client::device::RemoteData, permissions::Permission};
 
 #[derive(Default)]
 pub struct RealtimeStatusHandler;
@@ -58,7 +58,7 @@ impl CommandHandler for RealtimeStatusHandler {
 }
 
 pub struct SubscribeRealtimeStatus {
-    pub send: watch::Sender<RemoteLiveData<RealtimeStatus>>,
+    pub send: watch::Sender<RemoteData<RealtimeStatus>>,
     pub cancel: CancellationToken,
 }
 
@@ -91,7 +91,7 @@ impl CommandDispatcher for SubscribeRealtimeStatus {
                     match status {
                         Ok(status) => {
                             // debug!("received realtime status");
-                            if let Err(_) = self.send.send(RemoteLiveData::Ready(status)) {
+                            if let Err(_) = self.send.send(RemoteData::Ready(status)) {
                                 return Ok(());
                             }
                         }

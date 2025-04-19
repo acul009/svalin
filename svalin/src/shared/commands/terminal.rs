@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -115,6 +117,7 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
     }
 }
 
+#[derive(Debug)]
 pub struct RemoteTerminal {
     cancel: CancellationToken,
     input: mpsc::Sender<TerminalPacket>,
@@ -122,32 +125,31 @@ pub struct RemoteTerminal {
     joinset: JoinSet<()>,
 }
 
+pub enum TerminalAction {
+    Input(Vec<u8>),
+    Resize(TerminalSize),
+}
+
+// Todo: Split this into read and write parts
 impl RemoteTerminal {
-    pub async fn sender(&self) -> mpsc::Sender<TerminalPacket> {
-        self.input.clone()
+    pub fn try_write(&self, content: Vec<u8>) {
+        debug!(
+            "writing to remote terminal: {}",
+            String::from_utf8_lossy(&content)
+        );
+        if let Err(err) = self.input.try_send(TerminalPacket::Input(content)) {
+            tracing::error!("{err}");
+        }
     }
 
-    // pub async fn write(&self, content: Vec<u8>) {
-    //     debug!(
-    //         "writing to remote terminal: {}",
-    //         String::from_utf8_lossy(&content)
-    //     );
-    //     if let Err(err) = self.input.send(TerminalPacket::Input(content)).await {
-    //         tracing::error!("{err}");
-    //     }
-    // }
-
-    // pub async fn resize(&self, size: TerminalSize) {
-    //     if let Err(err) = self.input.send(TerminalPacket::Resize(size)).await {
-    //         tracing::error!("{err}");
-    //     }
-    // }
-
-    pub async fn read(&mut self) -> Result<Option<Vec<u8>>> {
-        match self.output.recv().await {
-            Some(chunk) => Ok(Some(chunk)),
-            None => Ok(None),
+    pub fn try_resize(&self, size: TerminalSize) {
+        if let Err(err) = self.input.try_send(TerminalPacket::Resize(size)) {
+            tracing::error!("{err}");
         }
+    }
+
+    pub async fn reader(&mut self) -> Option<Vec<u8>> {
+        self.output.recv().await
     }
 }
 
@@ -160,14 +162,13 @@ impl Drop for RemoteTerminal {
     }
 }
 
-pub struct RemoteTerminalDispatcher;
-
-#[derive(Debug, thiserror::Error)]
-pub enum RemoteTerminalDispatcherError {}
+pub struct RemoteTerminalDispatcher {
+    pub cancel: CancellationToken,
+}
 
 impl TakeableCommandDispatcher for RemoteTerminalDispatcher {
     type Output = RemoteTerminal;
-    type InnerError = RemoteTerminalDispatcherError;
+    type InnerError = Infallible;
     type Request = ();
 
     fn key() -> String {
@@ -219,8 +220,9 @@ impl TakeableCommandDispatcher for RemoteTerminalDispatcher {
 
             Ok(RemoteTerminal {
                 input,
-                output: tokio::sync::Mutex::new(output_recv),
+                output: output_recv,
                 joinset,
+                cancel: self.cancel.clone(),
             })
         } else {
             Err(DispatcherError::NoneSession)

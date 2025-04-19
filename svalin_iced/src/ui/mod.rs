@@ -1,7 +1,7 @@
 use iced::{
     Subscription, Task,
     keyboard::{self, key::Named},
-    widget::{center, focus_next, text},
+    widget::focus_next,
     window,
 };
 use mainview::MainView;
@@ -89,6 +89,10 @@ impl UI {
                     match action {
                         mainview::Action::None => Task::none(),
                         mainview::Action::Run(task) => task.map(Message::MainView),
+                        mainview::Action::OpenTerminal(device) => self
+                            .window_helper
+                            .add_terminal(device)
+                            .map(Message::WindowHelper),
                     }
                 }
                 _ => Task::none(),

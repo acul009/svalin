@@ -32,6 +32,7 @@ pub enum Message {
 pub enum Action {
     None,
     OpenTunnelGui,
+    OpenTerminal(Device),
     Run(Task<Message>),
 }
 
@@ -97,6 +98,7 @@ impl Devices {
                             Action::None
                         }
                         device_view::Action::OpenTunnelGui => Action::OpenTunnelGui,
+                        device_view::Action::OpenTerminal(device) => Action::OpenTerminal(device),
                         device_view::Action::Run(task) => {
                             Action::Run(task.map(Message::DeviceView))
                         }

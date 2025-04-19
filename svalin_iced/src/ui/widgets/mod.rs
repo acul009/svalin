@@ -1,6 +1,6 @@
 use std::{borrow::Cow, ops::RangeInclusive};
 
-use svalin::client::device::RemoteLiveData;
+use svalin::client::device::RemoteData;
 use svalin_sysctl::realtime::RealtimeStatus;
 
 use crate::Element;
@@ -40,7 +40,7 @@ pub fn header<'a, Message>(
     header::Header::new(content)
 }
 
-pub fn realtime(realtime: &RemoteLiveData<RealtimeStatus>) -> realtime::RealtimeDisplay<'_> {
+pub fn realtime(realtime: &RemoteData<RealtimeStatus>) -> realtime::RealtimeDisplay<'_> {
     realtime::RealtimeDisplay::new(realtime)
 }
 

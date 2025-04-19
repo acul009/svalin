@@ -1,7 +1,7 @@
 use std::sync::{LazyLock, Mutex};
 
 use anyhow::Result;
-use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
@@ -13,7 +13,7 @@ pub struct PtyProcess {
     write: mpsc::Sender<Vec<u8>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminalSize {
     pub cols: u16,
     pub rows: u16,

@@ -5,7 +5,7 @@ use iced::{
     Length, Subscription, Task,
     widget::{button, row, text},
 };
-use svalin::client::Client;
+use svalin::client::{Client, device::Device};
 use tunnel::TunnelUi;
 
 use super::{MapOpt, widgets::icon};
@@ -23,6 +23,7 @@ pub enum Message {
 pub enum Action {
     None,
     Run(Task<Message>),
+    OpenTerminal(Device),
 }
 
 enum State {
@@ -68,6 +69,7 @@ impl MainView {
                         self.context = Context::Tunnel;
                         Action::None
                     }
+                    devices::Action::OpenTerminal(device) => Action::OpenTerminal(device),
                     devices::Action::Run(task) => Action::Run(task.map(Message::Devices)),
                 }
             }

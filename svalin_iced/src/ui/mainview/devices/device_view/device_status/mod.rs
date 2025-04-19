@@ -1,5 +1,5 @@
 use iced::{advanced::subscription::from_recipe, widget::column};
-use svalin::client::device::{Device, RemoteLiveData};
+use svalin::client::device::{Device, RemoteData};
 use svalin_sysctl::realtime::RealtimeStatus;
 
 use crate::{ui::widgets::realtime, util::watch_recipe::WatchRecipe};
@@ -10,14 +10,14 @@ pub enum Message {
 }
 
 pub struct DeviceStatus {
-    recipe: WatchRecipe<String, RemoteLiveData<RealtimeStatus>, Message>,
-    realtime: RemoteLiveData<RealtimeStatus>,
+    recipe: WatchRecipe<String, RemoteData<RealtimeStatus>, Message>,
+    realtime: RemoteData<RealtimeStatus>,
 }
 
 impl DeviceStatus {
     pub fn new(device: &Device) -> Self {
         Self {
-            realtime: RemoteLiveData::Pending,
+            realtime: RemoteData::Pending,
             recipe: WatchRecipe::new(
                 format!(
                     "realtime-{:x?}",

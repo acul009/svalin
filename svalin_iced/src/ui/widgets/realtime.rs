@@ -3,7 +3,7 @@ use iced::{
     widget::{column, container, row, text},
 };
 use iced_aw::card;
-use svalin::client::device::RemoteLiveData;
+use svalin::client::device::RemoteData;
 use svalin_sysctl::realtime::RealtimeStatus;
 
 use crate::Element;
@@ -11,11 +11,11 @@ use crate::Element;
 use super::{loading, percent_display};
 
 pub struct RealtimeDisplay<'a> {
-    realtime: &'a RemoteLiveData<RealtimeStatus>,
+    realtime: &'a RemoteData<RealtimeStatus>,
 }
 
 impl<'a> RealtimeDisplay<'a> {
-    pub fn new(realtime: &'a RemoteLiveData<RealtimeStatus>) -> Self {
+    pub fn new(realtime: &'a RemoteData<RealtimeStatus>) -> Self {
         Self { realtime }
     }
 }
@@ -23,16 +23,16 @@ impl<'a> RealtimeDisplay<'a> {
 impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Message> {
     fn from(value: RealtimeDisplay) -> Self {
         let content: Element<Message> = match value.realtime {
-            RemoteLiveData::Unavailable => {
+            RemoteData::Unavailable => {
                 container(text(t!("realtime.live-unavailable")).center())
                     .padding(20)
                     .width(Length::Fill)
                     .into()
             }
-            RemoteLiveData::Pending => container(loading(t!("realtime.connecting")))
+            RemoteData::Pending => container(loading(t!("realtime.connecting")))
                 .height(200)
                 .into(),
-            RemoteLiveData::Ready(realtime) => column![
+            RemoteData::Ready(realtime) => column![
                 card(
                     text(t!("realtime.cpu")),
                     row(realtime.cpu.cores.iter().enumerate().map(|(index, usage)| {

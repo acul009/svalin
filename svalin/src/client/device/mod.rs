@@ -27,7 +27,7 @@ use crate::{
 use super::tunnel_manager::{TunnelConfig, TunnelCreateError, TunnelManager};
 
 #[derive(Clone, Debug)]
-pub enum RemoteLiveData<T> {
+pub enum RemoteData<T> {
     Unavailable,
     Pending,
     Ready(T),
@@ -100,11 +100,11 @@ impl Device {
         self.data.item.subscribe()
     }
 
-    pub fn subscribe_realtime(&self) -> watch::Receiver<RemoteLiveData<RealtimeStatus>> {
+    pub fn subscribe_realtime(&self) -> watch::Receiver<RemoteData<RealtimeStatus>> {
         self.data.realtime.subscribe()
     }
 
-    pub fn subscribe_install_info(&self) -> watch::Receiver<RemoteLiveData<InstallationInfo>> {
+    pub fn subscribe_install_info(&self) -> watch::Receiver<RemoteData<InstallationInfo>> {
         self.data.install_info.subscribe()
     }
 
@@ -118,7 +118,10 @@ impl Device {
     pub async fn open_terminal(&self) -> Result<RemoteTerminal> {
         self.data
             .connection
-            .dispatch(RemoteTerminalDispatcher)
+            // TODO: get a proper cancellationtoken in here
+            .dispatch(RemoteTerminalDispatcher {
+                cancel: CancellationToken::new(),
+            })
             .await
             .map_err(|err| anyhow!(err))
     }
@@ -145,10 +148,10 @@ struct InstallInfoStarter {
 }
 
 impl SubscriberStarter for InstallInfoStarter {
-    type Item = RemoteLiveData<InstallationInfo>;
+    type Item = RemoteData<InstallationInfo>;
 
     fn default(&self) -> Self::Item {
-        RemoteLiveData::Unavailable
+        RemoteData::Unavailable
     }
 
     fn start(
@@ -157,7 +160,7 @@ impl SubscriberStarter for InstallInfoStarter {
         _cancel: CancellationToken,
     ) -> impl Future<Output = ()> + Send + 'static {
         let connection = self.connection.clone();
-        let _ = send.send(RemoteLiveData::Pending);
+        let _ = send.send(RemoteData::Pending);
 
         async move {
             let send2 = send.clone();
@@ -165,7 +168,7 @@ impl SubscriberStarter for InstallInfoStarter {
                 .dispatch(InstallationInfoDispatcher { send })
                 .await
             {
-                let _ = send2.send(RemoteLiveData::Unavailable);
+                let _ = send2.send(RemoteData::Unavailable);
                 error!("error while requesting InstallationInfo: {err}");
             }
         }
@@ -177,10 +180,10 @@ struct RealtimeStarter {
 }
 
 impl SubscriberStarter for RealtimeStarter {
-    type Item = RemoteLiveData<RealtimeStatus>;
+    type Item = RemoteData<RealtimeStatus>;
 
     fn default(&self) -> Self::Item {
-        RemoteLiveData::Unavailable
+        RemoteData::Unavailable
     }
 
     fn start(
@@ -189,7 +192,7 @@ impl SubscriberStarter for RealtimeStarter {
         cancel: CancellationToken,
     ) -> impl Future<Output = ()> + Send + 'static {
         let connection = self.connection.clone();
-        let _ = send.send(RemoteLiveData::Pending);
+        let _ = send.send(RemoteData::Pending);
 
         async move {
             let send2 = send.clone();
@@ -197,7 +200,7 @@ impl SubscriberStarter for RealtimeStarter {
                 .dispatch(SubscribeRealtimeStatus { cancel, send })
                 .await
             {
-                let _ = send2.send(RemoteLiveData::Unavailable);
+                let _ = send2.send(RemoteData::Unavailable);
                 error!("error while requesting InstallationInfo: {err}");
             }
         }

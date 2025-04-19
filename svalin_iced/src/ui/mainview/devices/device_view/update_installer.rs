@@ -8,7 +8,7 @@ use iced::{
 use iced_aw::card;
 use svalin::{
     agent::update::{InstallationInfo, UpdateChannel},
-    client::device::{Device, RemoteLiveData},
+    client::device::{Device, RemoteData},
 };
 
 use crate::{
@@ -41,8 +41,8 @@ enum PossibleUpdate {
 
 pub struct UpdateInstaller {
     device: Device,
-    data: RemoteLiveData<InstallationInfo>,
-    recipe: WatchRecipe<String, RemoteLiveData<InstallationInfo>, Message>,
+    data: RemoteData<InstallationInfo>,
+    recipe: WatchRecipe<String, RemoteData<InstallationInfo>, Message>,
     possible_update: PossibleUpdate,
     channels: combo_box::State<UpdateChannel>,
     selected_channel: Option<UpdateChannel>,
@@ -62,7 +62,7 @@ impl UpdateInstaller {
 
         let update_installer = Self {
             device,
-            data: RemoteLiveData::Pending,
+            data: RemoteData::Pending,
             recipe,
             channels: combo_box::State::new(vec![UpdateChannel::Alpha]),
             selected_channel: None,
@@ -132,13 +132,13 @@ impl UpdateInstaller {
 
     pub fn view(&self) -> Element<Message> {
         let content: Element<Message> = match &self.data {
-            RemoteLiveData::Pending => loading(t!("device.update.loading-status"))
+            RemoteData::Pending => loading(t!("device.update.loading-status"))
                 .height(200)
                 .into(),
-            RemoteLiveData::Unavailable => center(text(t!("device.update.status-unavailable")))
+            RemoteData::Unavailable => center(text(t!("device.update.status-unavailable")))
                 .height(200)
                 .into(),
-            RemoteLiveData::Ready(install_info) => {
+            RemoteData::Ready(install_info) => {
                 if install_info.currently_updating {
                     return loading(t!("device.update.updating")).height(200).into();
                 }

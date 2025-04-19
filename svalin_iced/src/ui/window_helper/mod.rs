@@ -5,7 +5,10 @@ use iced::{
     widget::{center, text},
     window,
 };
-use svalin::shared::commands::terminal::RemoteTerminal;
+use svalin::{
+    client::device::{self, Device},
+    shared::commands::terminal::RemoteTerminal,
+};
 use terminal::TerminalWindow;
 
 use crate::Element;
@@ -32,11 +35,21 @@ impl WindowHelper {
         }
     }
 
-    pub fn add_terminal(&mut self, terminal: RemoteTerminal) -> Task<Message> {
-        let (id, task) = Self::new_window();
-        
-        let terminal = TerminalWindow::
-        
+    pub fn add_terminal(&mut self, device: Device) -> Task<Message> {
+        let (window_id, task1) = Self::new_window();
+
+        let (terminal, task2) = TerminalWindow::start(device);
+
+        self.windows
+            .insert(window_id, WindowContent::Terminal(terminal));
+
+        Task::batch(vec![
+            task1,
+            task2.map(move |message| Message::Forwarded {
+                id: window_id,
+                message: WindowMessage::Terminal(message),
+            }),
+        ])
     }
 
     fn new_window() -> (window::Id, Task<Message>) {
@@ -44,7 +57,7 @@ impl WindowHelper {
             ..Default::default()
         });
 
-        (id, task.map(|_| Message::None))
+        (id, task.discard())
     }
 
     pub fn view(&self, id: window::Id) -> Element<Message> {
@@ -71,6 +84,7 @@ impl WindowHelper {
                     Task::none()
                 }
             }
+            Message::None => Task::none(),
         }
     }
 
@@ -78,7 +92,7 @@ impl WindowHelper {
         if let Some(window) = self.windows.get(&window_id) {
             window.title()
         } else {
-            String::from("Window Error")
+            "Window Error".to_string()
         }
     }
 }
@@ -115,7 +129,7 @@ impl WindowContent {
     pub fn title(&self) -> String {
         match self {
             Self::Terminal(terminal) => terminal.title(),
-            Self::Todo => String::from("Todo"),
+            Self::Todo => "Todo".to_string(),
         }
     }
 }

@@ -25,12 +25,14 @@ pub enum Message {
     UpdateInstaller(update_installer::Message),
     TunnelOpener(tunnel_opener::Message),
     ItemUpdate,
+    OpenTerminal,
 }
 
 pub enum Action {
     None,
     Back,
     OpenTunnelGui,
+    OpenTerminal(Device),
     Run(Task<Message>),
 }
 
@@ -91,6 +93,7 @@ impl DeviceView {
                     tunnel_opener::Action::None => Action::None,
                 }
             }
+            Message::OpenTerminal => Action::OpenTerminal(self.device.clone()),
             Message::ItemUpdate => {
                 self.item = self.device.item().clone();
                 Action::None
@@ -103,6 +106,7 @@ impl DeviceView {
         scrollable(
             column![
                 self.status.view().map(Message::Status),
+                iced::widget::button("Terminal").on_press(Message::OpenTerminal),
                 self.tunnel_opener.view().map(Message::TunnelOpener),
                 self.update_installer.view().map(Message::UpdateInstaller),
             ]

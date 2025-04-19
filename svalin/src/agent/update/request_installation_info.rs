@@ -11,7 +11,7 @@ use svalin_rpc::rpc::{
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 
-use crate::{client::device::RemoteLiveData, permissions::Permission};
+use crate::{client::device::RemoteData, permissions::Permission};
 
 use super::{InstallationInfo, Updater};
 
@@ -65,7 +65,7 @@ impl CommandHandler for InstallationInfoHandler {
 }
 
 pub struct InstallationInfoDispatcher {
-    pub send: watch::Sender<RemoteLiveData<InstallationInfo>>,
+    pub send: watch::Sender<RemoteData<InstallationInfo>>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -94,9 +94,9 @@ impl CommandDispatcher for InstallationInfoDispatcher {
                 _ = send.closed() => break,
                 installation_info = session.read_object::<InstallationInfo>() => {
                     if let Ok(installation_info) = installation_info {
-                        let _ = send.send(RemoteLiveData::Ready(installation_info));
+                        let _ = send.send(RemoteData::Ready(installation_info));
                     } else {
-                        let _ = send.send(RemoteLiveData::Unavailable);
+                        let _ = send.send(RemoteData::Unavailable);
                         break;
                     }
                 }
