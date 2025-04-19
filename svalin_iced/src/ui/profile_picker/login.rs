@@ -124,7 +124,7 @@ impl LoginDialog {
                                 )),
                                 Ok(new_profile) => {
                                     match Client::open_profile(&new_profile, password).await {
-                                        Ok(client) => Message::OpenProfile(Arc::new(client)),
+                                        Ok(client) => Message::OpenProfile(client),
                                         Err(e) => Message::Error(ErrorDisplayInfo::new(
                                             e.into(),
                                             t!("profile-picker.error.unlock"),

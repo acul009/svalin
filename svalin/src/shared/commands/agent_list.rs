@@ -23,7 +23,7 @@ use tokio::{select, sync::watch};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    client::{device::Device, tunnel_manager::TunnelManager},
+    client::{Client, device::Device, tunnel_manager::TunnelManager},
     permissions::Permission,
     server::agent_store::{AgentStore, AgentUpdate},
     shared::join_agent::PublicAgentData,
@@ -138,6 +138,7 @@ impl CommandHandler for AgentListHandler {
 
 pub struct UpdateAgentList {
     pub base_connection: DirectConnection,
+    pub client: Arc<Client>,
     pub credentials: PermCredentials,
     pub list: watch::Sender<BTreeMap<Certificate, Device>>,
     pub verifier: ExactVerififier,
@@ -168,7 +169,6 @@ impl CommandDispatcher for UpdateAgentList {
     }
 
     async fn dispatch(self, session: &mut Session) -> Result<(), Self::Error> {
-        let cancel2 = self.cancel.clone();
         let result = self
             .cancel
             .run_until_cancelled(async move {
@@ -200,12 +200,7 @@ impl CommandDispatcher for UpdateAgentList {
                             );
 
                             let cert = item.public_data.cert.clone();
-                            let device = Device::new(
-                                device_connection,
-                                item,
-                                self.tunnel_manager.clone(),
-                                cancel2.clone(),
-                            );
+                            let device = Device::new(device_connection, item, self.client.clone());
 
                             list.insert(cert, device);
                         }

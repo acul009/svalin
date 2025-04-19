@@ -1,52 +1,59 @@
-use std::sync::Arc;
-
 use iced::{
-    Subscription, Task,
-    advanced::subscription,
-    widget::{center, text},
-    window,
+    Task,
+    widget::{center, stack, text},
 };
-use svalin::{
-    client::device::{Device, RemoteData},
-    shared::commands::terminal::RemoteTerminal,
-};
+use sipper::sipper;
+use svalin::{client::device::Device, shared::commands::terminal::TerminalInput};
+use tokio::sync::mpsc;
 
 use crate::{Element, ui::widgets::loading};
 
 #[derive(Debug, Clone)]
 pub enum Message {
     Terminal(frozen_term::Message),
-    Ready(Arc<RemoteTerminal>),
+    Output(Vec<u8>),
+    Closed,
     Unavailable,
+}
+
+enum State {
+    Pending,
+    Ready,
+    Unavailable,
+    Closed,
 }
 
 pub struct TerminalWindow {
     term_display: frozen_term::Terminal,
-    remote: RemoteData<RemoteTerminal>,
-    current_size: svalin_sysctl::pty::TerminalSize,
+    state: State,
+    send: mpsc::Sender<TerminalInput>,
 }
 
 impl TerminalWindow {
     pub fn start(device: Device) -> (Self, Task<Message>) {
-        let current_size = svalin_sysctl::pty::TerminalSize { cols: 80, rows: 25 };
+        let (term_display, task1) = frozen_term::Terminal::new(25, 80);
 
-        let (term_display, task1) =
-            frozen_term::Terminal::new(current_size.rows, current_size.cols);
+        let (send, recv) = device.open_terminal();
 
-        let task2 = Task::future(async move {
-            match device.open_terminal().await {
-                Ok(remote) => Message::Ready(Arc::new(remote)),
-                Err(_) => Message::Unavailable,
+        let task2 = Task::stream(sipper(move |mut sender| async move {
+            let mut recv = recv;
+            while let Some(output) = recv.recv().await {
+                match output {
+                    Ok(output) => sender.send(Message::Output(output)).await,
+                    Err(_) => sender.send(Message::Unavailable).await,
+                }
             }
-        });
+
+            Message::Closed
+        }));
 
         let task = Task::batch(vec![task1.map(Message::Terminal), task2]);
 
         (
             Self {
                 term_display,
-                remote: RemoteData::Pending,
-                current_size,
+                state: State::Ready,
+                send,
             },
             task,
         )
@@ -54,13 +61,15 @@ impl TerminalWindow {
 
     pub fn update(&mut self, message: Message) {
         match message {
-            Message::Ready(remote) => {
-                if let Ok(remote) = Arc::try_unwrap(remote) {
-                    self.remote = RemoteData::Ready(remote);
-                }
+            Message::Output(output) => {
+                self.state = State::Ready;
+                self.term_display.advance_bytes(&output);
+            }
+            Message::Closed => {
+                self.state = State::Closed;
             }
             Message::Unavailable => {
-                self.remote = RemoteData::Unavailable;
+                self.state = State::Unavailable;
             }
             Message::Terminal(message) => {
                 let action = self.term_display.update(message);
@@ -71,15 +80,10 @@ impl TerminalWindow {
                             cols: size.cols as u16,
                             rows: size.rows as u16,
                         };
-                        if let RemoteData::Ready(remote) = &self.remote {
-                            remote.try_resize(size.clone());
-                        }
-                        self.current_size = size;
+                        let _ = self.send.try_send(TerminalInput::Resize(size));
                     }
                     frozen_term::Action::Input(input) => {
-                        if let RemoteData::Ready(remote) = &self.remote {
-                            remote.try_write(input);
-                        }
+                        let _ = self.send.try_send(TerminalInput::Input(input));
                     }
                 }
             }
@@ -87,23 +91,19 @@ impl TerminalWindow {
     }
 
     pub fn view(&self) -> Element<Message> {
-        match &self.remote {
-            RemoteData::Pending => loading(t!("terminal.connecting")).into(),
-            RemoteData::Unavailable => center(text(t!("terminal.unavailable"))).into(),
-            RemoteData::Ready(_remote) => self.term_display.view().map(Message::Terminal),
+        match &self.state {
+            State::Pending => loading(t!("terminal.connecting")).into(),
+            State::Unavailable => center(text(t!("terminal.unavailable"))).into(),
+            State::Ready => self.term_display.view().map(Message::Terminal),
+            State::Closed => stack![
+                self.term_display.view().map(Message::Terminal),
+                center(text(t!("terminal.closed")))
+            ]
+            .into(),
         }
     }
 
     pub fn title(&self) -> String {
         self.term_display.get_title().to_string()
-    }
-
-    pub fn subscription(&self, id: window::Id) -> Subscription<Message> {
-        
-        match &self.remote {
-            RemoteData::Pending => Subscription::none(),
-            RemoteData::Unavailable => Subscription::none(),
-            RemoteData::Ready(remote) => Subscription::run_with_id(id, stream),
-        }
     }
 }

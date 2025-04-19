@@ -6,7 +6,7 @@ use svalin_rpc::{
     rpc::connection::{Connection, direct_connection::DirectConnection},
 };
 use svalin_sysctl::realtime::RealtimeStatus;
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 
@@ -19,12 +19,15 @@ use crate::{
     shared::commands::{
         agent_list::AgentListItem,
         realtime_status::SubscribeRealtimeStatus,
-        terminal::{RemoteTerminal, RemoteTerminalDispatcher},
+        terminal::{RemoteTerminalDispatcher, TerminalInput},
     },
     util::smart_subscriber::{SmartSubscriber, SubscriberStarter},
 };
 
-use super::tunnel_manager::{TunnelConfig, TunnelCreateError, TunnelManager};
+use super::{
+    Client,
+    tunnel_manager::{TunnelConfig, TunnelCreateError},
+};
 
 #[derive(Clone, Debug)]
 pub enum RemoteData<T> {
@@ -45,8 +48,8 @@ impl Debug for Device {
 }
 
 struct DeviceData {
+    client: Arc<Client>,
     connection: ForwardConnection<DirectConnection>,
-    tunnel_manager: TunnelManager,
     item: watch::Sender<AgentListItem>,
     realtime: SmartSubscriber<RealtimeStarter>,
     install_info: SmartSubscriber<InstallInfoStarter>,
@@ -56,21 +59,23 @@ impl Device {
     pub fn new(
         connection: ForwardConnection<DirectConnection>,
         item: AgentListItem,
-        tunnel_manager: TunnelManager,
-        cancel: CancellationToken,
+        client: Arc<Client>,
     ) -> Self {
         return Self {
             data: Arc::new(DeviceData {
                 connection: connection.clone(),
-                tunnel_manager,
                 item: watch::channel(item).0,
                 realtime: SmartSubscriber::new(
                     RealtimeStarter {
                         connection: connection.clone(),
                     },
-                    cancel.clone(),
+                    client.cancellation_token().clone(),
                 ),
-                install_info: SmartSubscriber::new(InstallInfoStarter { connection }, cancel),
+                install_info: SmartSubscriber::new(
+                    InstallInfoStarter { connection },
+                    client.cancellation_token().clone(),
+                ),
+                client,
             }),
         };
     }
@@ -110,20 +115,37 @@ impl Device {
 
     pub async fn open_tunnel(&self, config: TunnelConfig) -> Result<(), TunnelCreateError> {
         self.data
-            .tunnel_manager
+            .client
+            .tunnel_manager()
             .open(self.data.connection.clone(), config)
             .await
     }
 
-    pub async fn open_terminal(&self) -> Result<RemoteTerminal> {
-        self.data
-            .connection
-            // TODO: get a proper cancellationtoken in here
-            .dispatch(RemoteTerminalDispatcher {
-                cancel: CancellationToken::new(),
-            })
-            .await
-            .map_err(|err| anyhow!(err))
+    pub fn open_terminal(
+        &self,
+    ) -> (
+        mpsc::Sender<TerminalInput>,
+        mpsc::Receiver<Result<Vec<u8>, ()>>,
+    ) {
+        let (input_send, input_recv) = tokio::sync::mpsc::channel(10);
+        let (output_send, output_recv) = tokio::sync::mpsc::channel(10);
+
+        let dispatcher = RemoteTerminalDispatcher {
+            cancel: self.data.client.cancellation_token().clone(),
+            input: input_recv,
+            output: output_send.clone(),
+        };
+
+        let connection = self.data.connection.clone();
+
+        self.data.client.background_tasks().spawn(async move {
+            if let Err(err) = connection.dispatch(dispatcher).await {
+                let _ = output_send.try_send(Err(()));
+                tracing::error!("Terminal dispatcher error: {}", err);
+            }
+        });
+
+        (input_send, output_recv)
     }
 
     pub async fn check_update(&self, channel: UpdateChannel) -> Result<String> {

@@ -1,17 +1,15 @@
-use std::convert::Infallible;
-
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_rpc::rpc::{
     command::{
-        dispatcher::{DispatcherError, TakeableCommandDispatcher},
+        dispatcher::CommandDispatcher,
         handler::{PermissionPrecursor, TakeableCommandHandler},
     },
     session::Session,
 };
 use svalin_sysctl::pty::{PtyProcess, TerminalSize};
-use tokio::{select, sync::mpsc, task::JoinSet};
+use tokio::{select, sync::mpsc};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::debug;
 
@@ -22,6 +20,20 @@ pub enum TerminalPacket {
     Close,
     Input(Vec<u8>),
     Resize(TerminalSize),
+}
+
+pub enum TerminalInput {
+    Input(Vec<u8>),
+    Resize(TerminalSize),
+}
+
+impl From<TerminalInput> for TerminalPacket {
+    fn from(data: TerminalInput) -> Self {
+        match data {
+            TerminalInput::Input(input) => TerminalPacket::Input(input),
+            TerminalInput::Resize(size) => TerminalPacket::Resize(size),
+        }
+    }
 }
 
 pub struct RemoteTerminalHandler;
@@ -57,22 +69,14 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
                 loop {
                     select! {
                         output = pty_reader.recv() => {
+                            if let Err(err) = write.write_object(&output).await {
+                                tracing::error!("{err}");
+                                return;
+                            }
 
-                            match output {
-                                Some(output) => {
-                                    if let Err(err) = write.write_object(&output).await {
-                                        tracing::error!("{err}");
-                                        return;
-                                    } else {
-                                        if let Ok(debug_string) = String::from_utf8(output) {
-                                            tracing::debug!("wrote to terminal: {debug_string}");
-                                        }
-                                    }
-                                }
-                                None => {
-                                    let _ = write.shutdown().await;
-                                    return;
-                                }
+                            if output.is_none() {
+                                let _ = write.shutdown().await;
+                                return;
                             }
                         }
                     }
@@ -117,58 +121,15 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
     }
 }
 
-#[derive(Debug)]
-pub struct RemoteTerminal {
-    cancel: CancellationToken,
-    input: mpsc::Sender<TerminalPacket>,
-    output: mpsc::Receiver<Vec<u8>>,
-    joinset: JoinSet<()>,
-}
-
-pub enum TerminalAction {
-    Input(Vec<u8>),
-    Resize(TerminalSize),
-}
-
-// Todo: Split this into read and write parts
-impl RemoteTerminal {
-    pub fn try_write(&self, content: Vec<u8>) {
-        debug!(
-            "writing to remote terminal: {}",
-            String::from_utf8_lossy(&content)
-        );
-        if let Err(err) = self.input.try_send(TerminalPacket::Input(content)) {
-            tracing::error!("{err}");
-        }
-    }
-
-    pub fn try_resize(&self, size: TerminalSize) {
-        if let Err(err) = self.input.try_send(TerminalPacket::Resize(size)) {
-            tracing::error!("{err}");
-        }
-    }
-
-    pub async fn reader(&mut self) -> Option<Vec<u8>> {
-        self.output.recv().await
-    }
-}
-
-impl Drop for RemoteTerminal {
-    fn drop(&mut self) {
-        match self.input.try_send(TerminalPacket::Close) {
-            Ok(_) => (),
-            Err(_) => self.joinset.abort_all(),
-        }
-    }
-}
-
 pub struct RemoteTerminalDispatcher {
+    pub input: mpsc::Receiver<TerminalInput>,
+    pub output: mpsc::Sender<Result<Vec<u8>, ()>>,
     pub cancel: CancellationToken,
 }
 
-impl TakeableCommandDispatcher for RemoteTerminalDispatcher {
-    type Output = RemoteTerminal;
-    type InnerError = Infallible;
+impl CommandDispatcher for RemoteTerminalDispatcher {
+    type Output = ();
+    type Error = anyhow::Error;
     type Request = ();
 
     fn key() -> String {
@@ -179,53 +140,45 @@ impl TakeableCommandDispatcher for RemoteTerminalDispatcher {
         &()
     }
 
-    async fn dispatch(
-        self,
-        session: &mut Option<Session>,
-    ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
-        if let Some(session) = session.take() {
-            debug!("starting remote terminal");
+    async fn dispatch(mut self, session: &mut Session) -> Result<Self::Output, Self::Error> {
+        debug!("starting remote terminal");
 
-            let (input, mut input_recv) = mpsc::channel::<TerminalPacket>(10);
-            let (output, output_recv) = mpsc::channel::<Vec<u8>>(10);
-
-            let (mut read, mut write, _) = session.destructure();
-
-            let mut joinset = JoinSet::new();
-
-            joinset.spawn(async move {
-                loop {
-                    match read.read_object::<Vec<u8>>().await {
-                        Ok(chunk) => {
-                            if let Err(err) = output.send(chunk).await {
+        loop {
+            tokio::select! {
+                _ = self.cancel.cancelled() => {
+                    break;
+                },
+                input = self.input.recv() => {
+                    match input {
+                        Some(input) => {
+                            session.write_object(&TerminalPacket::from(input)).await?;
+                        },
+                        None => {
+                            break;
+                        }
+                    }
+                },
+                output = session.read_object::<Option<Vec<u8>>>() => {
+                    match output {
+                        Ok(Some(chunk)) => {
+                            if let Err(err) = self.output.send(Ok(chunk)).await {
                                 tracing::error!("{err}");
                             }
-                        }
+                        },
+                        Ok(None) => {
+                            break;
+                        },
                         Err(err) => {
                             tracing::error!("{err}");
-                            return;
+                            break;
                         }
                     }
                 }
-            });
-
-            joinset.spawn(async move {
-                while let Some(packet) = input_recv.recv().await {
-                    if let Err(err) = write.write_object(&packet).await {
-                        tracing::error!("{err}");
-                        return;
-                    }
-                }
-            });
-
-            Ok(RemoteTerminal {
-                input,
-                output: output_recv,
-                joinset,
-                cancel: self.cancel.clone(),
-            })
-        } else {
-            Err(DispatcherError::NoneSession)
+            }
         }
+
+        session.write_object(&TerminalPacket::Close).await?;
+
+        Ok(())
     }
 }

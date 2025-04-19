@@ -1,14 +1,11 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use iced::{
     Task,
     widget::{center, text},
     window,
 };
-use svalin::{
-    client::device::{self, Device},
-    shared::commands::terminal::RemoteTerminal,
-};
+use svalin::client::device::Device;
 use terminal::TerminalWindow;
 
 use crate::Element;

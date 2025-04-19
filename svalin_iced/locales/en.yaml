@@ -76,11 +76,11 @@ device_list:
 device:
   update:
     loading-status: Loading update status...
-    status-unavailable: Update Status unavailable!
+    status-unavailable: Update status unavailable!
     updating: Device is currently updating...
     current-version: Agent Version
     method: Installation Method
     start: Update Now
     available-version: Available Update
-    unsupported: This installation Method does not support remote updates.
+    unsupported: This installation method does not support remote updates.
     title: Agent Update

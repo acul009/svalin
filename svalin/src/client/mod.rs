@@ -69,6 +69,14 @@ impl Client {
         &self.tunnel_manager
     }
 
+    pub(crate) fn cancellation_token(&self) -> &CancellationToken {
+        &self.cancel
+    }
+
+    pub(crate) fn background_tasks(&self) -> &TaskTracker {
+        &self.background_tasks
+    }
+
     pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {
         self.cancel.cancel();
         self.background_tasks.close();

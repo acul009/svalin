@@ -200,7 +200,7 @@ impl ProfilePicker {
 
                     Action::Run(Task::future(async move {
                         match Client::open_profile(&profile, password.into_bytes()).await {
-                            Ok(client) => Message::Profile(Arc::new(client)),
+                            Ok(client) => Message::Profile(client),
                             Err(err) => Message::Error(ErrorDisplayInfo::new(
                                 Arc::new(err),
                                 t!("profile-picker.error.unlock"),

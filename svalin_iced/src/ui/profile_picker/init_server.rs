@@ -238,7 +238,7 @@ impl InitServer {
                                                 Ok(client) => client,
                                             };
 
-                                            Message::Client(Arc::new(client))
+                                            Message::Client(client)
                                         }
                                     }
                                 }))

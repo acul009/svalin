@@ -44,44 +44,47 @@ async fn run() {
 
     match app.command {
         Command::Server { address } => {
-            if let Ok(addr) = address.parse() {
-                let mutex = Arc::new(Mutex::<Option<Server>>::new(None));
-                let mutex2 = mutex.clone();
+            tracing::debug!("User wants to run server");
 
-                let cancel = CancellationToken::new();
-                let cancel2 = cancel.clone();
-                let cancel3 = cancel.clone();
+            let address = address.parse().unwrap();
+            tracing::debug!("Server address parsed successfully");
+            let mutex = Arc::new(Mutex::<Option<Server>>::new(None));
+            let mutex2 = mutex.clone();
 
-                tokio::spawn(async move {
-                    // This needs to be in a seperate task since the init server will block on
-                    // start_server
-                    let server = Server::build()
-                        .addr(addr)
-                        .cancel(cancel2)
-                        .start_server()
-                        .await
-                        .unwrap();
+            let cancel = CancellationToken::new();
+            let cancel2 = cancel.clone();
+            let cancel3 = cancel.clone();
 
-                    *mutex2.lock().unwrap() = Some(server);
-                });
+            tokio::spawn(async move {
+                tracing::debug!("Starting server");
+                // This needs to be in a seperate task since the init server will block on
+                // start_server
+                let server = Server::build()
+                    .addr(address)
+                    .cancel(cancel2)
+                    .start_server()
+                    .await
+                    .unwrap();
 
-                tokio::spawn(async move {
-                    // Wait for shutdown signal
-                    tokio::signal::ctrl_c().await.unwrap();
+                *mutex2.lock().unwrap() = Some(server);
+            });
 
-                    cancel3.cancel();
-                });
+            tokio::spawn(async move {
+                // Wait for shutdown signal
+                tokio::signal::ctrl_c().await.unwrap();
 
-                cancel.cancelled().await;
-                println!("Shutting down server...");
+                cancel3.cancel();
+            });
 
-                let server = mutex.lock().unwrap().take();
+            cancel.cancelled().await;
+            println!("Shutting down server...");
 
-                if let Some(server) = server {
-                    server.close(Duration::from_secs(5)).await.unwrap();
-                } else {
-                    panic!("server Mutex was empty")
-                }
+            let server = mutex.lock().unwrap().take();
+
+            if let Some(server) = server {
+                server.close(Duration::from_secs(5)).await.unwrap();
+            } else {
+                panic!("server Mutex was empty")
             }
         }
         Command::Agent { action } => match action {

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,11 @@ impl Profile {
     }
 
     pub fn name(&self) -> String {
-        format!("{}@{}", self.username, self.upstream_address)
+        format!(
+            "{}@{}",
+            self.username,
+            self.upstream_address.replace(":", "+")
+        )
     }
 }
 
@@ -140,7 +144,7 @@ impl Client {
         Ok(())
     }
 
-    pub async fn open_profile(profile_key: &str, password: Vec<u8>) -> Result<Self> {
+    pub async fn open_profile(profile_key: &str, password: Vec<u8>) -> Result<Arc<Self>> {
         let profile = Self::get_profile(&profile_key).await?;
 
         debug!("Data from profile ready");
@@ -169,7 +173,7 @@ impl Client {
 
             let tunnel_manager = TunnelManager::new();
 
-            let client = Self {
+            let client = Arc::new(Self {
                 rpc,
                 _upstream_address: profile.upstream_address,
                 upstream_certificate: profile.upstream_certificate,
@@ -179,17 +183,19 @@ impl Client {
                 tunnel_manager,
                 background_tasks: TaskTracker::new(),
                 cancel: CancellationToken::new(),
-            };
+            });
 
             let list_clone = client.device_list.clone();
             let sync_connection = client.rpc.upstream_connection();
             let tunnel_manager = client.tunnel_manager.clone();
             let cancel = client.cancel.clone();
+            let client2 = client.clone();
 
             client.background_tasks.spawn(async move {
                 debug!("subscribing to upstream agent list");
                 if let Err(err) = sync_connection
                     .dispatch(UpdateAgentList {
+                        client: client2,
                         base_connection: sync_connection.clone(),
                         credentials: identity,
                         list: list_clone,

@@ -54,6 +54,8 @@ impl Location {
         {
             #[cfg(target_os = "windows")]
             {
+                use anyhow::Context;
+
                 let appdata = std::env::var("APPDATA")
                     .context("Failed to retrieve APPDATA environment variable")?;
 
