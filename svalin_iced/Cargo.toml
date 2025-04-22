@@ -15,7 +15,7 @@ frozen_term = { path = "../frozen_term" }
 
 anyhow = "1.0.97"
 futures-util = "0.3.31"
-tokio = { version = "1.44.2", features = ["full"] }
+tokio = { workspace = true }
 totp-rs = { version = "5.6.0", features = ["qr", "gen_secret"] }
 lyon_algorithms = "1.0.5"
 iced = { version = "0.13.1", features = [
@@ -27,9 +27,9 @@ iced = { version = "0.13.1", features = [
     "canvas",
 ] }
 iced_aw = "0.12.2"
-thiserror = "2.0.12"
+thiserror = { workspace = true }
 tokio-stream = { version = "0.1.17", features = ["full"] }
-tokio-util = "0.7.14"
+tokio-util = { workspace = true }
 futures = "0.3.31"
 uuid = "1.16.0"
 rust-i18n = "3.1.4"

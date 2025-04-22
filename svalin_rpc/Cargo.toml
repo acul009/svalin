@@ -7,18 +7,18 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.97"
-async-trait = "0.1.88"
-futures = "0.3.31"
-postcard = "1.1.1"
-serde = "1.0.219"
-tokio = { version = "1.44.2", features = ["full"] }
+async-trait = { workspace = true }
+# futures = "0.3.31"
+postcard = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
 svalin_macros = { path = "../svalin_macros" }
 svalin_pki = { path = "../svalin_pki", features = ["rustls"] }
 quinn = { version = "0.11.7", features = ["ring"] }
-tracing = "0.1.41"
+tracing = { workspace = true }
 test-log = { version = "0.2.17", features = ["trace"] }
 tokio-rustls = { version = "0.26.2", default-features = false, features = [
     "ring",
 ] }
-tokio-util = { version = "0.7.14", features = ["rt"] }
-thiserror = "2.0.12"
+tokio-util = { workspace = true }
+thiserror = { workspace = true }
