@@ -25,6 +25,7 @@ clap = { version = "4.5.35", features = ["derive", "unstable-doc"] }
 svalin_rpc = { path = "../svalin_rpc" }
 svalin_sysctl = { path = "../svalin_sysctl" }
 svalin_macros = { path = "../svalin_macros" }
+svalin_pki = { path = "../svalin_pki" }
 totp-rs = { version = "5.6.0", features = [
     "qr",
     "serde_support",

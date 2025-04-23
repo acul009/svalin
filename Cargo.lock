@@ -1907,8 +1907,10 @@ version = "0.1.0"
 dependencies = [
  "frozen_term",
  "iced",
- "portable-pty",
+ "sipper",
+ "svalin_sysctl",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -6141,7 +6143,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "futures",
  "postcard",
  "quinn",
  "serde",
@@ -6164,6 +6165,7 @@ dependencies = [
  "serde",
  "sysinfo",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]

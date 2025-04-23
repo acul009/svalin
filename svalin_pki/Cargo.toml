@@ -16,13 +16,13 @@ rcgen = { version = "0.13.2", features = ["pem", "ring", "x509-parser"] }
 ring = "0.17.14"
 rustls = { version = "0.23.25", optional = true, default-features = false }
 serde = { workspace = true }
-svalin_pki = { path = "../svalin_pki" }
 thiserror = { workspace = true }
 time = "0.3.41"
 tokio = { workspace = true }
 tracing = { workspace = true }
 x509-parser = { version = "0.17.0", features = ["ring", "validate", "verify"] }
 zeroize = { version = "1.8.1", features = ["aarch64", "derive", "std"] }
+spki = { version = "0.7.3", features = ["std", "sha2", "fingerprint"] }
 
 [dev-dependencies]
 serde_json = { workspace = true }

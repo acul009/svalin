@@ -22,11 +22,6 @@ pub enum TerminalPacket {
     Resize(TerminalSize),
 }
 
-pub enum TerminalInput {
-    Input(Vec<u8>),
-    Resize(TerminalSize),
-}
-
 impl From<TerminalInput> for TerminalPacket {
     fn from(data: TerminalInput) -> Self {
         match data {
