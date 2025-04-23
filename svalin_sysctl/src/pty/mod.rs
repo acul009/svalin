@@ -76,7 +76,6 @@ impl PtyProcess {
                         }
                     })
                     .await;
-                println!("helper task exited");
             });
 
             // writer thread
@@ -86,60 +85,44 @@ impl PtyProcess {
                     while let Some(input) = helper_recv.blocking_recv() {
                         match input {
                             TerminalInput::Input(input) => {
-                                // println!("writer thread received {} bytes", input.len());
-                                if let Err(err) = writer.write_all(&input) {
-                                    panic!("{}", err);
+                                if let Err(_err) = writer.write_all(&input) {
                                     return;
                                 }
                             }
                             TerminalInput::Resize(size) => {
-                                // println!("writer thread received resize");
-                                if let Err(err) = master.resize(size.into()) {
-                                    panic!("{}", err);
+                                if let Err(_err) = master.resize(size.into()) {
                                     return;
                                 }
                             }
                         }
                     }
                 }
-                println!("Writer task exited");
             });
 
             let (reader_send, reader_recv) = mpsc::channel::<Vec<u8>>(10);
 
             // reader thread
-            let reader_thread = std::thread::spawn(move || {
-                println!("async reader started");
+            std::thread::spawn(move || {
                 let mut buffer = [0u8; 1024];
                 loop {
                     match reader.read(&mut buffer) {
                         Ok(0) => break,
                         Ok(bytes) => {
-                            // println!(
-                            //     "reader thread received {} bytes: {:?}",
-                            //     bytes,
-                            //     &buffer[0..bytes]
-                            // );
                             if bytes == 0 {
                                 break;
                             }
 
                             let mut chunk = Vec::new();
                             chunk.extend_from_slice(&buffer[0..bytes]);
-                            if let Err(err) = reader_send.try_send(chunk) {
-                                println!("reader thread error: {}", err);
-                                panic!("{}", err);
+                            if let Err(_err) = reader_send.try_send(chunk) {
                                 return;
                             }
                         }
-                        Err(err) => {
-                            println!("reader task error: {}", err);
-                            panic!("{}", err);
+                        Err(_err) => {
                             return;
                         }
                     }
                 }
-                println!("Reader task exited");
             });
 
             let win_child = child.as_any().downcast_ref::<WinChild>();
@@ -148,20 +131,16 @@ impl PtyProcess {
                     std::thread::spawn(move || {
                         let mut child = child;
                         let _ = child.wait();
-                        println!("child finished");
 
                         cancel.cancel();
                     });
                 }
                 Some(_win_child) => {
                     tokio::spawn(async move {
-                        println!("win child detected");
                         let mut child = child;
                         let win_child = child.as_any_mut().downcast_mut::<WinChild>().unwrap();
 
                         let _ = win_child.await;
-
-                        println!("child finished");
 
                         cancel.cancel();
                     });
