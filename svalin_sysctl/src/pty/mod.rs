@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
 use anyhow::Result;
-use portable_pty::{CommandBuilder, PtySize, native_pty_system, win::WinChild};
+use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -96,7 +96,7 @@ impl PtyProcess {
                 }
             });
 
-            let (reader_send, reader_recv) = mpsc::channel::<Vec<u8>>(10);
+            let (reader_send, reader_recv) = mpsc::channel::<Vec<u8>>(100);
 
             // reader thread
             std::thread::spawn(move || {
@@ -111,37 +111,51 @@ impl PtyProcess {
 
                             let mut chunk = Vec::new();
                             chunk.extend_from_slice(&buffer[0..bytes]);
-                            if let Err(_err) = reader_send.try_send(chunk) {
-                                return;
+                            if let Err(_err) = reader_send.blocking_send(chunk) {
+                                break;
                             }
                         }
                         Err(_err) => {
-                            return;
+                            break;
                         }
                     }
                 }
+                println!("reader shut down")
             });
 
-            let win_child = child.as_any().downcast_ref::<WinChild>();
-            match win_child {
-                None => {
-                    std::thread::spawn(move || {
-                        let mut child = child;
-                        let _ = child.wait();
+            #[cfg(target_os = "windows")]
+            {
+                let win_child = child.as_any().downcast_ref::<WinChild>();
+                match win_child {
+                    None => {
+                        std::thread::spawn(move || {
+                            let mut child = child;
+                            let _ = child.wait();
 
-                        cancel.cancel();
-                    });
+                            cancel.cancel();
+                        });
+                    }
+                    Some(_win_child) => {
+                        tokio::spawn(async move {
+                            let mut child = child;
+                            let win_child = child.as_any_mut().downcast_mut::<WinChild>().unwrap();
+
+                            let _ = win_child.await;
+
+                            cancel.cancel();
+                        });
+                    }
                 }
-                Some(_win_child) => {
-                    tokio::spawn(async move {
-                        let mut child = child;
-                        let win_child = child.as_any_mut().downcast_mut::<WinChild>().unwrap();
+            }
 
-                        let _ = win_child.await;
+            #[cfg(not(target_os = "windows"))]
+            {
+                std::thread::spawn(move || {
+                    let mut child = child;
+                    let _ = child.wait();
 
-                        cancel.cancel();
-                    });
-                }
+                    cancel.cancel();
+                });
             }
 
             Ok((Self { write: writer_send }, reader_recv))
