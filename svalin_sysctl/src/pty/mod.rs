@@ -1,12 +1,9 @@
-use std::{
-    sync::{Arc, LazyLock, Mutex},
-    time::Duration,
-};
+use std::sync::LazyLock;
 
 use anyhow::Result;
-use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system, win::WinChild};
+use portable_pty::{CommandBuilder, PtySize, native_pty_system, win::WinChild};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 static SHELL: LazyLock<String> = LazyLock::new(|| {
