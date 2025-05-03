@@ -120,17 +120,14 @@ impl PtyProcess {
                         }
                     }
                 }
-                println!("reader shut down")
             });
 
             // For win specifically, the explicit child does implement Future.
             // Unfortunately, it doesn't work.
             // As I'm not all that great of a programmer, this is what I'll use for now.
             std::thread::spawn(move || {
-                println!("started waiter thread");
                 let mut child = child;
                 let _ = child.wait();
-                println!("win_child completed!");
 
                 cancel.cancel();
             });
