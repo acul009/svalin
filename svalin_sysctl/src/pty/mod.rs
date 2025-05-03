@@ -8,7 +8,6 @@ use tokio_util::sync::CancellationToken;
 
 static SHELL: LazyLock<String> = LazyLock::new(|| {
     let shell = CommandBuilder::new_default_prog().get_shell();
-    println!("{shell}");
     if &shell == r"C:\WINDOWS\system32\cmd.exe" {
         return "powershell.exe".to_string();
     }
