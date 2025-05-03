@@ -1932,7 +1932,6 @@ dependencies = [
  "svalin_sysctl",
  "tokio",
  "tokio-util",
- "uuid",
 ]
 
 [[package]]
