@@ -123,40 +123,17 @@ impl PtyProcess {
                 println!("reader shut down")
             });
 
-            #[cfg(target_os = "windows")]
-            {
-                let win_child = child.as_any().downcast_ref::<WinChild>();
-                match win_child {
-                    None => {
-                        std::thread::spawn(move || {
-                            let mut child = child;
-                            let _ = child.wait();
+            // For win specifically, the explicit child does implement Future.
+            // Unfortunately, it doesn't work.
+            // As I'm not all that great of a programmer, this is what I'll use for now.
+            std::thread::spawn(move || {
+                println!("started waiter thread");
+                let mut child = child;
+                let _ = child.wait();
+                println!("win_child completed!");
 
-                            cancel.cancel();
-                        });
-                    }
-                    Some(_win_child) => {
-                        tokio::spawn(async move {
-                            let mut child = child;
-                            let win_child = child.as_any_mut().downcast_mut::<WinChild>().unwrap();
-
-                            let _ = win_child.await;
-
-                            cancel.cancel();
-                        });
-                    }
-                }
-            }
-
-            #[cfg(not(target_os = "windows"))]
-            {
-                std::thread::spawn(move || {
-                    let mut child = child;
-                    let _ = child.wait();
-
-                    cancel.cancel();
-                });
-            }
+                cancel.cancel();
+            });
 
             Ok((Self { write: writer_send }, reader_recv))
         })
