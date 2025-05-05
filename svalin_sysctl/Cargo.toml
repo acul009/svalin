@@ -10,3 +10,4 @@ portable-pty = "0.9.0"
 sysinfo = { version = "0.34.2", features = ["windows", "serde"] }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
+tracing.workspace = true

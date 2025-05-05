@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use iced::{
-    Task,
+    Subscription, Task,
     widget::{center, text},
     window,
 };
@@ -18,6 +18,7 @@ pub enum Message {
         id: window::Id,
         message: WindowMessage,
     },
+    WindowClosed(window::Id),
     None,
 }
 
@@ -81,6 +82,10 @@ impl WindowHelper {
                     Task::none()
                 }
             }
+            Message::WindowClosed(id) => {
+                self.windows.remove(&id);
+                Task::none()
+            }
             Message::None => Task::none(),
         }
     }
@@ -91,6 +96,10 @@ impl WindowHelper {
         } else {
             "Window Error".to_string()
         }
+    }
+
+    pub fn subscription(&self) -> Subscription<Message> {
+        window::close_events().map(Message::WindowClosed)
     }
 }
 

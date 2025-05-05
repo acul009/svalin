@@ -3,7 +3,8 @@ use iced::{
     widget::{center, stack, text},
 };
 use sipper::sipper;
-use svalin::{client::device::Device, shared::commands::terminal::TerminalInput};
+use svalin::client::device::Device;
+use svalin_sysctl::pty::{TerminalInput, TerminalSize};
 use tokio::sync::mpsc;
 
 use crate::{Element, ui::widgets::loading};
@@ -31,11 +32,11 @@ pub struct TerminalWindow {
 
 impl TerminalWindow {
     pub fn start(device: Device) -> (Self, Task<Message>) {
-        let (term_display, task1) = frozen_term::Terminal::new(25, 80);
+        let (term_display, terminal_emulator_task) = frozen_term::Terminal::new(25, 80);
 
-        let (send, recv) = device.open_terminal();
+        let (send, recv) = device.open_terminal(TerminalSize { rows: 25, cols: 80 });
 
-        let task2 = Task::stream(sipper(move |mut sender| async move {
+        let read_task = Task::stream(sipper(move |mut sender| async move {
             let mut recv = recv;
             while let Some(output) = recv.recv().await {
                 match output {
@@ -44,15 +45,15 @@ impl TerminalWindow {
                 }
             }
 
-            Message::Closed
+            sender.send(Message::Closed).await;
         }));
 
-        let task = Task::batch(vec![task1.map(Message::Terminal), task2]);
+        let task = Task::batch([terminal_emulator_task.map(Message::Terminal), read_task]);
 
         (
             Self {
                 term_display,
-                state: State::Ready,
+                state: State::Pending,
                 send,
             },
             task,

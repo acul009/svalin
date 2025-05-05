@@ -8,7 +8,7 @@ use svalin_rpc::rpc::{
     },
     session::Session,
 };
-use svalin_sysctl::pty::{PtyProcess, TerminalSize};
+use svalin_sysctl::pty::{PtyProcess, TerminalInput, TerminalSize};
 use tokio::{select, sync::mpsc};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::debug;
@@ -81,7 +81,6 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
             loop {
                 select! {
                     _ = cancel.cancelled() => {
-                        pty.close();
                         break;
                     }
                     packet = read.read_object() => {
@@ -90,9 +89,7 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
                         debug!("got terminal packet: {packet:?}");
                         match packet {
                             TerminalPacket::Close => {
-                                pty.close();
-                                cancel.cancel();
-                                return Ok(());
+                                break;
                             }
                             TerminalPacket::Input(input) => {
                                 if let Err(err) = pty.write(input).await {
@@ -100,7 +97,7 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
                                     return Err(err);
                                 }
                             }
-                            TerminalPacket::Resize(size) => pty.resize(size).unwrap(),
+                            TerminalPacket::Resize(size) => pty.resize(size).await?,
                         };
                     }
                 }
@@ -117,6 +114,7 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
 }
 
 pub struct RemoteTerminalDispatcher {
+    pub initial_size: TerminalSize,
     pub input: mpsc::Receiver<TerminalInput>,
     pub output: mpsc::Sender<Result<Vec<u8>, ()>>,
     pub cancel: CancellationToken,
@@ -136,7 +134,7 @@ impl CommandDispatcher for RemoteTerminalDispatcher {
     }
 
     async fn dispatch(mut self, session: &mut Session) -> Result<Self::Output, Self::Error> {
-        debug!("starting remote terminal");
+        session.write_object(&self.initial_size).await?;
 
         loop {
             tokio::select! {

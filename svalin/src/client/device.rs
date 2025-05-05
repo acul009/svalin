@@ -5,7 +5,10 @@ use svalin_rpc::{
     commands::{forward::ForwardConnection, ping::Ping},
     rpc::connection::{Connection, direct_connection::DirectConnection},
 };
-use svalin_sysctl::realtime::RealtimeStatus;
+use svalin_sysctl::{
+    pty::{TerminalInput, TerminalSize},
+    realtime::RealtimeStatus,
+};
 use tokio::sync::{mpsc, watch};
 use tokio_util::sync::CancellationToken;
 use tracing::error;
@@ -17,9 +20,8 @@ use crate::{
         start_agent_update::StartUpdateDispatcher,
     },
     shared::commands::{
-        agent_list::AgentListItem,
-        realtime_status::SubscribeRealtimeStatus,
-        terminal::{RemoteTerminalDispatcher, TerminalInput},
+        agent_list::AgentListItem, realtime_status::SubscribeRealtimeStatus,
+        terminal::RemoteTerminalDispatcher,
     },
     util::smart_subscriber::{SmartSubscriber, SubscriberStarter},
 };
@@ -123,6 +125,7 @@ impl Device {
 
     pub fn open_terminal(
         &self,
+        initial_size: TerminalSize,
     ) -> (
         mpsc::Sender<TerminalInput>,
         mpsc::Receiver<Result<Vec<u8>, ()>>,
@@ -134,6 +137,7 @@ impl Device {
             cancel: self.data.client.cancellation_token().clone(),
             input: input_recv,
             output: output_send.clone(),
+            initial_size,
         };
 
         let connection = self.data.connection.clone();

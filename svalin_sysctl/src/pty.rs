@@ -109,6 +109,8 @@ impl PtyProcess {
                                 break;
                             }
 
+                            tracing::debug!("Read {} bytes from pty", bytes);
+
                             let mut chunk = Vec::new();
                             chunk.extend_from_slice(&buffer[0..bytes]);
                             if let Err(_err) = reader_send.blocking_send(chunk) {
