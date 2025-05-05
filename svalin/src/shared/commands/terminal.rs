@@ -56,7 +56,7 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
         if let Some(mut session) = session.take() {
             let tasks = TaskTracker::new();
             let size: TerminalSize = session.read_object().await?;
-            let (pty, mut pty_reader) = PtyProcess::shell(size)?;
+            let (pty, mut pty_reader) = PtyProcess::shell(size).await?;
 
             let (mut read, mut write, _) = session.destructure();
 
