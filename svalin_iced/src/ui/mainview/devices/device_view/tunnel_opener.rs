@@ -75,6 +75,7 @@ impl TunnelOpener {
         }
     }
 
+    #[must_use]
     pub fn update(&mut self, message: Message) -> Action {
         match message {
             Message::TunnelType(tunnel_type) => {

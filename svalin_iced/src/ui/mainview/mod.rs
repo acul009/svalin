@@ -58,6 +58,7 @@ impl MainView {
         }
     }
 
+    #[must_use]
     pub fn update(&mut self, message: Message) -> Action {
         match message {
             Message::Devices(msg) => {

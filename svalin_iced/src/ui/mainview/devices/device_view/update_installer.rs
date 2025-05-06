@@ -72,6 +72,7 @@ impl UpdateInstaller {
         update_installer
     }
 
+    #[must_use]
     pub fn update(&mut self, message: Message) -> Action {
         match message {
             Message::Noop => Action::None,

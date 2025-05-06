@@ -84,6 +84,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Continue => match self.step {
@@ -119,7 +120,7 @@ where
                         let (send, recv) = mpsc::channel(2);
 
                         tokio::spawn(async move {
-                            
+
                         });
 
                         Task::stream(recv)

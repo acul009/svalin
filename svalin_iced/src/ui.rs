@@ -60,6 +60,7 @@ impl UI {
         )
     }
 
+    #[must_use]
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Noop => Task::none(),

@@ -60,31 +60,38 @@ impl TerminalWindow {
         )
     }
 
-    pub fn update(&mut self, message: Message) {
+    #[must_use]
+    pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Output(output) => {
                 self.state = State::Ready;
                 self.term_display.advance_bytes(&output);
+                Task::none()
             }
             Message::Closed => {
                 self.state = State::Closed;
+                Task::none()
             }
             Message::Unavailable => {
                 self.state = State::Unavailable;
+                Task::none()
             }
             Message::Terminal(message) => {
                 let action = self.term_display.update(message);
                 match action {
-                    frozen_term::Action::None => {}
+                    frozen_term::Action::None => Task::none(),
+                    frozen_term::Action::Run(task) => task.map(Message::Terminal),
                     frozen_term::Action::Resize(size) => {
                         let size = svalin_sysctl::pty::TerminalSize {
                             cols: size.cols as u16,
                             rows: size.rows as u16,
                         };
                         let _ = self.send.try_send(TerminalInput::Resize(size));
+                        Task::none()
                     }
                     frozen_term::Action::Input(input) => {
                         let _ = self.send.try_send(TerminalInput::Input(input));
+                        Task::none()
                     }
                 }
             }

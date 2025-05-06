@@ -65,6 +65,7 @@ impl Devices {
 }
 
 impl Devices {
+    #[must_use]
     pub fn update(&mut self, message: Message) -> Action {
         match message {
             Message::AddDevice(message) => match &mut self.state {

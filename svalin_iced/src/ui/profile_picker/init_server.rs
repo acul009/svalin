@@ -98,6 +98,7 @@ impl InitServer {
         )
     }
 
+    #[must_use]
     pub fn update(&mut self, message: Message) -> Action {
         match message {
             Message::Error(display_info) => {

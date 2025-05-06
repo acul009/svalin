@@ -68,6 +68,7 @@ impl WindowHelper {
         }
     }
 
+    #[must_use]
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Forwarded { id, message } => {
