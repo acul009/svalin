@@ -45,11 +45,7 @@ impl Profile {
     }
 
     pub fn name(&self) -> String {
-        format!(
-            "{}@{}",
-            self.username,
-            self.upstream_address.replace(":", "+")
-        )
+        format!("{}@{}", self.username, self.upstream_address)
     }
 }
 
@@ -62,7 +58,7 @@ impl Client {
     }
 
     async fn profile_dir(profile_name: &str) -> Result<Location> {
-        Ok(Self::data_dir().await?.push(profile_name))
+        Ok(Self::data_dir().await?.push(profile_name.replace(":", "+")))
     }
 
     pub async fn list_profiles() -> Result<Vec<String>> {

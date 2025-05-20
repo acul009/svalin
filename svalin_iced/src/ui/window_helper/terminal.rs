@@ -1,10 +1,11 @@
+use async_pty::{TerminalInput, TerminalSize};
 use iced::{
     Task,
     widget::{center, stack, text},
 };
 use sipper::sipper;
 use svalin::client::device::Device;
-use svalin_sysctl::pty::{TerminalInput, TerminalSize};
+
 use tokio::sync::mpsc;
 
 use crate::{Element, ui::widgets::loading};
@@ -82,7 +83,7 @@ impl TerminalWindow {
                     frozen_term::Action::None => Task::none(),
                     frozen_term::Action::Run(task) => task.map(Message::Terminal),
                     frozen_term::Action::Resize(size) => {
-                        let size = svalin_sysctl::pty::TerminalSize {
+                        let size = async_pty::TerminalSize {
                             cols: size.cols as u16,
                             rows: size.rows as u16,
                         };

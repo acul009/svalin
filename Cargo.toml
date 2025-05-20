@@ -12,7 +12,7 @@ members = [
 ]
 
 [workspace.dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 async-trait = "0.1.88"
 iced = { version = "0.13.1", features = [
     "tokio",
@@ -23,11 +23,11 @@ iced = { version = "0.13.1", features = [
     "canvas",
 ] }
 postcard = { version = "1.1.1", features = ["alloc", "use-std"] }
-rand = "0.9.0"
+rand = "0.9.1"
 serde = "1.0.219"
 serde_json = { version = "1.0.140", features = ["alloc"] }
 sipper = "0.1.0"
 thiserror = "2.0.12"
-tokio = { version = "1.44.2", features = ["full", "test-util"] }
-tokio-util = { version = "0.7.14", features = ["rt"] }
+tokio = { version = "1.45.0", features = ["full", "test-util"] }
+tokio-util = { version = "0.7.15", features = ["rt"] }
 tracing = "0.1.41"

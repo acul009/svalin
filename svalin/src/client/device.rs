@@ -1,14 +1,12 @@
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use anyhow::{Result, anyhow};
+use async_pty::{TerminalInput, TerminalSize};
 use svalin_rpc::{
     commands::{forward::ForwardConnection, ping::Ping},
     rpc::connection::{Connection, direct_connection::DirectConnection},
 };
-use svalin_sysctl::{
-    pty::{TerminalInput, TerminalSize},
-    realtime::RealtimeStatus,
-};
+use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::sync::{mpsc, watch};
 use tokio_util::sync::CancellationToken;
 use tracing::error;

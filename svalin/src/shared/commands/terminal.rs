@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow};
+use async_pty::{PtyProcess, TerminalInput, TerminalSize};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_rpc::rpc::{
@@ -8,7 +9,7 @@ use svalin_rpc::rpc::{
     },
     session::Session,
 };
-use svalin_sysctl::pty::{PtyProcess, TerminalInput, TerminalSize};
+
 use tokio::{select, sync::mpsc};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::debug;
