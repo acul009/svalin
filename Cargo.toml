@@ -3,8 +3,6 @@
 resolver = "2"
 
 members = [
-    "frostbyte_term",
-    "frozen_term",
     "svalin",
     "svalin_macros",
     "svalin_pki",
