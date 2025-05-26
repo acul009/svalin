@@ -6,6 +6,7 @@ mod hash;
 mod keypair;
 mod perm_credentials;
 mod public_key;
+// pub mod sealed_object;
 mod signed_message;
 pub mod signed_object;
 // pub mod tbrhl;
@@ -17,12 +18,13 @@ use anyhow::{Result, anyhow};
 pub use certificate::Certificate;
 pub use certificate::CertificateParseError;
 pub use certificate_request::{CertificateRequest, CertificateRequestParseError};
-pub use encrypt::{DecryptError, EncryptError, EncryptedData};
+pub use encrypt::{DecryptError, EncryptError, EncryptedData, EncryptedObject};
 pub use error::Error;
 pub use hash::*;
 pub use keypair::{GenerateRequestError, Keypair, ToSelfSingedError};
 pub use perm_credentials::{
-    ApproveRequestError, CreateCredentialsError, DecodeCredentialsError, PermCredentials,
+    ApproveRequestError, CreateCredentialsError, DecodeCredentialsError, EncryptedCredentials,
+    PermCredentials,
 };
 use ring::rand::{SecureRandom, SystemRandom};
 

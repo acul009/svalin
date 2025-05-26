@@ -16,8 +16,8 @@ use serde::{
     de::{self},
 };
 use svalin_pki::{
-    ArgonCost, Certificate, DecryptError, EncryptError, EncryptedData, Keypair,
-    ParamsStringParseError, ToSelfSingedError, argon2::Argon2, sha2::Sha512,
+    ArgonCost, Certificate, DecryptError, EncryptError, EncryptedCredentials, EncryptedObject,
+    Keypair, ParamsStringParseError, ToSelfSingedError, argon2::Argon2, sha2::Sha512,
 };
 use svalin_rpc::{
     rpc::{
@@ -45,7 +45,7 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginSuccess {
-    pub encrypted_credentials: Vec<u8>,
+    pub encrypted_credentials: EncryptedCredentials,
     pub root_cert: Certificate,
     pub server_cert: Certificate,
 }
@@ -428,11 +428,10 @@ impl TakeableCommandHandler for LoginHandler {
                 .await?
                 .ok_or_else(|| anyhow!("failed to get user by username"))?;
 
-            let totp_encrypted: Vec<u8> =
+            let totp_encrypted: EncryptedObject<String> =
                 session.read_object().await.context("Failed to read totp")?;
 
-            let totp: String =
-                EncryptedData::decrypt_object_with_key(&totp_encrypted, key_to_array(key))?;
+            let totp: String = totp_encrypted.decrypt_with_key(key_to_array(key))?;
 
             let totp_success = user.totp_secret.check_current(&totp)?;
 
@@ -451,8 +450,7 @@ impl TakeableCommandHandler for LoginHandler {
                 server_cert: self.server_cert.clone(),
             };
 
-            let encrypted_success =
-                EncryptedData::encrypt_object_with_key(&success, key_to_array(key))?;
+            let encrypted_success = EncryptedObject::encrypt_with_key(&success, key_to_array(key))?;
 
             session
                 .write_object(&encrypted_success)
@@ -724,7 +722,7 @@ impl TakeableCommandDispatcher for Login {
                 .receive_server_authenticator(server_authenticator.0)
                 .map_err(LoginDispatcherError::AucPaceError)?;
 
-            let totp = EncryptedData::encrypt_object_with_key(&self.totp, key_to_array(key))
+            let totp = EncryptedObject::encrypt_with_key(&self.totp, key_to_array(key))
                 .map_err(LoginDispatcherError::EncryptError)?;
 
             session
@@ -741,14 +739,14 @@ impl TakeableCommandDispatcher for Login {
                 return Err(LoginDispatcherError::InvalidTotp.into());
             }
 
-            let encrypted_success: Vec<u8> = session
+            let encrypted_success: EncryptedObject<LoginSuccess> = session
                 .read_object()
                 .await
                 .map_err(LoginDispatcherError::ReadSuccessError)?;
 
-            let success: LoginSuccess =
-                EncryptedData::decrypt_object_with_key(&encrypted_success, key_to_array(key))
-                    .map_err(LoginDispatcherError::DecryptError)?;
+            let success: LoginSuccess = encrypted_success
+                .decrypt_with_key(key_to_array(key))
+                .map_err(LoginDispatcherError::DecryptError)?;
 
             Ok(success)
         } else {

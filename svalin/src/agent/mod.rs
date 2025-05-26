@@ -4,7 +4,7 @@ use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::verifier::KnownCertificateVerifier;
 use svalin_pki::verifier::exact::ExactVerififier;
-use svalin_pki::{Certificate, PermCredentials};
+use svalin_pki::{Certificate, EncryptedCredentials, PermCredentials};
 use svalin_rpc::commands::deauthenticate::DeauthenticateHandler;
 use svalin_rpc::commands::e2e::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
@@ -51,7 +51,7 @@ impl Agent {
 
         let credentials = config
             .key_source
-            .decrypt_credentials(&config.encrypted_credentials)
+            .decrypt_credentials(config.encrypted_credentials)
             .await
             .context("error decrypting credentials")?;
 
@@ -193,6 +193,6 @@ struct AgentConfig {
     upstream_address: String,
     upstream_certificate: Certificate,
     root_certificate: Certificate,
-    encrypted_credentials: Vec<u8>,
+    encrypted_credentials: EncryptedCredentials,
     key_source: KeySource,
 }

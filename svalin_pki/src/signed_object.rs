@@ -10,6 +10,8 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// A signed Object allows you to take a serializeable type and sign it.
+/// After signing it, you can only access the data again using a verifier.
 pub struct SignedObject<T> {
     raw: Vec<u8>,
     singer_fingerprint: [u8; 32],

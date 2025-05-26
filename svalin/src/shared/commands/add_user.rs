@@ -6,7 +6,9 @@ use aucpace::{AuCPaceClient, ClientMessage};
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::{ParamsString, rand_core::OsRng};
 use serde::{Deserialize, Serialize};
-use svalin_pki::{ArgonCost, Certificate, PermCredentials, argon2::Argon2, sha2::Sha512};
+use svalin_pki::{
+    ArgonCost, Certificate, EncryptedCredentials, PermCredentials, argon2::Argon2, sha2::Sha512,
+};
 use svalin_rpc::rpc::{
     command::{
         dispatcher::CommandDispatcher,
@@ -27,7 +29,7 @@ use crate::{
 pub struct AddUserRequest {
     certificate: Certificate,
     // username: String,
-    encrypted_credentials: Vec<u8>,
+    encrypted_credentials: EncryptedCredentials,
     totp_secret: TOTP,
     current_totp: String,
     /// The username of the user being added
@@ -165,7 +167,7 @@ impl AddUser {
         let certificate = credentials.get_certificate().to_owned();
         debug!("certificate extracted");
 
-        let encrypted_credentials = credentials.to_bytes(password.clone()).await?;
+        let encrypted_credentials = credentials.export(password.clone()).await?;
         debug!("credentials encrypted");
 
         let request = AddUserRequest {

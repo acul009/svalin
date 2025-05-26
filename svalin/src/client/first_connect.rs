@@ -2,8 +2,8 @@ use std::fmt::Debug;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use svalin_pki::DecodeCredentialsError;
 use svalin_pki::verifier::KnownCertificateVerifier;
-use svalin_pki::{DecodeCredentialsError, PermCredentials};
 use svalin_rpc::rpc::command::dispatcher::DispatcherError;
 use svalin_rpc::rpc::connection::ConnectionDispatchError;
 use svalin_rpc::rpc::session::SessionDispatchError;
@@ -186,9 +186,10 @@ impl Login {
                 _ => LoginError::DispatchError(err),
             })?;
 
-        let credentials =
-            PermCredentials::from_bytes(&login_data.encrypted_credentials, password.clone())
-                .await?;
+        let credentials = login_data
+            .encrypted_credentials
+            .decrypt(password.clone())
+            .await?;
 
         let profile = Client::add_profile(
             username,

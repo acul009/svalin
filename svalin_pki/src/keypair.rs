@@ -1,11 +1,12 @@
 use std::fmt::Debug;
 
 use crate::{
-    Certificate, CertificateParseError, EncryptedData, PermCredentials,
+    Certificate, CertificateParseError, PermCredentials,
+    encrypt::EncryptedObject,
     perm_credentials::CreateCredentialsError,
     signed_message::{CanSign, CanVerify},
 };
-use anyhow::{Context, Result};
+use anyhow::Result;
 use rcgen::{DnType, ExtendedKeyUsagePurpose, KeyUsagePurpose, SignatureAlgorithm};
 use ring::signature::Ed25519KeyPair;
 use serde::{Deserialize, Serialize};
@@ -80,7 +81,7 @@ impl Algorithm {
 }
 
 #[derive(Serialize, Deserialize, ZeroizeOnDrop)]
-struct SavedKeypair {
+pub struct EncryptedKeypair {
     der: Vec<u8>,
     alg: Algorithm,
 }
@@ -162,29 +163,20 @@ impl Keypair {
         self.keypair.public_key_raw()
     }
 
-    pub async fn to_bytes(&self, password: Vec<u8>) -> Result<Vec<u8>> {
-        let saved = SavedKeypair {
+    pub async fn encrypt(&self, password: Vec<u8>) -> Result<EncryptedObject<EncryptedKeypair>> {
+        let saved = EncryptedKeypair {
             der: self.keypair.serialize_der(),
             alg: self.alg.clone(),
         };
 
-        let mut bytes = postcard::to_stdvec(&saved)?;
-
-        let encrypted_keypair = EncryptedData::encrypt_with_password(&bytes, password)
-            .await
-            .context("Failed to encrypt keypair")?;
-        bytes.zeroize();
-        drop(bytes);
-
-        Ok(encrypted_keypair)
+        Ok(EncryptedObject::encrypt_with_password(&saved, password).await?)
     }
 
-    pub async fn from_bytes(bytes: &[u8], password: Vec<u8>) -> Result<Self, DecodeKeypairError> {
-        let mut decrypted_keypair = EncryptedData::decrypt_with_password(&bytes, password).await?;
-
-        let saved: SavedKeypair = postcard::from_bytes(&decrypted_keypair)?;
-        decrypted_keypair.zeroize();
-        drop(decrypted_keypair);
+    pub async fn decrypt(
+        ciphertext: EncryptedObject<EncryptedKeypair>,
+        password: Vec<u8>,
+    ) -> Result<Self, DecodeKeypairError> {
+        let saved = ciphertext.decrypt_with_password(password).await?;
 
         let keypair = rcgen::KeyPair::from_der_and_sign_algo(
             &saved
@@ -241,8 +233,8 @@ mod test {
         let credentials = Keypair::generate();
         let password = "testpass".as_bytes().to_owned();
 
-        let bytes = credentials.to_bytes(password.clone()).await.unwrap();
-        let _credentials2 = Keypair::from_bytes(&bytes, password).await.unwrap();
+        let encrypted = credentials.encrypt(password.clone()).await.unwrap();
+        let _credentials2 = Keypair::decrypt(encrypted, password).await.unwrap();
     }
 
     #[test]

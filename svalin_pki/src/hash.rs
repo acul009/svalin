@@ -4,7 +4,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ArgonCost {
     m_cost: u32,
     t_cost: u32,
@@ -81,7 +81,7 @@ impl TryFrom<&ParamsString> for ArgonCost {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ArgonParams {
     cost: ArgonCost,
     salt: Vec<u8>,

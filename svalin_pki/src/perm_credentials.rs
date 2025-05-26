@@ -9,7 +9,8 @@ use zeroize::ZeroizeOnDrop;
 
 use crate::{
     Certificate, CertificateParseError, CertificateRequest, Keypair,
-    keypair::DecodeKeypairError,
+    encrypt::EncryptedObject,
+    keypair::{DecodeKeypairError, EncryptedKeypair},
     signed_message::{CanSign, CanVerify},
 };
 
@@ -34,10 +35,28 @@ impl Debug for PermCredentials {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct CredentialOnDisk {
-    encrypted_keypair: Vec<u8>,
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct EncryptedCredentials {
+    encrypted_keypair: EncryptedObject<EncryptedKeypair>,
     raw_cert: Vec<u8>,
+}
+
+impl EncryptedCredentials {
+    pub async fn decrypt(
+        self,
+        password: Vec<u8>,
+    ) -> Result<PermCredentials, DecodeCredentialsError> {
+        let certificate = Certificate::from_der(self.raw_cert)?;
+
+        debug!("decrypting credentials with password");
+
+        let decrypted_keypair = Keypair::decrypt(self.encrypted_keypair, password).await?;
+
+        debug!("credentials decrypted");
+
+        PermCredentials::new(decrypted_keypair, certificate)
+            .map_err(DecodeCredentialsError::CreateCredentialsError)
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -94,34 +113,14 @@ impl PermCredentials {
         })
     }
 
-    pub async fn to_bytes(&self, password: Vec<u8>) -> Result<Vec<u8>> {
-        let encrypted_keypair = self.data.keypair.to_bytes(password).await?;
-        let on_disk = CredentialOnDisk {
+    pub async fn export(&self, password: Vec<u8>) -> Result<EncryptedCredentials> {
+        let encrypted_keypair = self.data.keypair.encrypt(password).await?;
+        let on_disk = EncryptedCredentials {
             encrypted_keypair,
             raw_cert: self.data.certificate.to_der().to_owned(),
         };
 
-        let encoded = postcard::to_extend(&on_disk, Vec::new())?;
-
-        Ok(encoded)
-    }
-
-    pub async fn from_bytes(
-        bytes: &[u8],
-        password: Vec<u8>,
-    ) -> Result<Self, DecodeCredentialsError> {
-        let on_disk: CredentialOnDisk = postcard::from_bytes(bytes)?;
-
-        let certificate = Certificate::from_der(on_disk.raw_cert)?;
-
-        debug!("decrypting credentials with password");
-
-        let decrypted_keypair = Keypair::from_bytes(&on_disk.encrypted_keypair, password).await?;
-
-        debug!("credentials decrypted");
-
-        Self::new(decrypted_keypair, certificate)
-            .map_err(DecodeCredentialsError::CreateCredentialsError)
+        Ok(on_disk)
     }
 
     pub fn get_certificate(&self) -> &Certificate {
@@ -172,7 +171,7 @@ impl CanVerify for PermCredentials {
 mod test {
     use ring::rand::{SecureRandom, SystemRandom};
 
-    use crate::{Keypair, PermCredentials};
+    use crate::Keypair;
 
     #[tokio::test]
     async fn test_on_disk_storage() {
@@ -190,11 +189,9 @@ mod test {
         )
         .unwrap();
 
-        let on_disk = original.to_bytes(pw.clone().into()).await.unwrap();
+        let encrypted_credentials = original.export(pw.clone().into()).await.unwrap();
 
-        let copy = PermCredentials::from_bytes(&on_disk, pw.into())
-            .await
-            .unwrap();
+        let copy = encrypted_credentials.decrypt(pw.into()).await.unwrap();
 
         assert_eq!(
             copy.data.keypair.spki_hash(),

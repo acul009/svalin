@@ -126,7 +126,7 @@ impl WindowContent {
         match message {
             WindowMessage::Terminal(message) => {
                 if let Self::Terminal(terminal) = self {
-                    terminal.update(message);
+                    return terminal.update(message).map(WindowMessage::Terminal);
                 }
                 Task::none()
             }

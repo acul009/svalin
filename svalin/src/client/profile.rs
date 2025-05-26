@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Certificate, PermCredentials,
+    Certificate, EncryptedCredentials, PermCredentials,
     verifier::{KnownCertificateVerifier, exact::ExactVerififier},
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
@@ -24,7 +24,7 @@ pub(crate) struct Profile {
     pub(crate) upstream_address: String,
     pub(crate) upstream_certificate: Certificate,
     pub(crate) root_certificate: Certificate,
-    pub(crate) raw_credentials: Vec<u8>,
+    pub(crate) encrypted_credentials: EncryptedCredentials,
 }
 
 impl Profile {
@@ -33,14 +33,14 @@ impl Profile {
         upstream_address: String,
         upstream_certificate: Certificate,
         root_certificate: Certificate,
-        raw_credentials: Vec<u8>,
+        encrypted_credentials: EncryptedCredentials,
     ) -> Self {
         Self {
             username,
             upstream_address,
             upstream_certificate,
             root_certificate,
-            raw_credentials,
+            encrypted_credentials,
         }
     }
 
@@ -85,7 +85,7 @@ impl Client {
         credentials: PermCredentials,
         password: Vec<u8>,
     ) -> Result<String> {
-        let raw_credentials = credentials.to_bytes(password).await?;
+        let raw_credentials = credentials.export(password).await?;
 
         let profile = Profile::new(
             username,
@@ -147,7 +147,7 @@ impl Client {
 
         if let Some(profile) = profile {
             debug!("unlocking profile");
-            let identity = PermCredentials::from_bytes(&profile.raw_credentials, password).await?;
+            let identity = profile.encrypted_credentials.decrypt(password).await?;
 
             debug!("creating verifier");
             let verifier = UpstreamVerifier::new(

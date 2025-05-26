@@ -7,7 +7,9 @@ use config_builder::ServerConfigBuilder;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
-use svalin_pki::{Certificate, Keypair, PermCredentials, verifier::KnownCertificateVerifier};
+use svalin_pki::{
+    Certificate, EncryptedCredentials, Keypair, PermCredentials, verifier::KnownCertificateVerifier,
+};
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},
     rpc::{command::handler::HandlerCollection, server::Socket},
@@ -60,7 +62,7 @@ pub struct Server {
 #[derive(Serialize, Deserialize)]
 struct BaseConfig {
     root_cert: Certificate,
-    credentials: Vec<u8>,
+    credentials: EncryptedCredentials,
     key_source: KeySource,
     pseudo_data_seed: Vec<u8>,
 }
@@ -169,7 +171,7 @@ impl Server {
 
         let credentials = base_config
             .key_source
-            .decrypt_credentials(&base_config.credentials)
+            .decrypt_credentials(base_config.credentials)
             .await?;
 
         let user_store = UserStore::open(pool.clone());
