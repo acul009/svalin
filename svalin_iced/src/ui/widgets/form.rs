@@ -1,17 +1,15 @@
 use std::borrow::Cow;
 
 use iced::{
-    widget::{self, column, text, Column, Row},
     Element, Length,
+    widget::{self, Column, Row, column, text},
 };
 
 pub struct Form<'a, Message> {
     title: Option<Cow<'a, str>>,
 
     control: Vec<Element<'a, Message>>,
-    primary_action: Option<Element<'a, Message>>,
-    secondary_action: Option<Element<'a, Message>>,
-    tertiary_action: Option<Element<'a, Message>>,
+    buttons: Vec<Element<'a, Message>>,
 }
 
 impl<'a, Message> Form<'a, Message> {
@@ -19,9 +17,7 @@ impl<'a, Message> Form<'a, Message> {
         Self {
             title: None,
             control: vec![],
-            primary_action: None,
-            secondary_action: None,
-            tertiary_action: None,
+            buttons: vec![],
         }
     }
 
@@ -42,18 +38,8 @@ impl<'a, Message> Form<'a, Message> {
         self
     }
 
-    pub fn primary_action(mut self, button: impl Into<Element<'a, Message>>) -> Self {
-        self.primary_action = Some(button.into());
-        self
-    }
-
-    pub fn secondary_action(mut self, button: impl Into<Element<'a, Message>>) -> Self {
-        self.secondary_action = Some(button.into());
-        self
-    }
-
-    pub fn tertiary_action(mut self, button: impl Into<Element<'a, Message>>) -> Self {
-        self.tertiary_action = Some(button.into());
+    pub fn button(mut self, button: impl Into<Element<'a, Message>>) -> Self {
+        self.buttons.push(button.into());
         self
     }
 }
@@ -83,12 +69,13 @@ impl<'a, Message: Clone + 'static> From<Form<'a, Message>> for Element<'a, Messa
             .width(Length::Fill);
         content_row = content_row.push(content_col);
 
-        let button_row = Row::with_capacity(4)
+        let mut button_row = Row::with_capacity(1 + form.buttons.len())
             .spacing(4)
-            .push(widget::horizontal_space().width(Length::Fill))
-            .push_maybe(form.tertiary_action)
-            .push_maybe(form.secondary_action)
-            .push_maybe(form.primary_action);
+            .push(widget::horizontal_space().width(Length::Fill));
+
+        for button in form.buttons {
+            button_row = button_row.push(button);
+        }
 
         Element::from(
             widget::container(column![content_row, button_row].spacing(32))

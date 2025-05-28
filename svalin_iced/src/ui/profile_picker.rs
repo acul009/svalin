@@ -306,8 +306,8 @@ impl ProfilePicker {
                         .on_input(|input| Message::Input(Input::Password(input)))
                         .on_submit(Message::UnlockProfile),
                 )
-                .primary_action(button(text(t!("generic.unlock"))).on_press(Message::UnlockProfile))
-                .secondary_action(button(text(t!("generic.cancel"))).on_press(Message::Reset))
+                .button(button(text(t!("generic.cancel"))).on_press(Message::Reset))
+                .button(button(text(t!("generic.unlock"))).on_press(Message::UnlockProfile))
                 .into(),
             State::AddProfile { host } => form()
                 .title(t!("profile-picker.title.add"))
@@ -317,10 +317,10 @@ impl ProfilePicker {
                         .on_input(|input| Message::Input(Input::Host(input)))
                         .on_submit(Message::Connect(host.clone())),
                 )
-                .primary_action(
+                .button(button(text(t!("generic.cancel"))).on_press(Message::Reset))
+                .button(
                     button(text(t!("generic.continue"))).on_press(Message::Connect(host.clone())),
                 )
-                .secondary_action(button(text(t!("generic.cancel"))).on_press(Message::Reset))
                 .into(),
         }
     }
@@ -330,8 +330,8 @@ impl ProfilePicker {
             return Some(
                 dialog()
                     .body(t!("profile-picker.confirm-delete", "profile" => profile))
-                    .primary_action(button(text("Cancel")).on_press(Message::CancelDelete))
-                    .secondary_action(
+                    .button(button(text("Cancel")).on_press(Message::CancelDelete))
+                    .button(
                         button(text("Delete")).on_press(Message::ConfirmDelete(profile.clone())),
                     )
                     .title("Delete Profile")

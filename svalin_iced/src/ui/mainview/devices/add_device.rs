@@ -189,8 +189,8 @@ impl AddDevice {
                         .on_input(|input| Message::Input(Input::JoinCode(input)))
                         .on_submit(Message::Continue),
                 )
-                .primary_action(button(text(t!("generic.continue"))).on_press(Message::Continue))
-                .secondary_action(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
                 .into(),
             State::DeviceName => form()
                 .title(t!("add-device.title.device-name"))
@@ -200,8 +200,8 @@ impl AddDevice {
                         .on_input(|input| Message::Input(Input::DeviceName(input)))
                         .on_submit(Message::Continue),
                 )
-                .primary_action(button(text(t!("generic.continue"))).on_press(Message::Continue))
-                .secondary_action(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
                 .into(),
             State::ConfirmCode => form()
                 .title(t!("add-device.title.confirm-code"))
@@ -211,13 +211,13 @@ impl AddDevice {
                         .on_input(|input| Message::Input(Input::ConfirmCode(input)))
                         .on_submit(Message::Continue),
                 )
-                .primary_action(button(text(t!("generic.continue"))).on_press(Message::Continue))
-                .secondary_action(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
+                .button(button(text(t!("generic.back"))).on_press(Message::Back))
                 .into(),
             State::Success => form()
                 .title(t!("add-device.title.success"))
                 .control(text(t!("add-device.success")))
-                .primary_action(button(text(t!("generic.back"))).on_press(Message::Exit))
+                .button(button(text(t!("generic.back"))).on_press(Message::Exit))
                 .into(),
         }
     }

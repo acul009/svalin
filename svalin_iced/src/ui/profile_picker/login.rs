@@ -156,29 +156,29 @@ impl LoginDialog {
                 .control(
                     text_input(&t!("generic.username"), &self.username)
                         .id("username")
-                        .on_input(|input| Message::Username(input)),
+                        .on_input(Message::Username),
                 )
                 .control(
                     text_input(&t!("generic.password"), &self.password)
                         .secure(true)
-                        .on_input(|input| Message::Password(input)),
+                        .on_input(Message::Password),
                 )
                 .control(
                     text_input(&t!("profile-picker.input.totp"), &self.current_totp)
                         .id("totp")
-                        .on_input(|input| Message::Totp(input))
+                        .on_input(Message::Totp)
                         .on_submit(Message::Continue),
                 )
-                .primary_action(button(text(t!("generic.continue"))).on_press(Message::Continue))
-                .secondary_action(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
                 .into(),
             State::WrongPassword => form()
                 .title(t!("profile-picker.wrong-password"))
-                .primary_action(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.back"))).on_press(Message::Back))
                 .into(),
             State::InvalidTotp => form()
                 .title(t!("profile-picker.invalid-totp"))
-                .primary_action(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.back"))).on_press(Message::Back))
                 .into(),
         }
     }

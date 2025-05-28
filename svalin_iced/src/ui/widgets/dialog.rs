@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use iced::{
-    widget::{center, container, text},
     Background, Border, Color, Shadow,
+    widget::{center, container, text},
 };
 
 use crate::Element;
@@ -13,6 +13,8 @@ pub struct Dialog<'a, Message> {
     form: Form<'a, Message>,
     body: Option<Cow<'a, str>>,
     controls: Vec<Element<'a, Message>>,
+    max_width: iced::Pixels,
+    max_height: iced::Pixels,
 }
 
 impl<'a, Message> Dialog<'a, Message> {
@@ -21,6 +23,8 @@ impl<'a, Message> Dialog<'a, Message> {
             form: Form::new(),
             body: None,
             controls: vec![],
+            max_width: 500.into(),
+            max_height: 300.into(),
         }
     }
 
@@ -39,18 +43,18 @@ impl<'a, Message> Dialog<'a, Message> {
         self
     }
 
-    pub fn primary_action(mut self, button: impl Into<Element<'a, Message>>) -> Self {
-        self.form = self.form.primary_action(button);
+    pub fn button(mut self, button: impl Into<Element<'a, Message>>) -> Self {
+        self.form = self.form.button(button);
         self
     }
 
-    pub fn secondary_action(mut self, button: impl Into<Element<'a, Message>>) -> Self {
-        self.form = self.form.secondary_action(button);
+    pub fn max_width(mut self, max_width: impl Into<iced::Pixels>) -> Self {
+        self.max_width = max_width.into();
         self
     }
 
-    pub fn tertiary_action(mut self, button: impl Into<Element<'a, Message>>) -> Self {
-        self.form = self.form.tertiary_action(button);
+    pub fn max_height(mut self, max_height: impl Into<iced::Pixels>) -> Self {
+        self.max_height = max_height.into();
         self
     }
 }
@@ -74,8 +78,8 @@ impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Mes
                 border: Border::default(),
                 shadow: Shadow::default(),
             })
-            .max_width(500)
-            .max_height(300),
+            .max_width(value.max_width)
+            .max_height(value.max_height),
         )
         .style(|_| container::Style {
             text_color: None,

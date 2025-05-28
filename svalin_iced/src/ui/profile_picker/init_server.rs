@@ -285,8 +285,8 @@ impl InitServer {
                     .on_input(|input| Message::Input(Input::ConfirmPassword(input)))
                     .on_submit(Message::Continue),
                 )
-                .primary_action(button(text(t!("generic.continue"))).on_press(Message::Continue))
-                .secondary_action(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
                 .into(),
             State::Totp { qr, totp_input, .. } => form()
                 .title(t!("profile-picker.add"))
@@ -298,8 +298,8 @@ impl InitServer {
                         .on_input(|input| Message::Input(Input::Totp(input)))
                         .on_submit(Message::Continue),
                 )
-                .primary_action(button(text(t!("generic.continue"))).on_press(Message::Continue))
-                .secondary_action(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.back"))).on_press(Message::Back))
+                .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
                 .into(),
         }
     }

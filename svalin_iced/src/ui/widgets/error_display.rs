@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use iced::{
-    widget::{button, text},
     Element,
+    widget::{button, text},
 };
 
 use super::form;
@@ -52,7 +52,7 @@ where
         form()
             .title(display.title)
             .control(text!("{:#}", display.error))
-            .primary_action(close_button)
+            .button(close_button)
             .into()
     }
 }
