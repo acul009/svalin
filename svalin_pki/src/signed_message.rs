@@ -1,7 +1,6 @@
 use anyhow::{Context, Result, anyhow};
 
-use ring::{agreement::X25519, signature::{Ed25519KeyPair, KeyPair, VerificationAlgorithm, ED25519}};
-use rustls::pki_types::alg_id::{ECDSA_P521, ED25519};
+use ring::signature::{ED25519, Ed25519KeyPair, VerificationAlgorithm};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -36,10 +35,6 @@ pub(crate) trait Sign {
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>>;
 }
 
-pub(crate) trait Encrypt {
-    fn encrypt_for(&self, message: &[u8]) -> Result<Vec<u8>>;
-}
-
 impl<T> Sign for T
 where
     T: CanSign,
@@ -47,25 +42,6 @@ where
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>> {
         let keypair = self.borrow_keypair();
         SignedMessage::create(message, keypair)
-    }
-}
-
-impl<T> Encrypt for T
-where
-    T: CanSign,
-{
-    fn encrypt_for(&self, message: &[u8]) -> Result<Vec<u8>> {
-        let keypair = self.borrow_keypair();
-        SignedMessage::create(message, keypair)
-    }
-}
-
-impl<T> Decrypt for T
-where
-    T: CanSign,
-{
-    fn decrypt(&self, message: &[u8]) -> Result<Vec<u8>> {
-        let keypair = self.borrow_keypair();
     }
 }
 
