@@ -41,9 +41,7 @@
 - [x] Connection forwarding
 - [x] E2E Encryption
 - [x] List all agents with connection status
-- [x] Unlock Routine
-- [x] Connection forwarding
-- [x] Remote Terminal (UI has been too laggy so far)
+
 - [x] Init Routine
 - [x] Login Routine (make sure the server sent hashing parameters are strong enough and non-existent users are simulated with key derived hashing parameters)
 - [x] Unlock Routine

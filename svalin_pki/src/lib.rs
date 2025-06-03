@@ -7,6 +7,7 @@ mod keypair;
 mod perm_credentials;
 mod public_key;
 // pub mod sealed_object;
+pub mod hybrid_encrypted_object;
 mod signed_message;
 pub mod signed_object;
 // pub mod tbrhl;
@@ -30,15 +31,23 @@ use ring::rand::{SecureRandom, SystemRandom};
 
 pub use argon2;
 pub use sha2;
+use thiserror::Error;
 
 #[cfg(test)]
 mod test;
 
-pub fn generate_key() -> Result<[u8; 32]> {
+#[derive(Error, Debug)]
+pub enum GenerateKeyError {
+    #[error("Unspecified error")]
+    UnspecifiedError(ring::error::Unspecified),
+}
+
+pub fn generate_key() -> Result<[u8; 32], GenerateKeyError> {
     let rand = SystemRandom::new();
 
     let mut msg = [0u8; 32];
-    rand.fill(&mut msg).map_err(|err| anyhow!(err))?;
+    rand.fill(&mut msg)
+        .map_err(GenerateKeyError::UnspecifiedError)?;
 
     Ok(msg)
 }
