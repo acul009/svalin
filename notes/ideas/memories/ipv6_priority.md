@@ -1,0 +1,1 @@
+The project is meant for small businesses and enthusiasts. IPv6 is not a priority and should not be a milestone.
