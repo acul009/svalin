@@ -23,6 +23,7 @@ tracing = { workspace = true }
 x509-parser = { version = "0.17.0", features = ["ring", "validate", "verify"] }
 zeroize = { version = "1.8.1", features = ["aarch64", "derive", "std"] }
 spki = { version = "0.7.3", features = ["std", "sha2", "fingerprint"] }
+hpke = { version = "0.13.0", default-features = false, features = ["alloc", "x25519"] }
 
 [dev-dependencies]
 serde_json = { workspace = true }
