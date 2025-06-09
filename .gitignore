@@ -2,5 +2,7 @@ target/
 *.jammdb
 *.sled
 *.sqlite
+*.sqlite-shm
+*.sqlite-wal
 flamegraph.svg
 svalin/test_data
