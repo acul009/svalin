@@ -15,7 +15,7 @@ pub mod verifier;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 pub use certificate::Certificate;
 pub use certificate::CertificateParseError;
 pub use certificate_request::{CertificateRequest, CertificateRequestParseError};

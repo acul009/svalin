@@ -7,7 +7,7 @@ edition = "2024"
 serde = { workspace = true }
 anyhow = "1.0.98"
 portable-pty = "0.9.0"
-sysinfo = { version = "0.35.1", features = ["windows", "serde"] }
+sysinfo = { version = "0.35.2", features = ["windows", "serde"] }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 tracing.workspace = true

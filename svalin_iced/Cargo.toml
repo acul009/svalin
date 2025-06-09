@@ -27,8 +27,8 @@ thiserror = { workspace = true }
 tokio-stream = { version = "0.1.17", features = ["full"] }
 tokio-util = { workspace = true }
 futures = "0.3.31"
-uuid = "1.16.0"
-rust-i18n = "3.1.4"
+uuid = "1.17.0"
+rust-i18n = "3.1.5"
 sipper = { workspace = true }
 
 [build-dependencies]
