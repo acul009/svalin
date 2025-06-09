@@ -3,11 +3,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use serde::{Deserialize, Serialize};
 use svalin_pki::Certificate;
 use svalin_rpc::{
     commands::forward::ForwardConnection,
     rpc::{
-        connection::{direct_connection::DirectConnection, Connection},
+        connection::{Connection, direct_connection::DirectConnection},
         peer::Peer,
     },
 };
@@ -124,7 +125,7 @@ impl Drop for Tunnel {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TunnelConfig {
     Tcp(TcpTunnelConfig),
 }

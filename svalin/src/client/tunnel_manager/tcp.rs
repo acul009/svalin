@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use anyhow::anyhow;
 use dispatcher::TcpForwardDispatcher;
+use serde::{Deserialize, Serialize};
 use svalin_rpc::rpc::connection::Connection;
 use thiserror::Error;
 use tokio::{
@@ -15,7 +16,7 @@ use super::TunnelConfig;
 pub mod dispatcher;
 pub mod handler;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TcpTunnelConfig {
     pub local_port: u16,
     pub remote_host: String,

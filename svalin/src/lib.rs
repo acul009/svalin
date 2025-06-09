@@ -4,6 +4,7 @@ pub use tracing_subscriber;
 // TODO: refactor module locations
 pub mod agent;
 pub mod client;
+pub mod device;
 pub mod permissions;
 pub mod server;
 pub mod shared;
