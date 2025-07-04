@@ -14,7 +14,7 @@ postcard = { workspace = true }
 rand = { workspace = true }
 rcgen = { version = "0.13.2", features = ["pem", "ring", "x509-parser"] }
 ring = "0.17.14"
-rustls = { version = "0.23.27", optional = true, default-features = false }
+rustls = { version = "0.23.28", optional = true, default-features = false }
 serde = { workspace = true }
 thiserror = { workspace = true }
 time = "0.3.41"
