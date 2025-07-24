@@ -8,7 +8,7 @@ use ring::aead::{
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-use crate::hash::ArgonParams;
+use crate::ArgonParams;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 enum EncryptionAlgorythm {
@@ -131,7 +131,7 @@ pub enum DecryptError {
     #[error("error decrypting data: {0}")]
     UnsealError(ring::error::Unspecified),
     #[error("error deriving encryption key: {0}")]
-    DeriveKeyError(#[from] crate::hash::DeriveKeyError),
+    DeriveKeyError(#[from] crate::DeriveKeyError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -139,7 +139,7 @@ pub enum EncryptError {
     #[error("error marshalling data: {0}")]
     MarshalError(#[from] postcard::Error),
     #[error("error deriving encryption key: {0}")]
-    DeriveKeyError(#[from] crate::hash::DeriveKeyError),
+    DeriveKeyError(#[from] crate::DeriveKeyError),
     #[error("error loading key into ring: {0}")]
     CreateUnboundError(ring::error::Unspecified),
     #[error("error sealing data: {0}")]

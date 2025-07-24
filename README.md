@@ -326,3 +326,16 @@ You might be interested in this crate if you want to build something similar to 
 1. QUIC with Network Authentication and Path encryption
 2. Routing through the Svalin Network
 3. P2P Encryption
+
+# Notes for myself / Problems to solve
+
+## First login problem
+
+The first login problem is the issue of establishing trust with the existing certificate & permission store on the first connection to the server.
+As we don't have any prior logs or data, which we could use as a base to follow transactions, how could we trust any data we are given?
+
+I think the solution could be to just add checksums to the via password encrypted data on the server.
+
+It's still possible for the server to present an older version of that encrypted data to the client though.
+
+Maybe I could include a timestamp and ask the user if this roughly matches the last time they used the service.

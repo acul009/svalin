@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Certificate, EncryptedCredentials, PermCredentials,
+    Certificate, Credential, EncryptedCredentials,
     verifier::{KnownCertificateVerifier, exact::ExactVerififier},
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
@@ -82,7 +82,7 @@ impl Client {
         upstream_address: String,
         upstream_certificate: Certificate,
         root_certificate: Certificate,
-        credentials: PermCredentials,
+        credentials: Credential,
         password: Vec<u8>,
     ) -> Result<String> {
         let raw_credentials = credentials.export(password).await?;

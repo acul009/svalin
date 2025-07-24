@@ -13,7 +13,7 @@ mod profile;
 
 use device::Device;
 pub use first_connect::*;
-use svalin_pki::{Certificate, PermCredentials};
+use svalin_pki::{Certificate, Credential};
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
@@ -30,7 +30,7 @@ pub struct Client {
     _upstream_address: String,
     upstream_certificate: Certificate,
     root_certificate: Certificate,
-    credentials: PermCredentials,
+    credentials: Credential,
     device_list: watch::Sender<BTreeMap<Certificate, Device>>,
     tunnel_manager: TunnelManager,
     // TODO: These should not be required here, but should be created and canceled as needed

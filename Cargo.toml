@@ -8,7 +8,7 @@ members = [
     "svalin_pki",
     "svalin_rpc",
     "svalin_sysctl",
-    "svalin_iced",
+    "svalin_iced", "svalin_crypto",
 ]
 
 [workspace.dependencies]

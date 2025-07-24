@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
-use svalin_pki::{ArgonParams, Certificate, CertificateRequest, PermCredentials};
+use svalin_pki::{ArgonParams, Certificate, CertificateRequest, Credential};
 use svalin_rpc::{
     rpc::{
         command::{
@@ -83,7 +83,7 @@ pub struct AcceptJoin<'a> {
     pub join_code: String,
     pub waiting_for_confirm: tokio::sync::oneshot::Sender<Result<()>>,
     pub confirm_code_channel: tokio::sync::oneshot::Receiver<String>,
-    pub credentials: &'a PermCredentials,
+    pub credentials: &'a Credential,
     pub root: &'a Certificate,
     pub upstream: &'a Certificate,
 }
@@ -173,7 +173,7 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
 async fn prepare_agent_enroll(
     mut session: Session,
     join_code: String,
-    credentials: &PermCredentials,
+    credentials: &Credential,
 ) -> anyhow::Result<(String, Session)> {
     session.write_object(&join_code).await?;
 

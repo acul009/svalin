@@ -12,7 +12,7 @@ use crate::transport::session_transport::{SessionTransportReader, SessionTranspo
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, PermCredentials};
+use svalin_pki::{Certificate, Credential};
 use tokio::io::AsyncWriteExt;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
@@ -162,13 +162,13 @@ impl<'a> TakeableCommandDispatcher for ForwardDispatcher<'a> {
 #[derive(Clone)]
 pub struct ForwardConnection<T> {
     connection: T,
-    credentials: PermCredentials,
+    credentials: Credential,
     target: Certificate,
     as_peer: Peer,
 }
 
 impl<T> ForwardConnection<T> {
-    pub fn new(base_connection: T, credentials: PermCredentials, target: Certificate) -> Self {
+    pub fn new(base_connection: T, credentials: Credential, target: Certificate) -> Self {
         Self {
             connection: base_connection,
             credentials,

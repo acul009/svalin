@@ -7,7 +7,7 @@ use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::{ParamsString, rand_core::OsRng};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    ArgonCost, Certificate, EncryptedCredentials, PermCredentials, argon2::Argon2, sha2::Sha512,
+    ArgonCost, Certificate, EncryptedCredentials, Credential, argon2::Argon2, sha2::Sha512,
 };
 use svalin_rpc::rpc::{
     command::{
@@ -136,7 +136,7 @@ pub struct AddUser {
 
 impl AddUser {
     pub async fn new(
-        credentials: &PermCredentials,
+        credentials: &Credential,
         username: Vec<u8>,
         password: Vec<u8>,
         totp_secret: TOTP,

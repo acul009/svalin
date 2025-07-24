@@ -2,7 +2,7 @@ use std::{future::Future, sync::Arc};
 
 use anyhow::Result;
 use quinn::rustls::server::danger::ClientCertVerifier;
-use svalin_pki::PermCredentials;
+use svalin_pki::Credential;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use crate::{permissions::PermissionHandler, rpc::command::handler::HandlerCollection};
@@ -32,8 +32,8 @@ impl RpcServerConfigBuilder<(), (), (), (), ()> {
 impl<A, B, C, D, E> RpcServerConfigBuilder<A, B, C, D, E> {
     pub fn credentials(
         self,
-        credentials: PermCredentials,
-    ) -> RpcServerConfigBuilder<PermCredentials, B, C, D, E> {
+        credentials: Credential,
+    ) -> RpcServerConfigBuilder<Credential, B, C, D, E> {
         RpcServerConfigBuilder {
             credentials,
             client_cert_verifier: self.client_cert_verifier,
@@ -98,7 +98,7 @@ impl<A, B, C, D, E> RpcServerConfigBuilder<A, B, C, D, E> {
 
 impl<CB>
     RpcServerConfigBuilder<
-        PermCredentials,
+        Credential,
         Arc<dyn ClientCertVerifier>,
         CB,
         CancellationToken,

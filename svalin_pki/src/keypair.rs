@@ -1,30 +1,16 @@
 use std::fmt::Debug;
 
 use crate::{
-    Certificate, CertificateParseError, PermCredentials,
+    Certificate, CertificateParseError, CreateCredentialsError, Credential,
     encrypt::EncryptedObject,
-    perm_credentials::CreateCredentialsError,
     signed_message::{CanSign, CanVerify},
 };
 use anyhow::Result;
-use rcgen::{DnType, ExtendedKeyUsagePurpose, KeyUsagePurpose, SignatureAlgorithm};
+use rcgen::{PublicKeyData, SignatureAlgorithm};
 use ring::signature::Ed25519KeyPair;
 use serde::{Deserialize, Serialize};
-use time::{Duration, OffsetDateTime};
-use x509_parser::nom::{AsBytes, HexDisplay};
+use x509_parser::nom::AsBytes;
 use zeroize::{Zeroize, ZeroizeOnDrop};
-
-pub struct Keypair {
-    keypair: rcgen::KeyPair,
-    sign_keypair: Ed25519KeyPair,
-    alg: Algorithm,
-}
-
-impl Debug for Keypair {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Keypair").finish()
-    }
-}
 
 #[derive(Debug, thiserror::Error)]
 pub enum ToSelfSingedError {
@@ -66,114 +52,50 @@ pub enum DecodeKeypairError {
     ParseKeypairError(rcgen::Error),
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Zeroize)]
-pub enum Algorithm {
-    #[default]
-    PkcsEd25519,
+pub struct KeyPair {
+    keypair: rcgen::KeyPair,
+    sign_keypair: Ed25519KeyPair,
 }
 
-impl Algorithm {
-    pub fn as_rcgen(&self) -> &'static SignatureAlgorithm {
-        match self {
-            Algorithm::PkcsEd25519 => &rcgen::PKCS_ED25519,
-        }
+impl Debug for KeyPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Keypair").finish()
     }
 }
 
-#[derive(Serialize, Deserialize, ZeroizeOnDrop)]
-pub struct EncryptedKeypair {
-    der: Vec<u8>,
-    alg: Algorithm,
-}
-
-impl Keypair {
+impl KeyPair {
     pub fn generate() -> Self {
-        let alg = Algorithm::default();
-        let keypair = rcgen::KeyPair::generate_for(alg.as_rcgen()).unwrap();
+        let keypair = rcgen::KeyPair::generate_for(&rcgen::PKCS_ED25519).unwrap();
         let sign_keypair = Ed25519KeyPair::from_pkcs8(keypair.serialized_der()).unwrap();
 
         Self {
             keypair,
-            alg,
             sign_keypair,
         }
     }
 
-    pub fn to_self_signed_cert(self) -> Result<PermCredentials, ToSelfSingedError> {
-        let mut params =
-            rcgen::CertificateParams::new(vec![]).map_err(ToSelfSingedError::CreateParamsError)?;
-        params.not_before = OffsetDateTime::now_utc();
-        params.not_after = OffsetDateTime::now_utc().saturating_add(Duration::days(365 * 10));
-        params.key_usages.push(KeyUsagePurpose::DigitalSignature);
-        params
-            .extended_key_usages
-            .push(ExtendedKeyUsagePurpose::ServerAuth);
-
-        params
-            .distinguished_name
-            .push(DnType::CommonName, self.spki_hash());
-
-        let ca_cert = params
-            .self_signed(&self.keypair)
-            .map_err(ToSelfSingedError::SelfSignError)?;
-
-        let certificate = Certificate::from_der(ca_cert.der().to_vec())
-            .map_err(ToSelfSingedError::CertificateParseError)?;
-
-        self.upgrade(certificate)
-            .map_err(ToSelfSingedError::CreateCredentialsError)
+    pub fn export_public_key(&self) -> ExportedPublicKey {
+        ExportedPublicKey {
+            der: self.keypair.der_bytes().to_vec(),
+            alg: Algorithm::from_rcgen(self.keypair.algorithm()),
+        }
     }
 
-    pub fn generate_request(&self) -> Result<String, GenerateRequestError> {
-        let mut params = rcgen::CertificateParams::new(vec![])
-            .map_err(GenerateRequestError::CreateParamsError)?;
-
-        params
-            .distinguished_name
-            .push(DnType::CommonName, self.spki_hash());
-
-        let request = params
-            .serialize_request(&self.keypair)
-            .map_err(GenerateRequestError::SerializeError)?;
-
-        request.pem().map_err(GenerateRequestError::EncodeError)
+    pub fn upgrade(self, certificate: Certificate) -> Result<Credential, CreateCredentialsError> {
+        Credential::new(self, certificate)
     }
 
-    /// This was recommended to me as a possible id by the rust crypto channel
-    /// on discord
-    pub fn spki_hash(&self) -> String {
-        let spki_hash = ring::digest::digest(&ring::digest::SHA512_256, &self.public_key_der())
-            .as_ref()
-            .to_hex(32);
-        spki_hash
-    }
-
-    pub fn upgrade(
-        self,
-        certificate: Certificate,
-    ) -> Result<PermCredentials, CreateCredentialsError> {
-        PermCredentials::new(self, certificate)
-    }
-
-    pub fn get_der_key_bytes(&self) -> &[u8] {
-        self.keypair.serialized_der()
-    }
-
-    pub fn public_key_der(&self) -> &[u8] {
-        self.keypair.public_key_raw()
-    }
-
-    pub async fn encrypt(&self, password: Vec<u8>) -> Result<EncryptedObject<EncryptedKeypair>> {
-        let saved = EncryptedKeypair {
+    pub async fn encrypt(&self, password: Vec<u8>) -> Result<EncryptedObject<SavedKeypair>> {
+        let saved = SavedKeypair {
             der: self.keypair.serialize_der(),
-            alg: self.alg.clone(),
+            alg: Algorithm::from_rcgen(self.keypair.algorithm()),
         };
 
         Ok(EncryptedObject::encrypt_with_password(&saved, password).await?)
     }
 
     pub async fn decrypt(
-        ciphertext: EncryptedObject<EncryptedKeypair>,
+        ciphertext: EncryptedObject<SavedKeypair>,
         password: Vec<u8>,
     ) -> Result<Self, DecodeKeypairError> {
         let saved = ciphertext.decrypt_with_password(password).await?;
@@ -192,89 +114,88 @@ impl Keypair {
 
         Ok(Self {
             keypair,
-            alg: saved.alg.clone(),
             sign_keypair,
         })
     }
 
-    pub fn rcgen(&self) -> &rcgen::KeyPair {
+    pub(crate) fn rcgen(&self) -> &rcgen::KeyPair {
         &self.keypair
     }
 
-    pub fn alg(&self) -> &Algorithm {
-        &self.alg
+    pub(crate) fn rcgen_clone(&self) -> rcgen::KeyPair {
+        let der = self.keypair.serialized_der().try_into().unwrap();
+        rcgen::KeyPair::from_der_and_sign_algo(&der, self.keypair.algorithm())
+            .expect("current value is valid, so new one should be too")
     }
 }
 
-impl CanSign for Keypair {
+impl CanSign for KeyPair {
     fn borrow_keypair(&self) -> &Ed25519KeyPair {
         &self.sign_keypair
     }
 }
 
-impl CanVerify for Keypair {
+impl CanVerify for KeyPair {
     fn borrow_public_key(&self) -> &[u8] {
-        self.public_key_der()
+        self.keypair.public_key_raw()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Zeroize, PartialEq)]
+pub enum Algorithm {
+    #[default]
+    PkcsEd25519,
+}
+
+impl Algorithm {
+    pub fn as_rcgen(&self) -> &'static SignatureAlgorithm {
+        match self {
+            Algorithm::PkcsEd25519 => &rcgen::PKCS_ED25519,
+        }
+    }
+
+    pub fn from_rcgen(alg: &'static SignatureAlgorithm) -> Self {
+        if &rcgen::PKCS_ED25519 == alg {
+            Self::PkcsEd25519
+        } else {
+            panic!("Algorithm not supported")
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, ZeroizeOnDrop)]
+pub struct SavedKeypair {
+    der: Vec<u8>,
+    alg: Algorithm,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct ExportedPublicKey {
+    der: Vec<u8>,
+    alg: Algorithm,
+}
+
+impl PublicKeyData for ExportedPublicKey {
+    fn der_bytes(&self) -> &[u8] {
+        &self.der
+    }
+
+    fn algorithm(&self) -> &'static SignatureAlgorithm {
+        self.alg.as_rcgen()
     }
 }
 
 #[cfg(test)]
 mod test {
 
-    use ring::rand::{SecureRandom, SystemRandom};
-
-    use crate::{
-        Keypair,
-        signed_message::{Sign, Verify},
-    };
+    use crate::KeyPair;
 
     #[tokio::test]
     async fn test_encode_decode() {
-        let credentials = Keypair::generate();
+        let credentials = KeyPair::generate();
         let password = "testpass".as_bytes().to_owned();
 
         let encrypted = credentials.encrypt(password.clone()).await.unwrap();
-        let _credentials2 = Keypair::decrypt(encrypted, password).await.unwrap();
-    }
-
-    #[test]
-    fn test_sign() {
-        let credentials = Keypair::generate();
-        let rand = SystemRandom::new();
-
-        let mut msg = [0u8; 1024];
-        rand.fill(&mut msg).unwrap();
-
-        let signed = credentials.sign(&msg).unwrap();
-
-        let msg2 = credentials.verify(&signed).unwrap();
-
-        assert_eq!(msg, msg2.as_ref());
-    }
-
-    #[test]
-    fn tampered_sign() {
-        let credentials = Keypair::generate();
-        let rand = SystemRandom::new();
-
-        let mut msg = [0u8; 1024];
-        rand.fill(&mut msg).unwrap();
-
-        let mut signed = credentials.sign(&msg).unwrap();
-
-        let replacement = &[1, 2, 3];
-        signed.splice(50..52, replacement.iter().cloned());
-
-        let msg2 = credentials.verify(&signed);
-        match msg2 {
-            Err(_) => (),
-            Ok(_) => panic!("message should not be readable after tampering"),
-        }
-    }
-
-    #[test]
-    fn create_self_signed() {
-        let credentials = Keypair::generate();
-        credentials.to_self_signed_cert().unwrap();
+        let _credentials2 = KeyPair::decrypt(encrypted, password).await.unwrap();
     }
 }

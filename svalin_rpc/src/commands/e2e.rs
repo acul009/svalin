@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use quinn::rustls::server::danger::ClientCertVerifier;
 use svalin_pki::{
-    Certificate, PermCredentials,
+    Certificate, Credential,
     verifier::{KnownCertificateVerifier, exact::ExactVerififier},
 };
 use tokio_util::sync::CancellationToken;
@@ -34,7 +34,7 @@ pub struct E2EHandler<P, V>
 where
     P: PermissionHandler,
 {
-    credentials: PermCredentials,
+    credentials: Credential,
     handler_collection: HandlerCollection<P>,
     verifier: Arc<V>,
 }
@@ -44,7 +44,7 @@ where
     P: PermissionHandler,
 {
     pub fn new(
-        credentials: PermCredentials,
+        credentials: Credential,
         handler_collection: HandlerCollection<P>,
         verifier: Arc<V>,
     ) -> Self {
@@ -106,7 +106,7 @@ pub enum E2EDispatchError {
 
 pub struct E2EDispatcher<'b> {
     pub peer: Certificate,
-    pub credentials: &'b PermCredentials,
+    pub credentials: &'b Credential,
 }
 
 impl<'b> TakeableCommandDispatcher for E2EDispatcher<'b> {

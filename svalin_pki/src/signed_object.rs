@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    Certificate, PermCredentials,
+    Certificate, Credential,
     signed_message::{Sign, Verify},
     verifier::Verifier,
 };
@@ -22,7 +22,7 @@ impl<T> SignedObject<T>
 where
     T: Serialize,
 {
-    pub fn new(object: &T, credentials: &PermCredentials) -> Result<Self> {
+    pub fn new(object: &T, credentials: &Credential) -> Result<Self> {
         let data = postcard::to_extend(object, Vec::new())?;
 
         let raw = credentials.sign(&data)?;
@@ -100,7 +100,7 @@ mod tests {
     use tokio::test;
 
     use crate::{
-        Keypair, get_current_timestamp, signed_object::SignedObject,
+        Credential, KeyPair, get_current_timestamp, signed_object::SignedObject,
         verifier::exact::ExactVerififier,
     };
 
@@ -119,7 +119,7 @@ mod tests {
             blob: vec![1, 2, 3],
         };
 
-        let credentials = Keypair::generate().to_self_signed_cert().unwrap();
+        let credentials = Credential::generate_root().unwrap();
 
         let signed = super::SignedObject::new(&object, &credentials).unwrap();
 
@@ -144,7 +144,7 @@ mod tests {
             blob: vec![1, 2, 3],
         };
 
-        let credentials = Keypair::generate().to_self_signed_cert().unwrap();
+        let credentials = Credential::generate_root().unwrap();
 
         let mut signed = super::SignedObject::new(&object, &credentials).unwrap();
         let verifier = ExactVerififier::new(credentials.get_certificate().clone());
@@ -173,8 +173,8 @@ mod tests {
             blob: vec![1, 2, 3],
         };
 
-        let credentials = Keypair::generate().to_self_signed_cert().unwrap();
-        let credentials2 = Keypair::generate().to_self_signed_cert().unwrap();
+        let credentials = Credential::generate_root().unwrap();
+        let credentials2 = Credential::generate_root().unwrap();
 
         let signed = super::SignedObject::new(&object, &credentials).unwrap();
         let verifier = ExactVerififier::new(credentials2.get_certificate().clone());

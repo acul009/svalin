@@ -12,7 +12,7 @@ argon2 = { version = "0.5.3", features = ["simple", "std"] }
 sha2 = "0.10.9"
 postcard = { workspace = true }
 rand = { workspace = true }
-rcgen = { version = "0.13.2", features = ["pem", "ring", "x509-parser"] }
+rcgen = { version = "0.14.3", features = ["x509-parser", "zeroize"] }
 ring = "0.17.14"
 rustls = { version = "0.23.28", optional = true, default-features = false }
 serde = { workspace = true }
@@ -23,7 +23,10 @@ tracing = { workspace = true }
 x509-parser = { version = "0.17.0", features = ["ring", "validate", "verify"] }
 zeroize = { version = "1.8.1", features = ["aarch64", "derive", "std"] }
 spki = { version = "0.7.3", features = ["std", "sha2", "fingerprint"] }
-hpke = { version = "0.13.0", default-features = false, features = ["alloc", "x25519"] }
+hpke = { version = "0.13.0", default-features = false, features = [
+    "alloc",
+    "x25519",
+] }
 ed25519-dalek = { version = "2.1.1", features = ["pkcs8"] }
 
 [dev-dependencies]

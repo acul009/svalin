@@ -5,7 +5,7 @@ use anyhow::{Ok, Result, anyhow};
 use quinn::{
     TransportConfig, VarInt, crypto::rustls::QuicClientConfig, rustls::crypto::CryptoProvider,
 };
-use svalin_pki::PermCredentials;
+use svalin_pki::Credential;
 use tokio::time::{error::Elapsed, timeout};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
@@ -23,7 +23,7 @@ pub struct RpcClient {
 impl RpcClient {
     pub async fn connect(
         address: &str,
-        identity: Option<&PermCredentials>,
+        identity: Option<&Credential>,
         verifier: Arc<dyn rustls::client::danger::ServerCertVerifier>,
         cancel: CancellationToken,
     ) -> Result<RpcClient> {

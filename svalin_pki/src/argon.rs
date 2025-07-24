@@ -3,6 +3,7 @@ use argon2::{Argon2, Params, password_hash::ParamsString};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use zeroize::Zeroize;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ArgonCost {
@@ -139,7 +140,7 @@ impl ArgonParams {
         }
     }
 
-    pub async fn derive_key(&self, secret: Vec<u8>) -> Result<[u8; 32], DeriveKeyError> {
+    pub async fn derive_key(&self, mut secret: Vec<u8>) -> Result<[u8; 32], DeriveKeyError> {
         let argon = self.cost.get_argon_hasher();
 
         let salt_bytes = self.salt.as_slice().to_owned();
@@ -151,6 +152,8 @@ impl ArgonParams {
                 .hash_password_into(&secret, &salt_bytes, &mut hash)
                 .map(move |_| hash)
                 .map_err(DeriveKeyError::HashError);
+
+            secret.zeroize();
 
             result
         })

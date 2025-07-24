@@ -1,7 +1,7 @@
 use anyhow::Result;
 use svalin_pki::{
-    ApproveRequestError, Certificate, CertificateRequest, CertificateRequestParseError, Keypair,
-    PermCredentials, ToSelfSingedError,
+    ApproveRequestError, Certificate, CertificateRequest, CertificateRequestParseError, KeyPair,
+    Credential, ToSelfSingedError,
 };
 
 use async_trait::async_trait;
@@ -14,11 +14,11 @@ use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 pub(crate) struct InitHandler {
-    channel: mpsc::Sender<(Certificate, PermCredentials)>,
+    channel: mpsc::Sender<(Certificate, Credential)>,
 }
 
 impl InitHandler {
-    pub fn new(conf: mpsc::Sender<(Certificate, PermCredentials)>) -> Self {
+    pub fn new(conf: mpsc::Sender<(Certificate, Credential)>) -> Self {
         Self { channel: conf }
     }
 }
@@ -41,7 +41,7 @@ impl CommandHandler for InitHandler {
 
         let root = request;
 
-        let keypair = Keypair::generate();
+        let keypair = KeyPair::generate();
         let request = keypair.generate_request()?;
         session.write_object(&request).await?;
 
@@ -67,12 +67,12 @@ impl CommandHandler for InitHandler {
 }
 
 pub struct Init {
-    root: PermCredentials,
+    root: Credential,
 }
 
 impl Init {
     pub fn new() -> Result<Self, ToSelfSingedError> {
-        let root = Keypair::generate().to_self_signed_cert()?;
+        let root = KeyPair::generate().to_self_signed_cert()?;
 
         Ok(Self { root })
     }
@@ -95,7 +95,7 @@ pub enum InitError {
 }
 
 impl CommandDispatcher for Init {
-    type Output = (PermCredentials, Certificate);
+    type Output = (Credential, Certificate);
     type Request = Certificate;
     type Error = InitError;
 

@@ -2,7 +2,7 @@ use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Certificate, Keypair,
+    Certificate, Credential,
     signed_message::{Sign, Verify},
 };
 
@@ -14,8 +14,8 @@ struct SerializationTestStruct {
 
 #[test]
 fn test_certificate_serde_serialization() {
-    let credentials = Keypair::generate().to_self_signed_cert().unwrap();
-    let credentials2 = Keypair::generate().to_self_signed_cert().unwrap();
+    let credentials = Credential::generate_root().unwrap();
+    let credentials2 = Credential::generate_root().unwrap();
 
     let test_struct = SerializationTestStruct {
         cert1: credentials.get_certificate().to_owned(),
@@ -31,7 +31,7 @@ fn test_certificate_serde_serialization() {
 
 #[test]
 pub fn cert_verify_message() {
-    let credentials = Keypair::generate();
+    let credentials = Credential::generate_root().unwrap();
     let rand = SystemRandom::new();
 
     let mut msg = [0u8; 1024];
@@ -39,9 +39,8 @@ pub fn cert_verify_message() {
 
     let signed = credentials.sign(&msg).unwrap();
 
-    let cert = credentials.to_self_signed_cert().unwrap();
-    let msg2 = cert.verify(&signed).unwrap();
-    let msg3 = cert.get_certificate().verify(&signed).unwrap();
+    let msg2 = credentials.verify(&signed).unwrap();
+    let msg3 = credentials.get_certificate().verify(&signed).unwrap();
 
     assert_eq!(msg, msg2.as_ref());
     assert_eq!(msg, msg3.as_ref());
@@ -49,8 +48,7 @@ pub fn cert_verify_message() {
 
 #[test]
 pub fn serialization() {
-    let credentials = Keypair::generate();
-    let perm_creds = credentials.to_self_signed_cert().unwrap();
+    let perm_creds = Credential::generate_root().unwrap();
     let cert = perm_creds.get_certificate();
 
     let seriaized = cert.to_der().to_owned();
@@ -60,8 +58,7 @@ pub fn serialization() {
 
 #[test]
 pub fn serde_serialization() {
-    let credentials = Keypair::generate();
-    let perm_creds = credentials.to_self_signed_cert().unwrap();
+    let perm_creds = Credential::generate_root().unwrap();
     let cert = perm_creds.get_certificate();
 
     let serialized = postcard::to_extend(cert, Vec::new()).unwrap();

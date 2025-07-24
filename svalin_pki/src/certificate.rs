@@ -257,12 +257,11 @@ impl Hash for Certificate {
 
 #[cfg(test)]
 mod test {
-    use crate::Keypair;
+    use crate::Credential;
 
     #[test]
     fn test_certificate_serialization() {
-        let cert = Keypair::generate()
-            .to_self_signed_cert()
+        let cert = Credential::generate_root()
             .unwrap()
             .get_certificate()
             .clone();
@@ -273,8 +272,7 @@ mod test {
 
     #[test]
     fn test_certificate_serialization_json() {
-        let cert = Keypair::generate()
-            .to_self_signed_cert()
+        let cert = Credential::generate_root()
             .unwrap()
             .get_certificate()
             .clone();

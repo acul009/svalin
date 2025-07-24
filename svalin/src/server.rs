@@ -8,7 +8,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
 use svalin_pki::{
-    Certificate, EncryptedCredentials, Keypair, PermCredentials, verifier::KnownCertificateVerifier,
+    Certificate, EncryptedCredentials, KeyPair, Credential, verifier::KnownCertificateVerifier,
 };
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},
@@ -219,8 +219,8 @@ impl Server {
     async fn init_server(
         socket: Socket,
         cancel: CancellationToken,
-    ) -> Result<(Certificate, PermCredentials)> {
-        let (send, mut receive) = mpsc::channel::<(Certificate, PermCredentials)>(1);
+    ) -> Result<(Certificate, Credential)> {
+        let (send, mut receive) = mpsc::channel::<(Certificate, Credential)>(1);
 
         let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
 
@@ -231,7 +231,7 @@ impl Server {
             .add(InitHandler::new(send))
             .add(PublicStatusHandler::new(PublicStatus::WaitingForInit));
 
-        let temp_credentials = Keypair::generate().to_self_signed_cert()?;
+        let temp_credentials = KeyPair::generate().to_self_signed_cert()?;
 
         debug!("starting up init server");
         let rpc = RpcServer::build()

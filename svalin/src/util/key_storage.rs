@@ -1,6 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{EncryptedCredentials, PermCredentials};
+use svalin_pki::{EncryptedCredentials, Credential};
 use tracing::debug;
 
 /// The keysource enum is saved in the configuration and specifies how to
@@ -25,7 +25,7 @@ impl KeySource {
 
     pub async fn encrypt_credentials(
         &self,
-        credentials: &PermCredentials,
+        credentials: &Credential,
     ) -> Result<EncryptedCredentials> {
         let key = self.to_key().await?;
 
@@ -35,7 +35,7 @@ impl KeySource {
     pub async fn decrypt_credentials(
         &self,
         encrypted_credentials: EncryptedCredentials,
-    ) -> Result<PermCredentials> {
+    ) -> Result<Credential> {
         let key = self.to_key().await?;
         debug!("headless password loaded, decrypting...");
         Ok(encrypted_credentials.decrypt(key).await?)

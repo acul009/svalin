@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, DeriveKeyError, PermCredentials};
+use svalin_pki::{Certificate, DeriveKeyError, Credential};
 use svalin_rpc::rpc::{command::handler::PermissionPrecursor, session::Session};
 use tokio::task::AbortHandle;
 use tracing::field::debug;
@@ -27,7 +27,7 @@ pub struct PublicAgentData {
 #[derive(Debug)]
 pub struct AgentInitPayload {
     pub address: String,
-    pub credentials: PermCredentials,
+    pub credentials: Credential,
     pub root: Certificate,
     pub upstream: Certificate,
 }

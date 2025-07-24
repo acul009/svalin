@@ -1,32 +1,29 @@
+mod argon;
 mod certificate;
 mod certificate_request;
+mod credential;
 mod encrypt;
-mod error;
-mod hash;
 mod keypair;
-mod perm_credentials;
 mod public_key;
-// pub mod sealed_object;
-pub mod hybrid_encrypted_object;
 mod signed_message;
-pub mod signed_object;
+mod signed_object;
 // pub mod tbrhl;
-pub mod verifier;
+mod verifier;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
-pub use certificate::Certificate;
-pub use certificate::CertificateParseError;
-pub use certificate_request::{CertificateRequest, CertificateRequestParseError};
-pub use encrypt::{DecryptError, EncryptError, EncryptedData, EncryptedObject};
-pub use error::Error;
-pub use hash::*;
-pub use keypair::{GenerateRequestError, Keypair, ToSelfSingedError};
-pub use perm_credentials::{
-    ApproveRequestError, CreateCredentialsError, DecodeCredentialsError, EncryptedCredentials,
-    PermCredentials,
+pub use argon::{ArgonCost, ArgonParams, DeriveKeyError, ParamsStringParseError, PasswordHash};
+pub use certificate::{
+    Certificate, CertificateParseError, SignatureVerificationError, ValidityError,
 };
+pub use certificate_request::{CertificateRequest, CertificateRequestParseError};
+pub use credential::{
+    ApproveRequestError, CreateCredentialsError, Credential, DecodeCredentialsError,
+    EncryptedCredentials,
+};
+pub use encrypt::{DecryptError, EncryptError, EncryptedData, EncryptedObject};
+pub use keypair::{GenerateRequestError, KeyPair, ToSelfSingedError};
 use ring::rand::{SecureRandom, SystemRandom};
 
 pub use argon2;

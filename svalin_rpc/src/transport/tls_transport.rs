@@ -5,7 +5,7 @@ use crate::rustls;
 use crate::rustls::{client::danger::ServerCertVerifier, server::danger::ClientCertVerifier};
 use anyhow::Result;
 use quinn::rustls::pki_types::InvalidDnsNameError;
-use svalin_pki::{Certificate, CertificateParseError, PermCredentials};
+use svalin_pki::{Certificate, CertificateParseError, Credential};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::{TlsAcceptor, TlsStream};
 
@@ -64,7 +64,7 @@ where
     pub async fn client(
         base_transport: T,
         verifier: Arc<dyn ServerCertVerifier>,
-        credentials: &PermCredentials,
+        credentials: &Credential,
     ) -> Result<Self, TlsClientError> {
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
             credentials.get_certificate().to_der().to_owned(),
@@ -112,7 +112,7 @@ where
     pub async fn server(
         base_transport: T,
         verifier: Arc<dyn ClientCertVerifier>,
-        credentials: &PermCredentials,
+        credentials: &Credential,
     ) -> Result<Self, TlsServerError> {
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
             credentials.get_certificate().to_der().to_owned(),

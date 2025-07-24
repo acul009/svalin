@@ -17,7 +17,7 @@ use serde::{
 };
 use svalin_pki::{
     ArgonCost, Certificate, DecryptError, EncryptError, EncryptedCredentials, EncryptedObject,
-    Keypair, ParamsStringParseError, ToSelfSingedError, argon2::Argon2, sha2::Sha512,
+    KeyPair, ParamsStringParseError, ToSelfSingedError, argon2::Argon2, sha2::Sha512,
 };
 use svalin_rpc::{
     rpc::{
@@ -295,7 +295,7 @@ impl TakeableCommandHandler for LoginHandler {
 
             let (read, write, _) = session.destructure_transport();
 
-            let temp_credentials = Keypair::generate()
+            let temp_credentials = KeyPair::generate()
                 .to_self_signed_cert()
                 .context("Failed to generate temporary credentials")?;
 
@@ -562,7 +562,7 @@ impl TakeableCommandDispatcher for Login {
             // ===== TLS Initialization =====
             let (read, write, _) = session.destructure_transport();
 
-            let credentials = Keypair::generate()
+            let credentials = KeyPair::generate()
                 .to_self_signed_cert()
                 .map_err(LoginDispatcherError::TempCredentialError)?;
 

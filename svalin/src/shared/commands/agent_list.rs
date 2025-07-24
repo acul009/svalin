@@ -4,7 +4,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Certificate, PermCredentials, get_current_timestamp, signed_object::SignedObject,
+    Certificate, Credential, get_current_timestamp, signed_object::SignedObject,
     verifier::exact::ExactVerififier,
 };
 use svalin_rpc::{
@@ -139,7 +139,7 @@ impl CommandHandler for AgentListHandler {
 pub struct UpdateAgentList {
     pub base_connection: DirectConnection,
     pub client: Arc<Client>,
-    pub credentials: PermCredentials,
+    pub credentials: Credential,
     pub list: watch::Sender<BTreeMap<Certificate, Device>>,
     pub verifier: ExactVerififier,
     pub tunnel_manager: TunnelManager,

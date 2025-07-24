@@ -25,7 +25,7 @@ async fn ping_test() {
     println!("starting ping test");
 
     let address = "127.0.0.1:1234";
-    let credentials = svalin_pki::Keypair::generate()
+    let credentials = svalin_pki::KeyPair::generate()
         .to_self_signed_cert()
         .unwrap();
 
@@ -78,7 +78,7 @@ async fn tls_test() {
     println!("starting tls test");
 
     let address = "127.0.0.1:1235";
-    let credentials = svalin_pki::Keypair::generate()
+    let credentials = svalin_pki::KeyPair::generate()
         .to_self_signed_cert()
         .unwrap();
     let socket =
@@ -127,7 +127,7 @@ async fn perm_test() {
     println!("starting permission test");
 
     let address = "127.0.0.1:1236";
-    let credentials = svalin_pki::Keypair::generate()
+    let credentials = svalin_pki::KeyPair::generate()
         .to_self_signed_cert()
         .unwrap();
     let socket =

@@ -4,7 +4,7 @@ use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::verifier::KnownCertificateVerifier;
 use svalin_pki::verifier::exact::ExactVerififier;
-use svalin_pki::{Certificate, EncryptedCredentials, PermCredentials};
+use svalin_pki::{Certificate, Credential, EncryptedCredentials};
 use svalin_rpc::commands::deauthenticate::DeauthenticateHandler;
 use svalin_rpc::commands::e2e::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
@@ -33,7 +33,7 @@ use crate::verifier::upstream_verifier::UpstreamVerifier;
 pub struct Agent {
     rpc: RpcClient,
     root_certificate: Certificate,
-    credentials: PermCredentials,
+    credentials: Credential,
     cancel: CancellationToken,
 }
 

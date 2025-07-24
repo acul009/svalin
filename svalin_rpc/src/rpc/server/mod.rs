@@ -7,7 +7,7 @@ use anyhow::{Context, Result, anyhow};
 use quinn::EndpointConfig;
 use quinn::crypto::rustls::QuicServerConfig;
 use quinn::rustls::crypto::CryptoProvider;
-use svalin_pki::{Certificate, PermCredentials};
+use svalin_pki::{Certificate, Credential};
 use tokio::select;
 use tokio::sync::{Mutex, broadcast};
 use tokio::time::error::Elapsed;
@@ -40,7 +40,7 @@ pub struct RpcServer {
 
 #[derive(Debug)]
 struct RpcServerConfig {
-    credentials: PermCredentials,
+    credentials: Credential,
     client_cert_verifier: Arc<dyn ClientCertVerifier>,
     cancellation_token: CancellationToken,
 }

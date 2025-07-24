@@ -5,7 +5,7 @@ use crate::shared::join_agent::{PublicAgentData, accept_handler::AcceptJoin, add
 use super::Client;
 
 use anyhow::{Result, anyhow};
-use svalin_pki::{Certificate, PermCredentials, signed_object::SignedObject};
+use svalin_pki::{Certificate, Credential, signed_object::SignedObject};
 use svalin_rpc::rpc::connection::{
     Connection, ConnectionDispatchError, direct_connection::DirectConnection,
 };
@@ -57,7 +57,7 @@ pub struct WaitingForConfirmCode {
     connection: DirectConnection,
     confirm_code_send: oneshot::Sender<String>,
     result_revc: oneshot::Receiver<Result<Certificate, ConnectionDispatchError<anyhow::Error>>>,
-    credentials: PermCredentials,
+    credentials: Credential,
 }
 
 impl Debug for WaitingForConfirmCode {

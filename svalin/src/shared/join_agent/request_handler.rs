@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use rand::Rng;
 use svalin_pki::{
-    Certificate, CreateCredentialsError, DeriveKeyError, GenerateRequestError, Keypair,
+    Certificate, CreateCredentialsError, DeriveKeyError, GenerateRequestError, KeyPair,
     ToSelfSingedError,
 };
 use svalin_rpc::{
@@ -177,7 +177,7 @@ impl TakeableCommandDispatcher for RequestJoin {
 
             let (read, write, _) = session.destructure_transport();
 
-            let temp_credentials = Keypair::generate()
+            let temp_credentials = KeyPair::generate()
                 .to_self_signed_cert()
                 .map_err(RequestJoinError::ToSelfSingedError)?;
 
@@ -213,7 +213,7 @@ impl TakeableCommandDispatcher for RequestJoin {
 
             self.confirm_code_channel.send(confirm_code).unwrap();
 
-            let keypair = Keypair::generate();
+            let keypair = KeyPair::generate();
             let request = keypair
                 .generate_request()
                 .map_err(RequestJoinError::GenerateRequestError)?;
