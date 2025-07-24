@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
     Certificate, Credential,
+    certificate::Fingerprint,
     signed_message::{Sign, Verify},
     verifier::Verifier,
 };
@@ -14,7 +15,7 @@ use crate::{
 /// After signing it, you can only access the data again using a verifier.
 pub struct SignedObject<T> {
     raw: Vec<u8>,
-    singer_fingerprint: [u8; 32],
+    singer_fingerprint: Fingerprint,
     phantom: PhantomData<T>,
 }
 
@@ -41,7 +42,7 @@ where
 {
     pub async fn verify(self, verifier: &impl Verifier, time: u64) -> Result<VerifiedObject<T>> {
         let signer = verifier
-            .verify_fingerprint(self.singer_fingerprint, time)
+            .verify_fingerprint(&self.singer_fingerprint, time)
             .await
             .context("failed to verify fingerprint of signed object")?;
 

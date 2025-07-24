@@ -1,12 +1,9 @@
-use std::{
-    fmt::Debug,
-    future::Future,
-};
+use std::{fmt::Debug, future::Future};
 use thiserror::Error;
 
 use crate::{
-    certificate::{SignatureVerificationError, ValidityError},
     Certificate,
+    certificate::{Fingerprint, SignatureVerificationError, ValidityError},
 };
 
 pub mod exact;
@@ -27,9 +24,11 @@ pub enum VerificationError {
     TimerangeError(#[from] ValidityError),
     #[error("The signature could not be verified: {0}")]
     SignatureError(#[from] SignatureVerificationError),
-    #[error("The given fingerprint {fingerprint:x?} is shared between these two certificates: {given_cert:?} (given) vs {loaded_cert:?} (loaded)")]
+    #[error(
+        "The given fingerprint {fingerprint:x?} is shared between these two certificates: {given_cert:?} (given) vs {loaded_cert:?} (loaded)"
+    )]
     FingerprintCollission {
-        fingerprint: [u8; 32],
+        fingerprint: Fingerprint,
         given_cert: Certificate,
         loaded_cert: Certificate,
     },
@@ -41,7 +40,7 @@ pub trait Verifier: Send + Sync + Debug + 'static {
     /// TODO: include time for revocation/expiration checking
     fn verify_fingerprint(
         &self,
-        fingerprint: [u8; 32],
+        fingerprint: &Fingerprint,
         time: u64,
     ) -> impl Future<Output = Result<Certificate, VerificationError>> + Send;
 }
@@ -57,7 +56,7 @@ pub trait KnownCertificateVerifier: Verifier + Sized + 'static {
         async move {
             let fingerprint = cert.fingerprint();
 
-            let loaded_cert = self.verify_fingerprint(fingerprint, time).await?;
+            let loaded_cert = self.verify_fingerprint(&fingerprint, time).await?;
 
             if cert != &loaded_cert {
                 Err(VerificationError::FingerprintCollission {
@@ -90,11 +89,11 @@ pub mod rustls_feat {
     use std::{fmt::Debug, sync::Arc};
 
     use rustls::{
-        client::danger::ServerCertVerified, crypto::CryptoProvider, CertificateError, OtherError,
+        CertificateError, OtherError, client::danger::ServerCertVerified, crypto::CryptoProvider,
     };
     use tokio::task::block_in_place;
 
-    use crate::{verifier::VerificationError, Certificate};
+    use crate::{Certificate, verifier::VerificationError};
 
     use super::KnownCertificateVerifier;
 

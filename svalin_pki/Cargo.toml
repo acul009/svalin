@@ -13,7 +13,7 @@ postcard = { workspace = true }
 rand = { workspace = true }
 rcgen = { version = "0.14.3", features = ["x509-parser", "zeroize"] }
 ring = "0.17.14"
-rustls = { version = "0.23.28", optional = true, default-features = false }
+rustls = { version = "0.23.29", optional = true, default-features = false }
 serde = { workspace = true }
 thiserror = { workspace = true }
 time = "0.3.41"
@@ -21,11 +21,6 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 x509-parser = { version = "0.17.0", features = ["ring", "validate", "verify"] }
 zeroize = { version = "1.8.1", features = ["aarch64", "derive", "std"] }
-spki = { version = "0.7.3", features = ["std", "sha2", "fingerprint"] }
-hpke = { version = "0.13.0", default-features = false, features = [
-    "alloc",
-    "x25519",
-] }
 
 [dev-dependencies]
 serde_json = { workspace = true }

@@ -5,7 +5,6 @@ use std::sync::Arc;
 use anyhow::Result;
 use serde::de::Visitor;
 use serde::{Deserialize, Serialize, de};
-use spki::FingerprintBytes;
 use thiserror::Error;
 use x509_parser::error::X509Error;
 use x509_parser::prelude::Validity;
@@ -63,6 +62,19 @@ pub enum SignatureVerificationError {
     X509ParserError(#[from] x509_parser::nom::Err<X509Error>),
     #[error("Verification Error: {0}")]
     X509VerificationError(#[from] X509Error),
+}
+
+#[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct Fingerprint([u8; 32]);
+
+impl Debug for Fingerprint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for byte in self.0.iter() {
+            write!(f, "{:02X}", byte)?
+        }
+
+        Ok(())
+    }
 }
 
 impl Certificate {
@@ -136,11 +148,12 @@ impl Certificate {
         &self.data.spki_hash
     }
 
-    pub fn fingerprint(&self) -> FingerprintBytes {
+    pub fn fingerprint(&self) -> Fingerprint {
         // Todo: use rcgen::Certificate::key_identifier instead
         let hash = ring::digest::digest(&ring::digest::SHA512_256, &self.data.der);
 
-        hash.as_ref()[0..32].try_into().unwrap()
+        let fingerprint = hash.as_ref()[0..32].try_into().unwrap();
+        Fingerprint(fingerprint)
     }
 
     pub fn check_validity_at(&self, time: u64) -> Result<(), ValidityError> {
