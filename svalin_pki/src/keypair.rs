@@ -13,34 +13,6 @@ use x509_parser::nom::AsBytes;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[derive(Debug, thiserror::Error)]
-pub enum ToSelfSingedError {
-    #[error("error parsing keypair: {0}")]
-    ParseKeypairError(rcgen::Error),
-    #[error("error creating params: {0}")]
-    CreateParamsError(rcgen::Error),
-    #[error("error self-signing certificate: {0}")]
-    SelfSignError(rcgen::Error),
-    #[error("error serializing keypair: {0}")]
-    SerializeError(rcgen::Error),
-    #[error("error parsing certificate: {0}")]
-    CertificateParseError(CertificateParseError),
-    #[error("error creating credentials: {0}")]
-    CreateCredentialsError(CreateCredentialsError),
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum GenerateRequestError {
-    #[error("error parsing keypair: {0}")]
-    ParseKeypairError(rcgen::Error),
-    #[error("error creating params: {0}")]
-    CreateParamsError(rcgen::Error),
-    #[error("error serializing keypair: {0}")]
-    SerializeError(rcgen::Error),
-    #[error("error encoding request: {0}")]
-    EncodeError(rcgen::Error),
-}
-
-#[derive(Debug, thiserror::Error)]
 pub enum DecodeKeypairError {
     #[error("error decrypting credentials: {0}")]
     DecryptError(#[from] crate::encrypt::DecryptError),
@@ -85,7 +57,7 @@ impl KeyPair {
         Credential::new(self, certificate)
     }
 
-    pub async fn encrypt(&self, password: Vec<u8>) -> Result<EncryptedObject<SavedKeypair>> {
+    pub(crate) async fn encrypt(&self, password: Vec<u8>) -> Result<EncryptedObject<SavedKeypair>> {
         let saved = SavedKeypair {
             der: self.keypair.serialize_der(),
             alg: Algorithm::from_rcgen(self.keypair.algorithm()),
@@ -94,7 +66,7 @@ impl KeyPair {
         Ok(EncryptedObject::encrypt_with_password(&saved, password).await?)
     }
 
-    pub async fn decrypt(
+    pub(crate) async fn decrypt(
         ciphertext: EncryptedObject<SavedKeypair>,
         password: Vec<u8>,
     ) -> Result<Self, DecodeKeypairError> {
@@ -127,22 +99,14 @@ impl KeyPair {
         rcgen::KeyPair::from_der_and_sign_algo(&der, self.keypair.algorithm())
             .expect("current value is valid, so new one should be too")
     }
-}
 
-impl CanSign for KeyPair {
-    fn borrow_keypair(&self) -> &Ed25519KeyPair {
+    pub(crate) fn signing_keypair(&self) -> &Ed25519KeyPair {
         &self.sign_keypair
     }
 }
 
-impl CanVerify for KeyPair {
-    fn borrow_public_key(&self) -> &[u8] {
-        self.keypair.public_key_raw()
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Zeroize, PartialEq)]
-pub enum Algorithm {
+enum Algorithm {
     #[default]
     PkcsEd25519,
 }
@@ -164,7 +128,7 @@ impl Algorithm {
 }
 
 #[derive(Serialize, Deserialize, ZeroizeOnDrop)]
-pub struct SavedKeypair {
+pub(crate) struct SavedKeypair {
     der: Vec<u8>,
     alg: Algorithm,
 }

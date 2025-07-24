@@ -100,7 +100,7 @@ mod tests {
     use tokio::test;
 
     use crate::{
-        Credential, KeyPair, get_current_timestamp, signed_object::SignedObject,
+        Credential, get_current_timestamp, signed_object::SignedObject,
         verifier::exact::ExactVerififier,
     };
 

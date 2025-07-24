@@ -1,6 +1,5 @@
 mod argon;
 mod certificate;
-mod certificate_request;
 mod credential;
 mod encrypt;
 mod keypair;
@@ -10,24 +9,26 @@ mod signed_object;
 // pub mod tbrhl;
 mod verifier;
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use anyhow::Result;
+// Re-Exports
 pub use argon::{ArgonCost, ArgonParams, DeriveKeyError, ParamsStringParseError, PasswordHash};
+pub use argon2;
 pub use certificate::{
     Certificate, CertificateParseError, SignatureVerificationError, ValidityError,
 };
-pub use certificate_request::{CertificateRequest, CertificateRequestParseError};
 pub use credential::{
     ApproveRequestError, CreateCredentialsError, Credential, DecodeCredentialsError,
     EncryptedCredentials,
 };
 pub use encrypt::{DecryptError, EncryptError, EncryptedData, EncryptedObject};
-pub use keypair::{GenerateRequestError, KeyPair, ToSelfSingedError};
-use ring::rand::{SecureRandom, SystemRandom};
+pub use keypair::{ExportedPublicKey, KeyPair};
+// pub use signed_object::{SignedObject, VerifiedObject};
+pub use verifier::{KnownCertificateVerifier, VerificationError, Verifier};
 
-pub use argon2;
-pub use sha2;
+// normal use statements
+use anyhow::Result;
+use ring::rand::{SecureRandom, SystemRandom};
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use thiserror::Error;
 
 #[cfg(test)]

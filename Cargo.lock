@@ -265,7 +265,6 @@ dependencies = [
  "blake2",
  "cpufeatures",
  "password-hash",
- "zeroize",
 ]
 
 [[package]]
@@ -1567,30 +1566,6 @@ checksum = "fd39dde40b6e196c2e8763f23d119ddb1a8714534bf7d77fa97a65b0feda3986"
 dependencies = [
  "libc",
  "linux-raw-sys 0.6.5",
-]
-
-[[package]]
-name = "ed25519"
-version = "2.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
-dependencies = [
- "pkcs8",
- "signature",
-]
-
-[[package]]
-name = "ed25519-dalek"
-version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a3daa8e81a3963a60642bcc1f90a670680bd4a77535faa384e9d1c79d620871"
-dependencies = [
- "curve25519-dalek",
- "ed25519",
- "serde",
- "sha2",
- "subtle",
- "zeroize",
 ]
 
 [[package]]
@@ -6227,22 +6202,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "svalin_crypto"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "postcard",
- "rand 0.9.1",
- "rcgen",
- "ring",
- "serde",
- "thiserror 2.0.12",
- "time",
- "tokio",
- "zeroize",
-]
-
-[[package]]
 name = "svalin_iced"
 version = "0.1.0"
 dependencies = [
@@ -6285,7 +6244,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "argon2",
- "ed25519-dalek",
  "hpke",
  "postcard",
  "rand 0.9.1",
@@ -6294,7 +6252,6 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
- "sha2",
  "spki",
  "thiserror 2.0.12",
  "time",

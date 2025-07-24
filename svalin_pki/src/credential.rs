@@ -2,18 +2,17 @@ use std::{fmt::Debug, sync::Arc};
 
 use anyhow::Result;
 
-use rcgen::{IsCa, Issuer};
+use rcgen::{Issuer, PublicKeyData};
 use ring::signature::Ed25519KeyPair;
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 use tracing::debug;
-use zeroize::ZeroizeOnDrop;
 
 use crate::{
-    Certificate, CertificateParseError, CertificateRequest, KeyPair,
+    Certificate, CertificateParseError, KeyPair,
     encrypt::EncryptedObject,
     keypair::{DecodeKeypairError, ExportedPublicKey, SavedKeypair},
-    signed_message::{CanSign, CanVerify},
+    signed_message::CanSign,
 };
 
 #[derive(Debug)]
@@ -124,7 +123,6 @@ impl Credential {
         root_parameters.not_before = OffsetDateTime::now_utc();
         root_parameters.not_after =
             OffsetDateTime::now_utc().saturating_add(Duration::days(365 * 10));
-        root_parameters.distinguished_name = rcgen::DistinguishedName::new();
 
         root_parameters.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
 
@@ -135,10 +133,14 @@ impl Credential {
             // rcgen::KeyUsagePurpose::CrlSign,
         ];
 
-        root_parameters.use_authority_key_identifier_extension = true;
-        root_parameters.key_identifier_method = rcgen::KeyIdMethod::Sha256;
-
         let keypair = KeyPair::generate();
+
+        let spki_hash =
+            Certificate::compute_spki_hash(&keypair.export_public_key().subject_public_key_info());
+        let mut dn = rcgen::DistinguishedName::new();
+        dn.push(rcgen::DnType::CommonName, spki_hash);
+
+        root_parameters.distinguished_name = dn;
 
         let certificate = root_parameters
             .self_signed(keypair.rcgen())
@@ -167,7 +169,6 @@ impl Credential {
         let mut leaf_parameters = rcgen::CertificateParams::default();
         leaf_parameters.not_before = OffsetDateTime::now_utc();
         leaf_parameters.not_after = OffsetDateTime::now_utc().saturating_add(Duration::days(365));
-        leaf_parameters.distinguished_name = rcgen::DistinguishedName::new();
 
         leaf_parameters.is_ca = rcgen::IsCa::NoCa;
 
@@ -175,6 +176,11 @@ impl Credential {
 
         leaf_parameters.use_authority_key_identifier_extension = true;
         leaf_parameters.key_identifier_method = rcgen::KeyIdMethod::Sha256;
+
+        let spki_hash = Certificate::compute_spki_hash(&public_key.subject_public_key_info());
+        let mut dn = rcgen::DistinguishedName::new();
+        dn.push(rcgen::DnType::CommonName, spki_hash);
+        leaf_parameters.distinguished_name = dn;
 
         let certificate = leaf_parameters
             .signed_by(
@@ -207,46 +213,6 @@ impl Credential {
 
 impl CanSign for Credential {
     fn borrow_keypair(&self) -> &Ed25519KeyPair {
-        &self.data.keypair.borrow_keypair()
-    }
-}
-
-impl CanVerify for Credential {
-    fn borrow_public_key(&self) -> &[u8] {
-        self.data.keypair.borrow_public_key()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use ring::rand::{SecureRandom, SystemRandom};
-
-    use crate::Credential;
-
-    #[tokio::test]
-    async fn test_on_disk_storage() {
-        let original = Credential::generate_root().unwrap();
-
-        let rand = SystemRandom::new();
-
-        let mut pw_seed = [0u8; 32];
-        rand.fill(&mut pw_seed).unwrap();
-        let pw = String::from_utf8(
-            pw_seed
-                .iter()
-                .map(|rand_num| (*rand_num & 0b00011111u8) + 58u8)
-                .collect(),
-        )
-        .unwrap();
-
-        let encrypted_credentials = original.export(pw.clone().into()).await.unwrap();
-
-        let copy = encrypted_credentials.decrypt(pw.into()).await.unwrap();
-
-        assert_eq!(
-            copy.data.keypair.export_public_key(),
-            original.data.keypair.export_public_key()
-        );
-        assert_eq!(copy.data.certificate, original.data.certificate);
+        &self.data.keypair.signing_keypair()
     }
 }

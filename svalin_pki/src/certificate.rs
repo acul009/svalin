@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Write};
 use std::hash::Hash;
 use std::sync::Arc;
 
@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize, de};
 use spki::FingerprintBytes;
 use thiserror::Error;
 use x509_parser::error::X509Error;
-use x509_parser::nom::{AsBytes, HexDisplay};
 use x509_parser::prelude::Validity;
 use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
 
@@ -68,13 +67,9 @@ pub enum SignatureVerificationError {
 
 impl Certificate {
     pub fn from_der(der: Vec<u8>) -> Result<Certificate, CertificateParseError> {
-        let (_, cert) = X509Certificate::from_der(der.as_bytes())?;
+        let (_, cert) = X509Certificate::from_der(der.as_ref())?;
 
-        let public_key = cert.public_key().subject_public_key.data.to_vec();
-
-        let spki_hash = ring::digest::digest(&ring::digest::SHA512_256, &public_key)
-            .as_ref()
-            .to_hex(32);
+        let spki_hash = Self::compute_spki_hash(&cert.public_key().raw.to_vec());
 
         let cn = cert
             .subject()
@@ -97,6 +92,8 @@ impl Certificate {
             .as_str()?
             .to_string();
 
+        let public_key = cert.public_key().subject_public_key.as_ref().to_vec();
+
         Ok(Certificate {
             data: Arc::new(CertificateData {
                 der,
@@ -106,6 +103,21 @@ impl Certificate {
                 validity,
             }),
         })
+    }
+
+    pub(crate) fn compute_spki_hash(spki_der: &[u8]) -> String {
+        let raw_identifier = ring::digest::digest(&ring::digest::SHA512_256, spki_der);
+
+        let identifier = raw_identifier.as_ref().iter().fold(
+            String::with_capacity(raw_identifier.as_ref().len() * 2),
+            |mut string, byte| {
+                write!(string, "{:02X}", byte)
+                    .expect("Writing to a preallocated string is unlikely to fail");
+                string
+            },
+        );
+
+        identifier
     }
 
     pub fn public_key(&self) -> &[u8] {
@@ -151,6 +163,7 @@ impl Certificate {
         Ok(())
     }
 
+    /// Verify the signature of the current certificate using the given issue certificate
     pub fn verify_signature(&self, issuer: &Certificate) -> Result<(), SignatureVerificationError> {
         let (_, cert) = X509Certificate::from_der(&self.data.der)?;
 
@@ -252,32 +265,5 @@ impl Eq for Certificate {}
 impl Hash for Certificate {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.data.der.hash(state);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::Credential;
-
-    #[test]
-    fn test_certificate_serialization() {
-        let cert = Credential::generate_root()
-            .unwrap()
-            .get_certificate()
-            .clone();
-        let serialized = postcard::to_stdvec(&cert).unwrap();
-        let deserialized = postcard::from_bytes(&serialized).unwrap();
-        assert_eq!(cert, deserialized);
-    }
-
-    #[test]
-    fn test_certificate_serialization_json() {
-        let cert = Credential::generate_root()
-            .unwrap()
-            .get_certificate()
-            .clone();
-        let serialized = serde_json::to_vec_pretty(&cert).unwrap();
-        let deserialized = serde_json::from_slice(&serialized).unwrap();
-        assert_eq!(cert, deserialized);
     }
 }

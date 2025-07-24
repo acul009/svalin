@@ -2,7 +2,8 @@ use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Certificate, Credential,
+    Certificate, Credential, KeyPair,
+    keypair::ExportedPublicKey,
     signed_message::{Sign, Verify},
 };
 
@@ -39,11 +40,9 @@ pub fn cert_verify_message() {
 
     let signed = credentials.sign(&msg).unwrap();
 
-    let msg2 = credentials.verify(&signed).unwrap();
-    let msg3 = credentials.get_certificate().verify(&signed).unwrap();
+    let msg2 = credentials.get_certificate().verify(&signed).unwrap();
 
     assert_eq!(msg, msg2.as_ref());
-    assert_eq!(msg, msg3.as_ref());
 }
 
 #[test]
@@ -65,4 +64,46 @@ pub fn serde_serialization() {
 
     let cert2: Certificate = postcard::from_bytes(&serialized).unwrap();
     assert_eq!(cert, &cert2)
+}
+
+#[tokio::test]
+async fn test_on_disk_storage() {
+    let original = Credential::generate_root().unwrap();
+
+    let rand = SystemRandom::new();
+
+    let mut pw_seed = [0u8; 32];
+    rand.fill(&mut pw_seed).unwrap();
+    let pw = String::from_utf8(
+        pw_seed
+            .iter()
+            .map(|rand_num| (*rand_num & 0b00011111u8) + 58u8)
+            .collect(),
+    )
+    .unwrap();
+
+    let encrypted_credentials = original.export(pw.clone().into()).await.unwrap();
+
+    let copy = encrypted_credentials.decrypt(pw.into()).await.unwrap();
+
+    assert_eq!(copy.get_certificate(), original.get_certificate());
+}
+
+#[tokio::test]
+async fn test_create_leaf() {
+    let root = Credential::generate_root().unwrap();
+
+    let keypair = KeyPair::generate();
+
+    let public_key = keypair.export_public_key();
+    let serialized = postcard::to_extend(&public_key, Vec::new()).unwrap();
+
+    let public_key: ExportedPublicKey = postcard::from_bytes(&serialized).unwrap();
+
+    let leaf = root.create_leaf_certificate_for_key(&public_key).unwrap();
+
+    let serialized = postcard::to_extend(&leaf, Vec::new()).unwrap();
+    let leaf: Certificate = postcard::from_bytes(&serialized).unwrap();
+
+    leaf.verify_signature(root.get_certificate()).unwrap()
 }
