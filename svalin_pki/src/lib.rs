@@ -3,11 +3,13 @@ mod certificate;
 mod credential;
 mod encrypt;
 mod keypair;
+mod mls;
 mod public_key;
 mod signed_message;
 mod signed_object;
-// pub mod tbrhl;
 mod verifier;
+
+// pub mod tbrhl;
 
 // Re-Exports
 pub use argon::{ArgonCost, ArgonParams, DeriveKeyError, ParamsStringParseError, PasswordHash};
