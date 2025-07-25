@@ -3,7 +3,7 @@ use openmls::{
     prelude::{
         BasicCredential, Ciphersuite, CredentialWithKey, DeserializeBytes, Extension,
         ExtensionType, Extensions, KeyPackage, MlsMessageIn, OpenMlsProvider, RatchetTreeExtension,
-        SignedStruct,
+        SenderRatchetConfiguration, SignedStruct,
         tls_codec::{Deserialize, Serialize},
     },
     test_utils::{OpenMlsRustCrypto, test_framework::Group},
@@ -45,8 +45,11 @@ fn experimenting() {
     let key_package_2_serialized = serde_json::to_vec(key_package_2.key_package()).unwrap();
     let key_package_2_copy: KeyPackage = serde_json::from_slice(&key_package_2_serialized).unwrap();
 
+    let sender_ratchet_config = SenderRatchetConfiguration::new(0, 1);
+
     let group_create_config = MlsGroupCreateConfig::builder()
         .use_ratchet_tree_extension(true)
+        .sender_ratchet_configuration(sender_ratchet_config.clone())
         .build();
 
     let mut group1 = MlsGroup::new(
@@ -75,6 +78,7 @@ fn experimenting() {
 
     let join_config = MlsGroupJoinConfig::builder()
         .use_ratchet_tree_extension(true)
+        .sender_ratchet_configuration(sender_ratchet_config)
         .build();
 
     let staged_join =
