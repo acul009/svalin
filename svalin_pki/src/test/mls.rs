@@ -143,6 +143,4 @@ fn experimenting() {
             ),
         )
         .unwrap();
-    
-    group_info.group_context().tree_hash()
 }
