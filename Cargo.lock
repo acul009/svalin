@@ -6902,6 +6902,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.12",
  "time",
+ "tls_codec",
  "tokio",
  "tracing",
  "x509-parser",

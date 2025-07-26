@@ -1,16 +1,15 @@
 use openmls::{
     group::{MlsGroup, MlsGroupCreateConfig, MlsGroupJoinConfig, StagedWelcome},
     prelude::{
-        BasicCredential, Ciphersuite, CredentialWithKey, DeserializeBytes, Extension,
-        ExtensionType, Extensions, KeyPackage, MlsMessageIn, OpenMlsProvider, RatchetTreeExtension,
-        SenderRatchetConfiguration, SignedStruct,
+        Ciphersuite, CredentialWithKey, DeserializeBytes, KeyPackage, MlsMessageIn,
+        OpenMlsProvider, OpenMlsSignaturePublicKey, SenderRatchetConfiguration, SignaturePublicKey,
+        Verifiable,
         tls_codec::{Deserialize, Serialize},
     },
-    test_utils::{OpenMlsRustCrypto, test_framework::Group},
-    treesync::RatchetTree,
+    test_utils::OpenMlsRustCrypto,
 };
 
-use crate::Credential;
+use crate::{Certificate, Credential};
 
 #[test]
 fn experimenting() {
@@ -71,10 +70,13 @@ fn experimenting() {
     let received_mls_message =
         MlsMessageIn::tls_deserialize_exact(&mut serialized_invite.as_slice()).unwrap();
 
-    let invite = match received_mls_message.extract() {
-        openmls::prelude::MlsMessageBodyIn::Welcome(invite) => invite,
-        _ => unreachable!("has to be an invite"),
-    };
+    let invite = received_mls_message
+        .into_welcome()
+        .expect("Has to be an invite");
+
+    for secret in invite.secrets() {
+        let new_member = secret.new_member();
+    }
 
     let join_config = MlsGroupJoinConfig::builder()
         .use_ratchet_tree_extension(true)
@@ -83,6 +85,12 @@ fn experimenting() {
 
     let staged_join =
         StagedWelcome::new_from_welcome(&provider2, &join_config, invite, None).unwrap();
+
+    // You can iterate over all members and grab their certificates...
+    for member in staged_join.members() {
+        let cert: Certificate = member.credential.deserialized().unwrap();
+        println!("{}", cert.spki_hash());
+    }
 
     let mut group2 = staged_join.into_group(&provider2).unwrap();
 
@@ -103,6 +111,9 @@ fn experimenting() {
         .process_message(&provider2, received_mls_message)
         .unwrap();
 
+    let sender: Certificate = processed_message.credential().deserialized().unwrap();
+    println!("sent by: {}", sender.spki_hash());
+
     let cleartext = match processed_message.into_content() {
         openmls::prelude::ProcessedMessageContent::ApplicationMessage(message) => {
             message.into_bytes()
@@ -111,4 +122,27 @@ fn experimenting() {
     };
 
     assert_eq!(content1.as_ref(), &cleartext);
+
+    let serialized_group_info = group1
+        .export_group_info(provider1.crypto(), &credential1, false)
+        .unwrap()
+        .tls_serialize_detached()
+        .unwrap();
+
+    let verifyable_group_info = MlsMessageIn::tls_deserialize_exact_bytes(&serialized_group_info)
+        .unwrap()
+        .into_verifiable_group_info()
+        .unwrap();
+
+    let group_info = verifyable_group_info
+        .verify(
+            provider1.crypto(),
+            &OpenMlsSignaturePublicKey::from_signature_key(
+                SignaturePublicKey::from(credential1.get_certificate().public_key()),
+                openmls::prelude::SignatureScheme::ED25519,
+            ),
+        )
+        .unwrap();
+    
+    group_info.group_context().tree_hash()
 }

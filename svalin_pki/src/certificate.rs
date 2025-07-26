@@ -261,6 +261,37 @@ impl<'de> Visitor<'de> for CertificateVisitor {
     }
 }
 
+impl tls_codec::Size for Certificate {
+    fn tls_serialized_len(&self) -> usize {
+        self.to_der().len()
+    }
+}
+
+impl tls_codec::Serialize for Certificate {
+    fn tls_serialize<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+    ) -> std::result::Result<usize, tls_codec::Error> {
+        writer
+            .write(self.to_der())
+            .map_err(|err| tls_codec::Error::EncodingError(err.to_string()))
+    }
+}
+
+impl tls_codec::Deserialize for Certificate {
+    fn tls_deserialize<R: std::io::Read>(
+        bytes: &mut R,
+    ) -> std::result::Result<Self, tls_codec::Error>
+    where
+        Self: Sized,
+    {
+        let mut buffer = Vec::new();
+        bytes.read_to_end(&mut buffer)?;
+        Certificate::from_der(buffer)
+            .map_err(|err| tls_codec::Error::DecodingError(err.to_string()))
+    }
+}
+
 impl Ord for Certificate {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.data.der.cmp(&other.data.der)
