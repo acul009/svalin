@@ -17,6 +17,7 @@ struct CertificateData {
     der: Vec<u8>,
     public_key: Vec<u8>,
     spki_hash: String,
+    is_ca: bool,
     issuer: String,
     validity: Validity,
 }
@@ -29,6 +30,7 @@ pub struct Certificate {
 impl Debug for Certificate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Certificate")
+            .field("spki_hash", &self.spki_hash())
             .field("fingerprint", &self.fingerprint())
             .finish()
     }
@@ -106,11 +108,14 @@ impl Certificate {
 
         let public_key = cert.public_key().subject_public_key.as_ref().to_vec();
 
+        let is_ca = cert.is_ca();
+
         Ok(Certificate {
             data: Arc::new(CertificateData {
                 der,
                 public_key,
                 spki_hash,
+                is_ca,
                 issuer,
                 validity,
             }),
@@ -146,6 +151,10 @@ impl Certificate {
 
     pub fn spki_hash(&self) -> &str {
         &self.data.spki_hash
+    }
+
+    pub fn is_ca(&self) -> bool {
+        self.data.is_ca
     }
 
     pub fn fingerprint(&self) -> Fingerprint {
