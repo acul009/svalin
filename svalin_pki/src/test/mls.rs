@@ -64,22 +64,19 @@ impl MlsClient {
     }
 
     fn ratchet_config(&self) -> SenderRatchetConfiguration {
-        SenderRatchetConfiguration::new(0, 1)
+        SenderRatchetConfiguration::new(0, 0)
     }
 
     fn create_group(&self) -> MlsGroup {
-        let group_create_config = MlsGroupCreateConfig::builder()
+        MlsGroup::builder()
             .use_ratchet_tree_extension(true)
             .sender_ratchet_configuration(self.ratchet_config())
-            .build();
-
-        MlsGroup::new(
-            &self.provider,
-            &self.credential,
-            &group_create_config,
-            self.public_info.clone(),
-        )
-        .unwrap()
+            .build(
+                self.provider(),
+                self.credential(),
+                self.public_info().clone(),
+            )
+            .unwrap()
     }
 
     fn join_config(&self) -> MlsGroupJoinConfig {
@@ -109,6 +106,7 @@ fn experimenting() {
     // to see the latest message in the group (e.g. a new config or a new system report.)
     // For this to work, the storage provider either needs to be shared or there has to be
     // a master store for each user, which would cause even more issues.
+    //
     //
     // Then the question is, can a storage provider be shared when 2 devices are online at the same time?
     // I should test what happends when I try to re-read the same group member add 2 times.
@@ -201,6 +199,8 @@ fn experimenting() {
     // see if the same message can be decrypted again
 
     // it seems like the per message ratchet is kept in memory only, so to re-read a message, all you need to do is reload the group from the storage
+    // That also seems to have the problematic effect of needing all those messages in the right order again...
+    // That can't be right, otherwise a group could not save and load state during an epoch
     let mut group2_clone = MlsGroup::load(client2.provider().storage(), group2.group_id())
         .unwrap()
         .unwrap();
@@ -464,5 +464,85 @@ fn test_quick_update() {
             .merge_staged_commit(client2.provider(), *commit)
             .unwrap(),
         _ => panic!("Unexpected message content"),
+    }
+}
+
+#[test]
+fn test_skipped_messages() {
+    let client1 = MlsClient::new();
+    let client2 = MlsClient::new();
+
+    let mut group1 = client1.create_group();
+    let (_message, welcome, _state) = group1
+        .add_members(
+            client1.provider(),
+            client1.credential(),
+            &[client2.create_key_package().key_package().clone()],
+        )
+        .unwrap();
+    group1.merge_pending_commit(client1.provider()).unwrap();
+
+    let welcome =
+        MlsMessageIn::tls_deserialize_exact_bytes(&welcome.tls_serialize_detached().unwrap())
+            .unwrap()
+            .into_welcome()
+            .unwrap();
+
+    let mut group2 = client2.join_group(welcome);
+
+    let message1 = group1
+        .create_message(client1.provider(), client1.credential(), b"Test 1")
+        .unwrap()
+        .tls_serialize_detached()
+        .unwrap();
+
+    let message2 = group1
+        .create_message(client1.provider(), client1.credential(), b"Test 2")
+        .unwrap()
+        .tls_serialize_detached()
+        .unwrap();
+
+    let received_mls_message = MlsMessageIn::tls_deserialize_exact(&mut message2.as_slice())
+        .unwrap()
+        .try_into_protocol_message()
+        .unwrap();
+
+    match group2
+        .process_message(client2.provider(), received_mls_message)
+        .unwrap()
+        .into_content()
+    {
+        openmls::prelude::ProcessedMessageContent::ApplicationMessage(message) => {
+            assert_eq!(message.into_bytes(), b"Test 2")
+        }
+        _ => panic!("message type is controlled"),
+    }
+
+    let message3 = group1
+        .create_message(client1.provider(), client1.credential(), b"Test 3")
+        .unwrap()
+        .tls_serialize_detached()
+        .unwrap();
+
+    let message4 = group1
+        .create_message(client1.provider(), client1.credential(), b"Test 4")
+        .unwrap()
+        .tls_serialize_detached()
+        .unwrap();
+
+    let received_mls_message = MlsMessageIn::tls_deserialize_exact(&mut message4.as_slice())
+        .unwrap()
+        .try_into_protocol_message()
+        .unwrap();
+
+    match group2
+        .process_message(client2.provider(), received_mls_message)
+        .unwrap()
+        .into_content()
+    {
+        openmls::prelude::ProcessedMessageContent::ApplicationMessage(message) => {
+            assert_eq!(message.into_bytes(), b"Test 4")
+        }
+        _ => panic!("message type is controlled"),
     }
 }
