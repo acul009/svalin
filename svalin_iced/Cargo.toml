@@ -16,7 +16,7 @@ frozen_term = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git", featu
 ] }
 async_pty = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git" }
 
-anyhow = "1.0.98"
+anyhow = "1.0.99"
 futures-util = "0.3.31"
 tokio = { workspace = true }
 totp-rs = { version = "5.7.0", features = ["qr", "gen_secret"] }
@@ -27,7 +27,7 @@ thiserror = { workspace = true }
 tokio-stream = { version = "0.1.17", features = ["full"] }
 tokio-util = { workspace = true }
 futures = "0.3.31"
-uuid = "1.17.0"
+uuid = "1.18.0"
 rust-i18n = "3.1.5"
 sipper = { workspace = true }
 

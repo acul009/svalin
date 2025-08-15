@@ -16,7 +16,7 @@ use crate::{
 };
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use svalin_pki::{Credential, KeyPair};
+use svalin_pki::Credential;
 use tokio_util::sync::CancellationToken;
 
 use crate::rpc::session::Session;

@@ -48,7 +48,6 @@ impl CommandHandler for ForwardHandler {
         forward_key()
     }
 
-    #[must_use]
     async fn handle(
         &self,
         session: &mut Session,
