@@ -70,20 +70,16 @@ pub trait KnownCertificateVerifier: Verifier + Sized + 'static {
         }
     }
 
-    #[cfg(feature = "rustls")]
     fn to_tls_verifier(self) -> std::sync::Arc<rustls_feat::RustlsVerifier<Self>> {
         use std::sync::Arc;
 
-        use rustls_feat::RustlsVerifier;
-
-        Arc::new(RustlsVerifier::new(self))
+        Arc::new(rustls_feat::RustlsVerifier::new(self))
     }
 }
 
 // #[cfg(feature = "rustls")]
 // pub use rustls_feat::*;
 
-#[cfg(feature = "rustls")]
 pub mod rustls_feat {
 
     use std::{fmt::Debug, sync::Arc};

@@ -13,7 +13,7 @@ postcard = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 svalin_macros = { path = "../svalin_macros" }
-svalin_pki = { path = "../svalin_pki", features = ["rustls"] }
+svalin_pki = { path = "../svalin_pki" }
 quinn = { version = "0.11.8", features = ["ring"] }
 tracing = { workspace = true }
 test-log = { version = "0.2.18", features = ["trace"] }

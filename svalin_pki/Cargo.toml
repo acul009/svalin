@@ -3,9 +3,6 @@ name = "svalin_pki"
 version = "0.1.0"
 edition = "2024"
 
-[features]
-rustls = ["dep:rustls"]
-
 [dependencies]
 anyhow = "1.0.99"
 argon2 = { version = "0.5.3", features = ["simple", "std"] }
@@ -13,7 +10,7 @@ postcard = { workspace = true }
 rand = { workspace = true }
 rcgen = { version = "0.14.3", features = ["x509-parser", "zeroize"] }
 ring = "0.17.14"
-rustls = { version = "0.23.31", optional = true, default-features = false }
+rustls = { version = "0.23.31", default-features = false, features = ["std"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
 time = "0.3.41"
