@@ -42,8 +42,7 @@ impl RpcClient {
                 vec![rustls::pki_types::CertificateDer::from(
                     id.get_certificate().to_der().to_owned(),
                 )],
-                rustls::pki_types::PrivateKeyDer::try_from(id.get_der_key_bytes().to_owned())
-                    .map_err(|err| anyhow!(err))?,
+                id.keypair().rustls_private_key(),
             )?,
             None => builder.with_no_client_auth(),
         };

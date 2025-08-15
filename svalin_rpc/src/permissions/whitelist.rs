@@ -1,14 +1,14 @@
 use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
-use anyhow::{anyhow, Result};
-use svalin_pki::Certificate;
+use anyhow::{Result, anyhow};
+use svalin_pki::{Certificate, Fingerprint};
 
 use crate::rpc::peer::Peer;
 
 use super::{PermissionCheckError, PermissionHandler};
 
 pub struct WhitelistPermissionHandler<Permission> {
-    whitelist: Arc<BTreeMap<[u8; 32], Certificate>>,
+    whitelist: Arc<BTreeMap<Fingerprint, Certificate>>,
 
     permission: PhantomData<Permission>,
 }
@@ -26,7 +26,7 @@ impl<Permission> WhitelistPermissionHandler<Permission> {
     pub fn new(whitelist: Vec<Certificate>) -> Self {
         let whitelist = whitelist
             .into_iter()
-            .map(|c| (c.fingerprint(), c))
+            .map(|c| (c.fingerprint().clone(), c))
             .collect();
 
         Self {

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use svalin_pki::{verifier::VerificationError, Certificate};
+use svalin_pki::{Certificate, Fingerprint, VerificationError};
 
 use crate::server::user_store::UserStore;
 
@@ -15,7 +15,7 @@ impl VerificationHelper {
         Self { root, user_store }
     }
 
-    pub fn try_root(&self, fingerprint: [u8; 32]) -> Option<Certificate> {
+    pub fn try_root(&self, fingerprint: &Fingerprint) -> Option<Certificate> {
         if fingerprint == self.root.fingerprint() {
             return Some(self.root.clone());
         }

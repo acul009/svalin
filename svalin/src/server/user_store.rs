@@ -6,7 +6,7 @@ use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::ParamsString;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use svalin_pki::{Certificate, EncryptedCredentials};
+use svalin_pki::{Certificate, EncryptedCredentials, Fingerprint};
 use totp_rs::TOTP;
 use tracing::{debug, instrument};
 
@@ -39,8 +39,8 @@ impl UserStore {
         Arc::new(Self { pool })
     }
 
-    pub async fn get_user(&self, fingerprint: &[u8; 32]) -> Result<Option<StoredUser>> {
-        let fingerprint = fingerprint.to_vec();
+    pub async fn get_user(&self, fingerprint: &Fingerprint) -> Result<Option<StoredUser>> {
+        let fingerprint = fingerprint.as_slice();
         let user_data = sqlx::query!("SELECT data FROM users WHERE fingerprint = ?", fingerprint)
             .fetch_optional(&self.pool)
             .await?;
@@ -83,7 +83,8 @@ impl UserStore {
 
         debug!("requesting user update transaction");
 
-        let fingerprint = user.certificate.fingerprint().to_vec();
+        let fingerprint = user.certificate.fingerprint();
+        let fingerprint = fingerprint.as_slice();
 
         let userdata = postcard::to_extend(&user, Vec::new())?;
 

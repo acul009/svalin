@@ -16,7 +16,7 @@ use crate::{
 };
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use svalin_pki::KeyPair;
+use svalin_pki::{Credential, KeyPair};
 use tokio_util::sync::CancellationToken;
 
 use crate::rpc::session::Session;
@@ -50,7 +50,7 @@ impl TakeableCommandHandler for TlsTestCommandHandler {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure_transport();
 
-            let credentials = KeyPair::generate().to_self_signed_cert().unwrap();
+            let credentials = Credential::generate_root().unwrap();
 
             let tls_transport = TlsTransport::server(
                 CombinedTransport::new(read, write),
@@ -111,7 +111,7 @@ impl TakeableCommandDispatcher for TlsTest {
         if let Some(session_ready) = session.take() {
             let (read, write, _) = session_ready.destructure_transport();
 
-            let credentials = KeyPair::generate().to_self_signed_cert().unwrap();
+            let credentials = Credential::generate_root().unwrap();
 
             let tls_transport = TlsTransport::client(
                 CombinedTransport::new(read, write),

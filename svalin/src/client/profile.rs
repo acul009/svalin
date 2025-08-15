@@ -3,8 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Certificate, Credential, EncryptedCredentials,
-    verifier::{KnownCertificateVerifier, exact::ExactVerififier},
+    Certificate, Credential, EncryptedCredentials, ExactVerififier, KnownCertificateVerifier,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::sync::watch;

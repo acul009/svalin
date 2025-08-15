@@ -1,8 +1,5 @@
 use anyhow::Result;
-use svalin_pki::{
-    ApproveRequestError, Certificate, CertificateRequest, CertificateRequestParseError, KeyPair,
-    Credential, ToSelfSingedError,
-};
+use svalin_pki::{Certificate, CreateCredentialsError, Credential, ExportedPublicKey, KeyPair};
 
 use async_trait::async_trait;
 use svalin_rpc::rpc::{
@@ -42,8 +39,8 @@ impl CommandHandler for InitHandler {
         let root = request;
 
         let keypair = KeyPair::generate();
-        let request = keypair.generate_request()?;
-        session.write_object(&request).await?;
+        let public_key = keypair.export_public_key();
+        session.write_object(&public_key).await?;
 
         let my_cert: Certificate = session.read_object().await?;
         let my_credentials = keypair.upgrade(my_cert)?;
@@ -71,8 +68,8 @@ pub struct Init {
 }
 
 impl Init {
-    pub fn new() -> Result<Self, ToSelfSingedError> {
-        let root = KeyPair::generate().to_self_signed_cert()?;
+    pub fn new() -> Result<Self, CreateCredentialsError> {
+        let root = Credential::generate_root()?;
 
         Ok(Self { root })
     }
@@ -82,10 +79,8 @@ impl Init {
 pub enum InitError {
     #[error("error reading request: {0}")]
     ReadRequestError(SessionReadError),
-    #[error("error parsing request: {0}")]
-    RequestParseError(CertificateRequestParseError),
-    #[error("error approving certificate request: {0}")]
-    ApproveRequestError(ApproveRequestError),
+    #[error("error creating certificate for public key: {0}")]
+    CreateCertError(CreateCredentialsError),
     #[error("error writing server certificate: {0}")]
     WriteServerCertError(SessionWriteError),
     #[error("error reading success: {0}")]
@@ -110,16 +105,14 @@ impl CommandDispatcher for Init {
     async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {
         debug!("sending init request");
 
-        let raw_request: String = session
+        let public_key: ExportedPublicKey = session
             .read_object()
             .await
             .map_err(InitError::ReadRequestError)?;
-        let request =
-            CertificateRequest::from_string(raw_request).map_err(InitError::RequestParseError)?;
         let server_cert: Certificate = self
             .root
-            .approve_request(request)
-            .map_err(InitError::ApproveRequestError)?;
+            .create_leaf_certificate_for_key(&public_key)
+            .map_err(InitError::CreateCertError)?;
 
         session
             .write_object(&server_cert)

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
-use svalin_pki::{ArgonParams, Certificate, CertificateRequest, Credential};
+use svalin_pki::{ArgonParams, Certificate, Credential, ExportedPublicKey};
 use svalin_rpc::{
     rpc::{
         command::{
@@ -135,16 +135,14 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
 
                     debug!("Confirm Codes match!");
 
-                    let raw_request: String = session_e2e
+                    let public_key: ExportedPublicKey = session_e2e
                         .read_object()
                         .await
                         .map_err(|err| anyhow!(err))?;
-                    debug!("received request: {}", raw_request);
-                    let request =
-                        CertificateRequest::from_string(raw_request).map_err(|err| anyhow!(err))?;
+                    debug!("received public key: {:?}", public_key);
                     let agent_cert: Certificate = self
                         .credentials
-                        .approve_request(request)
+                        .create_leaf_certificate_for_key(&public_key)
                         .map_err(|err| anyhow!(err))?;
 
                     session_e2e

@@ -60,7 +60,7 @@ pub trait KnownCertificateVerifier: Verifier + Sized + 'static {
 
             if cert != &loaded_cert {
                 Err(VerificationError::FingerprintCollission {
-                    fingerprint,
+                    fingerprint: fingerprint.clone(),
                     loaded_cert,
                     given_cert: cert.clone(),
                 })

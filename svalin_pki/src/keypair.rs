@@ -1,10 +1,6 @@
 use std::fmt::Debug;
 
-use crate::{
-    Certificate, CertificateParseError, CreateCredentialsError, Credential,
-    encrypt::EncryptedObject,
-    signed_message::{CanSign, CanVerify},
-};
+use crate::{Certificate, CreateCredentialsError, Credential, encrypt::EncryptedObject};
 use anyhow::Result;
 use rcgen::{PublicKeyData, SignatureAlgorithm};
 use ring::signature::Ed25519KeyPair;
@@ -102,6 +98,11 @@ impl KeyPair {
 
     pub(crate) fn signing_keypair(&self) -> &Ed25519KeyPair {
         &self.sign_keypair
+    }
+
+    pub fn rustls_private_key(&self) -> rustls::pki_types::PrivateKeyDer<'static> {
+        rustls::pki_types::PrivateKeyDer::try_from(self.keypair.serialized_der().to_owned())
+            .unwrap()
     }
 }
 

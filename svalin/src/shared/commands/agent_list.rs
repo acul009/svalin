@@ -3,10 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{
-    Certificate, Credential, get_current_timestamp, signed_object::SignedObject,
-    verifier::exact::ExactVerififier,
-};
+use svalin_pki::{Certificate, Credential, ExactVerififier, SignedObject, get_current_timestamp};
 use svalin_rpc::{
     commands::forward::ForwardConnection,
     rpc::{

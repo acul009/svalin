@@ -5,7 +5,7 @@ use crate::shared::join_agent::{PublicAgentData, accept_handler::AcceptJoin, add
 use super::Client;
 
 use anyhow::{Result, anyhow};
-use svalin_pki::{Certificate, Credential, signed_object::SignedObject};
+use svalin_pki::{Certificate, Credential, SignedObject};
 use svalin_rpc::rpc::connection::{
     Connection, ConnectionDispatchError, direct_connection::DirectConnection,
 };

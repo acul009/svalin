@@ -3,10 +3,7 @@ use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use quinn::rustls::server::danger::ClientCertVerifier;
-use svalin_pki::{
-    Certificate, Credential,
-    verifier::{KnownCertificateVerifier, exact::ExactVerififier},
-};
+use svalin_pki::{Certificate, Credential, ExactVerififier, KnownCertificateVerifier};
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 

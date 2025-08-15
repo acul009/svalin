@@ -7,9 +7,7 @@ use config_builder::ServerConfigBuilder;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
-use svalin_pki::{
-    Certificate, EncryptedCredentials, KeyPair, Credential, verifier::KnownCertificateVerifier,
-};
+use svalin_pki::{Certificate, Credential, EncryptedCredentials, KnownCertificateVerifier};
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},
     rpc::{command::handler::HandlerCollection, server::Socket},
@@ -231,7 +229,7 @@ impl Server {
             .add(InitHandler::new(send))
             .add(PublicStatusHandler::new(PublicStatus::WaitingForInit));
 
-        let temp_credentials = KeyPair::generate().to_self_signed_cert()?;
+        let temp_credentials = Credential::generate_root()?;
 
         debug!("starting up init server");
         let rpc = RpcServer::build()

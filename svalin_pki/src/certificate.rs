@@ -20,6 +20,7 @@ struct CertificateData {
     is_ca: bool,
     issuer: String,
     validity: Validity,
+    fingerprint: Fingerprint,
 }
 
 #[derive(Clone)]
@@ -66,8 +67,14 @@ pub enum SignatureVerificationError {
     X509VerificationError(#[from] X509Error),
 }
 
-#[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Serialize, Deserialize, PartialOrd, Ord, Hash)]
 pub struct Fingerprint([u8; 32]);
+
+impl Fingerprint {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 impl Debug for Fingerprint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -110,6 +117,11 @@ impl Certificate {
 
         let is_ca = cert.is_ca();
 
+        // Todo: use rcgen::Certificate::key_identifier instead
+        let hash = ring::digest::digest(&ring::digest::SHA512_256, &der);
+
+        let fingerprint = Fingerprint(hash.as_ref()[0..32].try_into().unwrap());
+
         Ok(Certificate {
             data: Arc::new(CertificateData {
                 der,
@@ -118,6 +130,7 @@ impl Certificate {
                 is_ca,
                 issuer,
                 validity,
+                fingerprint,
             }),
         })
     }
@@ -157,12 +170,8 @@ impl Certificate {
         self.data.is_ca
     }
 
-    pub fn fingerprint(&self) -> Fingerprint {
-        // Todo: use rcgen::Certificate::key_identifier instead
-        let hash = ring::digest::digest(&ring::digest::SHA512_256, &self.data.der);
-
-        let fingerprint = hash.as_ref()[0..32].try_into().unwrap();
-        Fingerprint(fingerprint)
+    pub fn fingerprint(&self) -> &Fingerprint {
+        &self.data.fingerprint
     }
 
     pub fn check_validity_at(&self, time: u64) -> Result<(), ValidityError> {

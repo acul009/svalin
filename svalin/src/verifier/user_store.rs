@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use svalin_pki::verifier::Verifier;
+use svalin_pki::{Fingerprint, VerificationError, Verifier};
 
 use crate::server::user_store::UserStore;
 
@@ -18,9 +18,9 @@ impl UserStoreVerifier {
 impl Verifier for UserStoreVerifier {
     async fn verify_fingerprint(
         &self,
-        fingerprint: [u8; 32],
+        fingerprint: &Fingerprint,
         time: u64,
-    ) -> Result<svalin_pki::Certificate, svalin_pki::verifier::VerificationError> {
+    ) -> Result<svalin_pki::Certificate, VerificationError> {
         todo!()
     }
 }

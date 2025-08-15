@@ -7,7 +7,7 @@ use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::{ParamsString, rand_core::OsRng};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    ArgonCost, Certificate, EncryptedCredentials, Credential, argon2::Argon2, sha2::Sha512,
+    ArgonCost, Certificate, Credential, EncryptedCredentials, Sha512, argon2::Argon2,
 };
 use svalin_rpc::rpc::{
     command::{
@@ -79,7 +79,6 @@ impl CommandHandler for AddUserHandler {
         "add_user".to_owned()
     }
 
-    #[must_use]
     #[instrument(skip_all)]
     async fn handle(
         &self,

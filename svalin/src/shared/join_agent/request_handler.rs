@@ -3,10 +3,7 @@ use std::time::Duration;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use rand::Rng;
-use svalin_pki::{
-    Certificate, CreateCredentialsError, DeriveKeyError, GenerateRequestError, KeyPair,
-    ToSelfSingedError,
-};
+use svalin_pki::{Certificate, CreateCredentialsError, Credential, DeriveKeyError, KeyPair};
 use svalin_rpc::{
     rpc::{
         command::{
@@ -89,15 +86,13 @@ pub enum RequestJoinError {
     #[error("error creating TLS client: {0}")]
     TlsCreateClientError(TlsClientError),
     #[error("error creating temp credentials: {0}")]
-    ToSelfSingedError(ToSelfSingedError),
+    CreateCredentialsError(CreateCredentialsError),
     #[error("error creating TLS server: {0}")]
     TlsCreateServerError(TlsServerError),
     #[error("error reading params: {0}")]
     ReadParamsError(SessionReadError),
     #[error("error deriving confirm key: {0}")]
     DeriveKeyError(DeriveKeyError),
-    #[error("error generating certificate request: {0}")]
-    GenerateRequestError(GenerateRequestError),
     #[error("error sending request: {0}")]
     SendRequestError(SessionWriteError),
     #[error("error reading certificate: {0}")]
@@ -177,9 +172,8 @@ impl TakeableCommandDispatcher for RequestJoin {
 
             let (read, write, _) = session.destructure_transport();
 
-            let temp_credentials = KeyPair::generate()
-                .to_self_signed_cert()
-                .map_err(RequestJoinError::ToSelfSingedError)?;
+            let temp_credentials =
+                Credential::generate_root().map_err(RequestJoinError::CreateCredentialsError)?;
 
             let tls_transport = TlsTransport::server(
                 CombinedTransport::new(read, write),
@@ -214,12 +208,10 @@ impl TakeableCommandDispatcher for RequestJoin {
             self.confirm_code_channel.send(confirm_code).unwrap();
 
             let keypair = KeyPair::generate();
-            let request = keypair
-                .generate_request()
-                .map_err(RequestJoinError::GenerateRequestError)?;
-            debug!("sending request: {}", request);
+            let public_key = keypair.export_public_key();
+            debug!("sending request: {:?}", public_key);
             session
-                .write_object(&request)
+                .write_object(&public_key)
                 .await
                 .map_err(RequestJoinError::SendRequestError)?;
 

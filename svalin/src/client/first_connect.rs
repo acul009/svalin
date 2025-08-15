@@ -2,8 +2,7 @@ use std::fmt::Debug;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use svalin_pki::DecodeCredentialsError;
-use svalin_pki::verifier::KnownCertificateVerifier;
+use svalin_pki::{DecodeCredentialsError, KnownCertificateVerifier};
 use svalin_rpc::rpc::command::dispatcher::DispatcherError;
 use svalin_rpc::rpc::connection::ConnectionDispatchError;
 use svalin_rpc::rpc::session::SessionDispatchError;

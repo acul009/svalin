@@ -10,21 +10,24 @@ mod signed_object;
 mod verifier;
 
 // pub mod tbrhl;
+pub use sha2::Sha512;
 
 // Re-Exports
+
+// Exports
 pub use argon::{ArgonCost, ArgonParams, DeriveKeyError, ParamsStringParseError, PasswordHash};
 pub use argon2;
 pub use certificate::{
-    Certificate, CertificateParseError, SignatureVerificationError, ValidityError,
+    Certificate, CertificateParseError, Fingerprint, SignatureVerificationError, ValidityError,
 };
 pub use credential::{
-    ApproveRequestError, CreateCredentialsError, Credential, DecodeCredentialsError,
-    EncryptedCredentials,
+    CreateCredentialsError, Credential, DecodeCredentialsError, EncryptedCredentials,
 };
 pub use encrypt::{DecryptError, EncryptError, EncryptedData, EncryptedObject};
 pub use keypair::{ExportedPublicKey, KeyPair};
 // pub use signed_object::{SignedObject, VerifiedObject};
-pub use verifier::{KnownCertificateVerifier, VerificationError, Verifier};
+pub use signed_object::{SignedObject, VerifiedObject};
+pub use verifier::{KnownCertificateVerifier, VerificationError, Verifier, exact::ExactVerififier};
 
 // normal use statements
 use anyhow::Result;

@@ -1,5 +1,6 @@
 use std::{net::ToSocketAddrs, panic, process, time::Duration};
 
+use svalin_pki::Credential;
 use test_log::test;
 use tls_test_command::{TlsTest, TlsTestCommandHandler};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
@@ -25,9 +26,7 @@ async fn ping_test() {
     println!("starting ping test");
 
     let address = "127.0.0.1:1234";
-    let credentials = svalin_pki::KeyPair::generate()
-        .to_self_signed_cert()
-        .unwrap();
+    let credentials = Credential::generate_root().unwrap();
 
     let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
 
@@ -78,9 +77,7 @@ async fn tls_test() {
     println!("starting tls test");
 
     let address = "127.0.0.1:1235";
-    let credentials = svalin_pki::KeyPair::generate()
-        .to_self_signed_cert()
-        .unwrap();
+    let credentials = Credential::generate_root().unwrap();
     let socket =
         RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
 
@@ -127,9 +124,7 @@ async fn perm_test() {
     println!("starting permission test");
 
     let address = "127.0.0.1:1236";
-    let credentials = svalin_pki::KeyPair::generate()
-        .to_self_signed_cert()
-        .unwrap();
+    let credentials = Credential::generate_root().unwrap();
     let socket =
         RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
 

@@ -136,10 +136,7 @@ impl RpcServer {
     }
 
     fn create_endpoint(socket: Socket, config: &RpcServerConfig) -> Result<quinn::Endpoint> {
-        let priv_key = rustls::pki_types::PrivateKeyDer::try_from(
-            config.credentials.get_der_key_bytes().to_owned(),
-        )
-        .map_err(|err| anyhow!(err))?;
+        let priv_key = config.credentials.keypair().rustls_private_key();
 
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
             config.credentials.get_certificate().to_der().to_owned(),

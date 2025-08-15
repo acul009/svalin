@@ -31,7 +31,6 @@ impl CommandHandler for PublicStatusHandler {
         "public_status".to_owned()
     }
 
-    #[must_use]
     async fn handle(
         &self,
         session: &mut Session,

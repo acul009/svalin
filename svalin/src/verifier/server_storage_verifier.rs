@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use svalin_pki::{
-    Certificate,
-    verifier::{VerificationError, Verifier, exact::ExactVerififier},
-};
+use svalin_pki::{Certificate, ExactVerififier, Fingerprint, VerificationError, Verifier};
 
 use crate::server::{agent_store::AgentStore, user_store::UserStore};
 
@@ -37,21 +34,21 @@ impl ServerStorageVerifier {
 impl Verifier for ServerStorageVerifier {
     async fn verify_fingerprint(
         &self,
-        fingerprint: [u8; 32],
+        fingerprint: &Fingerprint,
         time: u64,
-    ) -> Result<Certificate, svalin_pki::verifier::VerificationError> {
+    ) -> Result<Certificate, VerificationError> {
         if let Some(root) = self.helper.try_root(fingerprint) {
             return Ok(root);
         }
 
-        let agent = self.agent_store.get_agent(&fingerprint).await?;
+        let agent = self.agent_store.get_agent(fingerprint).await?;
         if let Some(agent) = agent {
             let agent_data = agent.verify(&self.agent_verifier, time).await?;
 
             return self.helper.help_verify(time, agent_data.unpack().cert);
         }
 
-        let user = self.user_store.get_user(&fingerprint).await?;
+        let user = self.user_store.get_user(fingerprint).await?;
         if let Some(_user) = user {
             // TODO: make helper actually check certificate chain
             // return self.helper.help_verify(time, _user.certificate);

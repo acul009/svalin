@@ -81,20 +81,6 @@ pub enum DecodeCredentialsError {
     CreateCredentialsError(#[from] CreateCredentialsError),
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum ApproveRequestError {
-    #[error("error parsing keypair: {0}")]
-    KeypairParseError(rcgen::Error),
-    #[error("error creating ca-certificate params: {0}")]
-    CreateCaParamsError(rcgen::Error),
-    #[error("error creating ca-certificate: {0}")]
-    CreateCaError(rcgen::Error),
-    #[error("error signing certificate: {0}")]
-    SignCertError(rcgen::Error),
-    #[error("error parsing new certificate: {0}")]
-    ParseNewCertError(CertificateParseError),
-}
-
 impl Credential {
     pub(crate) fn new(
         keypair: KeyPair,
@@ -209,10 +195,14 @@ impl Credential {
     pub fn get_certificate(&self) -> &Certificate {
         &self.data.certificate
     }
+
+    pub fn keypair(&self) -> &KeyPair {
+        &self.data.keypair
+    }
 }
 
 impl CanSign for Credential {
     fn borrow_keypair(&self) -> &Ed25519KeyPair {
-        &self.data.keypair.signing_keypair()
+        self.keypair().signing_keypair()
     }
 }

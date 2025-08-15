@@ -10,7 +10,7 @@ pub struct ExactVerififier {
 
 impl ExactVerififier {
     pub fn new(expected: Certificate) -> Self {
-        let expected_fingerprint = expected.fingerprint();
+        let expected_fingerprint = expected.fingerprint().clone();
         Self {
             expected,
             expected_fingerprint,

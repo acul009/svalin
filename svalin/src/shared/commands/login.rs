@@ -16,8 +16,8 @@ use serde::{
     de::{self},
 };
 use svalin_pki::{
-    ArgonCost, Certificate, DecryptError, EncryptError, EncryptedCredentials, EncryptedObject,
-    KeyPair, ParamsStringParseError, ToSelfSingedError, argon2::Argon2, sha2::Sha512,
+    ArgonCost, Certificate, CreateCredentialsError, Credential, DecryptError, EncryptError,
+    EncryptedCredentials, EncryptedObject, ParamsStringParseError, Sha512, argon2::Argon2,
 };
 use svalin_rpc::{
     rpc::{
@@ -295,9 +295,8 @@ impl TakeableCommandHandler for LoginHandler {
 
             let (read, write, _) = session.destructure_transport();
 
-            let temp_credentials = KeyPair::generate()
-                .to_self_signed_cert()
-                .context("Failed to generate temporary credentials")?;
+            let temp_credentials =
+                Credential::generate_root().context("Failed to generate temporary credentials")?;
 
             let tls_transport = TlsTransport::server(
                 CombinedTransport::new(read, write),
@@ -477,7 +476,7 @@ pub enum LoginDispatcherError {
     #[error("error reading server nonce: {0}")]
     ReadServerNonceError(SessionReadError),
     #[error("error creating temporary credentials: {0}")]
-    TempCredentialError(ToSelfSingedError),
+    TempCredentialError(CreateCredentialsError),
     #[error("error initializing TLS: {0}")]
     TlsClientError(TlsClientError),
     #[error("error deriving key: {0}")]
@@ -562,9 +561,8 @@ impl TakeableCommandDispatcher for Login {
             // ===== TLS Initialization =====
             let (read, write, _) = session.destructure_transport();
 
-            let credentials = KeyPair::generate()
-                .to_self_signed_cert()
-                .map_err(LoginDispatcherError::TempCredentialError)?;
+            let credentials =
+                Credential::generate_root().map_err(LoginDispatcherError::TempCredentialError)?;
 
             let tls_transport = TlsTransport::client(
                 CombinedTransport::new(read, write),
