@@ -25,6 +25,7 @@ openmls = { version = "0.7.0", features = [
 openmls_traits = "0.4.0"
 tls_codec = { version = "0.4.2" }
 sha2 = "0.10.9"
+openmls_rust_crypto = "0.4.0"
 
 [dev-dependencies]
 serde_json = { workspace = true }
