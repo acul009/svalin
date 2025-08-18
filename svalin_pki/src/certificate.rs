@@ -1,20 +1,32 @@
 use std::fmt::{Debug, Write};
 use std::hash::Hash;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::Result;
 use serde::de::Visitor;
 use serde::{Deserialize, Serialize, de};
 use thiserror::Error;
+use time::Duration;
 use x509_parser::error::X509Error;
 use x509_parser::prelude::Validity;
 use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
 
 use crate::signed_message::CanVerify;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CertificateType {
+    Root,
+    User,
+    UserDevice,
+    Agent,
+    Server,
+}
+
 #[derive(Debug)]
 struct CertificateData {
     der: Vec<u8>,
+    certificate_type: CertificateType,
     public_key: Vec<u8>,
     spki_hash: String,
     is_ca: bool,
@@ -53,10 +65,24 @@ pub enum CertificateParseError {
     X509Error(#[from] X509Error),
     #[error("Missing Common Name")]
     MissingCommonName,
+    #[error("Missing Organizational Unit")]
+    MissingOrganizationalUnit,
+    #[error("Invalid Certificate Type: {0}")]
+    InvalidCertificateType(#[from] CertificateTypeError),
     #[error("Issuer Missing Common Name")]
     IssuerMissingCommonName,
     #[error("SPKI Hash Mismatch - certificate is not following convention")]
     SpkiHashMismatch,
+    #[error("Certificate of type {0} should not be a CA")]
+    ShouldNotBeCa(CertificateType),
+    #[error("Certificate of type {0} should be a CA")]
+    ShouldBeCa(CertificateType),
+    #[error("Self-signed certificate is not of type root")]
+    SelfSignedNotRoot,
+    #[error("Certificate validity is broken")]
+    BrokenValidity,
+    #[error("Incorrect validity duration for certificate type {0}: expected {1}, got {2}")]
+    IncorrectValidityDuration(CertificateType, Duration, Duration),
 }
 
 #[derive(Error, Debug)]
@@ -99,11 +125,32 @@ impl Certificate {
             .ok_or_else(|| CertificateParseError::MissingCommonName)?
             .as_str()?;
 
+        let certificate_type = CertificateType::from_str(
+            cert.subject()
+                .iter_organizational_unit()
+                .next()
+                .ok_or_else(|| CertificateParseError::MissingOrganizationalUnit)?
+                .as_str()?,
+        )?;
+
         if spki_hash != cn {
             return Err(CertificateParseError::SpkiHashMismatch);
         };
 
         let validity = cert.validity().clone();
+
+        let validity_time = (validity.not_after - validity.not_before)
+            .ok_or_else(|| CertificateParseError::BrokenValidity)?;
+
+        let expected_validity = certificate_type.validity_duration();
+
+        if validity_time != expected_validity {
+            return Err(CertificateParseError::IncorrectValidityDuration(
+                certificate_type,
+                expected_validity,
+                validity_time,
+            ));
+        }
 
         let issuer = cert
             .issuer()
@@ -113,9 +160,23 @@ impl Certificate {
             .as_str()?
             .to_string();
 
+        if cert.issuer() == cert.subject() {
+            if certificate_type != CertificateType::Root {
+                return Err(CertificateParseError::SelfSignedNotRoot);
+            }
+        }
+
         let public_key = cert.public_key().subject_public_key.as_ref().to_vec();
 
         let is_ca = cert.is_ca();
+
+        if is_ca != certificate_type.should_be_ca() {
+            if is_ca {
+                return Err(CertificateParseError::ShouldNotBeCa(certificate_type));
+            } else {
+                return Err(CertificateParseError::ShouldBeCa(certificate_type));
+            }
+        }
 
         // Todo: use rcgen::Certificate::key_identifier instead
         let hash = ring::digest::digest(&ring::digest::SHA512_256, &der);
@@ -125,6 +186,7 @@ impl Certificate {
         Ok(Certificate {
             data: Arc::new(CertificateData {
                 der,
+                certificate_type,
                 public_key,
                 spki_hash,
                 is_ca,
@@ -203,6 +265,10 @@ impl Certificate {
         cert.verify_signature(Some(issuer_cert.public_key()))?;
 
         Ok(())
+    }
+
+    pub fn certificate_type(&self) -> CertificateType {
+        self.data.certificate_type
     }
 }
 
@@ -327,5 +393,60 @@ impl Eq for Certificate {}
 impl Hash for Certificate {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.data.der.hash(state);
+    }
+}
+
+impl CertificateType {
+    pub fn should_be_ca(&self) -> bool {
+        match self {
+            CertificateType::Root => true,
+            CertificateType::User => true,
+            CertificateType::UserDevice => false,
+            CertificateType::Agent => false,
+            CertificateType::Server => false,
+        }
+    }
+
+    pub fn validity_duration(&self) -> Duration {
+        match self {
+            CertificateType::Root => Duration::days(365 * 10),
+            CertificateType::User => Duration::days(365 * 1),
+            CertificateType::UserDevice => Duration::days(30),
+            CertificateType::Agent => Duration::days(365 * 1),
+            CertificateType::Server => Duration::days(365 * 10),
+        }
+    }
+}
+
+impl std::fmt::Display for CertificateType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CertificateType::Root => write!(f, "root"),
+            CertificateType::User => write!(f, "user"),
+            CertificateType::UserDevice => write!(f, "user_device"),
+            CertificateType::Agent => write!(f, "agent"),
+            CertificateType::Server => write!(f, "server"),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum CertificateTypeError {
+    #[error("Invalid type")]
+    InvalidType,
+}
+
+impl FromStr for CertificateType {
+    type Err = CertificateTypeError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "root" => Ok(CertificateType::Root),
+            "user" => Ok(CertificateType::User),
+            "user_device" => Ok(CertificateType::UserDevice),
+            "agent" => Ok(CertificateType::Agent),
+            "server" => Ok(CertificateType::Server),
+            _ => Err(CertificateTypeError::InvalidType),
+        }
     }
 }

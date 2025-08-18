@@ -142,7 +142,7 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
                     debug!("received public key: {:?}", public_key);
                     let agent_cert: Certificate = self
                         .credentials
-                        .create_leaf_certificate_for_key(&public_key)
+                        .create_agent_certificate_for_key(&public_key)
                         .map_err(|err| anyhow!(err))?;
 
                     session_e2e

@@ -275,51 +275,7 @@ You might be interested in this crate if you want to build something similar to 
 
 # Todo
 
-## Strategy
-- [ ] get really basic version working (soon)
-- [ ] add test so refactors arent as risky (already got some, but need more.)
-- [ ] find some epic rust nerds who can help me fix my architecture and get this in a stable state
-- [ ] find a way to reveal this with a big bang so I can find even more really cool nerds to gather feedback and extend this
-- [ ] have a small but nice community around svalin
-- [ ] ???
-- [ ] profit
-
-## Simple
-- [ ] Show Unlock Error when password on profile unlock wrong
-- [ ] Fix as many warnings as possible
-
-## Bigger
-- [ ] Add documentation for all public RPC types
-- [ ] Add support for IPv6
-- [ ] Rate Limiting
-- [X] Init Routine
-- [ ] Login Routine (make sure the server sent hashing parameters are strong enough and non existant users are simulated with key derived hashing parameters)
-- [X] Unlock Routine
-- [X] Make Credentials use an Arc internally
-- [X] Agent init / join
-- [X] Connection forwarding
-- [X] E2E Encryption
-- [X] List all agents with connection status
-- [X] Show realtime performance ingo
-- [X] Basic Port-Forwarding
-- [ ] Remote Terminal (UI has been to laggy so far)
-
-## Architecture
-- [X] crate for local system managment and package management (WIP)
-- [X] Framework for permission system
-- [ ] Basic permission system
-- [ ] Network Security System and Alerting
-- [ ] Replace certificate distribution with better system (possibly TBRHL)
-- [ ] Think of way to nicely and securely distribute group and system state
-- [ ] More general information subscription system (e.g. CPU utilization, connected clients)
-
-## Milestones
-- [ ] Basic Managment (Live)
-- [ ] Remote Desktop
-- [ ] Network Security System and Alerting
-- [ ] IPv6 Support
-- [ ] Group Configuration Managment
-- [ ]
+[See notes/todos.md](notes/todos.md)
 
 ## Svalin Network Architecture
 

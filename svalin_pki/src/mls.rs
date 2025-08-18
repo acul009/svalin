@@ -11,13 +11,16 @@ use openmls::{
         StagedWelcome, WelcomeError,
     },
     prelude::{
-        Ciphersuite, CredentialType, CredentialWithKey, KeyPackage, KeyPackageBundle,
-        KeyPackageNewError, MlsMessageIn, MlsMessageOut, ProcessedMessageContent, ProtocolMessage,
+        Ciphersuite, CredentialType, CredentialWithKey, KeyPackage, KeyPackageBundle, KeyPackageIn,
+        KeyPackageNewError, KeyPackageVerifyError, MlsMessageBodyIn, MlsMessageIn, MlsMessageOut,
+        PrivateMessageIn, ProcessedMessageContent, ProtocolMessage, ProtocolVersion,
         SenderRatchetConfiguration, Welcome,
     },
 };
 use openmls_rust_crypto::{MemoryStorage, MemoryStorageError, RustCrypto};
 use openmls_traits::{OpenMlsProvider, signatures::SignerError};
+use rand::RngCore;
+use tls_codec::{Deserialize, Serialize};
 
 use crate::{
     Certificate, Credential, DecryptError, EncryptError, EncryptedObject, signed_message::CanSign,
@@ -45,6 +48,7 @@ impl openmls_traits::signatures::Signer for Credential {
 pub struct SvalinProvider {
     crypto: RustCrypto,
     key_store: MemoryStorage,
+    protocol_version: ProtocolVersion,
 }
 
 impl OpenMlsProvider for SvalinProvider {
@@ -87,6 +91,7 @@ impl MlsClient {
             provider: Arc::new(SvalinProvider {
                 crypto: Default::default(),
                 key_store: MemoryStorage::default(),
+                protocol_version: ProtocolVersion::Mls10,
             }),
             credential,
             public_info,
@@ -126,6 +131,7 @@ impl MlsClient {
             provider: Arc::new(SvalinProvider {
                 crypto: Default::default(),
                 key_store,
+                protocol_version: ProtocolVersion::Mls10,
             }),
             credential,
             public_info,
@@ -168,7 +174,7 @@ impl MlsClient {
         })
     }
 
-    pub(crate) fn create_key_package(&self) -> Result<KeyPackageBundle, KeyPackageNewError> {
+    pub fn create_key_package(&self) -> Result<KeyPackageBundle, KeyPackageNewError> {
         KeyPackage::builder().build(
             self.cipher_suite,
             self.provider.deref(),
@@ -188,6 +194,8 @@ pub struct Group {
 
 #[derive(Debug, thiserror::Error)]
 pub enum GroupError {
+    #[error("Failed to verify key package: {0}")]
+    KeyPackageVerifyError(#[from] KeyPackageVerifyError),
     #[error("Failed to add members: {0}")]
     AddMembersError(#[from] AddMembersError<MemoryStorageError>),
     #[error("Failed to create commit: {0}")]
@@ -206,26 +214,42 @@ pub enum GroupError {
     ProcessMessageError(#[from] ProcessMessageError),
     #[error("Failed to store cipherdata: {0}")]
     StoreError(#[from] MemoryStorageError),
+    #[error("Failed to serialize TLS message: {0}")]
+    TlsSerializeError(tls_codec::Error),
+    #[error("Failed to deserialize TLS message: {0}")]
+    TlsDeserializeError(tls_codec::Error),
+    #[error("Unsupported message body type")]
+    UnsupportedMessageBodyType,
 }
 
 impl Group {
     pub fn add_members(
         &mut self,
-        key_packages: &[KeyPackage],
-    ) -> Result<(MlsMessageOut, MlsMessageOut), GroupError> {
-        let (message, welcome, _) =
-            self.group
-                .add_members(self.provider.deref(), &self.credential, key_packages)?;
+        key_packages: impl IntoIterator<Item = KeyPackageIn>,
+    ) -> Result<(Message, MlsMessageOut), GroupError> {
+        let key_packages = key_packages
+            .into_iter()
+            .map(|key_package_in| {
+                key_package_in.validate(self.provider.crypto(), self.provider.protocol_version)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(GroupError::KeyPackageVerifyError)?;
+
+        let (message, welcome, _) = self.group.add_members(
+            self.provider.deref(),
+            &self.credential,
+            key_packages.as_slice(),
+        )?;
 
         self.group.merge_pending_commit(self.provider.deref())?;
 
-        Ok((message, welcome))
+        Ok((Message::from_mls_messages([message])?, welcome))
     }
 
     /// This creates a new commit as well as the requested message right afterwards.
     /// The commit here helps to ensure that the message can easily be read, as the per message ratchet
     /// is kept in memory only and reading the last message would require all prior messages of that epoch too
-    pub fn create_message(&mut self, message: &[u8]) -> Result<[MlsMessageOut; 2], GroupError> {
+    pub fn create_message(&mut self, message: &[u8]) -> Result<Message, GroupError> {
         let empty_commit = self
             .group
             .commit_builder()
@@ -245,12 +269,22 @@ impl Group {
             self.group
                 .create_message(self.provider.deref(), &self.credential, message)?;
 
-        Ok([empty_commit, message])
+        Ok(Message::from_mls_messages([empty_commit, message])?)
     }
 
-    pub fn process_message(
+    pub fn process_message(&mut self, message: Message) -> Result<Option<Vec<u8>>, GroupError> {
+        let mut output = None;
+        for message in message.to_mls_messages() {
+            let message = message?;
+            output = self.process_mls_message(message)?;
+        }
+
+        Ok(output)
+    }
+
+    fn process_mls_message(
         &mut self,
-        message: ProtocolMessage,
+        message: impl Into<ProtocolMessage>,
     ) -> Result<Option<Vec<u8>>, GroupError> {
         let content = self
             .group
@@ -277,5 +311,61 @@ impl Group {
             }
             ProcessedMessageContent::ExternalJoinProposalMessage(queued_proposal) => todo!(),
         }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct MessageId([u8; 32]);
+
+impl MessageId {
+    pub fn new() -> Self {
+        let mut id = [0u8; 32];
+        rand::rng().fill_bytes(&mut id);
+        Self(id)
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct Message {
+    id: MessageId,
+    mls_messages: Vec<Vec<u8>>,
+}
+
+impl Message {
+    pub fn test<A>(&self) -> A
+    where
+        A: Default,
+    {
+        Default::default()
+    }
+
+    pub fn from_mls_messages(
+        mls_messages: impl IntoIterator<Item = MlsMessageOut>,
+    ) -> Result<Self, GroupError> {
+        let mls_messages = mls_messages
+            .into_iter()
+            .map(|mls_message| mls_message.tls_serialize_detached())
+            .collect::<Result<Vec<Vec<u8>>, tls_codec::Error>>()
+            .map_err(GroupError::TlsSerializeError)?;
+
+        Ok(Message {
+            id: MessageId::new(),
+            mls_messages,
+        })
+    }
+
+    pub fn to_mls_messages(&self) -> impl Iterator<Item = Result<PrivateMessageIn, GroupError>> {
+        self.mls_messages.iter().map(|raw| {
+            let message = MlsMessageIn::tls_deserialize_exact(raw)
+                .map_err(GroupError::TlsDeserializeError)?;
+
+            match message.extract() {
+                MlsMessageBodyIn::PrivateMessage(private_message_in) => Ok(private_message_in),
+                MlsMessageBodyIn::PublicMessage(_)
+                | MlsMessageBodyIn::Welcome(_)
+                | MlsMessageBodyIn::GroupInfo(_)
+                | MlsMessageBodyIn::KeyPackage(_) => Err(GroupError::UnsupportedMessageBodyType),
+            }
+        })
     }
 }

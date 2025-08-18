@@ -1,5 +1,8 @@
 use anyhow::Result;
-use svalin_pki::{Certificate, CreateCredentialsError, Credential, ExportedPublicKey, KeyPair};
+use svalin_pki::{
+    Certificate, CreateCertificateError, CreateCredentialsError, Credential, ExportedPublicKey,
+    KeyPair,
+};
 
 use async_trait::async_trait;
 use svalin_rpc::rpc::{
@@ -80,7 +83,7 @@ pub enum InitError {
     #[error("error reading request: {0}")]
     ReadRequestError(SessionReadError),
     #[error("error creating certificate for public key: {0}")]
-    CreateCertError(CreateCredentialsError),
+    CreateCertError(CreateCertificateError),
     #[error("error writing server certificate: {0}")]
     WriteServerCertError(SessionWriteError),
     #[error("error reading success: {0}")]
@@ -111,7 +114,7 @@ impl CommandDispatcher for Init {
             .map_err(InitError::ReadRequestError)?;
         let server_cert: Certificate = self
             .root
-            .create_leaf_certificate_for_key(&public_key)
+            .create_server_certificate_for_key(&public_key)
             .map_err(InitError::CreateCertError)?;
 
         session

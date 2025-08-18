@@ -5,11 +5,12 @@ use anyhow::Result;
 use rcgen::{Issuer, PublicKeyData};
 use ring::signature::Ed25519KeyPair;
 use serde::{Deserialize, Serialize};
-use time::{Duration, OffsetDateTime};
+use time::OffsetDateTime;
 use tracing::debug;
 
 use crate::{
     Certificate, CertificateParseError, KeyPair,
+    certificate::CertificateType,
     encrypt::EncryptedObject,
     keypair::{DecodeKeypairError, ExportedPublicKey, SavedKeypair},
     signed_message::CanSign,
@@ -59,10 +60,14 @@ impl EncryptedCredentials {
 pub enum CreateCredentialsError {
     #[error("error self-signing certificate: {0}")]
     SelfSignError(rcgen::Error),
-    #[error("error self-signing certificate: {0}")]
+    #[error("error creating certificate: {0}")]
+    CreateCertificateError(#[from] CreateCertificateError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CreateCertificateError {
+    #[error("error signing certificate: {0}")]
     SignCertificateError(rcgen::Error),
-    #[error("key rejected: {0}")]
-    KeyRejectError(ring::error::KeyRejected),
     #[error("error parsing certificate: {0}")]
     CertificateParseError(#[from] CertificateParseError),
     #[error("error while creating issuer from credential: {0}")]
@@ -108,7 +113,7 @@ impl Credential {
         let mut root_parameters = rcgen::CertificateParams::default();
         root_parameters.not_before = OffsetDateTime::now_utc();
         root_parameters.not_after =
-            OffsetDateTime::now_utc().saturating_add(Duration::days(365 * 10));
+            OffsetDateTime::now_utc().saturating_add(CertificateType::Root.validity_duration());
 
         root_parameters.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
 
@@ -124,6 +129,10 @@ impl Credential {
         let spki_hash =
             Certificate::compute_spki_hash(&keypair.export_public_key().subject_public_key_info());
         let mut dn = rcgen::DistinguishedName::new();
+        dn.push(
+            rcgen::DnType::OrganizationalUnitName,
+            CertificateType::Root.to_string(),
+        );
         dn.push(rcgen::DnType::CommonName, spki_hash);
 
         root_parameters.distinguished_name = dn;
@@ -132,7 +141,8 @@ impl Credential {
             .self_signed(keypair.rcgen())
             .map_err(CreateCredentialsError::SelfSignError)?;
 
-        let certificate = Certificate::from_der(certificate.der().to_vec())?;
+        let certificate = Certificate::from_der(certificate.der().to_vec())
+            .map_err(CreateCertificateError::CertificateParseError)?;
 
         let root = Self::new(keypair, certificate)?;
 
@@ -146,17 +156,20 @@ impl Credential {
         )
     }
 
-    /// Creates a certificate with the given public key.
-    /// Svalin uses these certificates as device credentials.
-    pub fn create_leaf_certificate_for_key(
+    fn create_certificate_for_key(
         &self,
         public_key: &ExportedPublicKey,
-    ) -> Result<Certificate, CreateCredentialsError> {
+        certificate_type: CertificateType,
+    ) -> Result<Certificate, CreateCertificateError> {
         let mut leaf_parameters = rcgen::CertificateParams::default();
         leaf_parameters.not_before = OffsetDateTime::now_utc();
-        leaf_parameters.not_after = OffsetDateTime::now_utc().saturating_add(Duration::days(365));
+        leaf_parameters.not_after =
+            OffsetDateTime::now_utc().saturating_add(certificate_type.validity_duration());
 
-        leaf_parameters.is_ca = rcgen::IsCa::NoCa;
+        leaf_parameters.is_ca = match certificate_type.should_be_ca() {
+            true => rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained),
+            false => rcgen::IsCa::NoCa,
+        };
 
         leaf_parameters.key_usages = vec![rcgen::KeyUsagePurpose::DigitalSignature];
 
@@ -165,6 +178,10 @@ impl Credential {
 
         let spki_hash = Certificate::compute_spki_hash(&public_key.subject_public_key_info());
         let mut dn = rcgen::DistinguishedName::new();
+        dn.push(
+            rcgen::DnType::OrganizationalUnitName,
+            CertificateType::Agent.to_string(),
+        );
         dn.push(rcgen::DnType::CommonName, spki_hash);
         leaf_parameters.distinguished_name = dn;
 
@@ -173,13 +190,40 @@ impl Credential {
                 public_key,
                 &self
                     .issuer()
-                    .map_err(CreateCredentialsError::IssuerCreateError)?,
+                    .map_err(CreateCertificateError::IssuerCreateError)?,
             )
-            .map_err(CreateCredentialsError::SignCertificateError)?;
+            .map_err(CreateCertificateError::SignCertificateError)?;
 
         let leaf = Certificate::from_der(certificate.der().to_vec())?;
 
         Ok(leaf)
+    }
+
+    /// Creates a certificate with the given public key.
+    /// Svalin uses these certificates as agent credentials.
+    pub fn create_agent_certificate_for_key(
+        &self,
+        public_key: &ExportedPublicKey,
+    ) -> Result<Certificate, CreateCertificateError> {
+        self.create_certificate_for_key(public_key, CertificateType::Agent)
+    }
+
+    pub fn create_server_certificate_for_key(
+        &self,
+        public_key: &ExportedPublicKey,
+    ) -> Result<Certificate, CreateCertificateError> {
+        self.create_certificate_for_key(public_key, CertificateType::Server)
+    }
+
+    pub fn create_user_device_credential(&self) -> Result<Self, CreateCredentialsError> {
+        let keypair = KeyPair::generate();
+
+        let certificate = self.create_certificate_for_key(
+            &keypair.export_public_key(),
+            CertificateType::UserDevice,
+        )?;
+
+        keypair.upgrade(certificate)
     }
 
     pub async fn export(&self, password: Vec<u8>) -> Result<EncryptedCredentials> {

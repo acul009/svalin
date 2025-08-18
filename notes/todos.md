@@ -15,6 +15,7 @@
 - [ ] Rate Limiting
 
 ## Architecture
+- [ ] Build new session and login system based on short lived certificates
 - [ ] Basic permission system
 - [ ] Network Security System and Alerting
 - [ ] Replace certificate distribution with a better system (possibly TBRHL)

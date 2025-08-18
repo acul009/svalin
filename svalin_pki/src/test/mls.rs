@@ -1,20 +1,11 @@
 use std::panic;
 
-use openmls::{
-    group::{MlsGroup, MlsGroupCreateConfig, MlsGroupJoinConfig, StagedWelcome},
-    prelude::{
-        Capabilities, Ciphersuite, CredentialWithKey, CustomProposal, DeserializeBytes, Extension,
-        Extensions, KeyPackage, KeyPackageBundle, MlsMessageIn, OpenMlsProvider,
-        OpenMlsSignaturePublicKey, Proposal, ProposalType, RatchetTreeExtension, RatchetTreeIn,
-        SenderRatchetConfiguration, SignaturePublicKey, Verifiable, Welcome, group_info,
-        tls_codec::{Deserialize, Serialize},
-    },
-    test_utils::OpenMlsRustCrypto,
-    treesync::RatchetTree,
+use openmls::prelude::{
+    KeyPackageIn, MlsMessageBodyIn, MlsMessageIn,
+    tls_codec::{Deserialize, Serialize},
 };
-use openmls_traits::public_storage::PublicStorageProvider;
 
-use crate::{Certificate, Credential, mls::MlsClient};
+use crate::{Credential, mls::MlsClient};
 
 #[test]
 fn experimenting() {
@@ -44,28 +35,46 @@ fn experimenting() {
     // Maybe there's a way to share only parts of the storage provider.
 
     // ChaCha20 icompatible with rust crypto
+    let credential1 = Credential::generate_root().unwrap();
 
-    let client1 = MlsClient::new(Credential::generate_root().unwrap());
+    let client1 = MlsClient::new(credential1.clone());
     let client2 = MlsClient::new(Credential::generate_root().unwrap());
+    let second_device = MlsClient::new(credential1);
 
-    let key_package_2_serialized =
-        serde_json::to_vec(client2.create_key_package().unwrap().key_package()).unwrap();
-    let key_package_2_copy: KeyPackage = serde_json::from_slice(&key_package_2_serialized).unwrap();
+    let key_package_2_serialized = client2
+        .create_key_package()
+        .unwrap()
+        .key_package()
+        .tls_serialize_detached()
+        .unwrap();
+    let key_package_second_device_serialized = second_device
+        .create_key_package()
+        .unwrap()
+        .key_package()
+        .tls_serialize_detached()
+        .unwrap();
+    let key_package_2 = KeyPackageIn::tls_deserialize_exact(&key_package_2_serialized).unwrap();
+    let key_package_second_device =
+        KeyPackageIn::tls_deserialize_exact(&key_package_second_device_serialized).unwrap();
 
     let mut group1 = client1.create_group().unwrap();
 
-    let (mls_message_out, welcome_out) = group1.add_members(&[key_package_2_copy]).unwrap();
+    let (_mls_message, welcome_out) = group1
+        .add_members([key_package_2, key_package_second_device])
+        .unwrap();
 
     let serialized_invite = welcome_out.tls_serialize_detached().unwrap();
 
     let received_mls_message =
         MlsMessageIn::tls_deserialize_exact(&mut serialized_invite.as_slice()).unwrap();
 
-    let invite = received_mls_message
-        .into_welcome()
-        .expect("Has to be an invite");
+    let welcome = if let MlsMessageBodyIn::Welcome(welcome) = received_mls_message.extract() {
+        welcome
+    } else {
+        panic!("Has to be an invite");
+    };
 
-    for secret in invite.secrets() {
+    for secret in welcome.secrets() {
         let new_member = secret.new_member();
     }
 
@@ -75,28 +84,22 @@ fn experimenting() {
     //     println!("{}", cert.spki_hash());
     // }
 
-    let mut group2 = client2.join_group(invite).unwrap();
+    let mut group2 = client2.join_group(welcome.clone()).unwrap();
+
+    let mut group_second_device = second_device.join_group(welcome).unwrap();
 
     let content1 = b"This is the first test message!";
 
-    let [message1, message2] = group1.create_message(content1).unwrap();
+    let message = group1.create_message(content1).unwrap();
 
-    let received1 =
-        MlsMessageIn::tls_deserialize_exact(message1.tls_serialize_detached().unwrap()).unwrap();
-
-    group2
-        .process_message(received1.into_protocol_message().unwrap())
-        .unwrap();
-
-    let received2 =
-        MlsMessageIn::tls_deserialize_exact(message2.tls_serialize_detached().unwrap()).unwrap();
-
-    let cleartext = group2
-        .process_message(received2.into_protocol_message().unwrap())
+    let cleartext = group2.process_message(message.clone()).unwrap().unwrap();
+    let second_cleartext = group_second_device
+        .process_message(message)
         .unwrap()
         .unwrap();
 
     assert_eq!(content1.as_ref(), &cleartext);
+    assert_eq!(content1.as_ref(), &second_cleartext);
 
     // The same message cannot be decrypted again because it's to distant in the past
     // You can however set the out of order tolerance to at least 1 to allow the newest message to be decrypted

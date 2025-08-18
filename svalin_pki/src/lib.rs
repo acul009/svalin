@@ -21,7 +21,8 @@ pub use certificate::{
     Certificate, CertificateParseError, Fingerprint, SignatureVerificationError, ValidityError,
 };
 pub use credential::{
-    CreateCredentialsError, Credential, DecodeCredentialsError, EncryptedCredentials,
+    CreateCertificateError, CreateCredentialsError, Credential, DecodeCredentialsError,
+    EncryptedCredentials,
 };
 pub use encrypt::{DecryptError, EncryptError, EncryptedData, EncryptedObject};
 pub use keypair::{ExportedPublicKey, KeyPair};

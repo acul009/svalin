@@ -100,7 +100,7 @@ async fn test_create_leaf() {
 
     let public_key: ExportedPublicKey = postcard::from_bytes(&serialized).unwrap();
 
-    let leaf = root.create_leaf_certificate_for_key(&public_key).unwrap();
+    let leaf = root.create_agent_certificate_for_key(&public_key).unwrap();
 
     let serialized = postcard::to_extend(&leaf, Vec::new()).unwrap();
     let leaf: Certificate = postcard::from_bytes(&serialized).unwrap();
