@@ -7,7 +7,7 @@ use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::{ParamsString, rand_core::OsRng};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    ArgonCost, Certificate, Credential, EncryptedCredentials, Sha512, argon2::Argon2,
+    ArgonCost, Certificate, Credential, EncryptedCredential, Sha512, argon2::Argon2,
 };
 use svalin_rpc::rpc::{
     command::{
@@ -29,7 +29,7 @@ use crate::{
 pub struct AddUserRequest {
     certificate: Certificate,
     // username: String,
-    encrypted_credentials: EncryptedCredentials,
+    encrypted_credentials: EncryptedCredential,
     totp_secret: TOTP,
     current_totp: String,
     /// The username of the user being added

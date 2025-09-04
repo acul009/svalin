@@ -7,7 +7,7 @@ use config_builder::ServerConfigBuilder;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
-use svalin_pki::{Certificate, Credential, EncryptedCredentials, KnownCertificateVerifier};
+use svalin_pki::{Certificate, Credential, EncryptedCredential, KnownCertificateVerifier};
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},
     rpc::{command::handler::HandlerCollection, server::Socket},
@@ -61,7 +61,7 @@ pub struct Server {
 #[derive(Serialize, Deserialize)]
 struct BaseConfig {
     root_cert: Certificate,
-    credentials: EncryptedCredentials,
+    credentials: EncryptedCredential,
     key_source: KeySource,
     pseudo_data_seed: Vec<u8>,
 }

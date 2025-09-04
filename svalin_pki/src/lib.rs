@@ -18,11 +18,12 @@ pub use sha2::Sha512;
 pub use argon::{ArgonCost, ArgonParams, DeriveKeyError, ParamsStringParseError, PasswordHash};
 pub use argon2;
 pub use certificate::{
-    Certificate, CertificateParseError, Fingerprint, SignatureVerificationError, ValidityError,
+    Certificate, CertificateParseError, CertificateType, Fingerprint, SignatureVerificationError,
+    ValidityError,
 };
 pub use credential::{
     CreateCertificateError, CreateCredentialsError, Credential, DecodeCredentialsError,
-    EncryptedCredentials,
+    EncryptedCredential,
 };
 pub use encrypt::{DecryptError, EncryptError, EncryptedData, EncryptedObject};
 pub use keypair::{ExportedPublicKey, KeyPair};

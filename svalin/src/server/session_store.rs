@@ -1,8 +1,16 @@
-use svalin_pki::{Certificate, Fingerprint};
+use svalin_pki::{Certificate, CertificateType, Fingerprint};
 
 #[derive(Debug)]
 pub struct SessionStore {
     pool: sqlx::SqlitePool,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AddSessionError {
+    #[error("SQLx error: {0}")]
+    SqlxError(#[from] sqlx::Error),
+    #[error("Invalid certificate type: {0}")]
+    InvalidCertificateType(CertificateType),
 }
 
 impl SessionStore {
@@ -10,7 +18,13 @@ impl SessionStore {
         Self { pool }
     }
 
-    pub async fn add_session(&self, certificate: Certificate) -> Result<(), sqlx::Error> {
+    pub async fn add_session(&self, certificate: Certificate) -> Result<(), AddSessionError> {
+        if certificate.certificate_type() != CertificateType::UserDevice {
+            return Err(AddSessionError::InvalidCertificateType(
+                certificate.certificate_type(),
+            ));
+        }
+
         let fingerprint = certificate.fingerprint().as_slice();
         let issuer = certificate.issuer();
         let der = certificate.to_der();

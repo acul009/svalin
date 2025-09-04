@@ -36,12 +36,12 @@ impl Debug for Credential {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct EncryptedCredentials {
+pub struct EncryptedCredential {
     encrypted_keypair: EncryptedObject<SavedKeypair>,
     raw_cert: Vec<u8>,
 }
 
-impl EncryptedCredentials {
+impl EncryptedCredential {
     pub async fn decrypt(self, password: Vec<u8>) -> Result<Credential, DecodeCredentialsError> {
         let certificate = Certificate::from_der(self.raw_cert)?;
 
@@ -260,9 +260,9 @@ impl Credential {
         keypair.upgrade(certificate)
     }
 
-    pub async fn export(&self, password: Vec<u8>) -> Result<EncryptedCredentials> {
+    pub async fn export(&self, password: Vec<u8>) -> Result<EncryptedCredential> {
         let encrypted_keypair = self.data.keypair.encrypt(password).await?;
-        let on_disk = EncryptedCredentials {
+        let on_disk = EncryptedCredential {
             encrypted_keypair,
             raw_cert: self.data.certificate.to_der().to_owned(),
         };

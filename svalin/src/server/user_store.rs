@@ -6,14 +6,14 @@ use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::ParamsString;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use svalin_pki::{Certificate, EncryptedCredentials, Fingerprint};
+use svalin_pki::{Certificate, EncryptedCredential, Fingerprint};
 use totp_rs::TOTP;
 use tracing::{debug, instrument};
 
 #[derive(Serialize, Deserialize)]
 pub struct StoredUser {
     pub certificate: Certificate,
-    pub encrypted_credentials: EncryptedCredentials,
+    pub encrypted_credentials: EncryptedCredential,
     pub totp_secret: TOTP,
     /// The username of whoever is registering
     pub username: Vec<u8>,
@@ -65,7 +65,7 @@ impl UserStore {
         &self,
         certificate: Certificate,
         username: Vec<u8>,
-        encrypted_credentials: EncryptedCredentials,
+        encrypted_credentials: EncryptedCredential,
         totp_secret: TOTP,
         secret_exponent: Scalar,
         params: ParamsString,

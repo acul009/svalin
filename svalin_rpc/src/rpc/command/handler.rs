@@ -188,7 +188,7 @@ where
         }
     }
 
-    pub async fn chain(&self) -> ChainCommandAdder<P> {
+    pub async fn chain<'a>(&'a self) -> ChainCommandAdder<'a, P> {
         let lock = self.commands.write().await;
         ChainCommandAdder { lock }
     }

@@ -10,6 +10,7 @@ use svalin_rpc::{
 
 use crate::{
     permissions::server_permission_handler::ServerPermissionHandler,
+    server::session_store::SessionStore,
     shared::{
         commands::{
             add_user::AddUserHandler,
@@ -28,6 +29,7 @@ pub struct SvalinCommandBuilder {
     pub server_cert: svalin_pki::Certificate,
     pub agent_store: Arc<AgentStore>,
     pub user_store: Arc<UserStore>,
+    pub session_store: Arc<SessionStore>,
 }
 
 impl RpcCommandBuilder for SvalinCommandBuilder {
@@ -48,6 +50,7 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             .add(PublicStatusHandler::new(PublicStatus::Ready))
             .add(LoginHandler::new(
                 self.user_store.clone(),
+                self.session_store.clone(),
                 self.root_cert.clone(),
                 self.server_cert.clone(),
             ))

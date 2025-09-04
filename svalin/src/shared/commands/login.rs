@@ -16,8 +16,9 @@ use serde::{
     de::{self},
 };
 use svalin_pki::{
-    ArgonCost, Certificate, CreateCredentialsError, Credential, DecryptError, EncryptError,
-    EncryptedCredentials, EncryptedObject, ParamsStringParseError, Sha512, argon2::Argon2,
+    ArgonCost, Certificate, CreateCredentialsError, Credential, DecodeCredentialsError,
+    DecryptError, EncryptError, EncryptedCredential, ParamsStringParseError, Sha512,
+    argon2::Argon2,
 };
 use svalin_rpc::{
     rpc::{
@@ -40,12 +41,15 @@ use tracing::debug;
 
 use crate::{
     permissions::Permission,
-    server::user_store::{UserStore, serde_paramsstring},
+    server::{
+        session_store::SessionStore,
+        user_store::{UserStore, serde_paramsstring},
+    },
 };
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginApproval {
-    pub encrypted_user_credentials: EncryptedCredentials,
+    pub encrypted_user_credentials: EncryptedCredential,
     pub root_cert: Certificate,
     pub server_cert: Certificate,
 }
@@ -58,6 +62,7 @@ impl From<&PermissionPrecursor<LoginHandler>> for Permission {
 
 pub struct LoginHandler {
     user_store: Arc<UserStore>,
+    session_store: Arc<SessionStore>,
     root_cert: Certificate,
     server_cert: Certificate,
 }
@@ -65,11 +70,13 @@ pub struct LoginHandler {
 impl LoginHandler {
     pub fn new(
         user_store: Arc<UserStore>,
+        session_store: Arc<SessionStore>,
         root_cert: Certificate,
         server_cert: Certificate,
     ) -> Self {
         Self {
             user_store,
+            session_store,
             root_cert,
             server_cert,
         }
@@ -459,6 +466,27 @@ impl TakeableCommandHandler for LoginHandler {
                 .await
                 .context("Failed to write encrypted success")?;
 
+            let session_certificate: Certificate = session
+                .read_object()
+                .await
+                .context("Failed to read session certificate")?;
+
+            let store_result = self
+                .session_store
+                .add_session(session_certificate)
+                .await
+                .context("Failed to save certificate to session store");
+
+            let cleaned_result = match &store_result {
+                Ok(_) => Ok(()),
+                Err(_) => Err(()),
+            };
+
+            let send_result = session.write_object(&cleaned_result).await;
+
+            store_result?;
+            send_result?;
+
             Ok(())
         } else {
             Err(anyhow!("tried executing commandhandler with None"))
@@ -522,17 +550,27 @@ pub enum LoginDispatcherError {
     ReadSuccessError(SessionReadError),
     #[error("wrong password")]
     WrongPassword,
+    #[error("error decoding credentials: {0}")]
+    DecodeCredentialsError(DecodeCredentialsError),
+    #[error("error creating session certificate: {0}")]
+    CreateSessionError(CreateCredentialsError),
+    #[error("error writing session certificate: {0}")]
+    WriteSessionError(SessionWriteError),
+    #[error("error reading session result: {0}")]
+    ReadSessionResultError(SessionReadError),
+    #[error("session was declined by server")]
+    SessionSubmitError,
 }
 
 pub struct LoginSuccess {
     pub user_credential: Credential,
-    pub session_credential: Credential,
+    pub device_credential: Credential,
     pub root_cert: Certificate,
     pub server_cert: Certificate,
 }
 
 impl TakeableCommandDispatcher for Login {
-    type Output = Credential;
+    type Output = LoginSuccess;
     type InnerError = LoginDispatcherError;
 
     type Request = ();
@@ -624,11 +662,11 @@ impl TakeableCommandDispatcher for Login {
 
             // ===== Augmentation Layer =====
             // Running is a blocking task, so the hashing doesn't cause issues
+            let username_clone = self.username.clone();
+            let password_clone = self.password.clone();
             let blocking_handle = tokio::task::spawn_blocking(move || {
-                let username = self.username.clone();
-                let password = self.password.clone();
                 let (client, strong_username) =
-                    client.start_augmentation_strong(&username, &password, &mut OsRng);
+                    client.start_augmentation_strong(&username_clone, &password_clone, &mut OsRng);
 
                 username_send
                     .send(
@@ -763,7 +801,36 @@ impl TakeableCommandDispatcher for Login {
                 .await
                 .map_err(LoginDispatcherError::ReadSuccessError)?;
 
-            todo!()
+            let user_credential = success
+                .encrypted_user_credentials
+                .decrypt(self.password)
+                .await
+                .map_err(LoginDispatcherError::DecodeCredentialsError)?;
+
+            let device_credential = user_credential
+                .create_user_device_credential()
+                .map_err(LoginDispatcherError::CreateSessionError)?;
+
+            session
+                .write_object(device_credential.get_certificate())
+                .await
+                .map_err(LoginDispatcherError::WriteSessionError)?;
+
+            let session_result: Result<(), ()> = session
+                .read_object()
+                .await
+                .map_err(LoginDispatcherError::ReadSessionResultError)?;
+
+            if session_result.is_err() {
+                return Err(LoginDispatcherError::SessionSubmitError.into());
+            }
+
+            Ok(LoginSuccess {
+                root_cert: success.root_cert,
+                server_cert: success.server_cert,
+                user_credential,
+                device_credential,
+            })
         } else {
             Err(DispatcherError::NoneSession)
         }

@@ -185,17 +185,13 @@ impl Login {
                 _ => LoginError::DispatchError(err),
             })?;
 
-        let credentials = login_data
-            .encrypted_user_credentials
-            .decrypt(password.clone())
-            .await?;
-
         let profile = Client::add_profile(
             username,
             self.address,
             login_data.server_cert,
             login_data.root_cert,
-            credentials,
+            login_data.user_credential,
+            login_data.device_credential,
             password,
         )
         .await

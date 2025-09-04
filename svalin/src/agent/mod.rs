@@ -3,7 +3,7 @@ use std::time::Duration;
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Certificate, Credential, EncryptedCredentials, ExactVerififier, KnownCertificateVerifier,
+    Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
 };
 use svalin_rpc::commands::deauthenticate::DeauthenticateHandler;
 use svalin_rpc::commands::e2e::E2EHandler;
@@ -193,6 +193,6 @@ struct AgentConfig {
     upstream_address: String,
     upstream_certificate: Certificate,
     root_certificate: Certificate,
-    encrypted_credentials: EncryptedCredentials,
+    encrypted_credentials: EncryptedCredential,
     key_source: KeySource,
 }

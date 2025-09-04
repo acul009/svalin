@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Certificate, Credential, EncryptedCredentials, ExactVerififier, KnownCertificateVerifier,
+    Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::sync::watch;
@@ -23,7 +23,8 @@ pub(crate) struct Profile {
     pub(crate) upstream_address: String,
     pub(crate) upstream_certificate: Certificate,
     pub(crate) root_certificate: Certificate,
-    pub(crate) encrypted_credentials: EncryptedCredentials,
+    pub(crate) user_credential: EncryptedCredential,
+    pub(crate) device_credential: EncryptedCredential,
 }
 
 impl Profile {
@@ -32,14 +33,16 @@ impl Profile {
         upstream_address: String,
         upstream_certificate: Certificate,
         root_certificate: Certificate,
-        encrypted_credentials: EncryptedCredentials,
+        user_credential: EncryptedCredential,
+        device_credential: EncryptedCredential,
     ) -> Self {
         Self {
             username,
             upstream_address,
             upstream_certificate,
             root_certificate,
-            encrypted_credentials,
+            user_credential,
+            device_credential,
         }
     }
 
@@ -81,17 +84,20 @@ impl Client {
         upstream_address: String,
         upstream_certificate: Certificate,
         root_certificate: Certificate,
-        credentials: Credential,
+        user_credentials: Credential,
+        device_credentials: Credential,
         password: Vec<u8>,
     ) -> Result<String> {
-        let raw_credentials = credentials.export(password).await?;
+        let encrypted_user_credential = user_credentials.export(password.clone()).await?;
+        let encrypted_device_credential = device_credentials.export(password.clone()).await?;
 
         let profile = Profile::new(
             username,
             upstream_address,
             upstream_certificate,
             root_certificate,
-            raw_credentials,
+            encrypted_user_credential,
+            encrypted_device_credential,
         );
 
         let profile_name = profile.name();
@@ -146,7 +152,7 @@ impl Client {
 
         if let Some(profile) = profile {
             debug!("unlocking profile");
-            let identity = profile.encrypted_credentials.decrypt(password).await?;
+            let identity = profile.user_credential.decrypt(password).await?;
 
             debug!("creating verifier");
             let verifier = UpstreamVerifier::new(
