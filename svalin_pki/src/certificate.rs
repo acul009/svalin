@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt::{Debug, Write};
 use std::hash::Hash;
 use std::str::FromStr;
@@ -17,6 +18,7 @@ use crate::signed_message::CanVerify;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CertificateType {
     Root,
+    Temporary,
     User,
     UserDevice,
     Agent,
@@ -404,6 +406,7 @@ impl CertificateType {
             CertificateType::UserDevice => false,
             CertificateType::Agent => false,
             CertificateType::Server => false,
+            CertificateType::Temporary => false,
         }
     }
 
@@ -414,6 +417,7 @@ impl CertificateType {
             CertificateType::UserDevice => Duration::days(30),
             CertificateType::Agent => Duration::days(365 * 1),
             CertificateType::Server => Duration::days(365 * 10),
+            CertificateType::Temporary => Duration::minutes(1),
         }
     }
 }
@@ -426,6 +430,7 @@ impl std::fmt::Display for CertificateType {
             CertificateType::UserDevice => write!(f, "user_device"),
             CertificateType::Agent => write!(f, "agent"),
             CertificateType::Server => write!(f, "server"),
+            CertificateType::Temporary => write!(f, "temporary"),
         }
     }
 }
@@ -446,6 +451,7 @@ impl FromStr for CertificateType {
             "user_device" => Ok(CertificateType::UserDevice),
             "agent" => Ok(CertificateType::Agent),
             "server" => Ok(CertificateType::Server),
+            "temporary" => Ok(CertificateType::Temporary),
             _ => Err(CertificateTypeError::InvalidType),
         }
     }

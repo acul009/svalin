@@ -39,6 +39,7 @@ use self::user_store::UserStore;
 pub mod agent_store;
 pub mod command_builder;
 pub mod config_builder;
+pub mod session_store;
 pub mod user_store;
 
 #[derive(Debug)]

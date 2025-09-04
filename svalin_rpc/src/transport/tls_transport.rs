@@ -5,8 +5,11 @@ use crate::rustls;
 use crate::rustls::{client::danger::ServerCertVerifier, server::danger::ClientCertVerifier};
 use anyhow::Result;
 use quinn::rustls::pki_types::InvalidDnsNameError;
-use svalin_pki::{Certificate, CertificateParseError, Credential};
-use tokio::io::{AsyncRead, AsyncWrite};
+use svalin_pki::{
+    Certificate, CertificateParseError, CreateCredentialsError, Credential, DecryptError,
+    EncryptError, EncryptedObject, ExactVerififier, KnownCertificateVerifier,
+};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_rustls::{TlsAcceptor, TlsStream};
 
 use super::session_transport::SessionTransport;
@@ -33,6 +36,8 @@ pub enum TlsClientError {
     MissingCertificateError,
     #[error("error parsing certificate: {0}")]
     CertificateParseError(#[from] CertificateParseError),
+    #[error("error while establishing with preshared key")]
+    PresharedError(#[from] PresharedError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -49,6 +54,22 @@ pub enum TlsServerError {
     MissingCertificateError,
     #[error("error parsing certificate: {0}")]
     CertificateParseError(#[from] CertificateParseError),
+    #[error("error while establishing with preshared key")]
+    PresharedError(#[from] PresharedError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum PresharedError {
+    #[error("error creating temporary credentials: {0}")]
+    CreateTempCredentialsError(#[from] CreateCredentialsError),
+    #[error("error encrypting temporary credentials: {0}")]
+    EncryptError(#[from] EncryptError),
+    #[error("error decrypting temporary certificate: {0}")]
+    DecryptError(#[from] DecryptError),
+    #[error("error encoding or decoding temporary credentials: {0}")]
+    PostcardError(#[from] postcard::Error),
+    #[error("error reading or writing to transport: {0}")]
+    ReadWriteError(#[from] std::io::Error),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -61,6 +82,18 @@ impl<T> TlsTransport<T>
 where
     T: SessionTransport,
 {
+    pub async fn client_preshared(
+        mut base_transport: T,
+        preshared: [u8; 32],
+    ) -> Result<Self, TlsClientError> {
+        let (credentials, certificate) =
+            Self::exchange_temp_credentials(&mut base_transport, preshared).await?;
+
+        let verifier = ExactVerififier::new(certificate);
+
+        Self::client(base_transport, verifier.to_tls_verifier(), &credentials).await
+    }
+
     pub async fn client(
         base_transport: T,
         verifier: Arc<dyn ServerCertVerifier>,
@@ -105,6 +138,18 @@ where
             tls_stream,
             peer: Peer::Certificate(cert),
         })
+    }
+
+    pub async fn server_preshared(
+        mut base_transport: T,
+        preshared: [u8; 32],
+    ) -> Result<Self, TlsServerError> {
+        let (credentials, certificate) =
+            Self::exchange_temp_credentials(&mut base_transport, preshared).await?;
+
+        let verifier = ExactVerififier::new(certificate);
+
+        Self::server(base_transport, verifier.to_tls_verifier(), &credentials).await
     }
 
     pub async fn server(
@@ -171,6 +216,36 @@ where
 
     pub fn peer(&self) -> &Peer {
         &self.peer
+    }
+
+    async fn exchange_temp_credentials(
+        base_transport: &mut T,
+        preshared: [u8; 32],
+    ) -> Result<(Credential, Certificate), PresharedError> {
+        let credentials = Credential::generate_temporary()?;
+
+        // Write my cert
+        let encrypted =
+            EncryptedObject::encrypt_with_key(credentials.get_certificate(), preshared)?;
+        let encoded = postcard::to_stdvec(&encrypted)?;
+
+        let length_bytes = (encoded.len() as u32).to_be_bytes();
+
+        base_transport.write_all(&length_bytes).await?;
+        base_transport.write_all(&encoded).await?;
+
+        // Read their cert
+        let mut length_bytes = [0u8; 4];
+        base_transport.read_exact(&mut length_bytes).await?;
+        let length = u32::from_be_bytes(length_bytes) as usize;
+
+        let mut encoded = vec![0u8; length];
+        base_transport.read_exact(&mut encoded).await?;
+        let encrypted: EncryptedObject<Certificate> = postcard::from_bytes(&encoded)?;
+
+        let certificate: Certificate = encrypted.decrypt_with_key(preshared)?;
+
+        Ok((credentials, certificate))
     }
 }
 

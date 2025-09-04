@@ -35,10 +35,10 @@ fn experimenting() {
     // Maybe there's a way to share only parts of the storage provider.
 
     // ChaCha20 icompatible with rust crypto
-    let credential1 = Credential::generate_root().unwrap();
+    let credential1 = Credential::generate_temporary().unwrap();
 
     let client1 = MlsClient::new(credential1.clone());
-    let client2 = MlsClient::new(Credential::generate_root().unwrap());
+    let client2 = MlsClient::new(Credential::generate_temporary().unwrap());
     let second_device = MlsClient::new(credential1);
 
     let key_package_2_serialized = client2

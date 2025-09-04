@@ -108,6 +108,40 @@ impl Credential {
         })
     }
 
+    /// Generates a new temporary certificate - these are only valid for 60 seconds
+    pub fn generate_temporary() -> Result<Self, CreateCredentialsError> {
+        let cert_type = CertificateType::Temporary;
+        let mut temp_parameters = rcgen::CertificateParams::default();
+        temp_parameters.not_before = OffsetDateTime::now_utc();
+        temp_parameters.not_after =
+            OffsetDateTime::now_utc().saturating_add(cert_type.validity_duration());
+
+        temp_parameters.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+
+        temp_parameters.key_usages = vec![];
+
+        let keypair = KeyPair::generate();
+
+        let spki_hash =
+            Certificate::compute_spki_hash(&keypair.export_public_key().subject_public_key_info());
+        let mut dn = rcgen::DistinguishedName::new();
+        dn.push(rcgen::DnType::OrganizationalUnitName, cert_type.to_string());
+        dn.push(rcgen::DnType::CommonName, spki_hash);
+
+        temp_parameters.distinguished_name = dn;
+
+        let certificate = temp_parameters
+            .self_signed(keypair.rcgen())
+            .map_err(CreateCredentialsError::SelfSignError)?;
+
+        let certificate = Certificate::from_der(certificate.der().to_vec())
+            .map_err(CreateCertificateError::CertificateParseError)?;
+
+        let temp = Self::new(keypair, certificate)?;
+
+        Ok(temp)
+    }
+
     /// Generates a new root certificate with 10 year lifetime and options tuned for svalin
     pub fn generate_root() -> Result<Self, CreateCredentialsError> {
         let mut root_parameters = rcgen::CertificateParams::default();

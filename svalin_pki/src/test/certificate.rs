@@ -15,8 +15,8 @@ struct SerializationTestStruct {
 
 #[test]
 fn test_certificate_serde_serialization() {
-    let credentials = Credential::generate_root().unwrap();
-    let credentials2 = Credential::generate_root().unwrap();
+    let credentials = Credential::generate_temporary().unwrap();
+    let credentials2 = Credential::generate_temporary().unwrap();
 
     let test_struct = SerializationTestStruct {
         cert1: credentials.get_certificate().to_owned(),
@@ -32,7 +32,7 @@ fn test_certificate_serde_serialization() {
 
 #[test]
 pub fn cert_verify_message() {
-    let credentials = Credential::generate_root().unwrap();
+    let credentials = Credential::generate_temporary().unwrap();
     let rand = SystemRandom::new();
 
     let mut msg = [0u8; 1024];
@@ -47,7 +47,7 @@ pub fn cert_verify_message() {
 
 #[test]
 pub fn serialization() {
-    let perm_creds = Credential::generate_root().unwrap();
+    let perm_creds = Credential::generate_temporary().unwrap();
     let cert = perm_creds.get_certificate();
 
     let seriaized = cert.to_der().to_owned();
@@ -57,7 +57,7 @@ pub fn serialization() {
 
 #[test]
 pub fn serde_serialization() {
-    let perm_creds = Credential::generate_root().unwrap();
+    let perm_creds = Credential::generate_temporary().unwrap();
     let cert = perm_creds.get_certificate();
 
     let serialized = postcard::to_extend(cert, Vec::new()).unwrap();
@@ -68,7 +68,7 @@ pub fn serde_serialization() {
 
 #[tokio::test]
 async fn test_on_disk_storage() {
-    let original = Credential::generate_root().unwrap();
+    let original = Credential::generate_temporary().unwrap();
 
     let rand = SystemRandom::new();
 
@@ -91,7 +91,7 @@ async fn test_on_disk_storage() {
 
 #[tokio::test]
 async fn test_create_leaf() {
-    let root = Credential::generate_root().unwrap();
+    let root = Credential::generate_temporary().unwrap();
 
     let keypair = KeyPair::generate();
 

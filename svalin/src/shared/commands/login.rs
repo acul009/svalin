@@ -44,8 +44,8 @@ use crate::{
 };
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct LoginSuccess {
-    pub encrypted_credentials: EncryptedCredentials,
+pub struct LoginApproval {
+    pub encrypted_user_credentials: EncryptedCredentials,
     pub root_cert: Certificate,
     pub server_cert: Certificate,
 }
@@ -407,7 +407,7 @@ impl TakeableCommandHandler for LoginHandler {
                         .write_object::<Result<_, ()>>(&Ok(server_authenticator))
                         .await
                         .context("Failed to write server authenticator")?;
-                    key
+                    key_to_array(key)
                 }
                 Err(err) => {
                     session
@@ -419,6 +419,14 @@ impl TakeableCommandHandler for LoginHandler {
                 }
             };
 
+            // Encrypt & Authenticate session
+
+            let (read, write, _) = session.destructure_transport();
+            let tls_transport =
+                TlsTransport::server_preshared(CombinedTransport::new(read, write), key).await?;
+            let (read, write) = tokio::io::split(tls_transport);
+            let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+
             // ===== TOTP =====
 
             let user = self
@@ -427,10 +435,7 @@ impl TakeableCommandHandler for LoginHandler {
                 .await?
                 .ok_or_else(|| anyhow!("failed to get user by username"))?;
 
-            let totp_encrypted: EncryptedObject<String> =
-                session.read_object().await.context("Failed to read totp")?;
-
-            let totp: String = totp_encrypted.decrypt_with_key(key_to_array(key))?;
+            let totp: String = session.read_object().await.context("Failed to read totp")?;
 
             let totp_success = user.totp_secret.check_current(&totp)?;
 
@@ -443,16 +448,14 @@ impl TakeableCommandHandler for LoginHandler {
                 return Err(anyhow!("failed to verify totp"));
             }
 
-            let success = LoginSuccess {
-                encrypted_credentials: user.encrypted_credentials,
+            let success = LoginApproval {
+                encrypted_user_credentials: user.encrypted_credentials,
                 root_cert: self.root_cert.clone(),
                 server_cert: self.server_cert.clone(),
             };
 
-            let encrypted_success = EncryptedObject::encrypt_with_key(&success, key_to_array(key))?;
-
             session
-                .write_object(&encrypted_success)
+                .write_object(&success)
                 .await
                 .context("Failed to write encrypted success")?;
 
@@ -521,8 +524,15 @@ pub enum LoginDispatcherError {
     WrongPassword,
 }
 
+pub struct LoginSuccess {
+    pub user_credential: Credential,
+    pub session_credential: Credential,
+    pub root_cert: Certificate,
+    pub server_cert: Certificate,
+}
+
 impl TakeableCommandDispatcher for Login {
-    type Output = LoginSuccess;
+    type Output = Credential;
     type InnerError = LoginDispatcherError;
 
     type Request = ();
@@ -720,11 +730,22 @@ impl TakeableCommandDispatcher for Login {
                 .receive_server_authenticator(server_authenticator.0)
                 .map_err(LoginDispatcherError::AucPaceError)?;
 
-            let totp = EncryptedObject::encrypt_with_key(&self.totp, key_to_array(key))
-                .map_err(LoginDispatcherError::EncryptError)?;
+            let key = key_to_array(key);
+
+            // Encrypt & Authenticate session
+
+            let (read, write, _) = session.destructure_transport();
+            let tls_transport =
+                TlsTransport::client_preshared(CombinedTransport::new(read, write), key)
+                    .await
+                    .map_err(LoginDispatcherError::TlsClientError)?;
+            let (read, write) = tokio::io::split(tls_transport);
+            let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+
+            // TOTP
 
             session
-                .write_object(&totp)
+                .write_object(&self.totp)
                 .await
                 .map_err(LoginDispatcherError::WriteTotpError)?;
 
@@ -737,16 +758,12 @@ impl TakeableCommandDispatcher for Login {
                 return Err(LoginDispatcherError::InvalidTotp.into());
             }
 
-            let encrypted_success: EncryptedObject<LoginSuccess> = session
+            let success: LoginApproval = session
                 .read_object()
                 .await
                 .map_err(LoginDispatcherError::ReadSuccessError)?;
 
-            let success: LoginSuccess = encrypted_success
-                .decrypt_with_key(key_to_array(key))
-                .map_err(LoginDispatcherError::DecryptError)?;
-
-            Ok(success)
+            todo!()
         } else {
             Err(DispatcherError::NoneSession)
         }

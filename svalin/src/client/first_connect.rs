@@ -186,7 +186,7 @@ impl Login {
             })?;
 
         let credentials = login_data
-            .encrypted_credentials
+            .encrypted_user_credentials
             .decrypt(password.clone())
             .await?;
 

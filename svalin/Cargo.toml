@@ -20,6 +20,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
+time.workspace = true
 
 async_pty = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git" }
 clap = { version = "4.5.45", features = ["derive", "unstable-doc"] }
