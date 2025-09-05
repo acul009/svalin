@@ -1,6 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Credential CEncryptedredential}s;
+use svalin_pki::{Credential, EncryptedCredential};
 use tracing::debug;
 
 /// The keysource enum is saved in the configuration and specifies how to

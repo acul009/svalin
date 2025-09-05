@@ -13,6 +13,8 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
+use crate::shared::commands::login::LoginSuccess;
+
 pub(crate) struct InitHandler {
     channel: mpsc::Sender<(Certificate, Credential)>,
 }
@@ -68,13 +70,14 @@ impl CommandHandler for InitHandler {
 
 pub struct Init {
     root: Credential,
+    totp: totp_rs::TOTP,
 }
 
 impl Init {
-    pub fn new() -> Result<Self, CreateCredentialsError> {
+    pub fn new(totp: totp_rs::TOTP) -> Result<Self, CreateCredentialsError> {
         let root = Credential::generate_root()?;
 
-        Ok(Self { root })
+        Ok(Self { root, totp })
     }
 }
 
@@ -92,8 +95,14 @@ pub enum InitError {
     WriteConfirmError(SessionWriteError),
 }
 
+pub struct InitSuccess {
+    pub root_credential: Credential,
+    pub device_credential: Credential,
+    pub server_cert: Certificate,
+}
+
 impl CommandDispatcher for Init {
-    type Output = (Credential, Certificate);
+    type Output = InitSuccess;
     type Request = Certificate;
     type Error = InitError;
 

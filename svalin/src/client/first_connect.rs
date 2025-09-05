@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use svalin_pki::{DecodeCredentialsError, KnownCertificateVerifier};
+use svalin_pki::DecodeCredentialsError;
 use svalin_rpc::rpc::command::dispatcher::DispatcherError;
 use svalin_rpc::rpc::connection::ConnectionDispatchError;
 use svalin_rpc::rpc::session::SessionDispatchError;
@@ -12,12 +12,10 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument};
 
 use crate::server::INIT_SERVER_SHUTDOWN_COUNTDOWN;
-use crate::shared::commands::add_user::AddUser;
 use crate::shared::commands::login::LoginDispatcherError;
 use crate::shared::commands::public_server_status::GetPutblicStatus;
 use crate::shared::commands::public_server_status::PublicStatus;
 use crate::shared::commands::{self, init};
-use crate::verifier::upstream_verifier::UpstreamVerifier;
 
 use super::Client;
 
@@ -78,10 +76,10 @@ impl Init {
         password: String,
         totp_secret: totp_rs::TOTP,
     ) -> Result<String> {
-        let (root, server_cert) = self
+        let init_data = self
             .client
             .upstream_connection()
-            .dispatch(init::Init::new()?)
+            .dispatch(init::Init::new(totp_secret)?)
             .await
             .context("failed to initialize server certificate")?;
 
@@ -89,40 +87,13 @@ impl Init {
 
         tokio::time::sleep(INIT_SERVER_SHUTDOWN_COUNTDOWN).await;
 
-        let verifier = UpstreamVerifier::new(root.get_certificate().clone(), server_cert.clone())
-            .to_tls_verifier();
-
-        let client = RpcClient::connect(
-            &self.address,
-            Some(&root),
-            verifier,
-            CancellationToken::new(),
-        )
-        .await
-        .context("failed to connect to server after certificate initialization")?;
-        let connection = client.upstream_connection();
-
-        debug!("connected to server with certificate");
-
-        connection
-            .dispatch(
-                AddUser::new(
-                    &root,
-                    username.clone().into(),
-                    password.clone().into(),
-                    totp_secret,
-                )
-                .await?,
-            )
-            .await
-            .context("failed to add root user")?;
-
         Client::add_profile(
             username,
             self.address,
-            server_cert,
-            root.get_certificate().clone(),
-            root,
+            init_data.server_cert,
+            init_data.root_credential.get_certificate().clone(),
+            init_data.root_credential,
+            init_data.device_credential,
             password.into(),
         )
         .await
