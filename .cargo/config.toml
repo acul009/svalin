@@ -1,0 +1,4 @@
+
+
+[env]
+DATABASE_URL = { value = "sqlite://dev.sqlite" }
