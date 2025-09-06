@@ -6,9 +6,7 @@ use aucpace::{AuCPaceClient, ClientMessage};
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::{ParamsString, rand_core::OsRng};
 use serde::{Deserialize, Serialize};
-use svalin_pki::{
-    ArgonCost, Certificate, Credential, EncryptedCredential, Sha512, argon2::Argon2,
-};
+use svalin_pki::{ArgonCost, Certificate, Credential, EncryptedCredential, Sha512, argon2::Argon2};
 use svalin_rpc::rpc::{
     command::{
         dispatcher::CommandDispatcher,

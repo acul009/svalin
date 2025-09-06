@@ -1,6 +1,8 @@
 use std::fmt::Debug;
 
-use crate::{Certificate, CreateCredentialsError, Credential, encrypt::EncryptedObject};
+use crate::{
+    Certificate, CreateCredentialsError, Credential, EncryptError, encrypt::EncryptedObject,
+};
 use anyhow::Result;
 use rcgen::{PublicKeyData, SignatureAlgorithm};
 use ring::signature::Ed25519KeyPair;
@@ -53,13 +55,16 @@ impl KeyPair {
         Credential::new(self, certificate)
     }
 
-    pub(crate) async fn encrypt(&self, password: Vec<u8>) -> Result<EncryptedObject<SavedKeypair>> {
+    pub(crate) async fn encrypt(
+        &self,
+        password: Vec<u8>,
+    ) -> Result<EncryptedObject<SavedKeypair>, EncryptError> {
         let saved = SavedKeypair {
             der: self.keypair.serialize_der(),
             alg: Algorithm::from_rcgen(self.keypair.algorithm()),
         };
 
-        Ok(EncryptedObject::encrypt_with_password(&saved, password).await?)
+        EncryptedObject::encrypt_with_password(&saved, password).await
     }
 
     pub(crate) async fn decrypt(

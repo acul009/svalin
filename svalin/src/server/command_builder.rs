@@ -13,7 +13,6 @@ use crate::{
     server::session_store::SessionStore,
     shared::{
         commands::{
-            add_user::AddUserHandler,
             agent_list::AgentListHandler,
             login::LoginHandler,
             public_server_status::{PublicStatus, PublicStatusHandler},
@@ -54,7 +53,6 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 self.root_cert.clone(),
                 self.server_cert.clone(),
             ))
-            .add(AddUserHandler::new(self.user_store.clone()))
             .add(join_manager.create_request_handler())
             .add(join_manager.create_accept_handler())
             .add(ForwardHandler::new(server.clone()))

@@ -9,7 +9,7 @@ use time::OffsetDateTime;
 use tracing::debug;
 
 use crate::{
-    Certificate, CertificateParseError, KeyPair,
+    Certificate, CertificateParseError, EncryptError, KeyPair,
     certificate::CertificateType,
     encrypt::EncryptedObject,
     keypair::{DecodeKeypairError, ExportedPublicKey, SavedKeypair},
@@ -38,21 +38,27 @@ impl Debug for Credential {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct EncryptedCredential {
     encrypted_keypair: EncryptedObject<SavedKeypair>,
-    raw_cert: Vec<u8>,
+    certificate: Certificate,
 }
 
 impl EncryptedCredential {
     pub async fn decrypt(self, password: Vec<u8>) -> Result<Credential, DecodeCredentialsError> {
-        let certificate = Certificate::from_der(self.raw_cert)?;
-
         debug!("decrypting credentials with password");
 
         let decrypted_keypair = KeyPair::decrypt(self.encrypted_keypair, password).await?;
 
         debug!("credentials decrypted");
 
-        Credential::new(decrypted_keypair, certificate)
+        Credential::new(decrypted_keypair, self.certificate)
             .map_err(DecodeCredentialsError::CreateCredentialsError)
+    }
+
+    pub fn certificate(&self) -> &Certificate {
+        &self.certificate
+    }
+
+    pub fn take_certificate(self) -> Certificate {
+        self.certificate
     }
 }
 
@@ -260,11 +266,11 @@ impl Credential {
         keypair.upgrade(certificate)
     }
 
-    pub async fn export(&self, password: Vec<u8>) -> Result<EncryptedCredential> {
+    pub async fn export(&self, password: Vec<u8>) -> Result<EncryptedCredential, EncryptError> {
         let encrypted_keypair = self.data.keypair.encrypt(password).await?;
         let on_disk = EncryptedCredential {
             encrypted_keypair,
-            raw_cert: self.data.certificate.to_der().to_owned(),
+            certificate: self.data.certificate.clone(),
         };
 
         Ok(on_disk)

@@ -1,8 +1,13 @@
+use std::sync::Arc;
+
 use svalin_pki::{Certificate, CertificateType, Fingerprint};
+
+use crate::server::user_store::UserStore;
 
 #[derive(Debug)]
 pub struct SessionStore {
     pool: sqlx::SqlitePool,
+    user_store: Arc<UserStore>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -14,10 +19,11 @@ pub enum AddSessionError {
 }
 
 impl SessionStore {
-    pub fn new(pool: sqlx::SqlitePool) -> Self {
-        Self { pool }
+    pub fn open(pool: sqlx::SqlitePool, user_store: Arc<UserStore>) -> Arc<Self> {
+        Arc::new(Self { pool, user_store })
     }
 
+    /// TODO: verify the certificate chain before acceping a session.
     pub async fn add_session(&self, certificate: Certificate) -> Result<(), AddSessionError> {
         if certificate.certificate_type() != CertificateType::UserDevice {
             return Err(AddSessionError::InvalidCertificateType(

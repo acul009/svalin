@@ -6732,6 +6732,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -7390,6 +7391,7 @@ dependencies = [
  "sha2",
  "url",
  "urlencoding",
+ "zeroize",
 ]
 
 [[package]]

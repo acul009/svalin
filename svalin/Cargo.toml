@@ -32,6 +32,7 @@ totp-rs = { version = "5.7.0", features = [
     "qr",
     "serde_support",
     "gen_secret",
+    "zeroize"
 ] }
 tracing-subscriber = "0.3.19"
 test-log = { version = "0.2.18", features = ["trace"] }
@@ -51,6 +52,7 @@ reqwest = { version = "0.12.23", features = [
     "stream",
 ], default-features = false }
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"] }
+zeroize = { version = "1.8.1", features = ["derive"] }
 
 [package.metadata.deb]
 depends = "libc6 (>= 2.31)"

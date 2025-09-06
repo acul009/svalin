@@ -456,7 +456,7 @@ impl TakeableCommandHandler for LoginHandler {
             }
 
             let success = LoginApproval {
-                encrypted_user_credentials: user.encrypted_credentials,
+                encrypted_user_credentials: user.encrypted_credential,
                 root_cert: self.root_cert.clone(),
                 server_cert: self.server_cert.clone(),
             };

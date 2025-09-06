@@ -1,7 +1,12 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
+use aucpace::{AuCPaceClient, ClientMessage};
+use curve25519_dalek::{RistrettoPoint, Scalar};
+use password_hash::{ParamsString, rand_core::OsRng};
+use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
 use svalin_pki::{
-    Certificate, CreateCertificateError, CreateCredentialsError, Credential, ExportedPublicKey,
-    KeyPair,
+    ArgonCost, Certificate, CreateCertificateError, CreateCredentialsError, Credential,
+    EncryptError, EncryptedCredential, ExportedPublicKey, KeyPair, Sha512, argon2::Argon2,
 };
 
 use async_trait::async_trait;
@@ -9,48 +14,92 @@ use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::{Session, SessionReadError, SessionWriteError},
 };
-use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
+use totp_rs::TOTP;
 use tracing::debug;
 
-use crate::shared::commands::login::LoginSuccess;
+use crate::server::user_store::{UserStore, serde_paramsstring};
+
+pub struct ServerInitSuccess {
+    credential: Credential,
+    root: Certificate,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct InitRequest {
+    server_cert: Certificate,
+    encrypted_credential: EncryptedCredential,
+    totp_secret: TOTP,
+    /// The username of the user being added
+    username: Vec<u8>,
+
+    /// The salt used when computing the verifier
+    secret_exponent: Scalar,
+
+    /// The password hasher's parameters used when computing the verifier
+    #[serde(with = "serde_paramsstring")]
+    params: ParamsString,
+
+    /// The verifier computer from the user's password
+    verifier: RistrettoPoint,
+}
 
 pub(crate) struct InitHandler {
-    channel: mpsc::Sender<(Certificate, Credential)>,
+    pool: SqlitePool,
+    channel: tokio::sync::Mutex<Option<oneshot::Sender<ServerInitSuccess>>>,
 }
 
 impl InitHandler {
-    pub fn new(conf: mpsc::Sender<(Certificate, Credential)>) -> Self {
-        Self { channel: conf }
+    pub fn new(channel: oneshot::Sender<ServerInitSuccess>, pool: SqlitePool) -> Self {
+        Self {
+            pool,
+            channel: tokio::sync::Mutex::new(Some(channel)),
+        }
     }
 }
 
 #[async_trait]
 impl CommandHandler for InitHandler {
-    type Request = Certificate;
+    type Request = ();
 
     async fn handle(
         &self,
         session: &mut Session,
-        request: Self::Request,
+        _request: Self::Request,
         _: CancellationToken,
     ) -> anyhow::Result<()> {
         debug!("incoming init request");
+        let mut guard = self.channel.lock().await;
 
-        if self.channel.is_closed() {
-            return Ok(());
+        if guard.is_none() {
+            return Err(anyhow!("Already initialized"));
         }
-
-        let root = request;
 
         let keypair = KeyPair::generate();
         let public_key = keypair.export_public_key();
         session.write_object(&public_key).await?;
 
-        let my_cert: Certificate = session.read_object().await?;
-        let my_credentials = keypair.upgrade(my_cert)?;
+        let init_request: InitRequest = session.read_object().await?;
+        let my_credential = keypair.upgrade(init_request.server_cert)?;
+        let root = init_request.encrypted_credential.certificate().clone();
+
+        UserStore::add_root_user(
+            &self.pool,
+            init_request.username,
+            init_request.encrypted_credential,
+            init_request.totp_secret,
+            init_request.secret_exponent,
+            init_request.params,
+            init_request.verifier,
+        )
+        .await?;
 
         debug!("init request handled");
+
+        let Some(channel) = guard.take() else {
+            return Err(anyhow!("channel not found"));
+        };
 
         session
             .write_object::<std::result::Result<(), ()>>(&Ok(()))
@@ -58,26 +107,16 @@ impl CommandHandler for InitHandler {
 
         let _: Result<(), SessionReadError> = session.read_object().await;
 
-        self.channel.send((root, my_credentials)).await?;
+        channel.send(ServerInitSuccess {
+            credential: my_credential,
+            root,
+        });
 
         Ok(())
     }
 
     fn key() -> String {
         "init".to_owned()
-    }
-}
-
-pub struct Init {
-    root: Credential,
-    totp: totp_rs::TOTP,
-}
-
-impl Init {
-    pub fn new(totp: totp_rs::TOTP) -> Result<Self, CreateCredentialsError> {
-        let root = Credential::generate_root()?;
-
-        Ok(Self { root, totp })
     }
 }
 
@@ -93,16 +132,45 @@ pub enum InitError {
     ReadSuccessError(SessionReadError),
     #[error("error writing confirm: {0}")]
     WriteConfirmError(SessionWriteError),
+    #[error("error with aucpace: {0}")]
+    AucPaceError(aucpace::Error),
+    #[error("error encrypting root credential: {0}")]
+    EncryptRootError(#[from] EncryptError),
+    #[error("server sent error status back")]
+    ServerError,
 }
 
-pub struct InitSuccess {
+pub struct ClientInitSuccess {
     pub root_credential: Credential,
-    pub device_credential: Credential,
     pub server_cert: Certificate,
 }
 
+pub struct Init {
+    root: Credential,
+    username: Vec<u8>,
+    password: Vec<u8>,
+    totp: totp_rs::TOTP,
+}
+
+impl Init {
+    pub fn new(
+        totp: totp_rs::TOTP,
+        username: Vec<u8>,
+        password: Vec<u8>,
+    ) -> Result<Self, CreateCredentialsError> {
+        let root = Credential::generate_root()?;
+
+        Ok(Self {
+            root,
+            username,
+            password,
+            totp,
+        })
+    }
+}
+
 impl CommandDispatcher for Init {
-    type Output = InitSuccess;
+    type Output = ClientInitSuccess;
     type Request = Certificate;
     type Error = InitError;
 
@@ -117,6 +185,8 @@ impl CommandDispatcher for Init {
     async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {
         debug!("sending init request");
 
+        // Create server certificate
+
         let public_key: ExportedPublicKey = session
             .read_object()
             .await
@@ -126,12 +196,52 @@ impl CommandDispatcher for Init {
             .create_server_certificate_for_key(&public_key)
             .map_err(InitError::CreateCertError)?;
 
+        // create aucpace login info
+
+        let mut pace_client = AuCPaceClient::<Sha512, Argon2, OsRng, 16>::new(OsRng);
+
+        let hasher = ArgonCost::strong().get_argon_hasher();
+
+        let (_username, secret_exponent, params, verifier) = match pace_client
+            .register_alloc_strong(
+                &self.username,
+                self.password.clone(),
+                hasher.params().clone(),
+                hasher,
+            )
+            .map_err(InitError::AucPaceError)?
+        {
+            ClientMessage::StrongRegistration {
+                username,
+                secret_exponent,
+                params,
+                verifier,
+            } => (username, secret_exponent, params, verifier),
+            _ => {
+                unreachable!();
+            }
+        };
+
+        // send init request
+
+        let encrypted_credential = self.root.export(self.password).await?;
+
+        let init_request = InitRequest {
+            username: self.username.clone(),
+            totp_secret: self.totp.clone(),
+            encrypted_credential,
+            params,
+            secret_exponent,
+            server_cert: server_cert.clone(),
+            verifier,
+        };
+
         session
-            .write_object(&server_cert)
+            .write_object(&init_request)
             .await
             .map_err(InitError::WriteServerCertError)?;
 
-        let _ok: std::result::Result<(), ()> = session
+        let server_result: std::result::Result<(), ()> = session
             .read_object()
             .await
             .map_err(InitError::ReadSuccessError)?;
@@ -142,7 +252,12 @@ impl CommandDispatcher for Init {
             .map_err(InitError::WriteConfirmError)?;
 
         debug!("init completed");
-
-        Ok((self.root, server_cert))
+        match server_result {
+            Ok(()) => Ok(ClientInitSuccess {
+                root_credential: self.root.clone(),
+                server_cert: server_cert,
+            }),
+            Err(_) => Err(InitError::ServerError),
+        }
     }
 }

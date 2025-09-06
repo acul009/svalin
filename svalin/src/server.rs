@@ -14,13 +14,14 @@ use svalin_rpc::{
     verifiers::skip_verify::SkipClientVerification,
 };
 use tokio::{
-    sync::mpsc,
+    sync::{mpsc, oneshot},
     time::{error::Elapsed, timeout},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
+    server::session_store::SessionStore,
     shared::commands::{
         init::InitHandler,
         public_server_status::{PublicStatus, PublicStatusHandler},
@@ -168,14 +169,16 @@ impl Server {
 
         let root = base_config.root_cert;
 
+        let user_store = UserStore::open(pool.clone(), root.clone());
+
+        let session_store = SessionStore::open(pool.clone(), user_store.clone());
+
+        let agent_store = AgentStore::open(pool.clone(), root.clone());
+
         let credentials = base_config
             .key_source
             .decrypt_credentials(base_config.credentials)
             .await?;
-
-        let user_store = UserStore::open(pool.clone());
-
-        let agent_store = AgentStore::open(pool.clone(), root.clone());
 
         let helper = VerificationHelper::new(root.clone(), user_store.clone());
 
@@ -194,6 +197,7 @@ impl Server {
             server_cert: credentials.get_certificate().clone(),
             user_store,
             agent_store,
+            session_store,
         };
 
         let tasks = TaskTracker::new();
@@ -222,6 +226,8 @@ impl Server {
         let (send, mut receive) = mpsc::channel::<(Certificate, Credential)>(1);
 
         let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
+
+        let (send, recv) = oneshot::channel();
 
         let commands = HandlerCollection::new(permission_handler);
         commands

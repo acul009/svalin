@@ -1,6 +1,6 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{collections::HashSet, fmt::Debug, mem, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Context, Result, anyhow};
 use aucpace::StrongDatabase;
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::ParamsString;
@@ -10,10 +10,11 @@ use svalin_pki::{Certificate, EncryptedCredential, Fingerprint};
 use totp_rs::TOTP;
 use tracing::{debug, instrument};
 
+use crate::server::config_builder::new;
+
 #[derive(Serialize, Deserialize)]
 pub struct StoredUser {
-    pub certificate: Certificate,
-    pub encrypted_credentials: EncryptedCredential,
+    pub encrypted_credential: EncryptedCredential,
     pub totp_secret: TOTP,
     /// The username of whoever is registering
     pub username: Vec<u8>,
@@ -31,12 +32,59 @@ pub struct StoredUser {
 
 #[derive(Debug)]
 pub struct UserStore {
+    root: Certificate,
     pool: sqlx::SqlitePool,
 }
 
 impl UserStore {
-    pub fn open(pool: SqlitePool) -> Arc<Self> {
-        Arc::new(Self { pool })
+    pub async fn add_root_user(
+        pool: &SqlitePool,
+        username: Vec<u8>,
+        encrypted_credential: EncryptedCredential,
+        totp_secret: TOTP,
+        secret_exponent: Scalar,
+        params: ParamsString,
+        verifier: RistrettoPoint,
+    ) -> Result<()> {
+        let count: u64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+            .fetch_one(pool)
+            .await?;
+
+        if count > 0 {
+            return Err(anyhow!("Root user already exists"));
+        }
+
+        let user = StoredUser {
+            username,
+            encrypted_credential,
+            totp_secret,
+            secret_exponent,
+            params,
+            verifier,
+        };
+
+        let cert = user.encrypted_credential.certificate();
+        let fingerprint = cert.fingerprint().as_slice();
+        let spki_hash = cert.spki_hash();
+        let username = &user.username;
+
+        let data = postcard::to_stdvec(&user)?;
+
+        sqlx::query!(
+            "INSERT INTO users (fingerprint, spki_hash, username, data) VALUES (?, ?, ?, ?)",
+            fingerprint,
+            spki_hash,
+            username,
+            data
+        )
+        .execute(pool)
+        .await?;
+
+        todo!()
+    }
+
+    pub fn open(pool: SqlitePool, root: Certificate) -> Arc<Self> {
+        Arc::new(Self { pool, root })
     }
 
     pub async fn get_user(&self, fingerprint: &Fingerprint) -> Result<Option<StoredUser>> {
@@ -60,45 +108,94 @@ impl UserStore {
         }
     }
 
-    #[instrument(skip_all)]
-    pub async fn add_user(
+    pub async fn get_user_chain_by_spki_hash(
         &self,
-        certificate: Certificate,
-        username: Vec<u8>,
-        encrypted_credentials: EncryptedCredential,
-        totp_secret: TOTP,
-        secret_exponent: Scalar,
-        params: ParamsString,
-        verifier: RistrettoPoint,
-    ) -> Result<()> {
-        let user = StoredUser {
-            certificate,
-            username,
-            encrypted_credentials,
-            totp_secret,
-            secret_exponent,
-            params,
-            verifier,
+        spki_hash: &str,
+    ) -> Result<Option<Vec<Certificate>>> {
+        let mut known_certs = HashSet::new();
+        let mut cert_chain = Vec::new();
+
+        let Some(mut user) = self.get_cert_by_spki_hash(&spki_hash).await? else {
+            return Ok(None);
         };
 
-        debug!("requesting user update transaction");
+        known_certs.insert(spki_hash.to_string());
 
-        let fingerprint = user.certificate.fingerprint();
-        let fingerprint = fingerprint.as_slice();
+        while user != self.root {
+            let parent_spki_hash = user.issuer().to_string();
+            if known_certs.contains(&parent_spki_hash) {
+                return Err(anyhow!("cyclic signature in user store!"));
+            }
+            let Some(parent) = self.get_cert_by_spki_hash(&parent_spki_hash).await? else {
+                return Ok(None);
+            };
+            user.verify_signature(&parent)
+                .context("failed to verify user certificate's signature")?;
+            let verified_user = mem::replace(&mut user, parent);
+            known_certs.insert(parent_spki_hash);
+            cert_chain.push(verified_user);
+        }
 
-        let userdata = postcard::to_extend(&user, Vec::new())?;
+        cert_chain.push(user);
 
-        sqlx::query!(
-            "INSERT INTO users (fingerprint, username, data) VALUES (?, ?, ?)",
-            fingerprint,
-            user.username,
-            userdata
-        )
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
+        Ok(Some(cert_chain))
     }
+
+    async fn get_cert_by_spki_hash(&self, spki_hash: &str) -> Result<Option<Certificate>> {
+        let user_data =
+            sqlx::query_scalar!("SELECT data FROM users WHERE spki_hash = ?", spki_hash)
+                .fetch_optional(&self.pool)
+                .await?;
+        match user_data {
+            None => Ok(None),
+            Some(user_data) => {
+                let user: StoredUser = postcard::from_bytes(&user_data)?;
+                Ok(Some(user.encrypted_credential.take_certificate()))
+            }
+        }
+    }
+
+    //     #[instrument(skip_all)]
+    //     pub async fn add_user(
+    //         &self,
+    //         username: Vec<u8>,
+    //         encrypted_credentials: EncryptedCredential,
+    //         totp_secret: TOTP,
+    //         secret_exponent: Scalar,
+    //         params: ParamsString,
+    //         verifier: RistrettoPoint,
+    //     ) -> Result<()> {
+    //         let user = StoredUser {
+    //             username,
+    //             encrypted_credentials,
+    //             totp_secret,
+    //             secret_exponent,
+    //             params,
+    //             verifier,
+    //         };
+
+    //         debug!("requesting user update transaction");
+
+    //         let certificate = user.encrypted_credentials.certificate();
+
+    //         let fingerprint = certificate.fingerprint();
+    //         let fingerprint = fingerprint.as_slice();
+    //         let spki_hash = certificate.spki_hash();
+
+    //         let userdata = postcard::to_extend(&user, Vec::new())?;
+
+    //         sqlx::query!(
+    //             "INSERT INTO users (fingerprint, spki_hash, username, data) VALUES (?, ?, ?, ?)",
+    //             fingerprint,
+    //             spki_hash,
+    //             user.username,
+    //             userdata
+    //         )
+    //         .execute(&self.pool)
+    //         .await?;
+
+    //         Ok(())
+    //     }
 }
 
 impl StrongDatabase for UserStore {
