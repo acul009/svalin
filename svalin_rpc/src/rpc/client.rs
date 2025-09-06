@@ -101,6 +101,10 @@ impl RpcClient {
         result
     }
 
+    pub async fn cancel_token(&self) -> CancellationToken {
+        self.cancel.clone()
+    }
+
     pub async fn serve<P>(&self, commands: HandlerCollection<P>) -> Result<()>
     where
         P: PermissionHandler,

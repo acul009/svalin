@@ -23,13 +23,13 @@ use tracing::{debug, error};
 use crate::{
     server::session_store::SessionStore,
     shared::commands::{
-        init::InitHandler,
+        init::{InitHandler, ServerInitSuccess},
         public_server_status::{PublicStatus, PublicStatusHandler},
     },
     util::{key_storage::KeySource, location::Location},
     verifier::{
-        server_storage_verifier::ServerStorageVerifier, tls_optional_wrapper::TlsOptionalWrapper,
-        verification_helper::VerificationHelper,
+        incoming_connection_verifier::IncomingConnectionVerifier,
+        tls_optional_wrapper::TlsOptionalWrapper, verification_helper::VerificationHelper,
     },
 };
 
@@ -137,10 +137,13 @@ impl Server {
 
                 debug!("Server is not yet initialized, starting initialization routine");
 
-                let (root, credentials) =
-                    Self::init_server(socket.clone(), config.cancelation_token.child_token())
-                        .await
-                        .context("failed to initialize server")?;
+                let init_success = Self::init_server(
+                    socket.clone(),
+                    config.cancelation_token.child_token(),
+                    pool.clone(),
+                )
+                .await
+                .context("failed to initialize server")?;
 
                 debug!("Initialisation complete, waiting for init server shutdown");
 
@@ -155,8 +158,10 @@ impl Server {
                 let key_source = KeySource::generate_builtin()?;
 
                 let conf = BaseConfig {
-                    root_cert: root,
-                    credentials: key_source.encrypt_credentials(&credentials).await?,
+                    root_cert: init_success.root,
+                    credentials: key_source
+                        .encrypt_credential(&init_success.credential)
+                        .await?,
                     pseudo_data_seed,
                     key_source,
                 };
@@ -182,10 +187,11 @@ impl Server {
 
         let helper = VerificationHelper::new(root.clone(), user_store.clone());
 
-        let verifier = ServerStorageVerifier::new(
+        let verifier = IncomingConnectionVerifier::new(
             helper,
             root.clone(),
             user_store.clone(),
+            session_store.clone(),
             agent_store.clone(),
         )
         .to_tls_verifier();
@@ -222,9 +228,8 @@ impl Server {
     async fn init_server(
         socket: Socket,
         cancel: CancellationToken,
-    ) -> Result<(Certificate, Credential)> {
-        let (send, mut receive) = mpsc::channel::<(Certificate, Credential)>(1);
-
+        pool: SqlitePool,
+    ) -> Result<ServerInitSuccess> {
         let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
 
         let (send, recv) = oneshot::channel();
@@ -233,7 +238,7 @@ impl Server {
         commands
             .chain()
             .await
-            .add(InitHandler::new(send))
+            .add(InitHandler::new(send, pool))
             .add(PublicStatusHandler::new(PublicStatus::WaitingForInit));
 
         let temp_credentials = Credential::generate_root()?;
@@ -250,7 +255,7 @@ impl Server {
 
         debug!("init server running");
 
-        if let Some(result) = receive.recv().await {
+        if let Ok(result) = recv.await {
             debug!("successfully initialized server");
             rpc.close(Duration::from_secs(1)).await?;
             Ok(result)

@@ -4,7 +4,6 @@ mod credential;
 mod encrypt;
 mod keypair;
 mod mls;
-mod public_key;
 mod signed_message;
 mod signed_object;
 mod verifier;

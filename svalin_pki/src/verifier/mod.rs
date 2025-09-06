@@ -18,10 +18,14 @@ pub enum VerificationError {
     CertificateInvalid,
     #[error("The certificate corresponding to the given fingerprint is unknown")]
     UnknownCertificate,
+    #[error("The issuer of the certificate could not be found")]
+    UnknownIssuer,
     #[error("The fingerprint did not match the expected certificate")]
     CertificateMismatch,
     #[error("The certificate is not valid: {0}")]
     TimerangeError(#[from] ValidityError),
+    #[error("The certificate in the chain with fingerprint {1} is not valid: {0}")]
+    ChainTimerangeError(ValidityError, Fingerprint),
     #[error("The signature could not be verified: {0}")]
     SignatureError(#[from] SignatureVerificationError),
     #[error(

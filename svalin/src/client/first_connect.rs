@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use svalin_pki::DecodeCredentialsError;
+use svalin_pki::{DecodeCredentialsError, ExactVerififier, KnownCertificateVerifier};
 use svalin_rpc::rpc::command::dispatcher::DispatcherError;
 use svalin_rpc::rpc::connection::ConnectionDispatchError;
 use svalin_rpc::rpc::session::SessionDispatchError;
@@ -73,13 +73,17 @@ impl Init {
     pub async fn init(
         self,
         username: String,
-        password: String,
+        password: Vec<u8>,
         totp_secret: totp_rs::TOTP,
     ) -> Result<String> {
         let init_data = self
             .client
             .upstream_connection()
-            .dispatch(init::Init::new(totp_secret)?)
+            .dispatch(init::Init::new(
+                totp_secret.clone(),
+                username.clone().into_bytes(),
+                password.clone(),
+            )?)
             .await
             .context("failed to initialize server certificate")?;
 
@@ -87,17 +91,22 @@ impl Init {
 
         tokio::time::sleep(INIT_SERVER_SHUTDOWN_COUNTDOWN).await;
 
-        Client::add_profile(
-            username,
-            self.address,
-            init_data.server_cert,
-            init_data.root_credential.get_certificate().clone(),
-            init_data.root_credential,
-            init_data.device_credential,
-            password.into(),
+        let client = RpcClient::connect(
+            &self.address,
+            None,
+            ExactVerififier::new(init_data.server_cert).to_tls_verifier(),
+            CancellationToken::new(),
         )
-        .await
-        .context("failed to save profile")
+        .await?;
+
+        let login = Login {
+            address: self.address,
+            client,
+        };
+
+        Ok(login
+            .login(username, password, totp_secret.generate_current()?)
+            .await?)
     }
 
     pub fn address(&self) -> &str {
@@ -141,7 +150,7 @@ impl Login {
             .client
             .upstream_connection()
             .dispatch(commands::login::Login {
-                username: username.clone().into(),
+                username: username.clone().into_bytes(),
                 password: password.clone(),
                 totp,
             })

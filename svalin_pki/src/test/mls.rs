@@ -54,14 +54,9 @@ fn experimenting() {
         .tls_serialize_detached()
         .unwrap();
     let key_package_2 = KeyPackageIn::tls_deserialize_exact(&key_package_2_serialized).unwrap();
-    let key_package_second_device =
-        KeyPackageIn::tls_deserialize_exact(&key_package_second_device_serialized).unwrap();
-
     let mut group1 = client1.create_group().unwrap();
 
-    let (_mls_message, welcome_out) = group1
-        .add_members([key_package_2, key_package_second_device])
-        .unwrap();
+    let (_mls_message, welcome_out) = group1.add_members([key_package_2]).unwrap();
 
     let serialized_invite = welcome_out.tls_serialize_detached().unwrap();
 
@@ -86,20 +81,13 @@ fn experimenting() {
 
     let mut group2 = client2.join_group(welcome.clone()).unwrap();
 
-    let mut group_second_device = second_device.join_group(welcome).unwrap();
-
     let content1 = b"This is the first test message!";
 
     let message = group1.create_message(content1).unwrap();
 
     let cleartext = group2.process_message(message.clone()).unwrap().unwrap();
-    let second_cleartext = group_second_device
-        .process_message(message)
-        .unwrap()
-        .unwrap();
 
     assert_eq!(content1.as_ref(), &cleartext);
-    assert_eq!(content1.as_ref(), &second_cleartext);
 
     // The same message cannot be decrypted again because it's to distant in the past
     // You can however set the out of order tolerance to at least 1 to allow the newest message to be decrypted

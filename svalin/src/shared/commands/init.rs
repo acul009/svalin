@@ -22,8 +22,8 @@ use tracing::debug;
 use crate::server::user_store::{UserStore, serde_paramsstring};
 
 pub struct ServerInitSuccess {
-    credential: Credential,
-    root: Certificate,
+    pub credential: Credential,
+    pub root: Certificate,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -205,7 +205,7 @@ impl CommandDispatcher for Init {
         let (_username, secret_exponent, params, verifier) = match pace_client
             .register_alloc_strong(
                 &self.username,
-                self.password.clone(),
+                &self.password,
                 hasher.params().clone(),
                 hasher,
             )

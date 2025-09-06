@@ -49,7 +49,7 @@ impl SessionStore {
 
     pub async fn get_session(
         &self,
-        fingerprint: Fingerprint,
+        fingerprint: &Fingerprint,
     ) -> Result<Option<Certificate>, anyhow::Error> {
         let fingerprint = fingerprint.as_slice();
         let session_der = sqlx::query_scalar!(

@@ -24,6 +24,9 @@ clean:
 # Restart the database by recreating it
 restart: clean setup
 
+test $RUST_LOG="1":
+    RUST_LOG=debug cargo test -p svalin_pki -p svalin_rpc -p svalin -- --nocapture
+
 build-debian: build-cross
     cargo deb --package svalin --target x86_64-unknown-linux-gnu --no-build
 

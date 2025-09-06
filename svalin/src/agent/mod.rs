@@ -138,7 +138,7 @@ impl Agent {
         let config = AgentConfig {
             root_certificate: data.root,
             upstream_certificate: data.upstream,
-            encrypted_credentials: key_source.encrypt_credentials(&data.credentials).await?,
+            encrypted_credentials: key_source.encrypt_credential(&data.credentials).await?,
             upstream_address: data.address,
             key_source,
         };

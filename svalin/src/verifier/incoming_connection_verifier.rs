@@ -1,37 +1,39 @@
 use std::sync::Arc;
 
-use anyhow::anyhow;
 use svalin_pki::{Certificate, ExactVerififier, Fingerprint, VerificationError, Verifier};
 
-use crate::server::{agent_store::AgentStore, user_store::UserStore};
+use crate::server::{agent_store::AgentStore, session_store::SessionStore, user_store::UserStore};
 
 use super::verification_helper::VerificationHelper;
 
 #[derive(Debug)]
-pub struct ServerStorageVerifier {
+pub struct IncomingConnectionVerifier {
     helper: VerificationHelper,
     agent_verifier: ExactVerififier,
     user_store: Arc<UserStore>,
+    session_store: Arc<SessionStore>,
     agent_store: Arc<AgentStore>,
 }
 
-impl ServerStorageVerifier {
+impl IncomingConnectionVerifier {
     pub fn new(
         helper: VerificationHelper,
         root: Certificate,
         user_store: Arc<UserStore>,
+        session_store: Arc<SessionStore>,
         agent_store: Arc<AgentStore>,
     ) -> Self {
         Self {
             helper,
             agent_verifier: ExactVerififier::new(root),
             user_store,
+            session_store,
             agent_store,
         }
     }
 }
 
-impl Verifier for ServerStorageVerifier {
+impl Verifier for IncomingConnectionVerifier {
     async fn verify_fingerprint(
         &self,
         fingerprint: &Fingerprint,
@@ -45,15 +47,16 @@ impl Verifier for ServerStorageVerifier {
         if let Some(agent) = agent {
             let agent_data = agent.verify(&self.agent_verifier, time).await?;
 
-            return self.helper.help_verify(time, agent_data.unpack().cert);
+            return self
+                .helper
+                .help_verify(time, agent_data.unpack().cert)
+                .await;
         }
 
-        let user = self.user_store.get_user(fingerprint).await?;
-        if let Some(_user) = user {
+        let session = self.session_store.get_session(fingerprint).await?;
+        if let Some(session) = session {
             // TODO: make helper actually check certificate chain
-            // return self.helper.help_verify(time, _user.certificate);
-
-            return Err(anyhow!("User verification not yet implemented").into());
+            return self.helper.help_verify(time, session).await;
         }
 
         Err(VerificationError::UnknownCertificate)

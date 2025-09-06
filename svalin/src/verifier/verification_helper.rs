@@ -23,7 +23,7 @@ impl VerificationHelper {
         None
     }
 
-    pub fn help_verify(
+    pub async fn help_verify(
         &self,
         time: u64,
         cert: Certificate,
@@ -34,16 +34,28 @@ impl VerificationHelper {
             return Ok(cert);
         }
 
-        if cert.issuer() == self.root.spki_hash() {
-            cert.verify_signature(&self.root)?;
+        let Some(chain) = self
+            .user_store
+            .get_verified_user_chain_by_spki_hash(cert.issuer())
+            .await?
+        else {
+            return Err(VerificationError::UnknownIssuer);
+        };
 
-            return Ok(cert);
+        for certificate in &chain {
+            certificate.check_validity_at(time).map_err(|err| {
+                VerificationError::ChainTimerangeError(err, certificate.fingerprint().clone())
+            })?;
         }
+
+        cert.verify_signature(
+            chain
+                .first()
+                .expect("A chain must have at least one certificate"),
+        )?;
 
         // TODO: check revocation
 
-        // TODO: check certificate chain
-
-        Err(VerificationError::NotYetImplemented)
+        Ok(cert)
     }
 }

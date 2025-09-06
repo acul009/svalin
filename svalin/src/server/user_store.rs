@@ -6,11 +6,8 @@ use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::ParamsString;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use svalin_pki::{Certificate, EncryptedCredential, Fingerprint};
+use svalin_pki::{Certificate, CertificateType, EncryptedCredential, Fingerprint};
 use totp_rs::TOTP;
-use tracing::{debug, instrument};
-
-use crate::server::config_builder::new;
 
 #[derive(Serialize, Deserialize)]
 pub struct StoredUser {
@@ -80,7 +77,7 @@ impl UserStore {
         .execute(pool)
         .await?;
 
-        todo!()
+        Ok(())
     }
 
     pub fn open(pool: SqlitePool, root: Certificate) -> Arc<Self> {
@@ -108,7 +105,14 @@ impl UserStore {
         }
     }
 
-    pub async fn get_user_chain_by_spki_hash(
+    /// This function retrieves the chain of user certificates starting from the given SPKI hash up to the root certificate.
+    ///
+    /// It will perform the following validations
+    /// - ensure the certificate types are corrent
+    /// - ensure the certificate chain signatures are correct
+    ///
+    /// Other than that, no further validation is performed.
+    pub async fn get_verified_user_chain_by_spki_hash(
         &self,
         spki_hash: &str,
     ) -> Result<Option<Vec<Certificate>>> {
@@ -122,6 +126,10 @@ impl UserStore {
         known_certs.insert(spki_hash.to_string());
 
         while user != self.root {
+            match user.certificate_type() {
+                CertificateType::User | CertificateType::Root => {}
+                _ => return Err(anyhow!("invalid certificate type in user store!")),
+            }
             let parent_spki_hash = user.issuer().to_string();
             if known_certs.contains(&parent_spki_hash) {
                 return Err(anyhow!("cyclic signature in user store!"));

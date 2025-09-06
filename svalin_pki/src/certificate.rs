@@ -1,5 +1,4 @@
-use std::borrow::Cow;
-use std::fmt::{Debug, Write};
+use std::fmt::{Debug, Display, Write};
 use std::hash::Hash;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -79,8 +78,8 @@ pub enum CertificateParseError {
     ShouldNotBeCa(CertificateType),
     #[error("Certificate of type {0} should be a CA")]
     ShouldBeCa(CertificateType),
-    #[error("Self-signed certificate is not of type root")]
-    SelfSignedNotRoot,
+    #[error("Self-signed certificate is not of type root or temporary")]
+    SelfSignedNotRootOrTemp,
     #[error("Certificate validity is broken")]
     BrokenValidity,
     #[error("Incorrect validity duration for certificate type {0}: expected {1}, got {2}")]
@@ -97,6 +96,16 @@ pub enum SignatureVerificationError {
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize, PartialOrd, Ord, Hash)]
 pub struct Fingerprint([u8; 32]);
+
+impl Display for Fingerprint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for byte in self.0.iter() {
+            write!(f, "{:02X}", byte)?
+        }
+
+        Ok(())
+    }
+}
 
 impl Fingerprint {
     pub fn as_slice(&self) -> &[u8] {
@@ -163,8 +172,10 @@ impl Certificate {
             .to_string();
 
         if cert.issuer() == cert.subject() {
-            if certificate_type != CertificateType::Root {
-                return Err(CertificateParseError::SelfSignedNotRoot);
+            if certificate_type != CertificateType::Root
+                && certificate_type != CertificateType::Temporary
+            {
+                return Err(CertificateParseError::SelfSignedNotRootOrTemp);
             }
         }
 

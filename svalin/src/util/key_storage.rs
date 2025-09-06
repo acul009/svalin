@@ -23,13 +23,13 @@ impl KeySource {
         Ok(Self::BuiltIn(key))
     }
 
-    pub async fn encrypt_credentials(
+    pub async fn encrypt_credential(
         &self,
         credentials: &Credential,
     ) -> Result<EncryptedCredential> {
         let key = self.to_key().await?;
 
-        credentials.export(key).await
+        Ok(credentials.export(key).await?)
     }
 
     pub async fn decrypt_credentials(

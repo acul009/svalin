@@ -122,7 +122,7 @@ impl Credential {
         temp_parameters.not_after =
             OffsetDateTime::now_utc().saturating_add(cert_type.validity_duration());
 
-        temp_parameters.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+        temp_parameters.is_ca = rcgen::IsCa::NoCa;
 
         temp_parameters.key_usages = vec![];
 
@@ -220,7 +220,7 @@ impl Credential {
         let mut dn = rcgen::DistinguishedName::new();
         dn.push(
             rcgen::DnType::OrganizationalUnitName,
-            CertificateType::Agent.to_string(),
+            certificate_type.to_string(),
         );
         dn.push(rcgen::DnType::CommonName, spki_hash);
         leaf_parameters.distinguished_name = dn;
