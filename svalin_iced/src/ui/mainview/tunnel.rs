@@ -4,7 +4,6 @@ use iced::{
     Color, Length, Padding, Shadow, Vector,
     advanced::graphics::futures::subscription,
     alignment::{Horizontal, Vertical},
-    border,
     widget::{button, column, container, row, text},
 };
 use svalin::{
@@ -120,14 +119,12 @@ impl TunnelUi {
                     .padding(20)
                     .width(Length::Fill)
                     .style(|_| container::Style {
-                        text_color: None,
-                        background: None,
-                        border: border::width(0),
                         shadow: Shadow {
                             color: Color::BLACK,
                             offset: Vector { x: 0.0, y: 10.0 },
                             blur_radius: 20.0,
-                        }
+                        },
+                        ..Default::default()
                     }),
                 column(
                     tunnels

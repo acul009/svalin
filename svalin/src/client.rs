@@ -24,13 +24,13 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tunnel_manager::TunnelManager;
 
-/// flutter_rust_bridge:opaque
 pub struct Client {
     rpc: RpcClient,
     _upstream_address: String,
     upstream_certificate: Certificate,
     root_certificate: Certificate,
-    credentials: Credential,
+    user_credential: Credential,
+    _device_credential: Credential,
     device_list: watch::Sender<BTreeMap<Certificate, Device>>,
     tunnel_manager: TunnelManager,
     // TODO: These should not be required here, but should be created and canceled as needed

@@ -24,8 +24,23 @@ clean:
 # Restart the database by recreating it
 restart: clean setup
 
-test $RUST_LOG="1":
-    RUST_LOG=debug cargo test -p svalin_pki -p svalin_rpc -p svalin -- --nocapture
+test $RUST_LOG="debug":
+    cargo test -p svalin_pki -p svalin_rpc -p svalin -- --nocapture
+
+server $RUST_LOG="debug":
+    cargo run -p svalin server 0.0.0.0:1234
+
+reset:
+    rm -r /var/lib/svalin/*
+
+agent $RUST_LOG="debug":
+    cargo run -p svalin agent
+
+agent_init:
+    cargo run -p svalin agent init localhost:1234
+
+gui $RUST_LOG="svalin=debug":
+    cargo run -p svalin_iced
 
 build-debian: build-cross
     cargo deb --package svalin --target x86_64-unknown-linux-gnu --no-build

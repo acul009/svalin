@@ -1,7 +1,6 @@
 use iced::{
-    border,
+    Color, Length, Shadow, border,
     widget::{column, container, horizontal_rule, row, stack, vertical_rule},
-    Color, Length, Shadow,
 };
 
 use crate::Element;
@@ -76,49 +75,46 @@ impl<'a, Message> Scaffold<'a, Message> {
 
 impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, Message> {
     fn from(scaffold: Scaffold<'a, Message>) -> Self {
-        let mut col = column!();
-
-        if let Some(header) = scaffold.header {
-            col = col
-                .push(
+        let has_header = scaffold.header.is_some();
+        let has_context = scaffold.context.is_some();
+        stack![
+            column![
+                scaffold.header.map(|header| {
                     container(header)
                         .style(|_| container::Style {
-                            text_color: None,
-                            background: None,
-                            border: border::width(0),
                             shadow: Shadow {
                                 blur_radius: 50.0,
                                 color: Color::BLACK.scale_alpha(0.5),
                                 offset: iced::Vector { x: 0.0, y: 10.0 },
                             },
+                            ..Default::default()
                         })
-                        .height(50),
-                )
-                .push(horizontal_rule(2));
-        }
-
-        let mut r = row!(scaffold.body);
-
-        if let Some(context) = scaffold.context {
-            r = r.push(vertical_rule(2)).push(
-                container(context)
-                    .style(|_| container::Style {
-                        text_color: None,
-                        background: None,
-                        border: border::width(0),
-                        shadow: Shadow {
-                            blur_radius: 50.0,
-                            color: Color::BLACK.scale_alpha(0.5),
-                            offset: iced::Vector { x: -10.0, y: 0.0 },
-                        },
+                        .height(50)
+                }),
+                has_header.then(|| horizontal_rule(2)),
+                row![
+                    scaffold.body,
+                    has_context.then(|| vertical_rule(2)),
+                    scaffold.context.map(|context| {
+                        {
+                            container(context)
+                                .style(|_| container::Style {
+                                    shadow: Shadow {
+                                        blur_radius: 50.0,
+                                        color: Color::BLACK.scale_alpha(0.5),
+                                        offset: iced::Vector { x: -10.0, y: 0.0 },
+                                    },
+                                    ..Default::default()
+                                })
+                                .width(400)
+                                .height(Length::Fill)
+                        }
                     })
-                    .width(400)
-                    .height(Length::Fill),
-            );
-        }
-
-        col = col.push(r).push_maybe(scaffold.footer);
-
-        stack!(col).push_maybe(scaffold.dialog).into()
+                ],
+                scaffold.footer
+            ],
+            scaffold.dialog
+        ]
+        .into()
     }
 }

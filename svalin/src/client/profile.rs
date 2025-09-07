@@ -152,7 +152,8 @@ impl Client {
 
         if let Some(profile) = profile {
             debug!("unlocking profile");
-            let identity = profile.user_credential.decrypt(password).await?;
+            let user_credential = profile.user_credential.decrypt(password.clone()).await?;
+            let device_credential = profile.device_credential.decrypt(password).await?;
 
             debug!("creating verifier");
             let verifier = UpstreamVerifier::new(
@@ -164,7 +165,7 @@ impl Client {
             debug!("connecting to server");
             let rpc = RpcClient::connect(
                 &profile.upstream_address,
-                Some(&identity),
+                Some(&device_credential),
                 verifier,
                 CancellationToken::new(),
             )
@@ -179,7 +180,8 @@ impl Client {
                 _upstream_address: profile.upstream_address,
                 upstream_certificate: profile.upstream_certificate,
                 root_certificate: profile.root_certificate.clone(),
-                credentials: identity.clone(),
+                user_credential: user_credential,
+                _device_credential: device_credential.clone(),
                 device_list: watch::channel(BTreeMap::new()).0,
                 tunnel_manager,
                 background_tasks: TaskTracker::new(),
@@ -198,7 +200,7 @@ impl Client {
                     .dispatch(UpdateAgentList {
                         client: client2,
                         base_connection: sync_connection.clone(),
-                        credentials: identity,
+                        credentials: device_credential,
                         list: list_clone,
                         verifier: ExactVerififier::new(profile.root_certificate),
                         tunnel_manager,

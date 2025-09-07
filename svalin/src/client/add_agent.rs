@@ -18,7 +18,7 @@ impl Client {
 
         let root = self.root_certificate.clone();
         let upstream = self.upstream_certificate.clone();
-        let credentials = self.credentials.clone();
+        let credentials = self.user_credential.clone();
 
         let (wait_for_confirm_send, wait_for_confirm_recv) = oneshot::channel::<Result<()>>();
 
@@ -48,7 +48,7 @@ impl Client {
             confirm_code_send,
             result_revc: result_recv,
             connection: self.rpc.upstream_connection(),
-            credentials: self.credentials.clone(),
+            credentials: self.user_credential.clone(),
         })
     }
 }

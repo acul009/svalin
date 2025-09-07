@@ -1,7 +1,7 @@
 use std::ops::RangeInclusive;
 
 use iced::window::RedrawRequest;
-use iced::{window, Element, Length};
+use iced::{Element, Length, window};
 
 impl StyleSheet for iced::Theme {
     type Style = ();
@@ -115,7 +115,7 @@ where
     }
 
     fn layout(
-        &self,
+        &mut self,
         _tree: &mut Tree,
         _renderer: &Renderer,
         limits: &layout::Limits,
@@ -123,17 +123,17 @@ where
         layout::atomic(limits, self.size, self.size)
     }
 
-    fn on_event(
+    fn update(
         &mut self,
         tree: &mut Tree,
-        event: Event,
+        event: &Event,
         _layout: Layout<'_>,
-        _cursor: mouse::Cursor,
+        _cursor: advanced::mouse::Cursor,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
-    ) -> event::Status {
+    ) {
         let state = tree.state.downcast_mut::<State>();
 
         if let Event::Window(window::Event::RedrawRequested(_)) = event {
@@ -150,10 +150,8 @@ where
             }
 
             state.cache.clear();
-            shell.request_redraw(RedrawRequest::NextFrame);
+            shell.request_redraw();
         }
-
-        event::Status::Ignored
     }
 
     fn draw(
@@ -166,8 +164,8 @@ where
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
-        use advanced::graphics::geometry::Renderer as _;
         use advanced::Renderer as _;
+        use advanced::graphics::geometry::Renderer as _;
         let state = tree.state.downcast_ref::<State>();
         let bounds = layout.bounds();
         let custom_style = <Theme as StyleSheet>::appearance(theme, &self.style);

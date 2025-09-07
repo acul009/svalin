@@ -1,10 +1,10 @@
 use std::{borrow::Cow, ops::RangeInclusive};
 
 use iced::{
+    Length, Padding,
     alignment::{self, Vertical},
     padding,
     widget::{column, container, progress_bar, stack, text},
-    Length, Padding,
 };
 
 use crate::Element;
@@ -89,19 +89,21 @@ impl<'a, Message: Clone + 'static> From<PercentDisplay<'a, Message>> for Element
         let percent =
             (percent_display.value - *range.start()) / (*range.end() - *range.start()) * 100.0;
         match percent_display.display_type {
-            DisplayType::Circle => column![stack![
-                progress_circle(range, percent_display.value).size(percent_display.size),
-                text!("{:.0}%", percent)
-                    .center()
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-            ]]
-            .push_maybe(if percent_display.label.len() > 0 {
-                Some(text(percent_display.label))
-            } else {
-                None
-            })
-            .push_maybe(percent_display.subinfo)
+            DisplayType::Circle => column![
+                stack![
+                    progress_circle(range, percent_display.value).size(percent_display.size),
+                    text!("{:.0}%", percent)
+                        .center()
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                ],
+                if percent_display.label.len() > 0 {
+                    Some(text(percent_display.label))
+                } else {
+                    None
+                },
+                percent_display.subinfo
+            ]
             .padding(percent_display.padding)
             .align_x(alignment::Horizontal::Center)
             .into(),
@@ -114,9 +116,9 @@ impl<'a, Message: Clone + 'static> From<PercentDisplay<'a, Message>> for Element
                         .padding(padding::left(20))
                         .align_y(Vertical::Center)
                         .height(Length::Fill)
-                ]
+                ],
+                percent_display.subinfo
             ]
-            .push_maybe(percent_display.subinfo)
             .spacing(10)
             .padding(percent_display.padding)
             .into(),

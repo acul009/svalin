@@ -33,7 +33,7 @@ pub struct TerminalWindow {
 
 impl TerminalWindow {
     pub fn start(device: Device) -> (Self, Task<Message>) {
-        let (term_display, terminal_emulator_task) = frozen_term::Terminal::new(25, 80);
+        let (term_display, terminal_emulator_task) = frozen_term::Terminal::new();
 
         let (send, recv) = device.open_terminal(TerminalSize { rows: 25, cols: 80 });
 
@@ -81,6 +81,7 @@ impl TerminalWindow {
                 let action = self.term_display.update(message);
                 match action {
                     frozen_term::Action::None => Task::none(),
+                    frozen_term::Action::IdChanged => Task::none(),
                     frozen_term::Action::Run(task) => task.map(Message::Terminal),
                     frozen_term::Action::Resize(size) => {
                         let size = async_pty::TerminalSize {

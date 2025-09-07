@@ -31,6 +31,7 @@ pub enum Message {
     ProfilePicker(profile_picker::Message),
     MainView(mainview::Message),
     WindowHelper(window_helper::Message),
+    WindowClosed(window::Id),
 }
 
 pub struct UI {
@@ -65,6 +66,15 @@ impl UI {
         match message {
             Message::Noop => Task::none(),
             Message::Tab => focus_next(),
+            Message::WindowClosed(id) => {
+                if id == self.main_window_id {
+                    // Todo: proper shutdown
+                    iced::exit()
+                } else {
+                    self.window_helper.close_window(&id);
+                    Task::none()
+                }
+            }
             Message::ProfilePicker(message) => match &mut self.screen {
                 Screen::ProfilePicker(profile_picker) => {
                     let action = profile_picker.update(message);
@@ -161,7 +171,7 @@ impl UI {
                 keyboard::Key::Character(_) => None,
                 keyboard::Key::Unidentified => None,
             }),
-            self.window_helper.subscription().map(Message::WindowHelper),
+            window::close_events().map(Message::WindowClosed),
         ];
 
         match &self.screen {

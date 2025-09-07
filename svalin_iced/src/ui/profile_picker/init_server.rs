@@ -218,7 +218,10 @@ impl InitServer {
                                     State::Loading(t!("profile-picker.init-loading").to_string());
 
                                 Action::Run(Task::future(async move {
-                                    match init.init(username, password.clone(), totp).await {
+                                    match init
+                                        .init(username, password.clone().into_bytes(), totp)
+                                        .await
+                                    {
                                         Err(err) => Message::Error(ErrorDisplayInfo::new(
                                             Arc::new(err),
                                             t!("profile-picker.error.server-init"),

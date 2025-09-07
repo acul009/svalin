@@ -18,7 +18,6 @@ pub enum Message {
         id: window::Id,
         message: WindowMessage,
     },
-    WindowClosed(window::Id),
     None,
 }
 
@@ -83,10 +82,6 @@ impl WindowHelper {
                     Task::none()
                 }
             }
-            Message::WindowClosed(id) => {
-                self.windows.remove(&id);
-                Task::none()
-            }
             Message::None => Task::none(),
         }
     }
@@ -99,8 +94,8 @@ impl WindowHelper {
         }
     }
 
-    pub fn subscription(&self) -> Subscription<Message> {
-        window::close_events().map(Message::WindowClosed)
+    pub(crate) fn close_window(&mut self, id: &window::Id) {
+        self.windows.remove(id);
     }
 }
 

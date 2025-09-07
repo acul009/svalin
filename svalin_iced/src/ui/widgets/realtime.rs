@@ -2,11 +2,10 @@ use iced::{
     Length, Padding,
     widget::{column, container, row, text},
 };
-use iced_aw::card;
 use svalin::client::device::RemoteData;
 use svalin_sysctl::realtime::RealtimeStatus;
 
-use crate::Element;
+use crate::{Element, ui::widgets::card};
 
 use super::{loading, percent_display};
 
@@ -23,12 +22,10 @@ impl<'a> RealtimeDisplay<'a> {
 impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Message> {
     fn from(value: RealtimeDisplay) -> Self {
         let content: Element<Message> = match value.realtime {
-            RemoteData::Unavailable => {
-                container(text(t!("realtime.live-unavailable")).center())
-                    .padding(20)
-                    .width(Length::Fill)
-                    .into()
-            }
+            RemoteData::Unavailable => container(text(t!("realtime.live-unavailable")).center())
+                .padding(20)
+                .width(Length::Fill)
+                .into(),
             RemoteData::Pending => container(loading(t!("realtime.connecting")))
                 .height(200)
                 .into(),
@@ -58,25 +55,25 @@ impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Mes
                             realtime.memory.used / 1024 / 1024,
                             realtime.memory.total / 1024 / 1024
                         ))
-                        .bar()
-                    ]
-                    .push_maybe(if realtime.swap.total > 0 {
-                        Some(
-                            percent_display(
-                                0.0..=(realtime.swap.total as f32),
-                                realtime.swap.used as f32,
+                        .bar(),
+                        if realtime.swap.total > 0 {
+                            Some(
+                                percent_display(
+                                    0.0..=(realtime.swap.total as f32),
+                                    realtime.swap.used as f32,
+                                )
+                                .label(t!("realtime.swap"))
+                                .subinfo(text!(
+                                    "{} / {} M",
+                                    realtime.swap.used / 1024 / 1024,
+                                    realtime.swap.total / 1024 / 1024
+                                ))
+                                .bar(),
                             )
-                            .label(t!("realtime.swap"))
-                            .subinfo(text!(
-                                "{} / {} M",
-                                realtime.swap.used / 1024 / 1024,
-                                realtime.swap.total / 1024 / 1024
-                            ))
-                            .bar(),
-                        )
-                    } else {
-                        None
-                    })
+                        } else {
+                            None
+                        }
+                    ]
                     .padding(20)
                     .spacing(20)
                 )

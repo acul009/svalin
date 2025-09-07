@@ -13,11 +13,12 @@ type Element<'a, Message> = iced::Element<'a, Message, crate::Theme>;
 fn main() {
     svalin::tracing_subscriber::fmt::init();
 
-    iced::daemon(UI::title, UI::update, UI::view)
+    iced::daemon(UI::start, UI::update, UI::view)
+        .title(UI::title)
         .subscription(UI::subscription)
         .theme(|_, _| iced::Theme::Dark)
         .font(icon::FONT)
         .antialiasing(true)
-        .run_with(UI::start)
+        .run()
         .unwrap();
 }

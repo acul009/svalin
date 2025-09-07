@@ -5,7 +5,6 @@ use iced::{
     advanced::subscription::from_recipe,
     widget::{button, center, column, combo_box, container, horizontal_rule, row, text},
 };
-use iced_aw::card;
 use svalin::{
     agent::update::{InstallationInfo, UpdateChannel},
     client::device::{Device, RemoteData},
@@ -13,7 +12,10 @@ use svalin::{
 
 use crate::{
     Element,
-    ui::{types::error_display_info::ErrorDisplayInfo, widgets::loading},
+    ui::{
+        types::error_display_info::ErrorDisplayInfo,
+        widgets::{card, loading},
+    },
     util::watch_recipe::WatchRecipe,
 };
 
@@ -132,76 +134,79 @@ impl UpdateInstaller {
     }
 
     pub fn view(&self) -> Element<Message> {
-        let content: Element<Message> = match &self.data {
-            RemoteData::Pending => loading(t!("device.update.loading-status"))
-                .height(200)
-                .into(),
-            RemoteData::Unavailable => center(text(t!("device.update.status-unavailable")))
-                .height(200)
-                .into(),
-            RemoteData::Ready(install_info) => {
-                if install_info.currently_updating {
-                    return loading(t!("device.update.updating")).height(200).into();
+        container(card(
+            text(t!("device.update.title")),
+            match &self.data {
+                RemoteData::Pending => {
+                    Element::from(loading(t!("device.update.loading-status")).height(200))
                 }
+                RemoteData::Unavailable => center(text(t!("device.update.status-unavailable")))
+                    .height(200)
+                    .into(),
+                RemoteData::Ready(install_info) => {
+                    if install_info.currently_updating {
+                        return loading(t!("device.update.updating")).height(200).into();
+                    }
 
-                let mut col = column![
-                    row![
-                        container(text(t!("device.update.current-version") + ":")).width(200),
-                        text(install_info.current_version.to_string()),
-                    ]
-                    .spacing(10),
-                    row![
-                        container(text(t!("device.update.method") + ":")).width(200),
-                        text(install_info.install_method.to_string()),
-                    ]
-                    .spacing(10),
-                    horizontal_rule(2),
-                ]
-                .spacing(10)
-                .padding(10);
-
-                if install_info.install_method.supports_update() {
-                    col = col
-                        .push(
-                            row![
-                                container(combo_box(
-                                    &self.channels,
-                                    "",
-                                    self.selected_channel.as_ref(),
-                                    Message::Channel
-                                ))
-                                .width(200),
-                                button(text(t!("device.update.start"))).on_press_maybe(
-                                    self.selected_channel.as_ref().map(|_| Message::StartUpdate)
-                                )
-                            ]
-                            .spacing(10),
-                        )
-                        .push_maybe(match &self.possible_update {
-                            PossibleUpdate::None => None,
-                            PossibleUpdate::Loading => {
-                                Some(Element::from(container(loading("").height(40))))
-                            }
-                            PossibleUpdate::Version(version) => Some(Element::from(
+                    column![
+                        row![
+                            container(text(t!("device.update.current-version") + ":")).width(200),
+                            text(install_info.current_version.to_string()),
+                        ]
+                        .spacing(10),
+                        row![
+                            container(text(t!("device.update.method") + ":")).width(200),
+                            text(install_info.install_method.to_string()),
+                        ]
+                        .spacing(10),
+                        horizontal_rule(2),
+                        if install_info.install_method.supports_update() {
+                            column![
                                 row![
-                                    container(text(t!("device.update.available-version") + ":"))
-                                        .width(200),
-                                    text(version.as_str())
+                                    container(combo_box(
+                                        &self.channels,
+                                        "",
+                                        self.selected_channel.as_ref(),
+                                        Message::Channel
+                                    ))
+                                    .width(200),
+                                    button(text(t!("device.update.start"))).on_press_maybe(
+                                        self.selected_channel
+                                            .as_ref()
+                                            .map(|_| Message::StartUpdate)
+                                    )
                                 ]
                                 .spacing(10),
-                            )),
-                        })
-                } else {
-                    col = col.push(text(t!("device.update.unsupported")))
+                                match &self.possible_update {
+                                    PossibleUpdate::None => None,
+                                    PossibleUpdate::Loading => {
+                                        Some(Element::from(container(loading("").height(40))))
+                                    }
+                                    PossibleUpdate::Version(version) => Some(Element::from(
+                                        row![
+                                            container(text(
+                                                t!("device.update.available-version") + ":"
+                                            ))
+                                            .width(200),
+                                            text(version.as_str())
+                                        ]
+                                        .spacing(10),
+                                    )),
+                                }
+                            ]
+                            .into()
+                        } else {
+                            Element::from(text(t!("device.update.unsupported")))
+                        }
+                    ]
+                    .spacing(10)
+                    .padding(10)
+                    .into()
                 }
-
-                col.into()
-            }
-        };
-
-        container(card(text(t!("device.update.title")), content))
-            .padding(30)
-            .into()
+            },
+        ))
+        .padding(30)
+        .into()
     }
 
     pub fn dialog(&self) -> Option<Element<Message>> {
