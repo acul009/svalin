@@ -6,7 +6,10 @@ use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::ParamsString;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use svalin_pki::{Certificate, CertificateType, EncryptedCredential, Fingerprint};
+use svalin_pki::{
+    Certificate, CertificateChain, CertificateChainBuilder, CertificateType, EncryptedCredential,
+    Fingerprint,
+};
 use totp_rs::TOTP;
 
 #[derive(Serialize, Deserialize)]
@@ -105,48 +108,23 @@ impl UserStore {
         }
     }
 
-    /// This function retrieves the chain of user certificates starting from the given SPKI hash up to the root certificate.
-    ///
-    /// It will perform the following validations
-    /// - ensure the certificate types are corrent
-    /// - ensure the certificate chain signatures are correct
-    ///
-    /// Other than that, no further validation is performed.
-    pub async fn get_verified_user_chain_by_spki_hash(
+    pub async fn complete_certificate_chain(
         &self,
-        spki_hash: &str,
-    ) -> Result<Option<Vec<Certificate>>> {
-        let mut known_certs = HashSet::new();
-        let mut cert_chain = Vec::new();
+        mut cert_chain: CertificateChainBuilder,
+    ) -> Result<CertificateChain> {
+        loop {
+            let issuer_spki = cert_chain
+                .requested_issuer()
+                .expect("chain not finished yet");
 
-        let Some(mut user) = self.get_cert_by_spki_hash(&spki_hash).await? else {
-            return Ok(None);
-        };
-
-        known_certs.insert(spki_hash.to_string());
-
-        while user != self.root {
-            match user.certificate_type() {
-                CertificateType::User | CertificateType::Root => {}
-                _ => return Err(anyhow!("invalid certificate type in user store!")),
-            }
-            let parent_spki_hash = user.issuer().to_string();
-            if known_certs.contains(&parent_spki_hash) {
-                return Err(anyhow!("cyclic signature in user store!"));
-            }
-            let Some(parent) = self.get_cert_by_spki_hash(&parent_spki_hash).await? else {
-                return Ok(None);
+            let Some(issuer) = self.get_cert_by_spki_hash(&issuer_spki).await? else {
+                return Err(anyhow!("issuer with spki hash {} not found", issuer_spki));
             };
-            user.verify_signature(&parent)
-                .context("failed to verify user certificate's signature")?;
-            let verified_user = mem::replace(&mut user, parent);
-            known_certs.insert(parent_spki_hash);
-            cert_chain.push(verified_user);
+
+            if let Some(chain) = cert_chain.push_parent(issuer)? {
+                return Ok(chain);
+            }
         }
-
-        cert_chain.push(user);
-
-        Ok(Some(cert_chain))
     }
 
     async fn get_cert_by_spki_hash(&self, spki_hash: &str) -> Result<Option<Certificate>> {

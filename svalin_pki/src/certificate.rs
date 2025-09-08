@@ -92,6 +92,8 @@ pub enum SignatureVerificationError {
     X509ParserError(#[from] x509_parser::nom::Err<X509Error>),
     #[error("Verification Error: {0}")]
     X509VerificationError(#[from] X509Error),
+    #[error("Certificate of type {0} is not allowed to sign certificates of type {1}")]
+    InvalidCertificateType(CertificateType, CertificateType),
 }
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize, PartialOrd, Ord, Hash)]
@@ -271,6 +273,16 @@ impl Certificate {
 
     /// Verify the signature of the current certificate using the given issue certificate
     pub fn verify_signature(&self, issuer: &Certificate) -> Result<(), SignatureVerificationError> {
+        if !issuer
+            .certificate_type()
+            .may_be_parent_of(self.certificate_type())
+        {
+            return Err(SignatureVerificationError::InvalidCertificateType(
+                issuer.certificate_type(),
+                self.certificate_type(),
+            ));
+        }
+
         let (_, cert) = X509Certificate::from_der(&self.data.der)?;
 
         let (_, issuer_cert) = X509Certificate::from_der(&issuer.data.der)?;
@@ -421,7 +433,7 @@ impl CertificateType {
         }
     }
 
-    pub fn validity_duration(&self) -> Duration {
+    pub(crate) fn validity_duration(&self) -> Duration {
         match self {
             CertificateType::Root => Duration::days(365 * 10),
             CertificateType::User => Duration::days(365 * 1),
@@ -429,6 +441,31 @@ impl CertificateType {
             CertificateType::Agent => Duration::days(365 * 1),
             CertificateType::Server => Duration::days(365 * 10),
             CertificateType::Temporary => Duration::minutes(1),
+        }
+    }
+
+    fn may_be_parent_of(&self, child_type: CertificateType) -> bool {
+        match self {
+            CertificateType::Root => match child_type {
+                CertificateType::Root => false,
+                CertificateType::Server => true,
+                CertificateType::User => true,
+                CertificateType::Agent => true,
+                CertificateType::UserDevice => true,
+                CertificateType::Temporary => false,
+            },
+            CertificateType::User => match child_type {
+                CertificateType::Root => false,
+                CertificateType::Server => false,
+                CertificateType::User => true,
+                CertificateType::Agent => true,
+                CertificateType::UserDevice => true,
+                CertificateType::Temporary => false,
+            },
+            CertificateType::UserDevice => false,
+            CertificateType::Agent => false,
+            CertificateType::Server => false,
+            CertificateType::Temporary => false,
         }
     }
 }

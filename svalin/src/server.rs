@@ -29,7 +29,7 @@ use crate::{
     util::{key_storage::KeySource, location::Location},
     verifier::{
         incoming_connection_verifier::IncomingConnectionVerifier,
-        tls_optional_wrapper::TlsOptionalWrapper, verification_helper::VerificationHelper,
+        tls_optional_wrapper::TlsOptionalWrapper,
     },
 };
 
@@ -185,10 +185,7 @@ impl Server {
             .decrypt_credentials(base_config.credentials)
             .await?;
 
-        let helper = VerificationHelper::new(root.clone(), user_store.clone());
-
         let verifier = IncomingConnectionVerifier::new(
-            helper,
             root.clone(),
             user_store.clone(),
             session_store.clone(),

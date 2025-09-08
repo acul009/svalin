@@ -1,4 +1,4 @@
-use svalin_pki::Certificate;
+use svalin_pki::{Certificate, CertificateType};
 use svalin_rpc::permissions::{PermissionCheckError, PermissionHandler};
 
 use super::Permission;
@@ -25,7 +25,12 @@ impl PermissionHandler for ServerPermissionHandler {
     ) -> anyhow::Result<(), PermissionCheckError> {
         match peer {
             svalin_rpc::rpc::peer::Peer::Certificate(certificate) => {
-                if certificate == &self.root {
+                if certificate.certificate_type() != CertificateType::UserDevice {
+                    return Err(PermissionCheckError::PermissionDenied(
+                        "Peer must be a user device for this action!".to_string(),
+                    ));
+                }
+                if certificate.issuer() == self.root.spki_hash() {
                     if let Permission::AnonymousOnly = permission {
                         return Err(PermissionCheckError::PermissionDenied(
                             "peer must be unauthenticated for this action! This could be a security critical bug, please report it!".to_string()

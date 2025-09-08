@@ -2,7 +2,7 @@ use std::{fmt::Debug, future::Future};
 use thiserror::Error;
 
 use crate::{
-    Certificate,
+    Certificate, VerifyChainError,
     certificate::{Fingerprint, SignatureVerificationError, ValidityError},
 };
 
@@ -10,6 +10,8 @@ pub mod exact;
 
 #[derive(Debug, Error)]
 pub enum VerificationError {
+    #[error("The certificate chain could not be verified: {0}")]
+    ChainError(#[from] VerifyChainError),
     #[error("The required logic to verify this certificate has not been written yet")]
     NotYetImplemented,
     #[error("The certificate of the given fingerprint was revoked")]
@@ -19,8 +21,6 @@ pub enum VerificationError {
     #[error("The certificate corresponding to the given fingerprint is unknown")]
     UnknownCertificate,
     #[error("The issuer of the certificate could not be found")]
-    UnknownIssuer,
-    #[error("The fingerprint did not match the expected certificate")]
     CertificateMismatch,
     #[error("The certificate is not valid: {0}")]
     TimerangeError(#[from] ValidityError),

@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
-use svalin_pki::{Certificate, ExactVerififier, Fingerprint, VerificationError, Verifier};
+use svalin_pki::{
+    Certificate, CertificateChainBuilder, ExactVerififier, Fingerprint, VerificationError, Verifier,
+};
 
 use crate::server::{agent_store::AgentStore, session_store::SessionStore, user_store::UserStore};
 
-use super::verification_helper::VerificationHelper;
-
 #[derive(Debug)]
 pub struct IncomingConnectionVerifier {
-    helper: VerificationHelper,
+    root: Certificate,
     agent_verifier: ExactVerififier,
     user_store: Arc<UserStore>,
     session_store: Arc<SessionStore>,
@@ -17,15 +17,15 @@ pub struct IncomingConnectionVerifier {
 
 impl IncomingConnectionVerifier {
     pub fn new(
-        helper: VerificationHelper,
         root: Certificate,
         user_store: Arc<UserStore>,
         session_store: Arc<SessionStore>,
         agent_store: Arc<AgentStore>,
     ) -> Self {
         Self {
-            helper,
-            agent_verifier: ExactVerififier::new(root),
+            // TODO: user verifier
+            agent_verifier: ExactVerififier::new(root.clone()),
+            root,
             user_store,
             session_store,
             agent_store,
@@ -39,26 +39,24 @@ impl Verifier for IncomingConnectionVerifier {
         fingerprint: &Fingerprint,
         time: u64,
     ) -> Result<Certificate, VerificationError> {
-        if let Some(root) = self.helper.try_root(fingerprint) {
-            return Ok(root);
-        }
-
-        let agent = self.agent_store.get_agent(fingerprint).await?;
-        if let Some(agent) = agent {
+        let certificate = if let Some(agent) = self.agent_store.get_agent(fingerprint).await? {
             let agent_data = agent.verify(&self.agent_verifier, time).await?;
+            agent_data.unpack().cert
+        } else if let Some(session) = self.session_store.get_session(fingerprint).await? {
+            session
+        } else {
+            return Err(VerificationError::UnknownCertificate);
+        };
 
-            return self
-                .helper
-                .help_verify(time, agent_data.unpack().cert)
-                .await;
-        }
+        let cert_chain = CertificateChainBuilder::new(certificate);
 
-        let session = self.session_store.get_session(fingerprint).await?;
-        if let Some(session) = session {
-            // TODO: make helper actually check certificate chain
-            return self.helper.help_verify(time, session).await;
-        }
+        let cert_chain = self
+            .user_store
+            .complete_certificate_chain(cert_chain)
+            .await?;
 
-        Err(VerificationError::UnknownCertificate)
+        let certificate = cert_chain.verify(&self.root, time)?;
+
+        Ok(certificate)
     }
 }

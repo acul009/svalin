@@ -1,5 +1,6 @@
 mod argon;
 mod certificate;
+mod certificate_chain;
 mod credential;
 mod encrypt;
 mod keypair;
@@ -19,6 +20,9 @@ pub use argon2;
 pub use certificate::{
     Certificate, CertificateParseError, CertificateType, Fingerprint, SignatureVerificationError,
     ValidityError,
+};
+pub use certificate_chain::{
+    AddCertificateError, CertificateChain, CertificateChainBuilder, VerifyChainError,
 };
 pub use credential::{
     CreateCertificateError, CreateCredentialsError, Credential, DecodeCredentialsError,
