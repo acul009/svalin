@@ -96,10 +96,10 @@ pub enum VerifyChainError {
 
 impl CertificateChain {
     pub fn verify(
-        self,
+        &self,
         root: &Certificate,
         timestamp: u64,
-    ) -> Result<Certificate, VerifyChainError> {
+    ) -> Result<&Certificate, VerifyChainError> {
         let chain_root = self
             .certificates
             .last()
@@ -115,11 +115,7 @@ impl CertificateChain {
         chain_root.check_validity_at(timestamp)?;
 
         if self.certificates.len() == 1 {
-            return Ok(self
-                .certificates
-                .into_iter()
-                .next()
-                .expect("already checked if chain is empty"));
+            return Ok(&self.certificates[0]);
         }
 
         let current_certificate = self.certificates.iter();
@@ -130,10 +126,6 @@ impl CertificateChain {
             current.check_validity_at(timestamp)?;
         }
 
-        Ok(self
-            .certificates
-            .into_iter()
-            .next()
-            .expect("already checked if chain is empty"))
+        Ok(&self.certificates[0])
     }
 }

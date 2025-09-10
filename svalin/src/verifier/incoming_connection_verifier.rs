@@ -57,6 +57,6 @@ impl Verifier for IncomingConnectionVerifier {
 
         let certificate = cert_chain.verify(&self.root, time)?;
 
-        Ok(certificate)
+        Ok(certificate.clone())
     }
 }
