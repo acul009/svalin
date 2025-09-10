@@ -107,7 +107,7 @@ impl CommandHandler for InitHandler {
 
         let _: Result<(), SessionReadError> = session.read_object().await;
 
-        channel.send(ServerInitSuccess {
+        let _ = channel.send(ServerInitSuccess {
             credential: my_credential,
             root,
         });

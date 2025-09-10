@@ -122,7 +122,7 @@ impl CertificateChain {
         let parent_certificate = self.certificates.iter().skip(1);
 
         for (current, parent) in current_certificate.zip(parent_certificate) {
-            parent.verify_signature(current)?;
+            current.verify_signature(parent)?;
             current.check_validity_at(timestamp)?;
         }
 

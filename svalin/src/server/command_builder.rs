@@ -9,7 +9,7 @@ use svalin_rpc::{
 };
 
 use crate::{
-    permissions::server_permission_handler::ServerPermissionHandler,
+    permissions::default_permission_handler::DefaultPermissionHandler,
     server::session_store::SessionStore,
     shared::{
         commands::{
@@ -19,6 +19,7 @@ use crate::{
         },
         join_agent::add_agent::AddAgentHandler,
     },
+    verifier::load_session_chain::{LoadSessionChain, LoadSessionChainHandler},
 };
 
 use super::{agent_store::AgentStore, user_store::UserStore};
@@ -32,11 +33,11 @@ pub struct SvalinCommandBuilder {
 }
 
 impl RpcCommandBuilder for SvalinCommandBuilder {
-    type PH = ServerPermissionHandler;
+    type PH = DefaultPermissionHandler;
 
     async fn build(self, server: &Arc<RpcServer>) -> anyhow::Result<HandlerCollection<Self::PH>> {
-        let permission_handler: ServerPermissionHandler =
-            ServerPermissionHandler::new(self.root_cert.clone());
+        let permission_handler: DefaultPermissionHandler =
+            DefaultPermissionHandler::new(self.root_cert.clone());
 
         let commands = HandlerCollection::new(permission_handler);
 
@@ -52,6 +53,11 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 self.session_store.clone(),
                 self.root_cert.clone(),
                 self.server_cert.clone(),
+            ))
+            .add(LoadSessionChainHandler::new(
+                self.user_store.clone(),
+                self.session_store.clone(),
+                self.root_cert.clone(),
             ))
             .add(join_manager.create_request_handler())
             .add(join_manager.create_accept_handler())

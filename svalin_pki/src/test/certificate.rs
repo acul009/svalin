@@ -91,7 +91,7 @@ async fn test_on_disk_storage() {
 
 #[tokio::test]
 async fn test_create_leaf() {
-    let root = Credential::generate_temporary().unwrap();
+    let root = Credential::generate_root().unwrap();
 
     let keypair = KeyPair::generate();
 

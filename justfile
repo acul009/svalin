@@ -33,6 +33,9 @@ server $RUST_LOG="debug":
 reset:
     rm -r /var/lib/svalin/*
 
+reset-win:
+    Remove-Item -Path C:\ProgramData\svalin\* -Recurse -Force
+
 agent $RUST_LOG="debug":
     cargo run -p svalin agent
 

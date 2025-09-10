@@ -1,10 +1,9 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
-use svalin_pki::{
-    Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
-};
+use svalin_pki::{Certificate, Credential, EncryptedCredential, KnownCertificateVerifier};
 use svalin_rpc::commands::deauthenticate::DeauthenticateHandler;
 use svalin_rpc::commands::e2e::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
@@ -22,16 +21,17 @@ mod init;
 pub mod update;
 
 use crate::client::tunnel_manager::tcp::handler::TcpForwardHandler;
-use crate::permissions::agent_permission_handler::AgentPermissionHandler;
+use crate::permissions::default_permission_handler::DefaultPermissionHandler;
 use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::commands::terminal::RemoteTerminalHandler;
 use crate::shared::join_agent::AgentInitPayload;
 use crate::util::key_storage::KeySource;
 use crate::util::location::Location;
+use crate::verifier::remote_session_verifier::RemoteSessionVerifier;
 use crate::verifier::upstream_verifier::UpstreamVerifier;
 
 pub struct Agent {
-    rpc: RpcClient,
+    rpc: Arc<RpcClient>,
     root_certificate: Certificate,
     credentials: Credential,
     cancel: CancellationToken,
@@ -79,7 +79,7 @@ impl Agent {
         Ok(Agent {
             credentials,
             root_certificate: config.root_certificate,
-            rpc,
+            rpc: Arc::new(rpc),
             cancel,
         })
     }
@@ -89,7 +89,7 @@ impl Agent {
     }
 
     pub async fn run(&self) -> Result<()> {
-        let permission_handler = AgentPermissionHandler::new(self.root_certificate.clone());
+        let permission_handler = DefaultPermissionHandler::new(self.root_certificate.clone());
 
         let e2e_commands = HandlerCollection::new(permission_handler.clone());
 
@@ -111,7 +111,7 @@ impl Agent {
         let public_commands = HandlerCollection::new(permission_handler.clone());
 
         // Todo: proper upstream verifier
-        let verifier = ExactVerififier::new(self.root_certificate.clone());
+        let verifier = RemoteSessionVerifier::new(self.root_certificate.clone(), self.rpc.clone());
 
         public_commands.chain().await.add(E2EHandler::new(
             self.credentials.clone(),

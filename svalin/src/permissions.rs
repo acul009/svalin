@@ -8,14 +8,17 @@ use svalin_rpc::{
     rustls::server::danger::ClientCertVerifier,
 };
 
-use crate::shared::commands::public_server_status::PublicStatusHandler;
+use crate::{
+    shared::commands::public_server_status::PublicStatusHandler,
+    verifier::load_session_chain::LoadSessionChainHandler,
+};
 
-pub mod agent_permission_handler;
-pub mod server_permission_handler;
+pub mod default_permission_handler;
 
 #[derive(Clone)]
 pub enum Permission {
     RootOnlyPlaceholder,
+    AgentOnlyPlaceholder,
     ViewPublicInformation,
     AuthenticatedOnly,
     AnonymousOnly,
@@ -36,6 +39,12 @@ impl From<&PermissionPrecursor<PublicStatusHandler>> for Permission {
 impl From<&PermissionPrecursor<ForwardHandler>> for Permission {
     fn from(_value: &PermissionPrecursor<ForwardHandler>) -> Self {
         Permission::RootOnlyPlaceholder
+    }
+}
+
+impl From<&PermissionPrecursor<LoadSessionChainHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<LoadSessionChainHandler>) -> Self {
+        Permission::AgentOnlyPlaceholder
     }
 }
 

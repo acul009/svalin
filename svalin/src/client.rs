@@ -57,7 +57,7 @@ impl Client {
             .map_err(|err| anyhow!(err))
     }
 
-    pub fn device_list(&self) -> watch::Ref<BTreeMap<Certificate, Device>> {
+    pub fn device_list<'a>(&'a self) -> watch::Ref<'a, BTreeMap<Certificate, Device>> {
         self.device_list.borrow()
     }
 

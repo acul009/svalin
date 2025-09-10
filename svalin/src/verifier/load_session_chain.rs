@@ -15,14 +15,28 @@ use tokio_util::sync::CancellationToken;
 
 use crate::server::{session_store::SessionStore, user_store::UserStore};
 
-pub struct LoadCertificateChainHandler {
+pub struct LoadSessionChainHandler {
     user_store: Arc<UserStore>,
     session_store: Arc<SessionStore>,
     root: Certificate,
 }
 
+impl LoadSessionChainHandler {
+    pub fn new(
+        user_store: Arc<UserStore>,
+        session_store: Arc<SessionStore>,
+        root: Certificate,
+    ) -> Self {
+        Self {
+            user_store,
+            session_store,
+            root,
+        }
+    }
+}
+
 #[async_trait]
-impl CommandHandler for LoadCertificateChainHandler {
+impl CommandHandler for LoadSessionChainHandler {
     type Request = Fingerprint;
 
     fn key() -> String {
@@ -39,7 +53,7 @@ impl CommandHandler for LoadCertificateChainHandler {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let chain_result = self.get_chain(&fingerprint, time).await;
+        let chain_result = self.get_session_chain(&fingerprint, time).await;
 
         let (chain, result) = match chain_result {
             Ok(chain) => (Some(chain), Ok(())),
@@ -57,17 +71,13 @@ impl CommandHandler for LoadCertificateChainHandler {
     }
 }
 
-impl LoadCertificateChainHandler {
-    async fn get_chain(
+impl LoadSessionChainHandler {
+    async fn get_session_chain(
         &self,
         fingerprint: &Fingerprint,
         time: u64,
     ) -> Result<CertificateChain, VerificationError> {
-        let certificate = if let Some(user) = self.user_store.get_user(&fingerprint).await? {
-            user.encrypted_credential.take_certificate()
-        } else if let Some(session) = self.session_store.get_session(&fingerprint).await? {
-            session
-        } else {
+        let Some(certificate) = self.session_store.get_session(&fingerprint).await? else {
             return Err(VerificationError::UnknownCertificate);
         };
 
@@ -84,18 +94,18 @@ impl LoadCertificateChainHandler {
     }
 }
 
-pub struct LoadCertificateChain {
-    fingerprint: Fingerprint,
+pub struct LoadSessionChain<'a> {
+    pub fingerprint: &'a Fingerprint,
 }
 
-impl LoadCertificateChain {
-    pub fn new(fingerprint: Fingerprint) -> Self {
+impl<'a> LoadSessionChain<'a> {
+    pub fn new(fingerprint: &'a Fingerprint) -> Self {
         Self { fingerprint }
     }
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum LoadCertificateChainError {
+pub enum LoadSessionChainError {
     #[error("session read error: {0}")]
     SessionReadError(#[from] SessionReadError),
     #[error("session write error: {0}")]
@@ -104,15 +114,15 @@ pub enum LoadCertificateChainError {
     ServerError,
 }
 
-impl CommandDispatcher for LoadCertificateChain {
+impl CommandDispatcher for LoadSessionChain<'_> {
     type Output = CertificateChain;
 
-    type Error = LoadCertificateChainError;
+    type Error = LoadSessionChainError;
 
-    type Request = <LoadCertificateChainHandler as CommandHandler>::Request;
+    type Request = <LoadSessionChainHandler as CommandHandler>::Request;
 
     fn key() -> String {
-        LoadCertificateChainHandler::key()
+        LoadSessionChainHandler::key()
     }
 
     fn get_request(&self) -> &Self::Request {
@@ -122,7 +132,7 @@ impl CommandDispatcher for LoadCertificateChain {
     async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {
         let chain_result: Result<CertificateChain, ()> = session.read_object().await?;
 
-        let chain_result = chain_result.map_err(|_| LoadCertificateChainError::ServerError);
+        let chain_result = chain_result.map_err(|_| LoadSessionChainError::ServerError);
 
         let _ = session.write_object(&()).await;
 

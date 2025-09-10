@@ -14,7 +14,7 @@ use svalin_rpc::{
     verifiers::skip_verify::SkipClientVerification,
 };
 use tokio::{
-    sync::{mpsc, oneshot},
+    sync::oneshot,
     time::{error::Elapsed, timeout},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
