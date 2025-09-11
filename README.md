@@ -5,10 +5,9 @@
 > [!WARNING]
 > **This repository is not yet ready for production use.**
 >
-> A lot of this code is still being heavily worked, is missing security checks and has not been reviewed.
+> A lot of this code is still being heavily worked on, is missing security checks and has not been reviewed.
 >
 > The current focus is getting this behemoth of a project working in any state.
->
 > Once the programm is usable, it's going to be time to slowly but surely improve everything.
 >
 > Feel free to browse the codebase and create issues for any problems you see.
@@ -110,7 +109,8 @@ Pre-Flight-Checklist:
 - [X] create a debian package
 - [X] create a docker image
 - [X] add logic for login ( don't forget fake hashing parameters )
-- [ ] add remote terminal
+- [X] add remote terminal
+- [ ] Add System reports
 
 Svalin currently has 2 executables:
 - svalin
