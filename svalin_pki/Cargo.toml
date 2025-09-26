@@ -18,7 +18,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 x509-parser = { version = "0.17.0", features = ["ring", "validate", "verify"] }
 zeroize = { version = "1.8.1", features = ["aarch64", "derive", "std"] }
-openmls = { version = "0.7.0", features = ["openmls_rust_crypto"] }
+openmls = { version = "0.7.1", features = ["openmls_rust_crypto"] }
 openmls_traits = "0.4.0"
 tls_codec = { version = "0.4.2" }
 sha2 = "0.10.9"
