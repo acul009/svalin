@@ -4,25 +4,25 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.99"
+anyhow = "1.0.100"
 argon2 = { version = "0.5.3", features = ["simple", "std"] }
 postcard = { workspace = true }
 rand = { workspace = true }
-rcgen = { version = "0.14.3", features = ["x509-parser", "zeroize"] }
+rcgen = { version = "0.14.5", features = ["x509-parser", "zeroize"] }
 ring = "0.17.14"
-rustls = { version = "0.23.31", default-features = false, features = ["std"] }
+rustls = { version = "0.23.34", default-features = false, features = ["std"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
 time = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 x509-parser = { version = "0.17.0", features = ["ring", "validate", "verify"] }
-zeroize = { version = "1.8.1", features = ["aarch64", "derive", "std"] }
-openmls = { version = "0.7.0", features = ["openmls_rust_crypto"] }
-openmls_traits = "0.4.0"
+zeroize = { version = "1.8.2", features = ["aarch64", "derive", "std"] }
+openmls = { version = "0.7.1", features = ["openmls_rust_crypto"] }
+openmls_traits = "0.4.1"
 tls_codec = { version = "0.4.2" }
 sha2 = "0.10.9"
-openmls_rust_crypto = "0.4.0"
+openmls_rust_crypto = "0.4.1"
 
 # [dev-dependencies]
 # serde_json = { workspace = true }

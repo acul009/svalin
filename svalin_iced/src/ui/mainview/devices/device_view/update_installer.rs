@@ -3,7 +3,7 @@ use std::sync::Arc;
 use iced::{
     Task,
     advanced::subscription::from_recipe,
-    widget::{button, center, column, combo_box, container, horizontal_rule, row, text},
+    widget::{button, center, column, combo_box, container, row, rule, text},
 };
 use svalin::{
     agent::update::{InstallationInfo, UpdateChannel},
@@ -159,7 +159,7 @@ impl UpdateInstaller {
                             text(install_info.install_method.to_string()),
                         ]
                         .spacing(10),
-                        horizontal_rule(2),
+                        rule::horizontal(2),
                         if install_info.install_method.supports_update() {
                             column![
                                 row![

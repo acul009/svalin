@@ -63,7 +63,7 @@ impl LoginDialog {
                 password: String::new(),
                 current_totp: String::new(),
             },
-            text_input::focus("username"),
+            iced::widget::operation::focus("username"),
         )
     }
 

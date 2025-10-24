@@ -1,6 +1,6 @@
 use iced::{
     Color, Length, Shadow, border,
-    widget::{column, container, horizontal_rule, row, stack, vertical_rule},
+    widget::{column, container, row, rule, stack},
 };
 
 use crate::Element;
@@ -91,10 +91,10 @@ impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, M
                         })
                         .height(50)
                 }),
-                has_header.then(|| horizontal_rule(2)),
+                has_header.then(|| rule::horizontal(2)),
                 row![
                     scaffold.body,
-                    has_context.then(|| vertical_rule(2)),
+                    has_context.then(|| rule::vertical(2)),
                     scaffold.context.map(|context| {
                         {
                             container(context)

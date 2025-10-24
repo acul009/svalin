@@ -94,7 +94,7 @@ impl InitServer {
                     confirm_password: String::new(),
                 },
             },
-            text_input::focus("username"),
+            iced::widget::operation::focus("username"),
         )
     }
 
@@ -171,7 +171,7 @@ impl InitServer {
                                     totp_input: String::new(),
                                 };
 
-                                Action::Run(text_input::focus("totp"))
+                                Action::Run(iced::widget::operation::focus("totp"))
                             }
                         }
                     }

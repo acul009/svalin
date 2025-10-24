@@ -1,7 +1,6 @@
 use iced::{
     Subscription, Task,
     keyboard::{self, key::Named},
-    widget::focus_next,
     window,
 };
 use mainview::MainView;
@@ -65,7 +64,7 @@ impl UI {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Noop => Task::none(),
-            Message::Tab => focus_next(),
+            Message::Tab => iced::widget::operation::focus_next(),
             Message::WindowClosed(id) => {
                 if id == self.main_window_id {
                     // Todo: proper shutdown

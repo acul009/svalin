@@ -104,7 +104,7 @@ impl MainView {
         let subheader = match &self.state {
             State::Devices => self.devices.header().mapopt(Message::Devices),
         }
-        .unwrap_or_else(|| iced::widget::horizontal_space().into());
+        .unwrap_or_else(|| iced::widget::space::horizontal().into());
 
         let actions = row![
             button(icon::tunnel().size(30).center())

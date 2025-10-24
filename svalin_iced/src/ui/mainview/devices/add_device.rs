@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use iced::{
     Task,
-    widget::{button, text, text_input},
+    advanced::widget::{operate, operation::focusable::focus},
+    widget::{button, operation, text, text_input},
 };
 use svalin::client::{Client, add_agent::WaitingForConfirmCode};
 
@@ -80,7 +81,8 @@ impl AddDevice {
                 device_name: String::new(),
                 waiting: None,
             },
-            text_input::focus("join-code"),
+            // focus("join-code").into(),
+            iced::widget::operation::focus("join-code"),
         )
     }
 
@@ -119,7 +121,7 @@ impl AddDevice {
                 }
                 State::DeviceName => {
                     self.state = State::ConfirmCode;
-                    Action::Run(text_input::focus("confirm-code"))
+                    Action::Run(iced::widget::operation::focus("confirm-code"))
                 }
                 State::ConfirmCode => match self.waiting.take() {
                     None => {
@@ -156,12 +158,12 @@ impl AddDevice {
                     self.join_code = String::new();
                     self.confirm_code = String::new();
                     self.waiting = None;
-                    Action::Run(text_input::focus("join-code"))
+                    Action::Run(iced::widget::operation::focus("join-code"))
                 }
                 State::ConfirmCode => {
                     self.state = State::DeviceName;
                     self.confirm_code = String::new();
-                    Action::Run(text_input::focus("device-name"))
+                    Action::Run(iced::widget::operation::focus("device-name"))
                 }
                 State::Success | State::Loading(_) => Action::None,
             },
@@ -171,7 +173,7 @@ impl AddDevice {
                 self.waiting = Some(waiting);
                 self.state = State::DeviceName;
 
-                Action::Run(text_input::focus("device-name"))
+                Action::Run(iced::widget::operation::focus("device-name"))
             }
             Message::Exit => Action::Exit,
         }

@@ -168,7 +168,7 @@ impl ProfilePicker {
                     password: String::new(),
                 };
 
-                Action::Run(text_input::focus("password"))
+                Action::Run(iced::widget::operation::focus("password"))
             }
             Message::DeleteProfile(profile) => {
                 self.confirm_delete = Some(profile.clone());
@@ -215,7 +215,7 @@ impl ProfilePicker {
             Message::AddProfile(host) => {
                 self.state = State::AddProfile { host };
 
-                Action::Run(text_input::focus("host"))
+                Action::Run(iced::widget::operation::focus("host"))
             }
             Message::Connect(host) => {
                 self.state = State::Loading(t!("profile-picker.connecting-to-server").to_string());

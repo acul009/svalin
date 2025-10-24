@@ -16,7 +16,7 @@ fn main() {
     iced::daemon(UI::start, UI::update, UI::view)
         .title(UI::title)
         .subscription(UI::subscription)
-        .theme(|_, _| iced::Theme::Dark)
+        .theme(|_: &'_ UI, _| iced::Theme::Dark)
         .font(icon::FONT)
         .antialiasing(true)
         .run()

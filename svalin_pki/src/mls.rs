@@ -211,7 +211,7 @@ pub enum GroupError {
     #[error("Failed to create message: {0}")]
     CreateMessageError(#[from] CreateMessageError),
     #[error("Failed to process message: {0}")]
-    ProcessMessageError(#[from] ProcessMessageError),
+    ProcessMessageError(#[from] ProcessMessageError<MemoryStorageError>),
     #[error("Failed to store cipherdata: {0}")]
     StoreError(#[from] MemoryStorageError),
     #[error("Failed to serialize TLS message: {0}")]

@@ -57,7 +57,7 @@ impl<'a, Message: Clone + 'static> From<Form<'a, Message>> for Element<'a, Messa
 
         for control in form.control {
             if should_space {
-                content_col = content_col.push(widget::vertical_space().height(16));
+                content_col = content_col.push(widget::space::vertical().height(16));
             }
             content_col = content_col.push(control);
             should_space = true;
@@ -71,7 +71,7 @@ impl<'a, Message: Clone + 'static> From<Form<'a, Message>> for Element<'a, Messa
 
         let mut button_row = Row::with_capacity(1 + form.buttons.len())
             .spacing(4)
-            .push(widget::horizontal_space().width(Length::Fill));
+            .push(widget::space::horizontal().width(Length::Fill));
 
         for button in form.buttons {
             button_row = button_row.push(button);
