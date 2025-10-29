@@ -4,6 +4,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+pub use openmls::key_packages::KeyPackageIn;
 use openmls::{
     group::{
         AddMembersError, CommitBuilderStageError, CreateCommitError, CreateMessageError,
@@ -11,7 +12,7 @@ use openmls::{
         StagedWelcome, WelcomeError,
     },
     prelude::{
-        Ciphersuite, CredentialType, CredentialWithKey, KeyPackage, KeyPackageBundle, KeyPackageIn,
+        Ciphersuite, CredentialType, CredentialWithKey, KeyPackage, KeyPackageBundle,
         KeyPackageNewError, KeyPackageVerifyError, MlsMessageBodyIn, MlsMessageIn, MlsMessageOut,
         PrivateMessageIn, ProcessedMessageContent, ProtocolMessage, ProtocolVersion,
         SenderRatchetConfiguration, Welcome,
@@ -25,6 +26,8 @@ use tls_codec::{Deserialize, Serialize};
 use crate::{
     Certificate, Credential, DecryptError, EncryptError, EncryptedObject, signed_message::CanSign,
 };
+
+mod group_defaults;
 
 impl From<&Certificate> for openmls::credentials::Credential {
     fn from(value: &Certificate) -> Self {
@@ -184,8 +187,6 @@ impl MlsClient {
     }
 }
 
-mod group_defaults;
-
 pub struct Group {
     group: MlsGroup,
     provider: Arc<SvalinProvider>,
@@ -226,7 +227,7 @@ impl Group {
     pub fn add_members(
         &mut self,
         key_packages: impl IntoIterator<Item = KeyPackageIn>,
-    ) -> Result<(Message, MlsMessageOut), GroupError> {
+    ) -> Result<(MlsMessageOut, MlsMessageOut), GroupError> {
         let key_packages = key_packages
             .into_iter()
             .map(|key_package_in| {
@@ -243,7 +244,7 @@ impl Group {
 
         self.group.merge_pending_commit(self.provider.deref())?;
 
-        Ok((Message::from_mls_messages([message])?, welcome))
+        Ok((message, welcome))
     }
 
     /// This creates a new commit as well as the requested message right afterwards.

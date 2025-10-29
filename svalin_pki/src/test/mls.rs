@@ -89,6 +89,8 @@ fn experimenting() {
 
     assert_eq!(content1.as_ref(), &cleartext);
 
+    let cleartext2 = group2.process_message(message.clone()).unwrap().unwrap();
+
     // The same message cannot be decrypted again because it's to distant in the past
     // You can however set the out of order tolerance to at least 1 to allow the newest message to be decrypted
     // Or that's what I would say if that didn't trigger a SecretReuseError instead of the ToDistantInThePastError

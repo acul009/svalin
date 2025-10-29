@@ -4,7 +4,7 @@ mod certificate_chain;
 mod credential;
 mod encrypt;
 mod keypair;
-mod mls;
+pub mod mls;
 mod signed_message;
 mod signed_object;
 mod verifier;
