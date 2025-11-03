@@ -7,7 +7,7 @@ pub struct AgentAsyncCom {
 }
 
 impl AgentAsyncCom {
-    pub fn uploaddevice_status(&self, report: SystemReport) -> anyhow::Result<()> {
+    pub fn upload_device_status(&self, report: SystemReport) -> anyhow::Result<()> {
         todo!()
     }
 
