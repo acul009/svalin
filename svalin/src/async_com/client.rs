@@ -1,8 +1,12 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
+use anyhow::anyhow;
 use svalin_pki::{
-    Certificate, Credential, Fingerprint,
-    mls::{KeyPackageIn, MlsClient, SvalinProvider},
+    Certificate, Credential,
+    mls::{MlsClient, NewMember, message_types::Invitation},
 };
 use svalin_sysctl::sytem_report::SystemReport;
 
@@ -10,20 +14,31 @@ pub struct ClientAsyncCom {
     mls_client: MlsClient,
     credential: Credential,
     root: Certificate,
-    device_status: HashMap<Certificate, SystemReport>,
+    device_status: Mutex<HashMap<Certificate, Arc<SystemReport>>>,
 }
 
 impl ClientAsyncCom {
-    pub fn create_device_group(&self, certificate: &Certificate) -> anyhow::Result<()> {
-        let root_package = self.get_key_package(&self.root)?;
-        let device_package = self.get_key_package(certificate)?;
+    pub fn create_device_group(&self, certificate: &Certificate) -> anyhow::Result<Invitation> {
+        let mut packages = Vec::with_capacity(2);
+        packages.push(self.get_key_package(certificate)?);
+        if self.credential.get_certificate() == &self.root {
+            packages.push(self.get_key_package(&self.root)?);
+        }
         let mut group = self.mls_client.create_group()?;
-        let (message, invitation) = group.add_members([root_package, device_package])?;
-        todo!()
+        let (_first_message, invitation) = group.add_members(packages)?;
+        Ok(invitation)
     }
 
-    pub fn get_device_status(&self, certificate: &Certificate) -> anyhow::Result<&SystemReport> {
-        todo!()
+    pub fn get_device_status(
+        &self,
+        certificate: &Certificate,
+    ) -> anyhow::Result<Arc<SystemReport>> {
+        self.device_status
+            .lock()
+            .unwrap()
+            .get(certificate)
+            .cloned()
+            .ok_or(anyhow!("missing device status"))
     }
 
     pub fn get_device_accesors(
@@ -33,7 +48,11 @@ impl ClientAsyncCom {
         todo!()
     }
 
-    fn get_key_package(&self, certificate: &Certificate) -> anyhow::Result<KeyPackageIn> {
-        todo!()
+    fn get_key_package(&self, certificate: &Certificate) -> anyhow::Result<NewMember> {
+        let key_package = todo!();
+        Ok(NewMember {
+            key_package,
+            member: certificate.clone(),
+        })
     }
 }

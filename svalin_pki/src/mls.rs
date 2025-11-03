@@ -24,10 +24,13 @@ use rand::RngCore;
 use tls_codec::{Deserialize, Serialize};
 
 use crate::{
-    Certificate, Credential, DecryptError, EncryptError, EncryptedObject, signed_message::CanSign,
+    Certificate, Credential, DecryptError, EncryptError, EncryptedObject,
+    mls::message_types::{Invitation, InvitationError},
+    signed_message::CanSign,
 };
 
 mod group_defaults;
+pub mod message_types;
 
 impl From<&Certificate> for openmls::credentials::Credential {
     fn from(value: &Certificate) -> Self {
@@ -221,20 +224,31 @@ pub enum GroupError {
     TlsDeserializeError(tls_codec::Error),
     #[error("Unsupported message body type")]
     UnsupportedMessageBodyType,
+    #[error("Failed to handle invitation: {0}")]
+    InvitationError(#[from] InvitationError),
+}
+
+pub struct NewMember {
+    pub member: Certificate,
+    pub key_package: KeyPackageIn,
 }
 
 impl Group {
     pub fn add_members(
         &mut self,
-        key_packages: impl IntoIterator<Item = KeyPackageIn>,
-    ) -> Result<(MlsMessageOut, MlsMessageOut), GroupError> {
-        let key_packages = key_packages
-            .into_iter()
-            .map(|key_package_in| {
-                key_package_in.validate(self.provider.crypto(), self.provider.protocol_version)
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(GroupError::KeyPackageVerifyError)?;
+        new_members: impl IntoIterator<Item = NewMember>,
+    ) -> Result<(MlsMessageOut, Invitation), GroupError> {
+        let mut key_packages = Vec::new();
+        let mut receivers = Vec::new();
+
+        for new_member in new_members.into_iter() {
+            receivers.push(new_member.member);
+            key_packages.push(
+                new_member
+                    .key_package
+                    .validate(self.provider.crypto(), self.provider.protocol_version)?,
+            );
+        }
 
         let (message, welcome, _) = self.group.add_members(
             self.provider.deref(),
@@ -244,7 +258,9 @@ impl Group {
 
         self.group.merge_pending_commit(self.provider.deref())?;
 
-        Ok((message, welcome))
+        let invitation = Invitation::new(welcome, receivers)?;
+
+        Ok((message, invitation))
     }
 
     /// This creates a new commit as well as the requested message right afterwards.
