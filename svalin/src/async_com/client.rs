@@ -19,13 +19,8 @@ pub struct ClientAsyncCom {
 
 impl ClientAsyncCom {
     pub fn create_device_group(&self, certificate: &Certificate) -> anyhow::Result<Invitation> {
-        let mut packages = Vec::with_capacity(2);
-        packages.push(self.get_key_package(certificate)?);
-        if self.credential.get_certificate() == &self.root {
-            packages.push(self.get_key_package(&self.root)?);
-        }
         let mut group = self.mls_client.create_group()?;
-        let (_first_message, invitation) = group.add_members(packages)?;
+        let (_first_message, invitation) = group.add_members(self.get_init_device_accessors()?)?;
         Ok(invitation)
     }
 
@@ -45,6 +40,10 @@ impl ClientAsyncCom {
         &self,
         certificate: &Certificate,
     ) -> anyhow::Result<Vec<Certificate>> {
+        todo!()
+    }
+
+    fn get_init_device_accessors(&self) -> anyhow::Result<Vec<NewMember>> {
         todo!()
     }
 
