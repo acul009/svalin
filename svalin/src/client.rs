@@ -13,7 +13,7 @@ mod profile;
 
 use device::Device;
 pub use first_connect::*;
-use svalin_pki::{Certificate, Credential};
+use svalin_pki::{Certificate, Credential, Fingerprint, SpkiHash};
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
@@ -23,6 +23,8 @@ use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tunnel_manager::TunnelManager;
+
+use crate::shared::commands::get_user_certs::{GetUserKeyPackages, UserKeyPackages};
 
 pub struct Client {
     rpc: RpcClient,
@@ -49,7 +51,7 @@ impl Client {
         self.device_list.borrow().get(certificate).cloned()
     }
 
-    pub async fn ping_upstream(&self) -> Result<Duration> {
+    pub async fn ping_upstream(&self) -> anyhow::Result<Duration> {
         self.rpc
             .upstream_connection()
             .dispatch(Ping)
@@ -67,6 +69,19 @@ impl Client {
 
     pub fn tunnel_manager(&self) -> &TunnelManager {
         &self.tunnel_manager
+    }
+
+    pub async fn get_user_certificates(
+        &self,
+        spki_hash: &SpkiHash,
+    ) -> anyhow::Result<UserKeyPackages> {
+        let certs = self
+            .rpc
+            .upstream_connection()
+            .dispatch(GetUserKeyPackages(spki_hash))
+            .await?;
+
+        Ok(certs)
     }
 
     pub(crate) fn cancellation_token(&self) -> &CancellationToken {

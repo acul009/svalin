@@ -29,9 +29,9 @@ struct CertificateData {
     der: Vec<u8>,
     certificate_type: CertificateType,
     public_key: Vec<u8>,
-    spki_hash: String,
+    spki_hash: SpkiHash,
     is_ca: bool,
-    issuer: String,
+    issuer: SpkiHash,
     validity: Validity,
     fingerprint: Fingerprint,
 }
@@ -84,6 +84,8 @@ pub enum CertificateParseError {
     BrokenValidity,
     #[error("Incorrect validity duration for certificate type {0}: expected {1}, got {2}")]
     IncorrectValidityDuration(CertificateType, Duration, Duration),
+    #[error("invalid issuer format: {0}")]
+    InvalidIssuer(String),
 }
 
 #[derive(Error, Debug)]
@@ -125,6 +127,34 @@ impl Debug for Fingerprint {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Serialize, Deserialize, PartialOrd, Ord, Hash)]
+pub struct SpkiHash([u8; 32]);
+impl Display for SpkiHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for byte in self.0.iter() {
+            write!(f, "{:02X}", byte)?
+        }
+
+        Ok(())
+    }
+}
+
+impl Debug for SpkiHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for byte in self.0.iter() {
+            write!(f, "{:02X}", byte)?
+        }
+
+        Ok(())
+    }
+}
+
+impl SpkiHash {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl Certificate {
     pub fn from_der(der: Vec<u8>) -> Result<Certificate, CertificateParseError> {
         let (_, cert) = X509Certificate::from_der(der.as_ref())?;
@@ -146,7 +176,7 @@ impl Certificate {
                 .as_str()?,
         )?;
 
-        if spki_hash != cn {
+        if spki_hash.to_string().as_str() != cn {
             return Err(CertificateParseError::SpkiHashMismatch);
         };
 
@@ -165,13 +195,23 @@ impl Certificate {
             ));
         }
 
-        let issuer = cert
+        let issuer_str = cert
             .issuer()
             .iter_common_name()
             .next()
             .ok_or_else(|| CertificateParseError::MissingCommonName)?
-            .as_str()?
-            .to_string();
+            .as_str()?;
+
+        let mut issuer_data = [0u8; 32];
+        if issuer_str.len() != 64 {
+            return Err(CertificateParseError::InvalidIssuer(issuer_str.to_string()));
+        }
+        for i in 0..32 {
+            let hex_byte = &issuer_str[i * 2..i * 2 + 2];
+            issuer_data[i] = u8::from_str_radix(hex_byte, 16)
+                .map_err(|_| CertificateParseError::InvalidIssuer(issuer_str.to_string()))?;
+        }
+        let issuer = SpkiHash(issuer_data);
 
         if cert.issuer() == cert.subject() {
             if certificate_type != CertificateType::Root
@@ -212,19 +252,10 @@ impl Certificate {
         })
     }
 
-    pub(crate) fn compute_spki_hash(spki_der: &[u8]) -> String {
+    pub(crate) fn compute_spki_hash(spki_der: &[u8]) -> SpkiHash {
         let raw_identifier = ring::digest::digest(&ring::digest::SHA512_256, spki_der);
-
-        let identifier = raw_identifier.as_ref().iter().fold(
-            String::with_capacity(raw_identifier.as_ref().len() * 2),
-            |mut string, byte| {
-                write!(string, "{:02X}", byte)
-                    .expect("Writing to a preallocated string is unlikely to fail");
-                string
-            },
-        );
-
-        identifier
+        let slice = raw_identifier.as_ref();
+        SpkiHash(slice.try_into().unwrap())
     }
 
     pub fn public_key(&self) -> &[u8] {
@@ -235,11 +266,11 @@ impl Certificate {
         &self.data.der
     }
 
-    pub fn issuer(&self) -> &str {
+    pub fn issuer(&self) -> &SpkiHash {
         &self.data.issuer
     }
 
-    pub fn spki_hash(&self) -> &str {
+    pub fn spki_hash(&self) -> &SpkiHash {
         &self.data.spki_hash
     }
 

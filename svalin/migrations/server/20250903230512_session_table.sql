@@ -1,5 +1,5 @@
 CREATE TABLE sessions (
     fingerprint BLOB PRIMARY KEY,
-    issuer TEXT NOT NULL,
+    issuer BLOB NOT NULL,
     certificate BLOB NOT NULL
 );

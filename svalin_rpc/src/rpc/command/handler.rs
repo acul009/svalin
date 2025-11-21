@@ -23,7 +23,7 @@ pub trait CommandHandler: Sync + Send {
         session: &mut Session,
         request: Self::Request,
         cancel: CancellationToken,
-    ) -> Result<()>;
+    ) -> anyhow::Result<()>;
 }
 
 /// Some handlers may require taking ownership of the session.

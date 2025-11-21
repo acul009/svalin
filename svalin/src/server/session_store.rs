@@ -24,7 +24,10 @@ impl SessionStore {
     }
 
     /// TODO: verify the certificate chain before acceping a session.
-    pub async fn add_session(&self, certificate: Certificate) -> Result<(), AddSessionError> {
+    pub async fn add_session(
+        &self,
+        certificate: Certificate,
+    ) -> anyhow::Result<(), AddSessionError> {
         if certificate.certificate_type() != CertificateType::UserDevice {
             return Err(AddSessionError::InvalidCertificateType(
                 certificate.certificate_type(),
@@ -32,7 +35,7 @@ impl SessionStore {
         }
 
         let fingerprint = certificate.fingerprint().as_slice();
-        let issuer = certificate.issuer();
+        let issuer = certificate.issuer().as_slice();
         let der = certificate.to_der();
 
         sqlx::query!(
@@ -50,7 +53,7 @@ impl SessionStore {
     pub async fn get_session(
         &self,
         fingerprint: &Fingerprint,
-    ) -> Result<Option<Certificate>, anyhow::Error> {
+    ) -> anyhow::Result<Option<Certificate>, anyhow::Error> {
         let fingerprint = fingerprint.as_slice();
         let session_der = sqlx::query_scalar!(
             "SELECT certificate FROM sessions WHERE fingerprint = ?",
@@ -65,5 +68,22 @@ impl SessionStore {
         };
 
         Ok(Some(session))
+    }
+
+    pub async fn list_user_sessions(&self, user: &Certificate) -> anyhow::Result<Vec<Certificate>> {
+        let spki_hash = user.spki_hash().as_slice();
+        let session_ders = sqlx::query_scalar!(
+            "SELECT certificate FROM sessions WHERE issuer = ?",
+            spki_hash
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let sessions = session_ders
+            .into_iter()
+            .map(|der| Certificate::from_der(der))
+            .collect::<Result<_, _>>()?;
+
+        Ok(sessions)
     }
 }

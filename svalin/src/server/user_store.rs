@@ -1,6 +1,6 @@
-use std::{collections::HashSet, fmt::Debug, mem, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use aucpace::StrongDatabase;
 use curve25519_dalek::{RistrettoPoint, Scalar};
 use password_hash::ParamsString;
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use svalin_pki::{
     Certificate, CertificateChain, CertificateChainBuilder, CertificateType, EncryptedCredential,
-    Fingerprint,
+    Fingerprint, SpkiHash,
 };
 use totp_rs::TOTP;
 
@@ -54,6 +54,10 @@ impl UserStore {
             return Err(anyhow!("Root user already exists"));
         }
 
+        if encrypted_credential.certificate().certificate_type() != CertificateType::Root {
+            return Err(anyhow!("Wrong certificate type for root"));
+        }
+
         let user = StoredUser {
             username,
             encrypted_credential,
@@ -65,7 +69,7 @@ impl UserStore {
 
         let cert = user.encrypted_credential.certificate();
         let fingerprint = cert.fingerprint().as_slice();
-        let spki_hash = cert.spki_hash();
+        let spki_hash = cert.spki_hash().as_slice();
         let username = &user.username;
 
         let data = postcard::to_stdvec(&user)?;
@@ -87,7 +91,7 @@ impl UserStore {
         Arc::new(Self { pool, root })
     }
 
-    pub async fn get_user(&self, fingerprint: &Fingerprint) -> Result<Option<StoredUser>> {
+    pub async fn get_user(&self, fingerprint: &Fingerprint) -> anyhow::Result<Option<StoredUser>> {
         let fingerprint = fingerprint.as_slice();
         let user_data = sqlx::query!("SELECT data FROM users WHERE fingerprint = ?", fingerprint)
             .fetch_optional(&self.pool)
@@ -98,7 +102,10 @@ impl UserStore {
         }
     }
 
-    pub async fn get_user_by_username(&self, username: &[u8]) -> Result<Option<StoredUser>> {
+    pub async fn get_user_by_username(
+        &self,
+        username: &[u8],
+    ) -> anyhow::Result<Option<StoredUser>> {
         let user_data = sqlx::query!("SELECT data FROM users WHERE username = ?", username)
             .fetch_optional(&self.pool)
             .await?;
@@ -127,7 +134,11 @@ impl UserStore {
         }
     }
 
-    async fn get_cert_by_spki_hash(&self, spki_hash: &str) -> Result<Option<Certificate>> {
+    pub async fn get_cert_by_spki_hash(
+        &self,
+        spki_hash: &SpkiHash,
+    ) -> anyhow::Result<Option<Certificate>> {
+        let spki_hash = spki_hash.as_slice();
         let user_data =
             sqlx::query_scalar!("SELECT data FROM users WHERE spki_hash = ?", spki_hash)
                 .fetch_optional(&self.pool)

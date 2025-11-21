@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 
-use crate::{Certificate, CertificateType, SignatureVerificationError, ValidityError};
+use crate::{
+    Certificate, CertificateType, SignatureVerificationError, ValidityError, certificate::SpkiHash,
+};
 use serde::{Deserialize, Serialize};
 
 pub struct CertificateChainBuilder {
@@ -71,7 +73,7 @@ impl CertificateChainBuilder {
         }
     }
 
-    pub fn requested_issuer(&self) -> Option<&str> {
+    pub fn requested_issuer(&self) -> Option<&SpkiHash> {
         let last_cert = self.certificates.last()?;
 
         if last_cert.certificate_type() == CertificateType::Root {

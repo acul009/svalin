@@ -132,7 +132,7 @@ impl Credential {
             Certificate::compute_spki_hash(&keypair.export_public_key().subject_public_key_info());
         let mut dn = rcgen::DistinguishedName::new();
         dn.push(rcgen::DnType::OrganizationalUnitName, cert_type.to_string());
-        dn.push(rcgen::DnType::CommonName, spki_hash);
+        dn.push(rcgen::DnType::CommonName, spki_hash.to_string());
 
         temp_parameters.distinguished_name = dn;
 
@@ -173,7 +173,7 @@ impl Credential {
             rcgen::DnType::OrganizationalUnitName,
             CertificateType::Root.to_string(),
         );
-        dn.push(rcgen::DnType::CommonName, spki_hash);
+        dn.push(rcgen::DnType::CommonName, spki_hash.to_string());
 
         root_parameters.distinguished_name = dn;
 
@@ -222,7 +222,7 @@ impl Credential {
             rcgen::DnType::OrganizationalUnitName,
             certificate_type.to_string(),
         );
-        dn.push(rcgen::DnType::CommonName, spki_hash);
+        dn.push(rcgen::DnType::CommonName, spki_hash.to_string());
         leaf_parameters.distinguished_name = dn;
 
         let certificate = leaf_parameters

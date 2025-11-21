@@ -19,7 +19,7 @@ pub use argon::{ArgonCost, ArgonParams, DeriveKeyError, ParamsStringParseError, 
 pub use argon2;
 pub use certificate::{
     Certificate, CertificateParseError, CertificateType, Fingerprint, SignatureVerificationError,
-    ValidityError,
+    SpkiHash, ValidityError,
 };
 pub use certificate_chain::{
     AddCertificateError, CertificateChain, CertificateChainBuilder, VerifyChainError,

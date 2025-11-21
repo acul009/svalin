@@ -5,12 +5,15 @@ use std::{
 
 use anyhow::anyhow;
 use svalin_pki::{
-    Certificate, Credential,
+    Certificate, CertificateType, Credential,
     mls::{MlsClient, NewMember, message_types::Invitation},
 };
 use svalin_sysctl::sytem_report::SystemReport;
 
+use crate::client::Client;
+
 pub struct ClientAsyncCom {
+    client: Client,
     mls_client: MlsClient,
     credential: Credential,
     root: Certificate,
@@ -18,9 +21,10 @@ pub struct ClientAsyncCom {
 }
 
 impl ClientAsyncCom {
-    pub fn create_device_group(&self, certificate: &Certificate) -> anyhow::Result<Invitation> {
+    pub async fn create_device_group(&self, device: &Certificate) -> anyhow::Result<Invitation> {
         let mut group = self.mls_client.create_group()?;
-        let (_first_message, invitation) = group.add_members(self.get_init_device_accessors()?)?;
+        let (_first_message, invitation) =
+            group.add_members(self.get_init_device_accessors(user_certs)?)?;
         Ok(invitation)
     }
 
@@ -43,8 +47,42 @@ impl ClientAsyncCom {
         todo!()
     }
 
-    fn get_init_device_accessors(&self) -> anyhow::Result<Vec<NewMember>> {
-        todo!()
+    async fn get_init_device_accessors(&self) -> anyhow::Result<Vec<NewMember>> {
+        {
+            let certs = self
+                .client
+                .get_user_certificates(self.credential.get_certificate().issuer())
+                .await?;
+
+            let add_root = &certs.user_cert != &self.root;
+
+            let mut certs = certs.to_vec();
+            if add_root {
+                certs.push(self.root.clone());
+            }
+
+            let certs = certs
+                .iter()
+                .filter(|cert| cert != self.credential.get_certificate());
+
+            let mut packages = Vec::new();
+
+            for certificate in certs {
+                self.
+            }
+
+            // let certs = user_certs
+            //     .session_certs
+            //     .into_iter()
+            //     .filter(|session| session != self.credential.get_certificate())
+            //     .collect::<Vec<_>>();
+            // certs.push(self.root);
+            // // Self not required, as it already creates the group
+            // [&self.root, user_certs.user_cert]
+            //     .into_iter()
+            //     .map(|certificate| self.get_key_package(certificate))
+            //     .collect()
+        }
     }
 
     fn get_key_package(&self, certificate: &Certificate) -> anyhow::Result<NewMember> {

@@ -23,7 +23,7 @@ tokio-util = { workspace = true }
 time.workspace = true
 
 async_pty = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git" }
-clap = { version = "4.5.50", features = ["derive", "unstable-doc"] }
+clap = { version = "4.5.52", features = ["derive", "unstable-doc"] }
 svalin_rpc = { path = "../svalin_rpc" }
 svalin_sysctl = { path = "../svalin_sysctl" }
 svalin_macros = { path = "../svalin_macros" }
