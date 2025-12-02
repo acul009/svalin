@@ -14,8 +14,7 @@ use openmls::{
     prelude::{
         Ciphersuite, CredentialType, CredentialWithKey, KeyPackage, KeyPackageBundle,
         KeyPackageNewError, KeyPackageVerifyError, MlsMessageBodyIn, MlsMessageIn, MlsMessageOut,
-        PrivateMessageIn, ProcessedMessageContent, ProtocolMessage, ProtocolVersion,
-        SenderRatchetConfiguration, Welcome,
+        PrivateMessageIn, ProcessedMessageContent, ProtocolMessage, ProtocolVersion, Welcome,
     },
 };
 use openmls_rust_crypto::{MemoryStorage, MemoryStorageError, RustCrypto};
@@ -229,8 +228,8 @@ pub enum GroupError {
 }
 
 pub struct NewMember {
-    pub member: Certificate,
-    pub key_package: KeyPackageIn,
+    member: Certificate,
+    key_package: KeyPackageIn,
 }
 
 impl Group {

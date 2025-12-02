@@ -24,7 +24,7 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tunnel_manager::TunnelManager;
 
-use crate::shared::commands::get_user_certs::{GetUserKeyPackages, UserKeyPackages};
+use crate::shared::commands::get_user_certs::{GetUserKeyPackages, UserCertificates};
 
 pub struct Client {
     rpc: RpcClient,
@@ -74,7 +74,7 @@ impl Client {
     pub async fn get_user_certificates(
         &self,
         spki_hash: &SpkiHash,
-    ) -> anyhow::Result<UserKeyPackages> {
+    ) -> anyhow::Result<UserCertificates> {
         let certs = self
             .rpc
             .upstream_connection()
@@ -82,6 +82,10 @@ impl Client {
             .await?;
 
         Ok(certs)
+    }
+
+    pub(crate) fn get_key_packages(&self, certs: Vec<Certificate>) {
+        todo!()
     }
 
     pub(crate) fn cancellation_token(&self) -> &CancellationToken {

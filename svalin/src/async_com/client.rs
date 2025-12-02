@@ -58,17 +58,23 @@ impl ClientAsyncCom {
 
             let mut certs = certs.to_vec();
             if add_root {
+                let root_certs = self
+                    .client
+                    .get_user_certificates(self.root.spki_hash())
+                    .await?;
                 certs.push(self.root.clone());
+                certs.extend_from_slice(&root_certs.session_certs);
             }
 
             let certs = certs
-                .iter()
-                .filter(|cert| cert != self.credential.get_certificate());
+                .into_iter()
+                .filter(|cert| cert != self.credential.get_certificate())
+                .collect();
 
             let mut packages = Vec::new();
 
             for certificate in certs {
-                self.
+                self.client.get_key_packages(certs)
             }
 
             // let certs = user_certs

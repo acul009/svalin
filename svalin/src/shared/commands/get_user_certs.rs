@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, CertificateType, SpkiHash, mls::NewMember};
+use svalin_pki::{Certificate, CertificateType, SpkiHash};
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::{Session, SessionReadError},
@@ -12,12 +12,12 @@ use tokio_util::sync::CancellationToken;
 use crate::server::{session_store::SessionStore, user_store::UserStore};
 
 #[derive(Serialize, Deserialize)]
-pub struct UserKeyPackages {
-    pub user_cert: NewMember,
-    pub session_certs: Vec<NewMember>,
+pub struct UserCertificates {
+    pub user_cert: Certificate,
+    pub session_certs: Vec<Certificate>,
 }
 
-impl UserKeyPackages {
+impl UserCertificates {
     fn verify(self) -> Result<Self, ()> {
         match self.user_cert.certificate_type() {
             CertificateType::Root | CertificateType::User => (),
@@ -56,7 +56,7 @@ pub enum GetUserKeyPackagesError {
 }
 
 impl<'a> CommandDispatcher for GetUserKeyPackages<'a> {
-    type Output = UserKeyPackages;
+    type Output = UserCertificates;
 
     type Error = GetUserKeyPackagesError;
 
@@ -74,7 +74,7 @@ impl<'a> CommandDispatcher for GetUserKeyPackages<'a> {
         self,
         session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
-        let response: Result<UserKeyPackages, ()> = session.read_object().await?;
+        let response: Result<UserCertificates, ()> = session.read_object().await?;
         match response {
             Err(()) => Err(GetUserKeyPackagesError::ServerError),
             Ok(certs) => certs
@@ -107,13 +107,13 @@ impl CommandHandler for GetUserCertificateHandler {
             Ok(Some(user)) => user,
             Ok(None) => {
                 let _ = session
-                    .write_object(&Result::<UserKeyPackages, ()>::Err(()))
+                    .write_object(&Result::<UserCertificates, ()>::Err(()))
                     .await;
                 return Ok(());
             }
             Err(err) => {
                 let _ = session
-                    .write_object(&Result::<UserKeyPackages, ()>::Err(()))
+                    .write_object(&Result::<UserCertificates, ()>::Err(()))
                     .await;
                 return Err(err);
             }
@@ -123,13 +123,13 @@ impl CommandHandler for GetUserCertificateHandler {
             Ok(sessions) => sessions,
             Err(err) => {
                 let _ = session
-                    .write_object(&Result::<UserKeyPackages, ()>::Err(()))
+                    .write_object(&Result::<UserCertificates, ()>::Err(()))
                     .await;
                 return Err(err);
             }
         };
 
-        let certs: Result<_, ()> = Ok(UserKeyPackages {
+        let certs: Result<_, ()> = Ok(UserCertificates {
             user_cert: user,
             session_certs: sessions,
         });
