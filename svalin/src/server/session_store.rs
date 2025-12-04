@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use svalin_pki::{Certificate, CertificateType, Fingerprint};
+use svalin_pki::{Certificate, CertificateType, SpkiHash};
 
 use crate::server::user_store::UserStore;
 
@@ -34,13 +34,13 @@ impl SessionStore {
             ));
         }
 
-        let fingerprint = certificate.fingerprint().as_slice();
+        let spki_hash = certificate.spki_hash().as_slice();
         let issuer = certificate.issuer().as_slice();
         let der = certificate.to_der();
 
         sqlx::query!(
-            "INSERT INTO sessions (fingerprint, issuer, certificate) VALUES (?, ?, ?)",
-            fingerprint,
+            "INSERT INTO sessions (spki_hash, issuer, certificate) VALUES (?, ?, ?)",
+            spki_hash,
             issuer,
             der
         )
@@ -52,11 +52,11 @@ impl SessionStore {
 
     pub async fn get_session(
         &self,
-        fingerprint: &Fingerprint,
+        spki_hash: &SpkiHash,
     ) -> anyhow::Result<Option<Certificate>, anyhow::Error> {
-        let fingerprint = fingerprint.as_slice();
+        let fingerprint = spki_hash.as_slice();
         let session_der = sqlx::query_scalar!(
-            "SELECT certificate FROM sessions WHERE fingerprint = ?",
+            "SELECT certificate FROM sessions WHERE spki_hash = ?",
             fingerprint
         )
         .fetch_optional(&self.pool)

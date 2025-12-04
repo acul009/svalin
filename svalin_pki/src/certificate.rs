@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display, Write};
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -33,7 +33,6 @@ struct CertificateData {
     is_ca: bool,
     issuer: SpkiHash,
     validity: Validity,
-    fingerprint: Fingerprint,
 }
 
 #[derive(Clone)]
@@ -45,7 +44,6 @@ impl Debug for Certificate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Certificate")
             .field("spki_hash", &self.spki_hash())
-            .field("fingerprint", &self.fingerprint())
             .finish()
     }
 }
@@ -96,35 +94,6 @@ pub enum SignatureVerificationError {
     X509VerificationError(#[from] X509Error),
     #[error("Certificate of type {0} is not allowed to sign certificates of type {1}")]
     InvalidCertificateType(CertificateType, CertificateType),
-}
-
-#[derive(PartialEq, Eq, Clone, Serialize, Deserialize, PartialOrd, Ord, Hash)]
-pub struct Fingerprint([u8; 32]);
-
-impl Display for Fingerprint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for byte in self.0.iter() {
-            write!(f, "{:02X}", byte)?
-        }
-
-        Ok(())
-    }
-}
-
-impl Fingerprint {
-    pub fn as_slice(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl Debug for Fingerprint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for byte in self.0.iter() {
-            write!(f, "{:02X}", byte)?
-        }
-
-        Ok(())
-    }
 }
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize, PartialOrd, Ord, Hash)]
@@ -233,11 +202,6 @@ impl Certificate {
             }
         }
 
-        // Todo: use rcgen::Certificate::key_identifier instead
-        let hash = ring::digest::digest(&ring::digest::SHA512_256, &der);
-
-        let fingerprint = Fingerprint(hash.as_ref()[0..32].try_into().unwrap());
-
         Ok(Certificate {
             data: Arc::new(CertificateData {
                 der,
@@ -247,7 +211,6 @@ impl Certificate {
                 is_ca,
                 issuer,
                 validity,
-                fingerprint,
             }),
         })
     }
@@ -276,10 +239,6 @@ impl Certificate {
 
     pub fn is_ca(&self) -> bool {
         self.data.is_ca
-    }
-
-    pub fn fingerprint(&self) -> &Fingerprint {
-        &self.data.fingerprint
     }
 
     pub fn check_validity_at(&self, time: u64) -> Result<(), ValidityError> {

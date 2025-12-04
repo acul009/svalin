@@ -1,6 +1,6 @@
 use std::{fmt::Debug, sync::Arc};
 
-use svalin_pki::{Certificate, Fingerprint, VerificationError, Verifier};
+use svalin_pki::{Certificate, SpkiHash, VerificationError, Verifier};
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 
 use crate::verifier::load_session_chain::LoadSessionChain;
@@ -25,13 +25,13 @@ impl RemoteSessionVerifier {
 impl Verifier for RemoteSessionVerifier {
     async fn verify_fingerprint(
         &self,
-        fingerprint: &Fingerprint,
+        spki_hash: &SpkiHash,
         time: u64,
     ) -> Result<svalin_pki::Certificate, svalin_pki::VerificationError> {
         let chain = self
             .rpc_client
             .upstream_connection()
-            .dispatch(LoadSessionChain { fingerprint })
+            .dispatch(LoadSessionChain { spki_hash })
             .await
             .map_err(|err| VerificationError::InternalError(err.into()))?;
 

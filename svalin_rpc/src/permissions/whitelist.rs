@@ -1,14 +1,14 @@
 use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
 
 use anyhow::{Result, anyhow};
-use svalin_pki::{Certificate, Fingerprint};
+use svalin_pki::{Certificate, SpkiHash};
 
 use crate::rpc::peer::Peer;
 
 use super::{PermissionCheckError, PermissionHandler};
 
 pub struct WhitelistPermissionHandler<Permission> {
-    whitelist: Arc<BTreeMap<Fingerprint, Certificate>>,
+    whitelist: Arc<BTreeMap<SpkiHash, Certificate>>,
 
     permission: PhantomData<Permission>,
 }
@@ -26,7 +26,7 @@ impl<Permission> WhitelistPermissionHandler<Permission> {
     pub fn new(whitelist: Vec<Certificate>) -> Self {
         let whitelist = whitelist
             .into_iter()
-            .map(|c| (c.fingerprint().clone(), c))
+            .map(|c| (c.spki_hash().clone(), c))
             .collect();
 
         Self {
@@ -43,7 +43,7 @@ where
     type Permission = Permission;
     async fn may(&self, peer: &Peer, _permission: &Permission) -> Result<(), PermissionCheckError> {
         if let Peer::Certificate(cert) = peer {
-            if let Some(known_cert) = self.whitelist.get(&cert.fingerprint()) {
+            if let Some(known_cert) = self.whitelist.get(&cert.spki_hash()) {
                 if known_cert == cert {
                     return Ok(());
                 } else {

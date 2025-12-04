@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use svalin_pki::{
-    Certificate, CertificateChainBuilder, ExactVerififier, Fingerprint, VerificationError, Verifier,
+    Certificate, CertificateChainBuilder, ExactVerififier, SpkiHash, VerificationError, Verifier,
 };
 
 use crate::server::{agent_store::AgentStore, session_store::SessionStore, user_store::UserStore};
@@ -36,13 +36,13 @@ impl IncomingConnectionVerifier {
 impl Verifier for IncomingConnectionVerifier {
     async fn verify_fingerprint(
         &self,
-        fingerprint: &Fingerprint,
+        spki_hash: &SpkiHash,
         time: u64,
     ) -> Result<Certificate, VerificationError> {
-        let certificate = if let Some(agent) = self.agent_store.get_agent(fingerprint).await? {
+        let certificate = if let Some(agent) = self.agent_store.get_agent(spki_hash).await? {
             let agent_data = agent.verify(&self.agent_verifier, time).await?;
             agent_data.unpack().cert
-        } else if let Some(session) = self.session_store.get_session(fingerprint).await? {
+        } else if let Some(session) = self.session_store.get_session(spki_hash).await? {
             session
         } else {
             return Err(VerificationError::UnknownCertificate);

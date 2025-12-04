@@ -1,4 +1,4 @@
-use svalin_pki::{ExactVerififier, Fingerprint, VerificationError, Verifier};
+use svalin_pki::{ExactVerififier, SpkiHash, VerificationError, Verifier};
 
 /// flutter_rust_bridge:ignore
 #[derive(Debug)]
@@ -25,10 +25,10 @@ impl UpstreamVerifier {
 impl Verifier for UpstreamVerifier {
     async fn verify_fingerprint(
         &self,
-        fingerprint: &Fingerprint,
+        spki_hash: &SpkiHash,
         time: u64,
     ) -> std::result::Result<svalin_pki::Certificate, VerificationError> {
-        let cert = self.verifier.verify_fingerprint(fingerprint, time).await?;
+        let cert = self.verifier.verify_fingerprint(spki_hash, time).await?;
 
         cert.verify_signature(&self.root_certificate)?;
 

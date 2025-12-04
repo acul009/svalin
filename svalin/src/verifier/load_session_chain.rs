@@ -5,7 +5,7 @@ use std::{
 
 use async_trait::async_trait;
 use svalin_pki::{
-    Certificate, CertificateChain, CertificateChainBuilder, Fingerprint, VerificationError,
+    Certificate, CertificateChain, CertificateChainBuilder, SpkiHash, VerificationError,
 };
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
@@ -37,7 +37,7 @@ impl LoadSessionChainHandler {
 
 #[async_trait]
 impl CommandHandler for LoadSessionChainHandler {
-    type Request = Fingerprint;
+    type Request = SpkiHash;
 
     fn key() -> String {
         "load_certificate_chain".to_string()
@@ -74,10 +74,10 @@ impl CommandHandler for LoadSessionChainHandler {
 impl LoadSessionChainHandler {
     async fn get_session_chain(
         &self,
-        fingerprint: &Fingerprint,
+        spki_hash: &SpkiHash,
         time: u64,
     ) -> Result<CertificateChain, VerificationError> {
-        let Some(certificate) = self.session_store.get_session(&fingerprint).await? else {
+        let Some(certificate) = self.session_store.get_session(spki_hash).await? else {
             return Err(VerificationError::UnknownCertificate);
         };
 
@@ -95,12 +95,14 @@ impl LoadSessionChainHandler {
 }
 
 pub struct LoadSessionChain<'a> {
-    pub fingerprint: &'a Fingerprint,
+    pub spki_hash: &'a SpkiHash,
 }
 
 impl<'a> LoadSessionChain<'a> {
-    pub fn new(fingerprint: &'a Fingerprint) -> Self {
-        Self { fingerprint }
+    pub fn new(fingerprint: &'a SpkiHash) -> Self {
+        Self {
+            spki_hash: fingerprint,
+        }
     }
 }
 
@@ -126,7 +128,7 @@ impl CommandDispatcher for LoadSessionChain<'_> {
     }
 
     fn get_request(&self) -> &Self::Request {
-        &self.fingerprint
+        &self.spki_hash
     }
 
     async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {

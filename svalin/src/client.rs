@@ -13,7 +13,7 @@ mod profile;
 
 use device::Device;
 pub use first_connect::*;
-use svalin_pki::{Certificate, Credential, Fingerprint, SpkiHash};
+use svalin_pki::{Certificate, Credential, SpkiHash, mls::NewMember};
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
@@ -84,7 +84,7 @@ impl Client {
         Ok(certs)
     }
 
-    pub(crate) fn get_key_packages(&self, certs: Vec<Certificate>) {
+    pub(crate) async fn get_key_packages(&self, entities: Vec<SpkiHash>) -> Vec<NewMember> {
         todo!()
     }
 

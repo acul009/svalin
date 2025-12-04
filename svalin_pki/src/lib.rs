@@ -18,7 +18,7 @@ pub use sha2::Sha512;
 pub use argon::{ArgonCost, ArgonParams, DeriveKeyError, ParamsStringParseError, PasswordHash};
 pub use argon2;
 pub use certificate::{
-    Certificate, CertificateParseError, CertificateType, Fingerprint, SignatureVerificationError,
+    Certificate, CertificateParseError, CertificateType, SignatureVerificationError,
     SpkiHash, ValidityError,
 };
 pub use certificate_chain::{

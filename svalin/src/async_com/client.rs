@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::anyhow;
 use svalin_pki::{
-    Certificate, CertificateType, Credential,
+    Certificate, Credential,
     mls::{MlsClient, NewMember, message_types::Invitation},
 };
 use svalin_sysctl::sytem_report::SystemReport;
@@ -24,7 +24,7 @@ impl ClientAsyncCom {
     pub async fn create_device_group(&self, device: &Certificate) -> anyhow::Result<Invitation> {
         let mut group = self.mls_client.create_group()?;
         let (_first_message, invitation) =
-            group.add_members(self.get_init_device_accessors(user_certs)?)?;
+            group.add_members(self.get_init_device_accessors().await?)?;
         Ok(invitation)
     }
 
@@ -67,15 +67,18 @@ impl ClientAsyncCom {
             }
 
             let certs = certs
-                .into_iter()
-                .filter(|cert| cert != self.credential.get_certificate())
+                .iter()
+                .filter(|cert| *cert != self.credential.get_certificate())
+                .map(|cert| cert.spki_hash().clone())
                 .collect();
 
             let mut packages = Vec::new();
 
             for certificate in certs {
-                self.client.get_key_packages(certs)
+                let key_packages = self.client.get_key_packages(certs)?;
             }
+
+            todo!()
 
             // let certs = user_certs
             //     .session_certs

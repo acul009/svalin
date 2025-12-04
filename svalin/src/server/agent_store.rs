@@ -4,7 +4,7 @@ use anyhow::{Ok, Result};
 use futures::future::try_join_all;
 use sqlx::SqlitePool;
 use svalin_pki::{
-    Certificate, ExactVerififier, Fingerprint, SignedObject, VerifiedObject, get_current_timestamp,
+    Certificate, ExactVerififier, SignedObject, SpkiHash, VerifiedObject, get_current_timestamp,
 };
 use tokio::sync::broadcast;
 
@@ -34,11 +34,11 @@ impl AgentStore {
 
     pub async fn get_agent(
         &self,
-        fingerprint: &Fingerprint,
+        spki_hash: &SpkiHash,
     ) -> Result<Option<SignedObject<PublicAgentData>>> {
-        let fingerprint = fingerprint.as_slice();
+        let spki_hash = spki_hash.as_slice();
 
-        let agent_data = sqlx::query!("SELECT data FROM agents WHERE fingerprint = ?", fingerprint)
+        let agent_data = sqlx::query!("SELECT data FROM agents WHERE spki_hash = ?", spki_hash)
             .fetch_optional(&self.pool)
             .await?;
 
@@ -62,13 +62,13 @@ impl AgentStore {
             .verify(&self.verifier, get_current_timestamp())
             .await?;
 
-        let fingerprint = agent.cert.fingerprint();
-        let fingerprint = fingerprint.as_slice();
+        let spki_hash = agent.cert.spki_hash();
+        let spki_hash = spki_hash.as_slice();
         let agent_data = postcard::to_stdvec(agent.pack())?;
 
         sqlx::query!(
-            "INSERT INTO agents (fingerprint, data) VALUES (?, ?)",
-            fingerprint,
+            "INSERT INTO agents (spki_hash, data) VALUES (?, ?)",
+            spki_hash,
             agent_data
         )
         .execute(&self.pool)

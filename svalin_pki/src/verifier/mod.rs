@@ -2,8 +2,8 @@ use std::{fmt::Debug, future::Future};
 use thiserror::Error;
 
 use crate::{
-    Certificate, VerifyChainError,
-    certificate::{Fingerprint, SignatureVerificationError, ValidityError},
+    Certificate, SpkiHash, VerifyChainError,
+    certificate::{SignatureVerificationError, ValidityError},
 };
 
 pub mod exact;
@@ -24,15 +24,15 @@ pub enum VerificationError {
     CertificateMismatch,
     #[error("The certificate is not valid: {0}")]
     TimerangeError(#[from] ValidityError),
-    #[error("The certificate in the chain with fingerprint {1} is not valid: {0}")]
-    ChainTimerangeError(ValidityError, Fingerprint),
+    #[error("The certificate in the chain with spki_hash {1} is not valid: {0}")]
+    ChainTimerangeError(ValidityError, SpkiHash),
     #[error("The signature could not be verified: {0}")]
     SignatureError(#[from] SignatureVerificationError),
     #[error(
-        "The given fingerprint {fingerprint:x?} is shared between these two certificates: {given_cert:?} (given) vs {loaded_cert:?} (loaded)"
+        "The given spki_hash {spki_hash:x?} is shared between these two certificates: {given_cert:?} (given) vs {loaded_cert:?} (loaded)"
     )]
-    FingerprintCollission {
-        fingerprint: Fingerprint,
+    SpkiHashCollission {
+        spki_hash: SpkiHash,
         given_cert: Certificate,
         loaded_cert: Certificate,
     },
@@ -44,7 +44,7 @@ pub trait Verifier: Send + Sync + Debug + 'static {
     /// TODO: include time for revocation/expiration checking
     fn verify_fingerprint(
         &self,
-        fingerprint: &Fingerprint,
+        spki_hash: &SpkiHash,
         time: u64,
     ) -> impl Future<Output = Result<Certificate, VerificationError>> + Send;
 }
@@ -58,13 +58,13 @@ pub trait KnownCertificateVerifier: Verifier + Sized + 'static {
         time: u64,
     ) -> impl Future<Output = Result<(), VerificationError>> + Send {
         async move {
-            let fingerprint = cert.fingerprint();
+            let fingerprint = cert.spki_hash();
 
             let loaded_cert = self.verify_fingerprint(&fingerprint, time).await?;
 
             if cert != &loaded_cert {
-                Err(VerificationError::FingerprintCollission {
-                    fingerprint: fingerprint.clone(),
+                Err(VerificationError::SpkiHashCollission {
+                    spki_hash: fingerprint.clone(),
                     loaded_cert,
                     given_cert: cert.clone(),
                 })

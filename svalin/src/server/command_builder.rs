@@ -19,7 +19,7 @@ use crate::{
         },
         join_agent::add_agent::AddAgentHandler,
     },
-    verifier::load_session_chain::{LoadSessionChain, LoadSessionChainHandler},
+    verifier::load_session_chain::LoadSessionChainHandler,
 };
 
 use super::{agent_store::AgentStore, user_store::UserStore};

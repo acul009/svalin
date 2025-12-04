@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use svalin_pki::{
     Certificate, CertificateChain, CertificateChainBuilder, CertificateType, EncryptedCredential,
-    Fingerprint, SpkiHash,
+    SpkiHash,
 };
 use totp_rs::TOTP;
 
@@ -68,15 +68,13 @@ impl UserStore {
         };
 
         let cert = user.encrypted_credential.certificate();
-        let fingerprint = cert.fingerprint().as_slice();
         let spki_hash = cert.spki_hash().as_slice();
         let username = &user.username;
 
         let data = postcard::to_stdvec(&user)?;
 
         sqlx::query!(
-            "INSERT INTO users (fingerprint, spki_hash, username, data) VALUES (?, ?, ?, ?)",
-            fingerprint,
+            "INSERT INTO users (spki_hash, username, data) VALUES (?, ?, ?)",
             spki_hash,
             username,
             data
@@ -91,9 +89,9 @@ impl UserStore {
         Arc::new(Self { pool, root })
     }
 
-    pub async fn get_user(&self, fingerprint: &Fingerprint) -> anyhow::Result<Option<StoredUser>> {
-        let fingerprint = fingerprint.as_slice();
-        let user_data = sqlx::query!("SELECT data FROM users WHERE fingerprint = ?", fingerprint)
+    pub async fn get_user(&self, spki_hash: &SpkiHash) -> anyhow::Result<Option<StoredUser>> {
+        let spki_hash = spki_hash.as_slice();
+        let user_data = sqlx::query!("SELECT data FROM users WHERE spki_hash = ?", spki_hash)
             .fetch_optional(&self.pool)
             .await?;
         match user_data {
