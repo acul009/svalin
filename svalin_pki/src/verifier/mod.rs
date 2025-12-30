@@ -41,8 +41,7 @@ pub enum VerificationError {
 }
 
 pub trait Verifier: Send + Sync + Debug + 'static {
-    /// TODO: include time for revocation/expiration checking
-    fn verify_fingerprint(
+    fn verify_spki_hash(
         &self,
         spki_hash: &SpkiHash,
         time: u64,
@@ -60,7 +59,7 @@ pub trait KnownCertificateVerifier: Verifier + Sized + 'static {
         async move {
             let fingerprint = cert.spki_hash();
 
-            let loaded_cert = self.verify_fingerprint(&fingerprint, time).await?;
+            let loaded_cert = self.verify_spki_hash(&fingerprint, time).await?;
 
             if cert != &loaded_cert {
                 Err(VerificationError::SpkiHashCollission {

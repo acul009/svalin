@@ -1,26 +1,31 @@
-use std::collections::HashMap;
+use std::{collections::HashSet, sync::Arc};
 
 use async_trait::async_trait;
-use svalin_pki::{Certificate, mls::NewMember};
+use svalin_pki::{SpkiHash, mls::new_member::UnverifiedNewMember};
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
-    session::Session,
+    session::{Session, SessionReadError},
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::server::user_store::UserStore;
+use crate::server::key_package_store::KeyPackageStore;
 
-pub struct GetKeyPackages(pub Vec<Certificate>);
+pub struct GetKeyPackages(pub HashSet<SpkiHash>);
 
 #[derive(Debug, thiserror::Error)]
-pub enum GetKeyPackagesError {}
+pub enum GetKeyPackagesError {
+    #[error("Session read error: {0}")]
+    SessionRead(#[from] SessionReadError),
+    #[error("Server error")]
+    ServerError,
+}
 
 impl CommandDispatcher for GetKeyPackages {
-    type Output = Vec<NewMember>;
+    type Output = Vec<UnverifiedNewMember>;
 
     type Error = GetKeyPackagesError;
 
-    type Request = Vec<Certificate>;
+    type Request = HashSet<SpkiHash>;
 
     fn key() -> String {
         GetKeyPackagesHandler::key()
@@ -34,15 +39,24 @@ impl CommandDispatcher for GetKeyPackages {
         self,
         session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
-        todo!()
+        let key_packages: Option<Vec<UnverifiedNewMember>> = session.read_object().await?;
+        key_packages.ok_or_else(|| GetKeyPackagesError::ServerError)
     }
 }
 
-pub struct GetKeyPackagesHandler {}
+pub struct GetKeyPackagesHandler {
+    key_package_store: Arc<KeyPackageStore>,
+}
+
+impl GetKeyPackagesHandler {
+    pub fn new(key_package_store: Arc<KeyPackageStore>) -> Self {
+        Self { key_package_store }
+    }
+}
 
 #[async_trait]
 impl CommandHandler for GetKeyPackagesHandler {
-    type Request = Vec<Certificate>;
+    type Request = HashSet<SpkiHash>;
 
     fn key() -> String {
         "get_key_packages".into()
@@ -52,8 +66,19 @@ impl CommandHandler for GetKeyPackagesHandler {
         &self,
         session: &mut Session,
         request: Self::Request,
-        cancel: CancellationToken,
+        _cancel: CancellationToken,
     ) -> anyhow::Result<()> {
-        todo!()
+        match self.key_package_store.get_key_packages(&request).await {
+            Ok(key_packages) => {
+                session.write_object(&Some(key_packages)).await?;
+                Ok(())
+            }
+            Err(err) => {
+                let _ = session
+                    .write_object(&Option::<Vec<UnverifiedNewMember>>::None)
+                    .await?;
+                Err(err.into())
+            }
+        }
     }
 }

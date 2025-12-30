@@ -1,4 +1,5 @@
 CREATE TABLE key_packages (
-    spki_hash BLOB PRIMARY KEY,
+    id TEXT PRIMARY KEY,
+    spki_hash BLOB NOT NULL,
     data BLOB NOT NULL
 );

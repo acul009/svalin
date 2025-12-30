@@ -23,7 +23,7 @@ impl RemoteSessionVerifier {
 }
 
 impl Verifier for RemoteSessionVerifier {
-    async fn verify_fingerprint(
+    async fn verify_spki_hash(
         &self,
         spki_hash: &SpkiHash,
         time: u64,

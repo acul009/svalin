@@ -41,7 +41,7 @@ where
 {
     pub async fn verify(self, verifier: &impl Verifier, time: u64) -> Result<VerifiedObject<T>> {
         let signer = verifier
-            .verify_fingerprint(&self.singer_spki_hash, time)
+            .verify_spki_hash(&self.singer_spki_hash, time)
             .await
             .context("failed to verify fingerprint of signed object")?;
 

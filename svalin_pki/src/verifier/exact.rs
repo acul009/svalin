@@ -19,7 +19,7 @@ impl ExactVerififier {
 }
 
 impl Verifier for ExactVerififier {
-    fn verify_fingerprint(
+    fn verify_spki_hash(
         &self,
         fingerprint: &SpkiHash,
         time: u64,

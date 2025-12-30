@@ -34,7 +34,7 @@ impl IncomingConnectionVerifier {
 }
 
 impl Verifier for IncomingConnectionVerifier {
-    async fn verify_fingerprint(
+    async fn verify_spki_hash(
         &self,
         spki_hash: &SpkiHash,
         time: u64,

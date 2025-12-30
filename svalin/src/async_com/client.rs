@@ -6,14 +6,14 @@ use std::{
 use anyhow::anyhow;
 use svalin_pki::{
     Certificate, Credential,
-    mls::{MlsClient, NewMember, message_types::Invitation},
+    mls::{MlsClient, UnvalidatedNewMember, message_types::Invitation},
 };
 use svalin_sysctl::sytem_report::SystemReport;
 
 use crate::client::Client;
 
 pub struct ClientAsyncCom {
-    client: Client,
+    client: Arc<Client>,
     mls_client: MlsClient,
     credential: Credential,
     root: Certificate,
@@ -21,13 +21,6 @@ pub struct ClientAsyncCom {
 }
 
 impl ClientAsyncCom {
-    pub async fn create_device_group(&self, device: &Certificate) -> anyhow::Result<Invitation> {
-        let mut group = self.mls_client.create_group()?;
-        let (_first_message, invitation) =
-            group.add_members(self.get_init_device_accessors().await?)?;
-        Ok(invitation)
-    }
-
     pub fn get_device_status(
         &self,
         certificate: &Certificate,
@@ -47,7 +40,7 @@ impl ClientAsyncCom {
         todo!()
     }
 
-    async fn get_init_device_accessors(&self) -> anyhow::Result<Vec<NewMember>> {
+    async fn get_init_device_accessors(&self) -> anyhow::Result<Vec<UnvalidatedNewMember>> {
         {
             let certs = self
                 .client
@@ -74,9 +67,7 @@ impl ClientAsyncCom {
 
             let mut packages = Vec::new();
 
-            for certificate in certs {
-                let key_packages = self.client.get_key_packages(certs)?;
-            }
+            let key_packages = self.client.get_key_packages(certs)?;
 
             todo!()
 
@@ -94,9 +85,9 @@ impl ClientAsyncCom {
         }
     }
 
-    fn get_key_package(&self, certificate: &Certificate) -> anyhow::Result<NewMember> {
+    fn get_key_package(&self, certificate: &Certificate) -> anyhow::Result<UnvalidatedNewMember> {
         let key_package = todo!();
-        Ok(NewMember {
+        Ok(UnvalidatedNewMember {
             key_package,
             member: certificate.clone(),
         })

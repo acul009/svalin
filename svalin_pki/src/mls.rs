@@ -4,7 +4,6 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-pub use openmls::key_packages::KeyPackageIn;
 use openmls::{
     group::{
         AddMembersError, CommitBuilderStageError, CreateCommitError, CreateMessageError,
@@ -16,20 +15,27 @@ use openmls::{
         KeyPackageNewError, KeyPackageVerifyError, MlsMessageBodyIn, MlsMessageIn, MlsMessageOut,
         PrivateMessageIn, ProcessedMessageContent, ProtocolMessage, ProtocolVersion, Welcome,
     },
+    treesync::RatchetTree,
 };
 use openmls_rust_crypto::{MemoryStorage, MemoryStorageError, RustCrypto};
 use openmls_traits::{OpenMlsProvider, signatures::SignerError};
 use rand::RngCore;
-use tls_codec::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
+use x509_parser::asn1_rs::AsTaggedExplicit;
 
 use crate::{
     Certificate, Credential, DecryptError, EncryptError, EncryptedObject,
-    mls::message_types::{Invitation, InvitationError},
+    mls::{
+        message_types::{Invitation, InvitationError},
+        new_member::{UnverifiedNewMember, VerifyNewMemberError},
+    },
     signed_message::CanSign,
 };
 
+pub mod delivery_service;
 mod group_defaults;
 pub mod message_types;
+pub mod new_member;
 
 impl From<&Certificate> for openmls::credentials::Credential {
     fn from(value: &Certificate) -> Self {
@@ -225,29 +231,16 @@ pub enum GroupError {
     UnsupportedMessageBodyType,
     #[error("Failed to handle invitation: {0}")]
     InvitationError(#[from] InvitationError),
-}
-
-pub struct NewMember {
-    member: Certificate,
-    key_package: KeyPackageIn,
+    #[error("Failed to verify new member: {0}")]
+    VerifyNewMemberError(#[from] VerifyNewMemberError),
 }
 
 impl Group {
-    pub fn add_members(
+    pub async fn add_members(
         &mut self,
-        new_members: impl IntoIterator<Item = NewMember>,
+        new_members: impl IntoIterator<Item = UnverifiedNewMember>,
     ) -> Result<(MlsMessageOut, Invitation), GroupError> {
         let mut key_packages = Vec::new();
-        let mut receivers = Vec::new();
-
-        for new_member in new_members.into_iter() {
-            receivers.push(new_member.member);
-            key_packages.push(
-                new_member
-                    .key_package
-                    .validate(self.provider.crypto(), self.provider.protocol_version)?,
-            );
-        }
 
         let (message, welcome, _) = self.group.add_members(
             self.provider.deref(),
@@ -257,7 +250,7 @@ impl Group {
 
         self.group.merge_pending_commit(self.provider.deref())?;
 
-        let invitation = Invitation::new(welcome, receivers)?;
+        let invitation = Invitation::new(welcome, todo!())?;
 
         Ok((message, invitation))
     }
@@ -358,6 +351,7 @@ impl Message {
     pub fn from_mls_messages(
         mls_messages: impl IntoIterator<Item = MlsMessageOut>,
     ) -> Result<Self, GroupError> {
+        use tls_codec::Serialize;
         let mls_messages = mls_messages
             .into_iter()
             .map(|mls_message| mls_message.tls_serialize_detached())
@@ -371,6 +365,7 @@ impl Message {
     }
 
     pub fn to_mls_messages(&self) -> impl Iterator<Item = Result<PrivateMessageIn, GroupError>> {
+        use tls_codec::Deserialize;
         self.mls_messages.iter().map(|raw| {
             let message = MlsMessageIn::tls_deserialize_exact(raw)
                 .map_err(GroupError::TlsDeserializeError)?;
