@@ -1,16 +1,21 @@
 use std::collections::HashSet;
 
 use crate::{
-    Certificate, CertificateType, SignatureVerificationError, ValidityError, certificate::SpkiHash,
+    Certificate, CertificateType, SignatureVerificationError, ValidityError,
+    certificate::{SpkiHash, UnverifiedCertificate},
 };
 use serde::{Deserialize, Serialize};
 
 pub struct CertificateChainBuilder {
-    certificates: Vec<Certificate>,
+    certificates: Vec<UnverifiedCertificate>,
     known_spki_hashes: HashSet<String>,
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct UnverifiedCertificateChain {
+    certificates: Vec<UnverifiedCertificate>,
+}
+
 pub struct CertificateChain {
     certificates: Vec<Certificate>,
 }
@@ -18,7 +23,7 @@ pub struct CertificateChain {
 #[derive(Debug, thiserror::Error)]
 pub enum AddCertificateError {
     #[error("Signature loop detected. Certificates order is {0:?}")]
-    SignatureLoop(Vec<Certificate>),
+    SignatureLoop(Vec<UnverifiedCertificate>),
     #[error("Couldn't verify signature with given parent")]
     SignatureVerificationError(#[from] SignatureVerificationError),
     #[error("Parent with wrong spki_hash given. Expected {0}, got {1}")]
@@ -26,7 +31,7 @@ pub enum AddCertificateError {
 }
 
 impl CertificateChainBuilder {
-    pub fn new(leaf_certificate: Certificate) -> Self {
+    pub fn new(leaf_certificate: UnverifiedCertificate) -> Self {
         let mut known_spki_hashes = HashSet::new();
         known_spki_hashes.insert(leaf_certificate.spki_hash().to_string());
         CertificateChainBuilder {
@@ -37,8 +42,8 @@ impl CertificateChainBuilder {
 
     pub fn push_parent(
         &mut self,
-        parent: Certificate,
-    ) -> Result<Option<CertificateChain>, AddCertificateError> {
+        parent: UnverifiedCertificate,
+    ) -> Result<Option<UnverifiedCertificateChain>, AddCertificateError> {
         let last_cert = self
             .certificates
             .last()
@@ -50,8 +55,6 @@ impl CertificateChainBuilder {
                 parent.spki_hash().to_string(),
             ));
         }
-
-        last_cert.verify_signature(&parent)?;
 
         if !self
             .known_spki_hashes
@@ -65,8 +68,8 @@ impl CertificateChainBuilder {
         self.certificates.push(parent);
 
         if parent_type == CertificateType::Root {
-            Ok(Some(CertificateChain {
-                certificates: self.certificates.clone(),
+            Ok(Some(UnverifiedCertificateChain {
+                certificates: self.certificates.iter().rev().cloned().collect(),
             }))
         } else {
             Ok(None)
@@ -89,22 +92,22 @@ pub enum VerifyChainError {
     #[error("Empty certificate chain")]
     EmptyChain,
     #[error("Wrong root certificate: expected {0:?}, found {1:?}")]
-    WrongRoot(Certificate, Certificate),
+    WrongRoot(Certificate, UnverifiedCertificate),
     #[error("Signature verification failed: {0}")]
     SignatureVerificationFailed(#[from] SignatureVerificationError),
     #[error("Certificate validity error: {0}")]
     ValidityError(#[from] ValidityError),
 }
 
-impl CertificateChain {
+impl UnverifiedCertificateChain {
     pub fn verify(
-        &self,
+        self,
         root: &Certificate,
         timestamp: u64,
-    ) -> Result<&Certificate, VerifyChainError> {
+    ) -> Result<CertificateChain, VerifyChainError> {
         let chain_root = self
             .certificates
-            .last()
+            .first()
             .ok_or(VerifyChainError::EmptyChain)?;
 
         if chain_root != root {
@@ -114,20 +117,27 @@ impl CertificateChain {
             ));
         }
 
-        chain_root.check_validity_at(timestamp)?;
+        let mut verified_chain = Vec::with_capacity(self.certificates.len());
+        verified_chain.push(root.clone());
 
         if self.certificates.len() == 1 {
-            return Ok(&self.certificates[0]);
+            return Ok(CertificateChain {
+                certificates: vec![root.clone()],
+            });
         }
 
-        let current_certificate = self.certificates.iter();
-        let parent_certificate = self.certificates.iter().skip(1);
-
-        for (current, parent) in current_certificate.zip(parent_certificate) {
-            current.verify_signature(parent)?;
-            current.check_validity_at(timestamp)?;
+        for current in self.certificates.into_iter().skip(1) {
+            let verified_cert = current.verify_signature(
+                verified_chain
+                    .last()
+                    .expect("prefilled Vec cannot be empty"),
+                timestamp,
+            )?;
+            verified_chain.push(verified_cert);
         }
 
-        Ok(&self.certificates[0])
+        Ok(CertificateChain {
+            certificates: verified_chain,
+        })
     }
 }

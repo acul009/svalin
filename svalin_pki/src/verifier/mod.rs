@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use crate::{
     Certificate, SpkiHash, VerifyChainError,
-    certificate::{SignatureVerificationError, ValidityError},
+    certificate::{SignatureVerificationError, UnverifiedCertificate, ValidityError},
 };
 
 pub mod exact;
@@ -33,7 +33,7 @@ pub enum VerificationError {
     )]
     SpkiHashCollission {
         spki_hash: SpkiHash,
-        given_cert: Certificate,
+        given_cert: UnverifiedCertificate,
         loaded_cert: Certificate,
     },
     #[error("Internal Error: {0}")]
@@ -53,9 +53,9 @@ impl<T: Verifier> KnownCertificateVerifier for T {}
 pub trait KnownCertificateVerifier: Verifier + Sized + 'static {
     fn verify_known_certificate(
         &self,
-        cert: &Certificate,
+        cert: &UnverifiedCertificate,
         time: u64,
-    ) -> impl Future<Output = Result<(), VerificationError>> + Send {
+    ) -> impl Future<Output = Result<Certificate, VerificationError>> + Send {
         async move {
             let fingerprint = cert.spki_hash();
 
@@ -68,7 +68,7 @@ pub trait KnownCertificateVerifier: Verifier + Sized + 'static {
                     given_cert: cert.clone(),
                 })
             } else {
-                Ok(())
+                Ok(loaded_cert)
             }
         }
     }
@@ -92,7 +92,7 @@ pub mod rustls_feat {
     };
     use tokio::task::block_in_place;
 
-    use crate::{Certificate, verifier::VerificationError};
+    use crate::{certificate::UnverifiedCertificate, verifier::VerificationError};
 
     use super::KnownCertificateVerifier;
 
@@ -119,7 +119,7 @@ pub mod rustls_feat {
             now: rustls::pki_types::UnixTime,
         ) -> Result<(), rustls::Error> {
             // TODO: better error handling
-            let cert = Certificate::from_der(end_entity.as_ref().to_vec())
+            let cert = UnverifiedCertificate::from_der(end_entity.as_ref().to_vec())
                 // TODO: wrap error
                 .map_err(|_err| rustls::Error::InvalidCertificate(CertificateError::BadEncoding))?;
 

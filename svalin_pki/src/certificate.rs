@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -33,6 +34,19 @@ struct CertificateData {
     is_ca: bool,
     issuer: SpkiHash,
     validity: Validity,
+}
+
+#[derive(Clone)]
+pub struct UnverifiedCertificate {
+    data: Arc<CertificateData>,
+}
+
+impl Debug for UnverifiedCertificate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Certificate")
+            .field("spki_hash", &self.spki_hash())
+            .finish()
+    }
 }
 
 #[derive(Clone)]
@@ -94,6 +108,8 @@ pub enum SignatureVerificationError {
     X509VerificationError(#[from] X509Error),
     #[error("Certificate of type {0} is not allowed to sign certificates of type {1}")]
     InvalidCertificateType(CertificateType, CertificateType),
+    #[error("Certificate validity could not be verified: {0}")]
+    ValidityError(#[from] ValidityError),
 }
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize, PartialOrd, Ord, Hash)]
@@ -124,8 +140,8 @@ impl SpkiHash {
     }
 }
 
-impl Certificate {
-    pub fn from_der(der: Vec<u8>) -> Result<Certificate, CertificateParseError> {
+impl UnverifiedCertificate {
+    pub fn from_der(der: Vec<u8>) -> Result<Self, CertificateParseError> {
         let (_, cert) = X509Certificate::from_der(der.as_ref())?;
 
         let spki_hash = Self::compute_spki_hash(&cert.public_key().raw.to_vec());
@@ -202,7 +218,7 @@ impl Certificate {
             }
         }
 
-        Ok(Certificate {
+        Ok(Self {
             data: Arc::new(CertificateData {
                 der,
                 certificate_type,
@@ -221,48 +237,12 @@ impl Certificate {
         SpkiHash(slice.try_into().unwrap())
     }
 
-    pub fn public_key(&self) -> &[u8] {
-        &self.data.public_key
-    }
-
-    pub fn to_der(&self) -> &[u8] {
-        &self.data.der
-    }
-
-    pub fn issuer(&self) -> &SpkiHash {
-        &self.data.issuer
-    }
-
-    pub fn spki_hash(&self) -> &SpkiHash {
-        &self.data.spki_hash
-    }
-
-    pub fn is_ca(&self) -> bool {
-        self.data.is_ca
-    }
-
-    pub fn check_validity_at(&self, time: u64) -> Result<(), ValidityError> {
-        // Todo: maybe not try to panic here or at least verify that this conversion
-        // always works
-        if time
-            < self
-                .data
-                .validity
-                .not_before
-                .timestamp()
-                .try_into()
-                .unwrap()
-        {
-            return Err(ValidityError::NotYetValid);
-        } else if time > self.data.validity.not_after.timestamp().try_into().unwrap() {
-            return Err(ValidityError::Expired);
-        }
-
-        Ok(())
-    }
-
     /// Verify the signature of the current certificate using the given issue certificate
-    pub fn verify_signature(&self, issuer: &Certificate) -> Result<(), SignatureVerificationError> {
+    pub fn verify_signature(
+        self,
+        issuer: &Certificate,
+        time: u64,
+    ) -> Result<Certificate, SignatureVerificationError> {
         if !issuer
             .certificate_type()
             .may_be_parent_of(self.certificate_type())
@@ -278,17 +258,96 @@ impl Certificate {
         let (_, issuer_cert) = X509Certificate::from_der(&issuer.data.der)?;
 
         cert.verify_signature(Some(issuer_cert.public_key()))?;
+        self.check_validity_at(time)?;
 
-        Ok(())
+        Ok(Certificate { data: self.data })
+    }
+
+    pub(crate) fn mark_as_trusted(self) -> Certificate {
+        Certificate { data: self.data }
+    }
+}
+
+impl Deref for UnverifiedCertificate {
+    type Target = CertificateData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl Deref for Certificate {
+    type Target = CertificateData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl CertificateData {
+    pub fn public_key(&self) -> &[u8] {
+        &self.public_key
+    }
+
+    pub fn to_der(&self) -> &[u8] {
+        &self.der
+    }
+
+    pub fn issuer(&self) -> &SpkiHash {
+        &self.issuer
+    }
+
+    pub fn spki_hash(&self) -> &SpkiHash {
+        &self.spki_hash
+    }
+
+    pub fn is_ca(&self) -> bool {
+        self.is_ca
     }
 
     pub fn certificate_type(&self) -> CertificateType {
-        self.data.certificate_type
+        self.certificate_type
+    }
+
+    pub(crate) fn check_validity_at(&self, time: u64) -> Result<(), ValidityError> {
+        // Todo: maybe not try to panic here or at least verify that this conversion
+        // always works
+        if time < self.validity.not_before.timestamp().try_into().unwrap() {
+            return Err(ValidityError::NotYetValid);
+        } else if time > self.validity.not_after.timestamp().try_into().unwrap() {
+            return Err(ValidityError::Expired);
+        }
+
+        Ok(())
+    }
+}
+
+impl Certificate {
+    pub fn to_unverified(self) -> UnverifiedCertificate {
+        UnverifiedCertificate { data: self.data }
     }
 }
 
 impl PartialEq for Certificate {
     fn eq(&self, other: &Self) -> bool {
+        self.data.der == other.data.der
+    }
+}
+
+impl PartialEq for UnverifiedCertificate {
+    fn eq(&self, other: &Self) -> bool {
+        self.data.der == other.data.der
+    }
+}
+
+impl PartialEq<Certificate> for UnverifiedCertificate {
+    fn eq(&self, other: &Certificate) -> bool {
+        self.data.der == other.data.der
+    }
+}
+
+impl PartialEq<UnverifiedCertificate> for Certificate {
+    fn eq(&self, other: &UnverifiedCertificate) -> bool {
         self.data.der == other.data.der
     }
 }
@@ -299,7 +358,7 @@ impl CanVerify for Certificate {
     }
 }
 
-impl Serialize for Certificate {
+impl Serialize for UnverifiedCertificate {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -308,7 +367,7 @@ impl Serialize for Certificate {
     }
 }
 
-impl<'de> Deserialize<'de> for Certificate {
+impl<'de> Deserialize<'de> for UnverifiedCertificate {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -320,7 +379,7 @@ impl<'de> Deserialize<'de> for Certificate {
 struct CertificateVisitor;
 
 impl<'de> Visitor<'de> for CertificateVisitor {
-    type Value = Certificate;
+    type Value = UnverifiedCertificate;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("a der encoded certificate")
@@ -330,7 +389,7 @@ impl<'de> Visitor<'de> for CertificateVisitor {
     where
         E: de::Error,
     {
-        Certificate::from_der(v).map_err(|err| de::Error::custom(err))
+        UnverifiedCertificate::from_der(v).map_err(|err| de::Error::custom(err))
     }
 
     fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
@@ -360,13 +419,13 @@ impl<'de> Visitor<'de> for CertificateVisitor {
     }
 }
 
-impl tls_codec::Size for Certificate {
+impl tls_codec::Size for UnverifiedCertificate {
     fn tls_serialized_len(&self) -> usize {
         self.to_der().len()
     }
 }
 
-impl tls_codec::Serialize for Certificate {
+impl tls_codec::Serialize for UnverifiedCertificate {
     fn tls_serialize<W: std::io::Write>(
         &self,
         writer: &mut W,
@@ -377,7 +436,7 @@ impl tls_codec::Serialize for Certificate {
     }
 }
 
-impl tls_codec::Deserialize for Certificate {
+impl tls_codec::Deserialize for UnverifiedCertificate {
     fn tls_deserialize<R: std::io::Read>(
         bytes: &mut R,
     ) -> std::result::Result<Self, tls_codec::Error>
@@ -386,7 +445,7 @@ impl tls_codec::Deserialize for Certificate {
     {
         let mut buffer = Vec::new();
         bytes.read_to_end(&mut buffer)?;
-        Certificate::from_der(buffer)
+        UnverifiedCertificate::from_der(buffer)
             .map_err(|err| tls_codec::Error::DecodingError(err.to_string()))
     }
 }

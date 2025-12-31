@@ -10,7 +10,7 @@ use tracing::debug;
 
 use crate::{
     Certificate, CertificateParseError, EncryptError, KeyPair,
-    certificate::CertificateType,
+    certificate::{CertificateType, UnverifiedCertificate},
     encrypt::EncryptedObject,
     keypair::{DecodeKeypairError, ExportedPublicKey, SavedKeypair},
     signed_message::CanSign,
@@ -38,7 +38,7 @@ impl Debug for Credential {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct EncryptedCredential {
     encrypted_keypair: EncryptedObject<SavedKeypair>,
-    certificate: Certificate,
+    certificate: UnverifiedCertificate,
 }
 
 impl EncryptedCredential {
@@ -49,15 +49,15 @@ impl EncryptedCredential {
 
         debug!("credentials decrypted");
 
-        Credential::new(decrypted_keypair, self.certificate)
+        Credential::new(decrypted_keypair, self.certificate.mark_as_trusted())
             .map_err(DecodeCredentialsError::CreateCredentialsError)
     }
 
-    pub fn certificate(&self) -> &Certificate {
+    pub fn certificate(&self) -> &UnverifiedCertificate {
         &self.certificate
     }
 
-    pub fn take_certificate(self) -> Certificate {
+    pub fn take_certificate(self) -> UnverifiedCertificate {
         self.certificate
     }
 }
@@ -128,8 +128,9 @@ impl Credential {
 
         let keypair = KeyPair::generate();
 
-        let spki_hash =
-            Certificate::compute_spki_hash(&keypair.export_public_key().subject_public_key_info());
+        let spki_hash = UnverifiedCertificate::compute_spki_hash(
+            &keypair.export_public_key().subject_public_key_info(),
+        );
         let mut dn = rcgen::DistinguishedName::new();
         dn.push(rcgen::DnType::OrganizationalUnitName, cert_type.to_string());
         dn.push(rcgen::DnType::CommonName, spki_hash.to_string());
@@ -140,10 +141,10 @@ impl Credential {
             .self_signed(keypair.rcgen())
             .map_err(CreateCredentialsError::SelfSignError)?;
 
-        let certificate = Certificate::from_der(certificate.der().to_vec())
+        let certificate = UnverifiedCertificate::from_der(certificate.der().to_vec())
             .map_err(CreateCertificateError::CertificateParseError)?;
 
-        let temp = Self::new(keypair, certificate)?;
+        let temp = Self::new(keypair, certificate.mark_as_trusted())?;
 
         Ok(temp)
     }
@@ -166,8 +167,9 @@ impl Credential {
 
         let keypair = KeyPair::generate();
 
-        let spki_hash =
-            Certificate::compute_spki_hash(&keypair.export_public_key().subject_public_key_info());
+        let spki_hash = UnverifiedCertificate::compute_spki_hash(
+            &keypair.export_public_key().subject_public_key_info(),
+        );
         let mut dn = rcgen::DistinguishedName::new();
         dn.push(
             rcgen::DnType::OrganizationalUnitName,
@@ -181,10 +183,10 @@ impl Credential {
             .self_signed(keypair.rcgen())
             .map_err(CreateCredentialsError::SelfSignError)?;
 
-        let certificate = Certificate::from_der(certificate.der().to_vec())
+        let certificate = UnverifiedCertificate::from_der(certificate.der().to_vec())
             .map_err(CreateCertificateError::CertificateParseError)?;
 
-        let root = Self::new(keypair, certificate)?;
+        let root = Self::new(keypair, certificate.mark_as_trusted())?;
 
         Ok(root)
     }
@@ -216,7 +218,8 @@ impl Credential {
         leaf_parameters.use_authority_key_identifier_extension = true;
         leaf_parameters.key_identifier_method = rcgen::KeyIdMethod::Sha256;
 
-        let spki_hash = Certificate::compute_spki_hash(&public_key.subject_public_key_info());
+        let spki_hash =
+            UnverifiedCertificate::compute_spki_hash(&public_key.subject_public_key_info());
         let mut dn = rcgen::DistinguishedName::new();
         dn.push(
             rcgen::DnType::OrganizationalUnitName,
@@ -234,9 +237,9 @@ impl Credential {
             )
             .map_err(CreateCertificateError::SignCertificateError)?;
 
-        let leaf = Certificate::from_der(certificate.der().to_vec())?;
+        let leaf = UnverifiedCertificate::from_der(certificate.der().to_vec())?;
 
-        Ok(leaf)
+        Ok(leaf.mark_as_trusted())
     }
 
     /// Creates a certificate with the given public key.
@@ -270,7 +273,7 @@ impl Credential {
         let encrypted_keypair = self.data.keypair.encrypt(password).await?;
         let on_disk = EncryptedCredential {
             encrypted_keypair,
-            certificate: self.data.certificate.clone(),
+            certificate: self.data.certificate.clone().to_unverified(),
         };
 
         Ok(on_disk)
