@@ -29,6 +29,7 @@ use crate::{
     signed_message::CanSign,
 };
 
+pub mod client;
 pub mod delivery_service;
 mod group_defaults;
 pub mod message_types;

@@ -16,7 +16,7 @@ svalin_macros = { path = "../svalin_macros" }
 svalin_pki = { path = "../svalin_pki" }
 quinn = { version = "0.11.9", features = ["ring"] }
 tracing = { workspace = true }
-test-log = { version = "0.2.18", features = ["trace"] }
+test-log = { version = "0.2.19", features = ["trace"] }
 tokio-rustls = { version = "0.26.4", default-features = false, features = [
     "ring",
 ] }

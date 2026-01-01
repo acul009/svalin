@@ -8,7 +8,7 @@ anyhow = "1.0.100"
 argon2 = { version = "0.5.3", features = ["simple", "std"] }
 postcard = { workspace = true }
 rand = { workspace = true }
-rcgen = { version = "0.14.5", features = ["x509-parser", "zeroize"] }
+rcgen = { version = "0.14.6", features = ["x509-parser", "zeroize"] }
 ring = "0.17.14"
 rustls = { version = "0.23.35", default-features = false, features = ["std"] }
 serde = { workspace = true }
@@ -18,11 +18,12 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 x509-parser = { version = "0.18.0", features = ["ring", "validate", "verify"] }
 zeroize = { version = "1.8.2", features = ["aarch64", "derive", "std"] }
-openmls = { version = "0.7.1", features = ["openmls_rust_crypto"] }
+openmls = { version = "0.7.1", features = ["openmls_rust_crypto", "sqlite-provider"] }
 openmls_traits = "0.4.1"
 tls_codec = { version = "0.4.2" }
 sha2 = "0.10.9"
 openmls_rust_crypto = "0.4.1"
+openmls_sqlite_storage = "0.1.1"
 
 # [dev-dependencies]
 # serde_json = { workspace = true }
