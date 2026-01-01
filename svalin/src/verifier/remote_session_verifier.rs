@@ -28,6 +28,7 @@ impl Verifier for RemoteSessionVerifier {
         spki_hash: &SpkiHash,
         time: u64,
     ) -> Result<svalin_pki::Certificate, svalin_pki::VerifyError> {
+        tracing::debug!("entering remote session verifier");
         let unverified_chain = self
             .connection
             .dispatch(ChainRequest::Session(spki_hash.clone()))
@@ -38,6 +39,7 @@ impl Verifier for RemoteSessionVerifier {
 
         let leaf = chain.take_leaf();
 
+        tracing::debug!("exiting remote session verifier");
         if leaf.certificate_type() == CertificateType::UserDevice {
             Ok(leaf)
         } else {

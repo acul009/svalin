@@ -37,6 +37,7 @@ impl Verifier for RemoteAgentVerifier {
         spki_hash: &SpkiHash,
         time: u64,
     ) -> Result<svalin_pki::Certificate, svalin_pki::VerifyError> {
+        tracing::debug!("entering remote agent verifier");
         if let Some(cached) = self.cache.get(spki_hash) {
             cached.check_validity_at(get_current_timestamp())?;
             return Ok(cached.clone());
@@ -44,7 +45,7 @@ impl Verifier for RemoteAgentVerifier {
 
         let unverified_chain = self
             .connection
-            .dispatch(ChainRequest::Session(spki_hash.clone()))
+            .dispatch(ChainRequest::Agent(spki_hash.clone()))
             .await
             .map_err(|err| VerifyError::InternalError(err.into()))?;
 
@@ -54,8 +55,10 @@ impl Verifier for RemoteAgentVerifier {
 
         if leaf.certificate_type() == CertificateType::Agent {
             self.cache.insert(leaf.spki_hash().clone(), leaf.clone());
+            tracing::debug!("exiting remote agent verifier");
             Ok(leaf)
         } else {
+            tracing::debug!("exiting remote agent verifier");
             Err(VerifyError::IncorrectCertificateType)
         }
     }

@@ -18,8 +18,6 @@ async fn integration_tests() {
     }));
 
     // delete test dbs
-    let _ = std::fs::remove_file("./client.jammdb");
-    let _ = std::fs::remove_dir_all("./client.sled");
     let _ = std::fs::remove_dir_all("./test_data");
 
     let addr = "0.0.0.0:1234".to_socket_addrs().unwrap().next().unwrap();

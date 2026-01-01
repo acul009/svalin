@@ -37,6 +37,7 @@ impl Verifier for IncomingConnectionVerifier {
         spki_hash: &SpkiHash,
         time: u64,
     ) -> Result<Certificate, VerifyError> {
+        tracing::debug!("entering incoming connection verifier");
         let certificate = if let Some(agent) = self.agent_store.get_agent(spki_hash).await? {
             agent
         } else if let Some(session) = self.session_store.get_session(spki_hash).await? {
@@ -54,6 +55,8 @@ impl Verifier for IncomingConnectionVerifier {
 
         let cert_chain = cert_chain.verify(&self.root, time)?;
 
-        Ok(cert_chain.take_leaf())
+        let cert = cert_chain.take_leaf();
+        tracing::debug!("exiting incoming connection verifier");
+        Ok(cert)
     }
 }

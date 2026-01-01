@@ -73,14 +73,14 @@ impl LoadCertificateChainHandler {
     async fn get_certificate_chain(
         &self,
         request: &ChainRequest,
-    ) -> Result<Option<UnverifiedCertificateChain>, anyhow::Error> {
+    ) -> Result<UnverifiedCertificateChain, anyhow::Error> {
         let certificate = match request {
             ChainRequest::Session(spki_hash) => self.session_store.get_session(spki_hash).await?,
             ChainRequest::Agent(spki_hash) => self.agent_store.get_agent(spki_hash).await?,
         };
 
         let Some(certificate) = certificate else {
-            return Ok(None);
+            return Err(anyhow::anyhow!("Certificate not found"));
         };
 
         let cert_chain = CertificateChainBuilder::new(certificate);
@@ -90,7 +90,7 @@ impl LoadCertificateChainHandler {
             .complete_certificate_chain(cert_chain)
             .await?;
 
-        Ok(Some(cert_chain))
+        Ok(cert_chain)
     }
 }
 

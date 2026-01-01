@@ -21,6 +21,7 @@ use svalin_rpc::{
 };
 use tokio::{select, sync::watch};
 use tokio_util::sync::CancellationToken;
+use tracing::debug;
 
 use crate::{
     client::{Client, device::Device},
@@ -124,7 +125,7 @@ impl CommandHandler for AgentListHandler {
                                 online_status,
                             };
 
-                            // debug!("sending update to client: {:?}", item);
+                            debug!("sending update to client: {:?}", item);
 
                             session.write_object(&item).await?;
                         },
@@ -150,7 +151,7 @@ pub enum UpdateAgentListError {
     #[error("failed to receive AgentListItemTransport: {0}")]
     ReceiveItemError(#[from] SessionReadError),
     #[error("failed to verify AgentListItemTransport: {0}")]
-    VerifyItemError(#[from] VerifyError),
+    VerifyItemCertificateError(#[from] VerifyError),
 }
 
 impl CommandDispatcher for UpdateAgentList {
