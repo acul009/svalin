@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, CertificateType, SpkiHash};
+use svalin_pki::{
+    Certificate, CertificateType, SignatureVerificationError, SpkiHash, UnverifiedCertificate,
+    UnverifiedCertificateChain, VerificationError, VerifyChainError, get_current_timestamp,
+};
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::{Session, SessionReadError},
@@ -12,28 +15,58 @@ use tokio_util::sync::CancellationToken;
 use crate::server::{session_store::SessionStore, user_store::UserStore};
 
 #[derive(Serialize, Deserialize)]
+pub struct UnverifiedUserCertificates {
+    pub cert_chain: UnverifiedCertificateChain,
+    pub session_certs: Vec<UnverifiedCertificate>,
+}
+
 pub struct UserCertificates {
     pub user_cert: Certificate,
     pub session_certs: Vec<Certificate>,
 }
 
-impl UserCertificates {
-    fn verify(self) -> Result<Self, ()> {
-        match self.user_cert.certificate_type() {
+#[derive(Debug, thiserror::Error)]
+pub enum VerifyUserCertificatesError {
+    #[error("user certificate chain error")]
+    ChainError(#[from] VerifyChainError),
+    #[error("session certificate error")]
+    SessionError(#[from] SignatureVerificationError),
+    #[error("wrong user certificate type")]
+    WrongUserCertType,
+    #[error("wrong session certificate type")]
+    WrongSessionCertType,
+}
+
+impl UnverifiedUserCertificates {
+    fn verify(self, root: &Certificate) -> Result<UserCertificates, VerifyUserCertificatesError> {
+        let chain = self.cert_chain.verify(root, get_current_timestamp())?;
+        let user_cert = chain.take_leaf();
+
+        match user_cert.certificate_type() {
             CertificateType::Root | CertificateType::User => (),
-            _ => return Err(()),
+            _ => return Err(VerifyUserCertificatesError::WrongUserCertType),
         }
 
-        for session in &self.session_certs {
-            match session.certificate_type() {
-                CertificateType::UserDevice => (),
-                _ => return Err(()),
-            }
-        }
+        let session_certs = self
+            .session_certs
+            .into_iter()
+            .map(|session| {
+                let session = session.verify_signature(&user_cert, get_current_timestamp())?;
+                match session.certificate_type() {
+                    CertificateType::UserDevice => Ok(session),
+                    _ => return Err(VerifyUserCertificatesError::WrongSessionCertType),
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(self)
+        Ok(UserCertificates {
+            user_cert,
+            session_certs,
+        })
     }
+}
 
+impl UserCertificates {
     pub fn to_vec(self) -> Vec<Certificate> {
         let mut vec = self.session_certs;
         vec.push(self.user_cert);
@@ -56,7 +89,7 @@ pub enum GetUserKeyPackagesError {
 }
 
 impl<'a> CommandDispatcher for GetUserKeyPackages<'a> {
-    type Output = UserCertificates;
+    type Output = UnverifiedUserCertificates;
 
     type Error = GetUserKeyPackagesError;
 
@@ -74,7 +107,7 @@ impl<'a> CommandDispatcher for GetUserKeyPackages<'a> {
         self,
         session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
-        let response: Result<UserCertificates, ()> = session.read_object().await?;
+        let response: Result<UnverifiedUserCertificates, ()> = session.read_object().await?;
         match response {
             Err(()) => Err(GetUserKeyPackagesError::ServerError),
             Ok(certs) => certs
@@ -107,13 +140,13 @@ impl CommandHandler for GetUserCertificateHandler {
             Ok(Some(user)) => user,
             Ok(None) => {
                 let _ = session
-                    .write_object(&Result::<UserCertificates, ()>::Err(()))
+                    .write_object(&Result::<UnverifiedUserCertificates, ()>::Err(()))
                     .await;
                 return Ok(());
             }
             Err(err) => {
                 let _ = session
-                    .write_object(&Result::<UserCertificates, ()>::Err(()))
+                    .write_object(&Result::<UnverifiedUserCertificates, ()>::Err(()))
                     .await;
                 return Err(err);
             }
@@ -123,14 +156,14 @@ impl CommandHandler for GetUserCertificateHandler {
             Ok(sessions) => sessions,
             Err(err) => {
                 let _ = session
-                    .write_object(&Result::<UserCertificates, ()>::Err(()))
+                    .write_object(&Result::<UnverifiedUserCertificates, ()>::Err(()))
                     .await;
                 return Err(err);
             }
         };
 
-        let certs: Result<_, ()> = Ok(UserCertificates {
-            user_cert: user,
+        let certs: Result<_, ()> = Ok(UnverifiedUserCertificates {
+            cert_chain: user,
             session_certs: sessions,
         });
 

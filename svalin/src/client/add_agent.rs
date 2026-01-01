@@ -1,11 +1,11 @@
 use std::fmt::Debug;
 
-use crate::shared::join_agent::{PublicAgentData, accept_handler::AcceptJoin, add_agent::AddAgent};
+use crate::shared::join_agent::{accept_handler::AcceptJoin, add_agent::AddAgent};
 
 use super::Client;
 
 use anyhow::{Result, anyhow};
-use svalin_pki::{Certificate, Credential, SignedObject};
+use svalin_pki::Certificate;
 use svalin_rpc::rpc::connection::{
     Connection, ConnectionDispatchError, direct_connection::DirectConnection,
 };
@@ -48,7 +48,6 @@ impl Client {
             confirm_code_send,
             result_revc: result_recv,
             connection: self.rpc.upstream_connection(),
-            credentials: self.user_credential.clone(),
         })
     }
 }
@@ -57,7 +56,6 @@ pub struct WaitingForConfirmCode {
     connection: DirectConnection,
     confirm_code_send: oneshot::Sender<String>,
     result_revc: oneshot::Receiver<Result<Certificate, ConnectionDispatchError<anyhow::Error>>>,
-    credentials: Credential,
 }
 
 impl Debug for WaitingForConfirmCode {
@@ -67,22 +65,14 @@ impl Debug for WaitingForConfirmCode {
 }
 
 impl WaitingForConfirmCode {
-    pub async fn confirm(self, confirm_code: String, agent_name: String) -> Result<()> {
+    pub async fn confirm(self, confirm_code: String) -> Result<()> {
         self.confirm_code_send.send(confirm_code).unwrap();
         let certificate = self.result_revc.await?.map_err(|err| anyhow!(err))?;
 
         debug!("agent certificate successfully created and sent");
 
-        let agent = SignedObject::new(
-            &PublicAgentData {
-                cert: certificate,
-                name: agent_name,
-            },
-            &self.credentials,
-        )?;
-
         self.connection
-            .dispatch(AddAgent { agent: &agent })
+            .dispatch(AddAgent::new(&certificate))
             .await
             .map_err(|err| anyhow!(err))?;
 

@@ -1,95 +1,73 @@
 use std::sync::Arc;
 
-use anyhow::{Ok, Result};
-use futures::future::try_join_all;
+use anyhow::{Ok, Result, anyhow};
 use sqlx::SqlitePool;
-use svalin_pki::{
-    Certificate, ExactVerififier, SignedObject, SpkiHash, VerifiedObject, get_current_timestamp,
-};
+use svalin_pki::{Certificate, SpkiHash, UnverifiedCertificate};
 use tokio::sync::broadcast;
-
-use crate::shared::join_agent::PublicAgentData;
 
 #[derive(Debug)]
 pub struct AgentStore {
     pool: SqlitePool,
     broadcast: broadcast::Sender<AgentUpdate>,
-    verifier: ExactVerififier,
 }
 
 #[derive(Clone, Debug)]
 pub enum AgentUpdate {
-    Add(Arc<VerifiedObject<PublicAgentData>>),
+    Add(Certificate),
 }
 
 impl AgentStore {
-    pub fn open(pool: SqlitePool, root: Certificate) -> Arc<Self> {
+    pub fn open(pool: SqlitePool) -> Arc<Self> {
         let (broadcast, _) = broadcast::channel(10);
-        Arc::new(Self {
-            pool,
-            broadcast,
-            verifier: ExactVerififier::new(root),
-        })
+        Arc::new(Self { pool, broadcast })
     }
 
-    pub async fn get_agent(
-        &self,
-        spki_hash: &SpkiHash,
-    ) -> Result<Option<SignedObject<PublicAgentData>>> {
+    pub async fn get_agent(&self, spki_hash: &SpkiHash) -> Result<Option<UnverifiedCertificate>> {
         let spki_hash = spki_hash.as_slice();
 
-        let agent_data = sqlx::query!("SELECT data FROM agents WHERE spki_hash = ?", spki_hash)
-            .fetch_optional(&self.pool)
-            .await?;
+        let agent_data = sqlx::query_scalar!(
+            "SELECT certificate FROM agents WHERE spki_hash = ?",
+            spki_hash
+        )
+        .fetch_optional(&self.pool)
+        .await?;
 
         match agent_data {
             None => Ok(None),
-            Some(agent_data) => {
-                let agent: SignedObject<PublicAgentData> = postcard::from_bytes(&agent_data.data)?;
-
-                Ok(Some(
-                    agent
-                        .verify(&self.verifier, get_current_timestamp())
-                        .await?
-                        .pack_owned(),
-                ))
-            }
+            Some(der) => Ok(Some(UnverifiedCertificate::from_der(der)?)),
         }
     }
 
-    pub async fn add_agent(&self, agent: SignedObject<PublicAgentData>) -> Result<()> {
-        let agent = agent
-            .verify(&self.verifier, get_current_timestamp())
-            .await?;
-
-        let spki_hash = agent.cert.spki_hash();
-        let spki_hash = spki_hash.as_slice();
-        let agent_data = postcard::to_stdvec(agent.pack())?;
+    pub async fn add_agent(&self, agent: Certificate) -> Result<()> {
+        let spki_hash = agent.spki_hash().as_slice();
+        let certificate = agent.as_der();
 
         sqlx::query!(
-            "INSERT INTO agents (spki_hash, data) VALUES (?, ?)",
+            "INSERT INTO agents (spki_hash, certificate) VALUES (?, ?)",
             spki_hash,
-            agent_data
+            certificate
         )
         .execute(&self.pool)
         .await?;
 
-        self.broadcast.send(AgentUpdate::Add(Arc::new(agent)))?;
+        self.broadcast.send(AgentUpdate::Add(agent))?;
 
         Ok(())
     }
 
-    pub async fn list_agents(&self) -> Result<Vec<VerifiedObject<PublicAgentData>>> {
-        let agent_data = sqlx::query!("SELECT data FROM agents")
+    pub async fn list_agents(&self) -> Result<Vec<UnverifiedCertificate>> {
+        let agent_data = sqlx::query_scalar!("SELECT certificate FROM agents")
             .fetch_all(&self.pool)
             .await?;
 
-        try_join_all(agent_data.into_iter().map(|row| async move {
-            let agent: SignedObject<PublicAgentData> = postcard::from_bytes(&row.data)?;
+        let certificates = agent_data
+            .into_iter()
+            .map(|certificate| {
+                UnverifiedCertificate::from_der(certificate).map_err(|err| anyhow!(err))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-            agent.verify(&self.verifier, get_current_timestamp()).await
-        }))
-        .await
+        Ok(certificates)
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<AgentUpdate> {

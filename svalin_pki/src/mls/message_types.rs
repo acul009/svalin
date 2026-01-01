@@ -5,7 +5,6 @@ use crate::Certificate;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Invitation {
-    receivers: Vec<Certificate>,
     invitation: Vec<u8>,
 }
 
@@ -18,17 +17,13 @@ pub enum InvitationError {
 }
 
 impl Invitation {
-    pub(crate) fn new(
-        invitation: MlsMessageOut,
-        receivers: Vec<Certificate>,
-    ) -> Result<Self, InvitationError> {
+    pub(crate) fn new(invitation: MlsMessageOut) -> Result<Self, InvitationError> {
         match invitation.body() {
             openmls::prelude::MlsMessageBodyOut::Welcome(_) => {}
             _ => return Err(InvitationError::NotAnInvitation),
         }
 
         Ok(Self {
-            receivers,
             invitation: invitation.tls_serialize_detached()?,
         })
     }

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
-use svalin_pki::{ArgonParams, Certificate, Credential, ExportedPublicKey};
+use svalin_pki::{ArgonParams, Certificate, Credential, ExportedPublicKey, RootCertificate};
 use svalin_rpc::{
     rpc::{
         command::{
@@ -84,7 +84,7 @@ pub struct AcceptJoin<'a> {
     pub waiting_for_confirm: tokio::sync::oneshot::Sender<Result<()>>,
     pub confirm_code_channel: tokio::sync::oneshot::Receiver<String>,
     pub credentials: &'a Credential,
-    pub root: &'a Certificate,
+    pub root: &'a RootCertificate,
     pub upstream: &'a Certificate,
 }
 
@@ -140,21 +140,21 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
                         .await
                         .map_err(|err| anyhow!(err))?;
                     debug!("received public key: {:?}", public_key);
-                    let agent_cert: Certificate = self
+                    let agent_cert = self
                         .credentials
                         .create_agent_certificate_for_key(&public_key)
                         .map_err(|err| anyhow!(err))?;
 
                     session_e2e
-                        .write_object(&agent_cert)
+                        .write_object(agent_cert.as_unverified())
                         .await
                         .map_err(|err| anyhow!(err))?;
                     session_e2e
-                        .write_object(self.root)
+                        .write_object(self.root.as_unverified())
                         .await
                         .map_err(|err| anyhow!(err))?;
                     session_e2e
-                        .write_object(self.upstream)
+                        .write_object(self.upstream.as_unverified())
                         .await
                         .map_err(|err| anyhow!(err))?;
 

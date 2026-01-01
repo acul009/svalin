@@ -3,7 +3,10 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, Credential, ExactVerififier, SignedObject, get_current_timestamp};
+use svalin_pki::{
+    Certificate, Credential, KnownCertificateVerifier, SpkiHash, UnverifiedCertificate,
+    VerifyError, get_current_timestamp,
+};
 use svalin_rpc::{
     commands::forward::ForwardConnection,
     rpc::{
@@ -20,21 +23,21 @@ use tokio::{select, sync::watch};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    client::{Client, device::Device, tunnel_manager::TunnelManager},
+    client::{Client, device::Device},
     permissions::Permission,
     server::agent_store::{AgentStore, AgentUpdate},
-    shared::join_agent::PublicAgentData,
+    verifier::remote_agent_verifier::RemoteAgentVerifier,
 };
 
 #[derive(Clone, Debug)]
 pub struct AgentListItem {
-    pub public_data: PublicAgentData,
-    pub is_online: bool,
+    pub certificate: Certificate,
+    pub online_status: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct AgentListItemTransport {
-    pub public_data: SignedObject<PublicAgentData>,
+    pub certificate: UnverifiedCertificate,
     pub online_status: bool,
 }
 
@@ -78,9 +81,9 @@ impl CommandHandler for AgentListHandler {
         let agents = self.agent_store.list_agents().await?;
 
         for agent in agents {
-            let online_status = currently_online.contains(&agent.cert);
+            let online_status = currently_online.contains(&agent.spki_hash());
             let item = AgentListItemTransport {
-                public_data: agent.pack_owned(),
+                certificate: agent,
                 online_status,
             };
 
@@ -95,13 +98,13 @@ impl CommandHandler for AgentListHandler {
                 online_update = receiver.recv() => {
                     let online_update = online_update?;
 
-                    let agent = self
+                    let agent_certificate = self
                         .agent_store
                         .get_agent(&online_update.client.spki_hash()).await?;
 
-                    if let Some(agent) = agent {
+                    if let Some(agent) = agent_certificate {
                         let item = AgentListItemTransport {
-                            public_data: agent,
+                            certificate: agent,
                             online_status: online_update.online,
                         };
 
@@ -114,10 +117,10 @@ impl CommandHandler for AgentListHandler {
                     let store_update = store_update?;
 
                     match store_update {
-                        AgentUpdate::Add(public_data) => {
-                            let online_status = self.server.is_client_connected(&public_data.cert).await;
+                        AgentUpdate::Add(agent_certificate) => {
+                            let online_status = self.server.is_client_connected(&agent_certificate).await;
                             let item = AgentListItemTransport {
-                                public_data: public_data.pack().clone(),
+                                certificate: agent_certificate.to_unverified(),
                                 online_status,
                             };
 
@@ -137,18 +140,17 @@ pub struct UpdateAgentList {
     pub base_connection: DirectConnection,
     pub client: Arc<Client>,
     pub credentials: Credential,
-    pub list: watch::Sender<BTreeMap<Certificate, Device>>,
-    pub verifier: ExactVerififier,
-    pub tunnel_manager: TunnelManager,
+    pub list: watch::Sender<BTreeMap<SpkiHash, Device>>,
+    pub verifier: RemoteAgentVerifier,
     pub cancel: CancellationToken,
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum UpdateAgentListError {
     #[error("failed to receive AgentListItemTransport: {0}")]
-    ReceiveItemError(SessionReadError),
+    ReceiveItemError(#[from] SessionReadError),
     #[error("failed to verify AgentListItemTransport: {0}")]
-    VerifyItemError(anyhow::Error),
+    VerifyItemError(#[from] VerifyError),
 }
 
 impl CommandDispatcher for UpdateAgentList {
@@ -175,31 +177,33 @@ impl CommandDispatcher for UpdateAgentList {
                         .await
                         .map_err(UpdateAgentListError::ReceiveItemError)?;
 
-                    let public_data = list_item_update
-                        .public_data
-                        .verify(&self.verifier, get_current_timestamp())
-                        .await
-                        .map_err(UpdateAgentListError::VerifyItemError)?;
+                    let certificate = self
+                        .verifier
+                        .verify_known_certificate(
+                            &list_item_update.certificate,
+                            get_current_timestamp(),
+                        )
+                        .await?;
 
                     let item = AgentListItem {
-                        is_online: list_item_update.online_status,
-                        public_data: public_data.unpack(),
+                        online_status: list_item_update.online_status,
+                        certificate,
                     };
 
                     self.list.send_modify(|list| {
-                        if let Some(device) = list.get(&item.public_data.cert) {
+                        if let Some(device) = list.get(&item.certificate.spki_hash()) {
                             device.update(item);
                         } else {
+                            let spki_hash = item.certificate.spki_hash().clone();
                             let device_connection = ForwardConnection::new(
                                 self.base_connection.clone(),
                                 self.credentials.clone(),
-                                item.public_data.cert.clone(),
+                                item.certificate.clone(),
                             );
 
-                            let cert = item.public_data.cert.clone();
                             let device = Device::new(device_connection, item, self.client.clone());
 
-                            list.insert(cert, device);
+                            list.insert(spki_hash, device);
                         }
                     });
                 }

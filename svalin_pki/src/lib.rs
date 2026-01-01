@@ -18,11 +18,12 @@ pub use sha2::Sha512;
 pub use argon::{ArgonCost, ArgonParams, DeriveKeyError, ParamsStringParseError, PasswordHash};
 pub use argon2;
 pub use certificate::{
-    Certificate, CertificateParseError, CertificateType, SignatureVerificationError,
-    SpkiHash, ValidityError,
+    Certificate, CertificateParseError, CertificateType, RootCertificate,
+    SignatureVerificationError, SpkiHash, UnverifiedCertificate, UseAsRootError, ValidityError,
 };
 pub use certificate_chain::{
-    AddCertificateError, CertificateChain, CertificateChainBuilder, VerifyChainError,
+    AddCertificateError, CertificateChain, CertificateChainBuilder, UnverifiedCertificateChain,
+    VerifyChainError,
 };
 pub use credential::{
     CreateCertificateError, CreateCredentialsError, Credential, DecodeCredentialsError,
@@ -32,7 +33,7 @@ pub use encrypt::{DecryptError, EncryptError, EncryptedData, EncryptedObject};
 pub use keypair::{ExportedPublicKey, KeyPair};
 // pub use signed_object::{SignedObject, VerifiedObject};
 pub use signed_object::{SignedObject, VerifiedObject};
-pub use verifier::{KnownCertificateVerifier, VerificationError, Verifier, exact::ExactVerififier};
+pub use verifier::{KnownCertificateVerifier, Verifier, VerifyError, exact::ExactVerififier};
 
 // normal use statements
 use anyhow::Result;

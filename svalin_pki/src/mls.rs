@@ -15,13 +15,10 @@ use openmls::{
         KeyPackageNewError, KeyPackageVerifyError, MlsMessageBodyIn, MlsMessageIn, MlsMessageOut,
         PrivateMessageIn, ProcessedMessageContent, ProtocolMessage, ProtocolVersion, Welcome,
     },
-    treesync::RatchetTree,
 };
 use openmls_rust_crypto::{MemoryStorage, MemoryStorageError, RustCrypto};
 use openmls_traits::{OpenMlsProvider, signatures::SignerError};
 use rand::RngCore;
-use serde::{Deserialize, Serialize};
-use x509_parser::asn1_rs::AsTaggedExplicit;
 
 use crate::{
     Certificate, Credential, DecryptError, EncryptError, EncryptedObject,
@@ -41,7 +38,7 @@ impl From<&Certificate> for openmls::credentials::Credential {
     fn from(value: &Certificate) -> Self {
         // While there is the X509 credential type, it is not yet supported my openmls.
         // For now we'll have to use basic and handle verification ourselfves
-        Self::new(CredentialType::Basic, value.to_der().to_vec())
+        Self::new(CredentialType::Basic, value.as_der().to_vec())
     }
 }
 
@@ -250,7 +247,7 @@ impl Group {
 
         self.group.merge_pending_commit(self.provider.deref())?;
 
-        let invitation = Invitation::new(welcome, todo!())?;
+        let invitation = Invitation::new(welcome)?;
 
         Ok((message, invitation))
     }

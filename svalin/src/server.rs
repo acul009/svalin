@@ -7,7 +7,9 @@ use config_builder::ServerConfigBuilder;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
-use svalin_pki::{Certificate, Credential, EncryptedCredential, KnownCertificateVerifier};
+use svalin_pki::{
+    Credential, EncryptedCredential, KnownCertificateVerifier, UnverifiedCertificate,
+};
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},
     rpc::{command::handler::HandlerCollection, server::Socket},
@@ -62,7 +64,7 @@ pub struct Server {
 
 #[derive(Serialize, Deserialize)]
 struct BaseConfig {
-    root_cert: Certificate,
+    root_cert: UnverifiedCertificate,
     credentials: EncryptedCredential,
     key_source: KeySource,
     pseudo_data_seed: Vec<u8>,
@@ -159,7 +161,7 @@ impl Server {
                 let key_source = KeySource::generate_builtin()?;
 
                 let conf = BaseConfig {
-                    root_cert: init_success.root,
+                    root_cert: init_success.root.to_unverified(),
                     credentials: key_source
                         .encrypt_credential(&init_success.credential)
                         .await?,
@@ -173,13 +175,13 @@ impl Server {
             }
         };
 
-        let root = base_config.root_cert;
+        let root = base_config.root_cert.use_as_root()?;
 
-        let user_store = UserStore::open(pool.clone(), root.clone());
+        let user_store = UserStore::open(pool.clone());
 
-        let session_store = SessionStore::open(pool.clone(), user_store.clone());
+        let session_store = SessionStore::open(pool.clone());
 
-        let agent_store = AgentStore::open(pool.clone(), root.clone());
+        let agent_store = AgentStore::open(pool.clone());
 
         let credentials = base_config
             .key_source
@@ -197,7 +199,7 @@ impl Server {
         let verifier = TlsOptionalWrapper::new(verifier);
 
         let command_builder = SvalinCommandBuilder {
-            root_cert: root.clone(),
+            root_cert: root,
             server_cert: credentials.get_certificate().clone(),
             user_store,
             agent_store,

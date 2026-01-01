@@ -1,11 +1,12 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use openmls::prelude::{
     KeyPackage, KeyPackageIn, KeyPackageVerifyError, OpenMlsCrypto, ProtocolVersion,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{Certificate, KnownCertificateVerifier, SpkiHash, VerificationError, Verifier};
+use crate::{
+    Certificate, KnownCertificateVerifier, SpkiHash, Verifier, VerifyError,
+    certificate::UnverifiedCertificate, get_current_timestamp,
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct UnverifiedNewMember {
@@ -26,7 +27,7 @@ pub enum VerifyNewMemberError {
     #[error("Signature key mismatch")]
     SignatureKeyMismatch,
     #[error("Certificate verification error: {0}")]
-    CertificateVerificationError(#[from] VerificationError),
+    CertificateVerificationError(#[from] VerifyError),
 }
 
 impl UnverifiedNewMember {
@@ -38,26 +39,21 @@ impl UnverifiedNewMember {
     ) -> Result<NewMember, VerifyNewMemberError> {
         let key_package = self.key_package.validate(crypto, protocol_version)?;
 
-        let cert: Certificate = key_package.leaf_node().credential().deserialized()?;
+        let unverified_cert: UnverifiedCertificate =
+            key_package.leaf_node().credential().deserialized()?;
 
         let signature_key = key_package.leaf_node().signature_key();
-        if signature_key.as_slice() != cert.public_key() {
+        if signature_key.as_slice() != unverified_cert.public_key() {
             return Err(VerifyNewMemberError::SignatureKeyMismatch);
         }
 
-        verifier
-            .verify_known_certificate(
-                &cert,
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("We should never be before the unix epoch")
-                    .as_secs(),
-            )
+        let verified_cert = verifier
+            .verify_known_certificate(&unverified_cert, get_current_timestamp())
             .await?;
 
         Ok(NewMember {
             key_package,
-            certificate: cert,
+            certificate: verified_cert,
         })
     }
 }

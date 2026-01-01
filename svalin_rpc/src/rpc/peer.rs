@@ -1,4 +1,4 @@
-use std::{fmt::Debug, path::Display};
+use std::fmt::Debug;
 
 use svalin_pki::Certificate;
 

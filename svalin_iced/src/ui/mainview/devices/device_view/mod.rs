@@ -51,7 +51,7 @@ impl DeviceView {
         let status = DeviceStatus::new(&device);
 
         let recipe = WatchRecipe::new(
-            format!("device-{:x?}", item.public_data.cert.fingerprint()),
+            format!("device-{:x?}", item.certificate.cert.fingerprint()),
             device.subscribe_item(),
             Message::ItemUpdate,
         );
@@ -119,7 +119,7 @@ impl DeviceView {
     pub fn header(&self) -> Option<crate::Element<Message>> {
         Some(
             header(
-                text(&self.item.public_data.name)
+                text(&self.item.certificate.name)
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .center(),

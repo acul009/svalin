@@ -21,7 +21,7 @@ impl DeviceStatus {
             recipe: WatchRecipe::new(
                 format!(
                     "realtime-{:x?}",
-                    device.item().public_data.cert.fingerprint()
+                    device.item().certificate.cert.fingerprint()
                 ),
                 device.subscribe_realtime(),
                 Message::Refresh,

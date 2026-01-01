@@ -3,7 +3,10 @@ use std::time::Duration;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use rand::Rng;
-use svalin_pki::{Certificate, CreateCredentialsError, Credential, DeriveKeyError, KeyPair};
+use svalin_pki::{
+    CreateCredentialsError, Credential, DeriveKeyError, KeyPair, SignatureVerificationError,
+    UnverifiedCertificate, UseAsRootError, get_current_timestamp,
+};
 use svalin_rpc::{
     rpc::{
         command::{
@@ -74,35 +77,41 @@ impl TakeableCommandHandler for JoinRequestHandler {
 #[derive(Debug, thiserror::Error)]
 pub enum RequestJoinError {
     #[error("error reading join code: {0}")]
-    JoinCodeReadError(SessionReadError),
+    JoinCodeReadError(#[source] SessionReadError),
     #[error("error sending join code through channel")]
     ChannelSendError,
     #[error("error reading join code from client: {0}")]
-    SecondJoinCodeReadError(SessionReadError),
+    SecondJoinCodeReadError(#[source] SessionReadError),
     #[error("error sending confirm status: {0}")]
-    SendConfirmStatusError(SessionWriteError),
+    SendConfirmStatusError(#[source] SessionWriteError),
     #[error("confirm code did not match")]
     ConfirmError,
     #[error("error creating TLS client: {0}")]
-    TlsCreateClientError(TlsClientError),
+    TlsCreateClientError(#[source] TlsClientError),
     #[error("error creating temp credentials: {0}")]
-    CreateCredentialsError(CreateCredentialsError),
+    CreateCredentialsError(#[source] CreateCredentialsError),
     #[error("error creating TLS server: {0}")]
-    TlsCreateServerError(TlsServerError),
+    TlsCreateServerError(#[source] TlsServerError),
     #[error("error reading params: {0}")]
-    ReadParamsError(SessionReadError),
+    ReadParamsError(#[source] SessionReadError),
     #[error("error deriving confirm key: {0}")]
-    DeriveKeyError(DeriveKeyError),
+    DeriveKeyError(#[source] DeriveKeyError),
     #[error("error sending request: {0}")]
-    SendRequestError(SessionWriteError),
+    SendRequestError(#[source] SessionWriteError),
     #[error("error reading certificate: {0}")]
-    ReadCertificateError(SessionReadError),
+    ReadCertificateError(#[source] SessionReadError),
     #[error("error upgrading credentials: {0}")]
-    UpgradeError(CreateCredentialsError),
+    UpgradeError(#[source] CreateCredentialsError),
     #[error("error reading upstream cert: {0}")]
-    ReadUpstreamCertError(SessionReadError),
+    ReadUpstreamCertError(#[source] SessionReadError),
     #[error("error reading root cert: {0}")]
-    ReadRootCertError(SessionReadError),
+    ReadRootCertError(#[source] SessionReadError),
+    #[error("error verifying root cert")]
+    VerifyRootCertError,
+    #[error("error using root cert: {0}")]
+    UseRootError(#[source] UseAsRootError),
+    #[error("error verifying upstream cert: {0}")]
+    VerifyUpstreamCertError(#[source] SignatureVerificationError),
 }
 
 pub struct RequestJoin {
@@ -215,7 +224,7 @@ impl TakeableCommandDispatcher for RequestJoin {
                 .await
                 .map_err(RequestJoinError::SendRequestError)?;
 
-            let my_cert: Certificate = session
+            let my_cert: UnverifiedCertificate = session
                 .read_object()
                 .await
                 .map_err(RequestJoinError::ReadCertificateError)?;
@@ -223,14 +232,18 @@ impl TakeableCommandDispatcher for RequestJoin {
                 .upgrade(my_cert)
                 .map_err(RequestJoinError::UpgradeError)?;
 
-            let root: Certificate = session
+            let root: UnverifiedCertificate = session
                 .read_object()
                 .await
                 .map_err(RequestJoinError::ReadRootCertError)?;
-            let upstream: Certificate = session
+            let root = root.use_as_root().map_err(RequestJoinError::UseRootError)?;
+            let upstream: UnverifiedCertificate = session
                 .read_object()
                 .await
                 .map_err(RequestJoinError::ReadUpstreamCertError)?;
+            let upstream = upstream
+                .verify_signature(&root, get_current_timestamp())
+                .map_err(RequestJoinError::VerifyUpstreamCertError)?;
 
             debug!("received all neccessary data to initialize agent");
 

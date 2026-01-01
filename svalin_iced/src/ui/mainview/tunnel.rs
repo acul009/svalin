@@ -115,7 +115,7 @@ impl TunnelUi {
         }
         column(self.tunnels.iter().map(|(item, tunnels)| {
             column![
-                container(text(&item.public_data.name))
+                container(text(&item.certificate.name))
                     .padding(20)
                     .width(Length::Fill)
                     .style(|_| container::Style {

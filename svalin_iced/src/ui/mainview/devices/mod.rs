@@ -143,8 +143,8 @@ impl Devices {
                     column!().padding(10).spacing(10),
                     |col, device| {
                         let device = device.1.clone();
-                        let name = device.item().public_data.name.clone();
-                        let color = match device.item().is_online {
+                        let name = device.item().certificate.name.clone();
+                        let color = match device.item().online_status {
                             true => Color::from_rgb8(0, 255, 0),
                             false => Color::from_rgb8(255, 0, 0),
                         };

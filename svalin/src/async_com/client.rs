@@ -4,10 +4,7 @@ use std::{
 };
 
 use anyhow::anyhow;
-use svalin_pki::{
-    Certificate, Credential,
-    mls::{MlsClient, UnvalidatedNewMember, message_types::Invitation},
-};
+use svalin_pki::{Certificate, Credential, mls::MlsClient};
 use svalin_sysctl::sytem_report::SystemReport;
 
 use crate::client::Client;
@@ -47,7 +44,7 @@ impl ClientAsyncCom {
                 .get_user_certificates(self.credential.get_certificate().issuer())
                 .await?;
 
-            let add_root = &certs.user_cert != &self.root;
+            let add_root = &certs.cert_chain != &self.root;
 
             let mut certs = certs.to_vec();
             if add_root {

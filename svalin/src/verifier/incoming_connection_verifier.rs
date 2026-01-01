@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
 use svalin_pki::{
-    Certificate, CertificateChainBuilder, ExactVerififier, SpkiHash, VerificationError, Verifier,
+    Certificate, CertificateChainBuilder, RootCertificate, SpkiHash, Verifier, VerifyError,
 };
 
 use crate::server::{agent_store::AgentStore, session_store::SessionStore, user_store::UserStore};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IncomingConnectionVerifier {
-    root: Certificate,
-    agent_verifier: ExactVerififier,
+    root: RootCertificate,
     user_store: Arc<UserStore>,
     session_store: Arc<SessionStore>,
     agent_store: Arc<AgentStore>,
@@ -17,14 +16,13 @@ pub struct IncomingConnectionVerifier {
 
 impl IncomingConnectionVerifier {
     pub fn new(
-        root: Certificate,
+        root: RootCertificate,
         user_store: Arc<UserStore>,
         session_store: Arc<SessionStore>,
         agent_store: Arc<AgentStore>,
     ) -> Self {
         Self {
             // TODO: user verifier
-            agent_verifier: ExactVerififier::new(root.clone()),
             root,
             user_store,
             session_store,
@@ -38,14 +36,13 @@ impl Verifier for IncomingConnectionVerifier {
         &self,
         spki_hash: &SpkiHash,
         time: u64,
-    ) -> Result<Certificate, VerificationError> {
+    ) -> Result<Certificate, VerifyError> {
         let certificate = if let Some(agent) = self.agent_store.get_agent(spki_hash).await? {
-            let agent_data = agent.verify(&self.agent_verifier, time).await?;
-            agent_data.unpack().cert
+            agent
         } else if let Some(session) = self.session_store.get_session(spki_hash).await? {
             session
         } else {
-            return Err(VerificationError::UnknownCertificate);
+            return Err(VerifyError::UnknownCertificate);
         };
 
         let cert_chain = CertificateChainBuilder::new(certificate);
@@ -55,8 +52,8 @@ impl Verifier for IncomingConnectionVerifier {
             .complete_certificate_chain(cert_chain)
             .await?;
 
-        let certificate = cert_chain.verify(&self.root, time)?;
+        let cert_chain = cert_chain.verify(&self.root, time)?;
 
-        Ok(certificate.clone())
+        Ok(cert_chain.take_leaf())
     }
 }

@@ -1,7 +1,8 @@
 use std::fmt::Debug;
 
 use crate::{
-    Certificate, CreateCredentialsError, Credential, EncryptError, encrypt::EncryptedObject,
+    CreateCredentialsError, Credential, EncryptError, UnverifiedCertificate,
+    encrypt::EncryptedObject,
 };
 use anyhow::Result;
 use rcgen::{PublicKeyData, SignatureAlgorithm};
@@ -51,7 +52,10 @@ impl KeyPair {
         }
     }
 
-    pub fn upgrade(self, certificate: Certificate) -> Result<Credential, CreateCredentialsError> {
+    pub fn upgrade(
+        self,
+        certificate: UnverifiedCertificate,
+    ) -> Result<Credential, CreateCredentialsError> {
         Credential::new(self, certificate)
     }
 

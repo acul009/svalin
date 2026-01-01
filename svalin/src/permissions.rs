@@ -10,7 +10,7 @@ use svalin_rpc::{
 
 use crate::{
     shared::commands::public_server_status::PublicStatusHandler,
-    verifier::load_session_chain::LoadSessionChainHandler,
+    verifier::load_certificate_chain::LoadCertificateChainHandler,
 };
 
 pub mod default_permission_handler;
@@ -42,9 +42,16 @@ impl From<&PermissionPrecursor<ForwardHandler>> for Permission {
     }
 }
 
-impl From<&PermissionPrecursor<LoadSessionChainHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<LoadSessionChainHandler>) -> Self {
-        Permission::AgentOnlyPlaceholder
+impl From<&PermissionPrecursor<LoadCertificateChainHandler>> for Permission {
+    fn from(value: &PermissionPrecursor<LoadCertificateChainHandler>) -> Self {
+        match value.request {
+            crate::verifier::load_certificate_chain::ChainRequest::Session(_) => {
+                Permission::AgentOnlyPlaceholder
+            }
+            crate::verifier::load_certificate_chain::ChainRequest::Agent(_) => {
+                Permission::RootOnlyPlaceholder
+            }
+        }
     }
 }
 

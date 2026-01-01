@@ -9,7 +9,7 @@ use crate::{
 pub mod exact;
 
 #[derive(Debug, Error)]
-pub enum VerificationError {
+pub enum VerifyError {
     #[error("The certificate chain could not be verified: {0}")]
     ChainError(#[from] VerifyChainError),
     #[error("The required logic to verify this certificate has not been written yet")]
@@ -36,6 +36,8 @@ pub enum VerificationError {
         given_cert: UnverifiedCertificate,
         loaded_cert: Certificate,
     },
+    #[error("The certificate type is incorrect")]
+    IncorrectCertificateType,
     #[error("Internal Error: {0}")]
     InternalError(#[from] anyhow::Error),
 }
@@ -45,7 +47,7 @@ pub trait Verifier: Send + Sync + Debug + 'static {
         &self,
         spki_hash: &SpkiHash,
         time: u64,
-    ) -> impl Future<Output = Result<Certificate, VerificationError>> + Send;
+    ) -> impl Future<Output = Result<Certificate, VerifyError>> + Send;
 }
 
 impl<T: Verifier> KnownCertificateVerifier for T {}
@@ -55,14 +57,14 @@ pub trait KnownCertificateVerifier: Verifier + Sized + 'static {
         &self,
         cert: &UnverifiedCertificate,
         time: u64,
-    ) -> impl Future<Output = Result<Certificate, VerificationError>> + Send {
+    ) -> impl Future<Output = Result<Certificate, VerifyError>> + Send {
         async move {
             let fingerprint = cert.spki_hash();
 
             let loaded_cert = self.verify_spki_hash(&fingerprint, time).await?;
 
             if cert != &loaded_cert {
-                Err(VerificationError::SpkiHashCollission {
+                Err(VerifyError::SpkiHashCollission {
                     spki_hash: fingerprint.clone(),
                     loaded_cert,
                     given_cert: cert.clone(),
@@ -92,7 +94,7 @@ pub mod rustls_feat {
     };
     use tokio::task::block_in_place;
 
-    use crate::{certificate::UnverifiedCertificate, verifier::VerificationError};
+    use crate::{certificate::UnverifiedCertificate, verifier::VerifyError};
 
     use super::KnownCertificateVerifier;
 
@@ -139,10 +141,8 @@ pub mod rustls_feat {
 
             match result {
                 Ok(Ok(_)) => Ok(()),
-                Ok(Err(VerificationError::CertificateInvalid)) => {
-                    Err(CertificateError::BadEncoding)
-                }
-                Ok(Err(VerificationError::CertificateRevoked)) => Err(CertificateError::Revoked),
+                Ok(Err(VerifyError::CertificateInvalid)) => Err(CertificateError::BadEncoding),
+                Ok(Err(VerifyError::CertificateRevoked)) => Err(CertificateError::Revoked),
                 Ok(Err(err)) => Err(CertificateError::Other(OtherError(Arc::new(err)))),
                 Err(err) => Err(CertificateError::Other(OtherError(Arc::new(err)))),
             }

@@ -1,9 +1,12 @@
-use std::{error::Error, fmt::Display, sync::Arc};
+use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_pki::SignedObject;
+use svalin_pki::{
+    Certificate, CertificateChainBuilder, RootCertificate, UnverifiedCertificate,
+    get_current_timestamp,
+};
 use svalin_rpc::rpc::{
     command::{
         dispatcher::CommandDispatcher,
@@ -13,27 +16,23 @@ use svalin_rpc::rpc::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::{permissions::Permission, server::agent_store::AgentStore};
+use crate::{
+    permissions::Permission,
+    server::{agent_store::AgentStore, user_store::UserStore},
+};
 
-use super::PublicAgentData;
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, thiserror::Error)]
 enum AddAgentError {
+    #[error("Error adding agent to store")]
     StoreError,
-}
-
-impl Error for AddAgentError {}
-
-impl Display for AddAgentError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AddAgentError::StoreError => write!(f, "Error adding agent to store"),
-        }
-    }
+    #[error("Error verifying agent certificate")]
+    VerificationError,
 }
 
 pub struct AddAgentHandler {
-    store: Arc<AgentStore>,
+    agent_store: Arc<AgentStore>,
+    user_store: Arc<UserStore>,
+    root: RootCertificate,
 }
 
 impl From<&PermissionPrecursor<AddAgentHandler>> for Permission {
@@ -43,14 +42,22 @@ impl From<&PermissionPrecursor<AddAgentHandler>> for Permission {
 }
 
 impl AddAgentHandler {
-    pub fn new(store: Arc<AgentStore>) -> Result<Self> {
-        Ok(Self { store })
+    pub fn new(
+        agent_store: Arc<AgentStore>,
+        user_store: Arc<UserStore>,
+        root: RootCertificate,
+    ) -> Result<Self> {
+        Ok(Self {
+            agent_store,
+            user_store,
+            root,
+        })
     }
 }
 
 #[async_trait]
 impl CommandHandler for AddAgentHandler {
-    type Request = SignedObject<PublicAgentData>;
+    type Request = UnverifiedCertificate;
 
     fn key() -> String {
         "add_agent".to_owned()
@@ -62,9 +69,38 @@ impl CommandHandler for AddAgentHandler {
         request: Self::Request,
         _: CancellationToken,
     ) -> Result<()> {
-        let agent = request;
+        let cert_chain = CertificateChainBuilder::new(request);
+        let cert_chain = match self.user_store.complete_certificate_chain(cert_chain).await {
+            Err(err) => {
+                session
+                    .write_object::<Result<(), AddAgentError>>(&Err(
+                        AddAgentError::VerificationError,
+                    ))
+                    .await?;
 
-        if let Err(err) = self.store.add_agent(agent).await {
+                return Err(err);
+            }
+            Ok(cert_chain) => cert_chain,
+        };
+
+        let agent_cert_chain = match cert_chain.verify(&self.root, get_current_timestamp()) {
+            Err(err) => {
+                session
+                    .write_object::<Result<(), AddAgentError>>(&Err(
+                        AddAgentError::VerificationError,
+                    ))
+                    .await?;
+
+                return Err(anyhow!(err));
+            }
+            Ok(cert_chain) => cert_chain,
+        };
+
+        if let Err(err) = self
+            .agent_store
+            .add_agent(agent_cert_chain.take_leaf())
+            .await
+        {
             session
                 .write_object::<Result<(), AddAgentError>>(&Err(AddAgentError::StoreError))
                 .await?;
@@ -81,14 +117,22 @@ impl CommandHandler for AddAgentHandler {
 }
 
 pub struct AddAgent<'a> {
-    pub agent: &'a SignedObject<PublicAgentData>,
+    agent: &'a UnverifiedCertificate,
+}
+
+impl<'a> AddAgent<'a> {
+    pub fn new(agent: &'a Certificate) -> Self {
+        Self {
+            agent: agent.as_unverified(),
+        }
+    }
 }
 
 impl<'a> CommandDispatcher for AddAgent<'a> {
     type Output = ();
     type Error = anyhow::Error;
 
-    type Request = &'a SignedObject<PublicAgentData>;
+    type Request = &'a UnverifiedCertificate;
 
     fn get_request(&self) -> &Self::Request {
         &self.agent

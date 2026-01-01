@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    Certificate, CertificateType, SignatureVerificationError, ValidityError,
+    Certificate, CertificateType, RootCertificate, SignatureVerificationError, ValidityError,
     certificate::{SpkiHash, UnverifiedCertificate},
 };
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,16 @@ pub struct UnverifiedCertificateChain {
 }
 
 pub struct CertificateChain {
+    _root: RootCertificate,
     certificates: Vec<Certificate>,
+}
+
+impl CertificateChain {
+    pub fn take_leaf(mut self) -> Certificate {
+        self.certificates
+            .pop()
+            .expect("A verified certificate chain cannot be empty")
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -28,6 +37,8 @@ pub enum AddCertificateError {
     SignatureVerificationError(#[from] SignatureVerificationError),
     #[error("Parent with wrong spki_hash given. Expected {0}, got {1}")]
     WrongParent(String, String),
+    #[error("Certificate chain is already finished")]
+    AlreadyFinished,
 }
 
 impl CertificateChainBuilder {
@@ -43,11 +54,15 @@ impl CertificateChainBuilder {
     pub fn push_parent(
         &mut self,
         parent: UnverifiedCertificate,
-    ) -> Result<Option<UnverifiedCertificateChain>, AddCertificateError> {
+    ) -> Result<(), AddCertificateError> {
         let last_cert = self
             .certificates
             .last()
             .expect("constructor ensures no empty vec");
+
+        if last_cert.certificate_type() == CertificateType::Root {
+            return Err(AddCertificateError::AlreadyFinished);
+        }
 
         if last_cert.issuer() != parent.spki_hash() {
             return Err(AddCertificateError::WrongParent(
@@ -64,25 +79,39 @@ impl CertificateChainBuilder {
             return Err(AddCertificateError::SignatureLoop(fingerprint_order));
         }
 
-        let parent_type = parent.certificate_type();
         self.certificates.push(parent);
 
-        if parent_type == CertificateType::Root {
-            Ok(Some(UnverifiedCertificateChain {
-                certificates: self.certificates.iter().rev().cloned().collect(),
-            }))
-        } else {
-            Ok(None)
-        }
+        Ok(())
     }
 
     pub fn requested_issuer(&self) -> Option<&SpkiHash> {
-        let last_cert = self.certificates.last()?;
+        let last_cert = self
+            .certificates
+            .last()
+            .expect("a certificate chain cannot be empty");
 
         if last_cert.certificate_type() == CertificateType::Root {
             None
         } else {
             Some(last_cert.issuer())
+        }
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.certificates
+            .last()
+            .expect("a certificate chain cannot be empty")
+            .certificate_type()
+            == CertificateType::Root
+    }
+
+    pub fn finish(self) -> Result<UnverifiedCertificateChain, ()> {
+        if self.is_finished() {
+            Ok(UnverifiedCertificateChain {
+                certificates: self.certificates.iter().rev().cloned().collect(),
+            })
+        } else {
+            Err(())
         }
     }
 }
@@ -92,7 +121,7 @@ pub enum VerifyChainError {
     #[error("Empty certificate chain")]
     EmptyChain,
     #[error("Wrong root certificate: expected {0:?}, found {1:?}")]
-    WrongRoot(Certificate, UnverifiedCertificate),
+    WrongRoot(RootCertificate, UnverifiedCertificate),
     #[error("Signature verification failed: {0}")]
     SignatureVerificationFailed(#[from] SignatureVerificationError),
     #[error("Certificate validity error: {0}")]
@@ -102,7 +131,7 @@ pub enum VerifyChainError {
 impl UnverifiedCertificateChain {
     pub fn verify(
         self,
-        root: &Certificate,
+        root: &RootCertificate,
         timestamp: u64,
     ) -> Result<CertificateChain, VerifyChainError> {
         let chain_root = self
@@ -118,25 +147,26 @@ impl UnverifiedCertificateChain {
         }
 
         let mut verified_chain = Vec::with_capacity(self.certificates.len());
-        verified_chain.push(root.clone());
 
         if self.certificates.len() == 1 {
             return Ok(CertificateChain {
-                certificates: vec![root.clone()],
+                _root: root.clone(),
+                certificates: vec![],
             });
         }
 
         for current in self.certificates.into_iter().skip(1) {
-            let verified_cert = current.verify_signature(
-                verified_chain
-                    .last()
-                    .expect("prefilled Vec cannot be empty"),
-                timestamp,
-            )?;
+            let parent = verified_chain
+                .last()
+                .or(Some(root.as_certificate()))
+                .expect("prefilled Vec cannot be empty");
+
+            let verified_cert = current.verify_signature(parent, timestamp)?;
             verified_chain.push(verified_cert);
         }
 
         Ok(CertificateChain {
+            _root: root.clone(),
             certificates: verified_chain,
         })
     }

@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::Result;
+use rustls::pki_types::CertificateDer;
 use serde::de::Visitor;
 use serde::{Deserialize, Serialize, de};
 use thiserror::Error;
@@ -26,7 +27,7 @@ pub enum CertificateType {
 }
 
 #[derive(Debug)]
-struct CertificateData {
+pub struct CertificateData {
     der: Vec<u8>,
     certificate_type: CertificateType,
     public_key: Vec<u8>,
@@ -41,7 +42,26 @@ pub struct UnverifiedCertificate {
     data: Arc<CertificateData>,
 }
 
+impl Deref for UnverifiedCertificate {
+    type Target = CertificateData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
 impl Debug for UnverifiedCertificate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UnverifiedCertificate")
+            .field("spki_hash", &self.spki_hash())
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub struct Certificate(UnverifiedCertificate);
+
+impl Debug for Certificate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Certificate")
             .field("spki_hash", &self.spki_hash())
@@ -49,16 +69,59 @@ impl Debug for UnverifiedCertificate {
     }
 }
 
-#[derive(Clone)]
-pub struct Certificate {
-    data: Arc<CertificateData>,
+impl AsRef<Certificate> for &Certificate {
+    fn as_ref(&self) -> &Certificate {
+        self
+    }
 }
 
-impl Debug for Certificate {
+impl Deref for Certificate {
+    type Target = CertificateData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0.data
+    }
+}
+
+#[derive(Clone)]
+pub struct RootCertificate(Certificate);
+impl RootCertificate {
+    pub fn as_certificate(&self) -> &Certificate {
+        &self.0
+    }
+
+    pub fn to_certificate(self) -> Certificate {
+        self.0
+    }
+
+    pub fn as_unverified(&self) -> &UnverifiedCertificate {
+        &self.0.as_unverified()
+    }
+
+    pub fn to_unverified(self) -> UnverifiedCertificate {
+        self.0.to_unverified()
+    }
+}
+
+impl AsRef<Certificate> for &RootCertificate {
+    fn as_ref(&self) -> &Certificate {
+        self.as_certificate()
+    }
+}
+
+impl Debug for RootCertificate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Certificate")
+        f.debug_struct("RootCertificate")
             .field("spki_hash", &self.spki_hash())
             .finish()
+    }
+}
+
+impl Deref for RootCertificate {
+    type Target = CertificateData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0.0.data
     }
 }
 
@@ -138,6 +201,12 @@ impl SpkiHash {
     pub fn as_slice(&self) -> &[u8] {
         &self.0
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum UseAsRootError {
+    #[error("certificate is not a root certificate")]
+    InvalidCertificateType,
 }
 
 impl UnverifiedCertificate {
@@ -240,9 +309,10 @@ impl UnverifiedCertificate {
     /// Verify the signature of the current certificate using the given issue certificate
     pub fn verify_signature(
         self,
-        issuer: &Certificate,
+        issuer: impl AsRef<Certificate>,
         time: u64,
     ) -> Result<Certificate, SignatureVerificationError> {
+        let issuer = issuer.as_ref();
         if !issuer
             .certificate_type()
             .may_be_parent_of(self.certificate_type())
@@ -253,34 +323,34 @@ impl UnverifiedCertificate {
             ));
         }
 
-        let (_, cert) = X509Certificate::from_der(&self.data.der)?;
+        let (_, cert) = X509Certificate::from_der(&self.as_der())?;
 
-        let (_, issuer_cert) = X509Certificate::from_der(&issuer.data.der)?;
+        let (_, issuer_cert) = X509Certificate::from_der(&issuer.as_der())?;
 
         cert.verify_signature(Some(issuer_cert.public_key()))?;
         self.check_validity_at(time)?;
 
-        Ok(Certificate { data: self.data })
+        Ok(Certificate(self))
     }
 
     pub(crate) fn mark_as_trusted(self) -> Certificate {
-        Certificate { data: self.data }
+        Certificate(self)
     }
-}
 
-impl Deref for UnverifiedCertificate {
-    type Target = CertificateData;
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
+    pub fn use_as_temporary(self) -> Option<Certificate> {
+        if self.data.certificate_type != CertificateType::Temporary {
+            None
+        } else {
+            Some(Certificate(self))
+        }
     }
-}
 
-impl Deref for Certificate {
-    type Target = CertificateData;
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
+    pub fn use_as_root(self) -> Result<RootCertificate, UseAsRootError> {
+        if self.data.certificate_type == CertificateType::Root {
+            Ok(RootCertificate(Certificate(self)))
+        } else {
+            Err(UseAsRootError::InvalidCertificateType)
+        }
     }
 }
 
@@ -289,7 +359,7 @@ impl CertificateData {
         &self.public_key
     }
 
-    pub fn to_der(&self) -> &[u8] {
+    pub fn as_der(&self) -> &[u8] {
         &self.der
     }
 
@@ -309,7 +379,7 @@ impl CertificateData {
         self.certificate_type
     }
 
-    pub(crate) fn check_validity_at(&self, time: u64) -> Result<(), ValidityError> {
+    pub fn check_validity_at(&self, time: u64) -> Result<(), ValidityError> {
         // Todo: maybe not try to panic here or at least verify that this conversion
         // always works
         if time < self.validity.not_before.timestamp().try_into().unwrap() {
@@ -323,38 +393,66 @@ impl CertificateData {
 }
 
 impl Certificate {
-    pub fn to_unverified(self) -> UnverifiedCertificate {
-        UnverifiedCertificate { data: self.data }
+    pub fn as_unverified(&self) -> &UnverifiedCertificate {
+        &self.0
     }
-}
 
-impl PartialEq for Certificate {
-    fn eq(&self, other: &Self) -> bool {
-        self.data.der == other.data.der
+    pub fn to_unverified(self) -> UnverifiedCertificate {
+        self.0
+    }
+
+    pub fn dangerous_from_already_verified_der(
+        der: &CertificateDer<'_>,
+    ) -> Result<Self, CertificateParseError> {
+        Ok(UnverifiedCertificate::from_der(der.to_vec())?.mark_as_trusted())
     }
 }
 
 impl PartialEq for UnverifiedCertificate {
     fn eq(&self, other: &Self) -> bool {
-        self.data.der == other.data.der
+        self.as_der() == other.as_der()
     }
 }
 
 impl PartialEq<Certificate> for UnverifiedCertificate {
     fn eq(&self, other: &Certificate) -> bool {
-        self.data.der == other.data.der
+        self.as_der() == other.as_der()
     }
 }
 
 impl PartialEq<UnverifiedCertificate> for Certificate {
     fn eq(&self, other: &UnverifiedCertificate) -> bool {
-        self.data.der == other.data.der
+        self.as_der() == other.as_der()
+    }
+}
+
+impl PartialEq<RootCertificate> for UnverifiedCertificate {
+    fn eq(&self, other: &RootCertificate) -> bool {
+        self.as_der() == other.as_der()
+    }
+}
+
+impl PartialEq<UnverifiedCertificate> for RootCertificate {
+    fn eq(&self, other: &UnverifiedCertificate) -> bool {
+        self.as_der() == other.as_der()
+    }
+}
+
+impl PartialEq<Certificate> for RootCertificate {
+    fn eq(&self, other: &Certificate) -> bool {
+        self.as_der() == other.as_der()
+    }
+}
+
+impl PartialEq<RootCertificate> for Certificate {
+    fn eq(&self, other: &RootCertificate) -> bool {
+        self.as_der() == other.as_der()
     }
 }
 
 impl CanVerify for Certificate {
     fn borrow_public_key(&self) -> &[u8] {
-        return self.data.public_key.as_ref();
+        return self.0.public_key.as_ref();
     }
 }
 
@@ -363,7 +461,7 @@ impl Serialize for UnverifiedCertificate {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_bytes(self.to_der())
+        serializer.serialize_bytes(self.as_der())
     }
 }
 
@@ -421,7 +519,7 @@ impl<'de> Visitor<'de> for CertificateVisitor {
 
 impl tls_codec::Size for UnverifiedCertificate {
     fn tls_serialized_len(&self) -> usize {
-        self.to_der().len()
+        self.as_der().len()
     }
 }
 
@@ -431,7 +529,7 @@ impl tls_codec::Serialize for UnverifiedCertificate {
         writer: &mut W,
     ) -> std::result::Result<usize, tls_codec::Error> {
         writer
-            .write(self.to_der())
+            .write(self.as_der())
             .map_err(|err| tls_codec::Error::EncodingError(err.to_string()))
     }
 }
@@ -452,13 +550,13 @@ impl tls_codec::Deserialize for UnverifiedCertificate {
 
 impl Ord for Certificate {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.data.der.cmp(&other.data.der)
+        self.as_der().cmp(&other.as_der())
     }
 }
 
 impl PartialOrd for Certificate {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.data.der.partial_cmp(&other.data.der)
+        self.as_der().partial_cmp(other.as_der())
     }
 }
 
@@ -466,7 +564,7 @@ impl Eq for Certificate {}
 
 impl Hash for Certificate {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.data.der.hash(state);
+        self.as_der().hash(state);
     }
 }
 

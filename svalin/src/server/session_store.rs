@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-use svalin_pki::{Certificate, CertificateType, SpkiHash};
-
-use crate::server::user_store::UserStore;
+use svalin_pki::{Certificate, CertificateType, SpkiHash, UnverifiedCertificate};
 
 #[derive(Debug)]
 pub struct SessionStore {
     pool: sqlx::SqlitePool,
-    user_store: Arc<UserStore>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -19,11 +16,10 @@ pub enum AddSessionError {
 }
 
 impl SessionStore {
-    pub fn open(pool: sqlx::SqlitePool, user_store: Arc<UserStore>) -> Arc<Self> {
-        Arc::new(Self { pool, user_store })
+    pub fn open(pool: sqlx::SqlitePool) -> Arc<Self> {
+        Arc::new(Self { pool })
     }
 
-    /// TODO: verify the certificate chain before acceping a session.
     pub async fn add_session(
         &self,
         certificate: Certificate,
@@ -36,7 +32,7 @@ impl SessionStore {
 
         let spki_hash = certificate.spki_hash().as_slice();
         let issuer = certificate.issuer().as_slice();
-        let der = certificate.to_der();
+        let der = certificate.as_der();
 
         sqlx::query!(
             "INSERT INTO sessions (spki_hash, issuer, certificate) VALUES (?, ?, ?)",
@@ -53,7 +49,7 @@ impl SessionStore {
     pub async fn get_session(
         &self,
         spki_hash: &SpkiHash,
-    ) -> anyhow::Result<Option<Certificate>, anyhow::Error> {
+    ) -> anyhow::Result<Option<UnverifiedCertificate>, anyhow::Error> {
         let fingerprint = spki_hash.as_slice();
         let session_der = sqlx::query_scalar!(
             "SELECT certificate FROM sessions WHERE spki_hash = ?",
@@ -63,14 +59,17 @@ impl SessionStore {
         .await?;
 
         let session = match session_der {
-            Some(der) => Certificate::from_der(der)?,
+            Some(der) => UnverifiedCertificate::from_der(der)?,
             None => return Ok(None),
         };
 
         Ok(Some(session))
     }
 
-    pub async fn list_user_sessions(&self, user: &Certificate) -> anyhow::Result<Vec<Certificate>> {
+    pub async fn list_user_sessions(
+        &self,
+        user: &Certificate,
+    ) -> anyhow::Result<Vec<UnverifiedCertificate>> {
         let spki_hash = user.spki_hash().as_slice();
         let session_ders = sqlx::query_scalar!(
             "SELECT certificate FROM sessions WHERE issuer = ?",
@@ -81,7 +80,7 @@ impl SessionStore {
 
         let sessions = session_ders
             .into_iter()
-            .map(|der| Certificate::from_der(der))
+            .map(|der| UnverifiedCertificate::from_der(der))
             .collect::<Result<_, _>>()?;
 
         Ok(sessions)

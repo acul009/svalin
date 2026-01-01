@@ -16,9 +16,10 @@ use serde::{
     de::{self},
 };
 use svalin_pki::{
-    ArgonCost, Certificate, CreateCredentialsError, Credential, DecodeCredentialsError,
-    DecryptError, EncryptError, EncryptedCredential, ParamsStringParseError, Sha512,
-    argon2::Argon2,
+    ArgonCost, Certificate, CertificateChainBuilder, CreateCredentialsError, Credential,
+    DecodeCredentialsError, DecryptError, EncryptError, EncryptedCredential,
+    ParamsStringParseError, RootCertificate, Sha512, SignatureVerificationError,
+    UnverifiedCertificate, UseAsRootError, argon2::Argon2, get_current_timestamp,
 };
 use svalin_rpc::{
     rpc::{
@@ -50,8 +51,8 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginApproval {
     pub encrypted_user_credentials: EncryptedCredential,
-    pub root_cert: Certificate,
-    pub server_cert: Certificate,
+    pub root_cert: UnverifiedCertificate,
+    pub server_cert: UnverifiedCertificate,
 }
 
 impl From<&PermissionPrecursor<LoginHandler>> for Permission {
@@ -63,7 +64,7 @@ impl From<&PermissionPrecursor<LoginHandler>> for Permission {
 pub struct LoginHandler {
     user_store: Arc<UserStore>,
     session_store: Arc<SessionStore>,
-    root_cert: Certificate,
+    root_cert: RootCertificate,
     server_cert: Certificate,
 }
 
@@ -71,7 +72,7 @@ impl LoginHandler {
     pub fn new(
         user_store: Arc<UserStore>,
         session_store: Arc<SessionStore>,
-        root_cert: Certificate,
+        root_cert: RootCertificate,
         server_cert: Certificate,
     ) -> Self {
         Self {
@@ -457,23 +458,58 @@ impl TakeableCommandHandler for LoginHandler {
 
             let success = LoginApproval {
                 encrypted_user_credentials: user.encrypted_credential,
-                root_cert: self.root_cert.clone(),
-                server_cert: self.server_cert.clone(),
+                root_cert: self.root_cert.clone().to_unverified(),
+                server_cert: self.server_cert.clone().to_unverified(),
             };
+            let user_cert = success.encrypted_user_credentials.certificate();
 
             session
                 .write_object(&success)
                 .await
                 .context("Failed to write encrypted success")?;
 
-            let session_certificate: Certificate = session
+            let session_certificate: UnverifiedCertificate = session
                 .read_object()
                 .await
                 .context("Failed to read session certificate")?;
 
+            if session_certificate.issuer() != user_cert.spki_hash() {
+                let _send_result = session.write_object(&Result::<(), ()>::Err(())).await;
+                return Err(anyhow!(
+                    "session certificate issuer does not match user login certificate"
+                ));
+            }
+
+            let mut chain_builder = CertificateChainBuilder::new(session_certificate);
+            if let Err(err) = chain_builder.push_parent(user_cert.clone()) {
+                let _send_result = session.write_object(&Result::<(), ()>::Err(())).await;
+                return Err(anyhow!(err));
+            }
+
+            let session_chain = match self
+                .user_store
+                .complete_certificate_chain(chain_builder)
+                .await
+            {
+                Ok(chain) => chain,
+                Err(err) => {
+                    let _send_result = session.write_object(&Result::<(), ()>::Err(())).await;
+                    return Err(anyhow!(err));
+                }
+            };
+
+            let session_chain = match session_chain.verify(&self.root_cert, get_current_timestamp())
+            {
+                Ok(session_chain) => session_chain,
+                Err(err) => {
+                    let _send_result = session.write_object(&Result::<(), ()>::Err(())).await;
+                    return Err(anyhow!(err));
+                }
+            };
+
             let store_result = self
                 .session_store
-                .add_session(session_certificate)
+                .add_session(session_chain.take_leaf())
                 .await
                 .context("Failed to save certificate to session store");
 
@@ -503,69 +539,73 @@ pub struct Login {
 #[derive(Debug, thiserror::Error)]
 pub enum LoginDispatcherError {
     #[error("error writing client nonce: {0}")]
-    WriteClientNonceError(SessionWriteError),
+    WriteClientNonceError(#[source] SessionWriteError),
     #[error("error reading server nonce: {0}")]
-    ReadServerNonceError(SessionReadError),
+    ReadServerNonceError(#[source] SessionReadError),
     #[error("error creating temporary credentials: {0}")]
-    TempCredentialError(CreateCredentialsError),
+    TempCredentialError(#[source] CreateCredentialsError),
     #[error("error initializing TLS: {0}")]
-    TlsClientError(TlsClientError),
+    TlsClientError(#[source] TlsClientError),
     #[error("error deriving key: {0}")]
-    DeriveKeyError(TlsDeriveKeyError),
+    DeriveKeyError(#[source] TlsDeriveKeyError),
     #[error("error transforming message: {0}")]
-    MessageTransformError(MessageTransformError),
+    MessageTransformError(#[source] MessageTransformError),
     #[error("error writing username: {0}")]
-    WriteUsernameError(SessionWriteError),
+    WriteUsernameError(#[source] SessionWriteError),
     #[error("error reading client info: {0}")]
-    ReadClientInfoError(SessionReadError),
+    ReadClientInfoError(#[source] SessionReadError),
     #[error("error receiving channel: {0}")]
-    ChannelRecvError(oneshot::error::RecvError),
+    ChannelRecvError(#[source] oneshot::error::RecvError),
     #[error("error sending channel")]
     ChannelSendError,
     #[error("error joining task: {0}")]
-    JoinError(tokio::task::JoinError),
+    JoinError(#[source] tokio::task::JoinError),
     #[error("error parsing params: {0}")]
-    ParamsParseError(ParamsStringParseError),
+    ParamsParseError(#[source] ParamsStringParseError),
     #[error("error in aucpace: {0}")]
     AucPaceError(aucpace::Error),
     #[error("error writing client public key: {0}")]
-    ClientPublicKeyWriteError(SessionWriteError),
+    ClientPublicKeyWriteError(#[source] SessionWriteError),
     #[error("error reading server public key: {0}")]
-    ServerPublicKeyReadError(SessionReadError),
+    ServerPublicKeyReadError(#[source] SessionReadError),
     #[error("error writing client authenticator: {0}")]
-    ClientAuthenticatorWriteError(SessionWriteError),
+    ClientAuthenticatorWriteError(#[source] SessionWriteError),
     #[error("error reading server authenticator: {0}")]
-    ServerAuthenticatorReadError(SessionReadError),
+    ServerAuthenticatorReadError(#[source] SessionReadError),
     #[error("error encrypting data: {0}")]
-    EncryptError(EncryptError),
+    EncryptError(#[source] EncryptError),
     #[error("error decrypting data: {0}")]
-    DecryptError(DecryptError),
+    DecryptError(#[source] DecryptError),
     #[error("error writing totp: {0}")]
-    WriteTotpError(SessionWriteError),
+    WriteTotpError(#[source] SessionWriteError),
     #[error("error reading totp response: {0}")]
-    ReadTotpResponseError(SessionReadError),
+    ReadTotpResponseError(#[source] SessionReadError),
     #[error("totp invalid")]
     InvalidTotp,
     #[error("error reading success: {0}")]
-    ReadSuccessError(SessionReadError),
+    ReadSuccessError(#[source] SessionReadError),
     #[error("wrong password")]
     WrongPassword,
     #[error("error decoding credentials: {0}")]
-    DecodeCredentialsError(DecodeCredentialsError),
+    DecodeCredentialsError(#[source] DecodeCredentialsError),
     #[error("error creating session certificate: {0}")]
-    CreateSessionError(CreateCredentialsError),
+    CreateSessionError(#[source] CreateCredentialsError),
     #[error("error writing session certificate: {0}")]
-    WriteSessionError(SessionWriteError),
+    WriteSessionError(#[source] SessionWriteError),
     #[error("error reading session result: {0}")]
-    ReadSessionResultError(SessionReadError),
+    ReadSessionResultError(#[source] SessionReadError),
     #[error("session was declined by server")]
     SessionSubmitError,
+    #[error("error verifying root certificate")]
+    RootCert(#[source] UseAsRootError),
+    #[error("error verifying upstream certificate: {0}")]
+    VerifyUpstreamCertError(#[source] SignatureVerificationError),
 }
 
 pub struct LoginSuccess {
     pub user_credential: Credential,
     pub device_credential: Credential,
-    pub root_cert: Certificate,
+    pub root_cert: RootCertificate,
     pub server_cert: Certificate,
 }
 
@@ -812,7 +852,7 @@ impl TakeableCommandDispatcher for Login {
                 .map_err(LoginDispatcherError::CreateSessionError)?;
 
             session
-                .write_object(device_credential.get_certificate())
+                .write_object(device_credential.get_certificate().as_unverified())
                 .await
                 .map_err(LoginDispatcherError::WriteSessionError)?;
 
@@ -825,9 +865,19 @@ impl TakeableCommandDispatcher for Login {
                 return Err(LoginDispatcherError::SessionSubmitError.into());
             }
 
+            let root_cert = success
+                .root_cert
+                .use_as_root()
+                .map_err(LoginDispatcherError::RootCert)?;
+
+            let server_cert = success
+                .server_cert
+                .verify_signature(&root_cert, get_current_timestamp())
+                .map_err(LoginDispatcherError::VerifyUpstreamCertError)?;
+
             Ok(LoginSuccess {
-                root_cert: success.root_cert,
-                server_cert: success.server_cert,
+                root_cert,
+                server_cert,
                 user_credential,
                 device_credential,
             })

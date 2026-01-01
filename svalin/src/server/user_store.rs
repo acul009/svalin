@@ -7,8 +7,8 @@ use password_hash::ParamsString;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use svalin_pki::{
-    Certificate, CertificateChain, CertificateChainBuilder, CertificateType, EncryptedCredential,
-    SpkiHash,
+    CertificateChainBuilder, CertificateType, EncryptedCredential, SpkiHash, UnverifiedCertificate,
+    UnverifiedCertificateChain,
 };
 use totp_rs::TOTP;
 
@@ -32,7 +32,6 @@ pub struct StoredUser {
 
 #[derive(Debug)]
 pub struct UserStore {
-    root: Certificate,
     pool: sqlx::SqlitePool,
 }
 
@@ -85,8 +84,8 @@ impl UserStore {
         Ok(())
     }
 
-    pub fn open(pool: SqlitePool, root: Certificate) -> Arc<Self> {
-        Arc::new(Self { pool, root })
+    pub fn open(pool: SqlitePool) -> Arc<Self> {
+        Arc::new(Self { pool })
     }
 
     pub async fn get_user(&self, spki_hash: &SpkiHash) -> anyhow::Result<Option<StoredUser>> {
@@ -116,26 +115,24 @@ impl UserStore {
     pub async fn complete_certificate_chain(
         &self,
         mut cert_chain: CertificateChainBuilder,
-    ) -> Result<CertificateChain> {
-        loop {
-            let issuer_spki = cert_chain
-                .requested_issuer()
-                .expect("chain not finished yet");
-
+    ) -> Result<UnverifiedCertificateChain> {
+        while let Some(issuer_spki) = cert_chain.requested_issuer() {
             let Some(issuer) = self.get_cert_by_spki_hash(&issuer_spki).await? else {
                 return Err(anyhow!("issuer with spki hash {} not found", issuer_spki));
             };
 
-            if let Some(chain) = cert_chain.push_parent(issuer)? {
-                return Ok(chain);
-            }
+            cert_chain.push_parent(issuer)?;
         }
+
+        Ok(cert_chain
+            .finish()
+            .expect("already checked if the chain is finished"))
     }
 
     pub async fn get_cert_by_spki_hash(
         &self,
         spki_hash: &SpkiHash,
-    ) -> anyhow::Result<Option<Certificate>> {
+    ) -> anyhow::Result<Option<UnverifiedCertificate>> {
         let spki_hash = spki_hash.as_slice();
         let user_data =
             sqlx::query_scalar!("SELECT data FROM users WHERE spki_hash = ?", spki_hash)
@@ -149,48 +146,6 @@ impl UserStore {
             }
         }
     }
-
-    //     #[instrument(skip_all)]
-    //     pub async fn add_user(
-    //         &self,
-    //         username: Vec<u8>,
-    //         encrypted_credentials: EncryptedCredential,
-    //         totp_secret: TOTP,
-    //         secret_exponent: Scalar,
-    //         params: ParamsString,
-    //         verifier: RistrettoPoint,
-    //     ) -> Result<()> {
-    //         let user = StoredUser {
-    //             username,
-    //             encrypted_credentials,
-    //             totp_secret,
-    //             secret_exponent,
-    //             params,
-    //             verifier,
-    //         };
-
-    //         debug!("requesting user update transaction");
-
-    //         let certificate = user.encrypted_credentials.certificate();
-
-    //         let fingerprint = certificate.fingerprint();
-    //         let fingerprint = fingerprint.as_slice();
-    //         let spki_hash = certificate.spki_hash();
-
-    //         let userdata = postcard::to_extend(&user, Vec::new())?;
-
-    //         sqlx::query!(
-    //             "INSERT INTO users (fingerprint, spki_hash, username, data) VALUES (?, ?, ?, ?)",
-    //             fingerprint,
-    //             spki_hash,
-    //             user.username,
-    //             userdata
-    //         )
-    //         .execute(&self.pool)
-    //         .await?;
-
-    //         Ok(())
-    //     }
 }
 
 impl StrongDatabase for UserStore {

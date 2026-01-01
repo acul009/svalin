@@ -4,5 +4,5 @@
 //! The current code is mostly for experimentation and figuring out the correct API design.
 
 mod agent;
-mod client;
+// mod client;
 mod server;

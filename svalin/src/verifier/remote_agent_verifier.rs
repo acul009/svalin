@@ -1,33 +1,47 @@
 use std::fmt::Debug;
 
-use svalin_pki::{CertificateType, RootCertificate, SpkiHash, Verifier, VerifyError};
+use dashmap::DashMap;
+use svalin_pki::{
+    Certificate, CertificateType, RootCertificate, SpkiHash, Verifier, VerifyError,
+    get_current_timestamp,
+};
 use svalin_rpc::rpc::connection::{Connection, direct_connection::DirectConnection};
 
 use crate::verifier::load_certificate_chain::ChainRequest;
 
-pub struct RemoteSessionVerifier {
+pub struct RemoteAgentVerifier {
     root: RootCertificate,
     connection: DirectConnection,
+    cache: DashMap<SpkiHash, Certificate>,
 }
 
-impl Debug for RemoteSessionVerifier {
+impl Debug for RemoteAgentVerifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RemoteSessionVerifier").finish()
     }
 }
 
-impl RemoteSessionVerifier {
+impl RemoteAgentVerifier {
     pub fn new(root: RootCertificate, connection: DirectConnection) -> Self {
-        Self { root, connection }
+        Self {
+            root,
+            connection,
+            cache: DashMap::new(),
+        }
     }
 }
 
-impl Verifier for RemoteSessionVerifier {
+impl Verifier for RemoteAgentVerifier {
     async fn verify_spki_hash(
         &self,
         spki_hash: &SpkiHash,
         time: u64,
     ) -> Result<svalin_pki::Certificate, svalin_pki::VerifyError> {
+        if let Some(cached) = self.cache.get(spki_hash) {
+            cached.check_validity_at(get_current_timestamp())?;
+            return Ok(cached.clone());
+        }
+
         let unverified_chain = self
             .connection
             .dispatch(ChainRequest::Session(spki_hash.clone()))
@@ -38,7 +52,8 @@ impl Verifier for RemoteSessionVerifier {
 
         let leaf = chain.take_leaf();
 
-        if leaf.certificate_type() == CertificateType::UserDevice {
+        if leaf.certificate_type() == CertificateType::Agent {
+            self.cache.insert(leaf.spki_hash().clone(), leaf.clone());
             Ok(leaf)
         } else {
             Err(VerifyError::IncorrectCertificateType)

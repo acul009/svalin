@@ -1,4 +1,4 @@
-use svalin_pki::{Certificate, CertificateType};
+use svalin_pki::{CertificateType, RootCertificate};
 use svalin_rpc::permissions::{PermissionCheckError, PermissionHandler};
 
 use super::Permission;
@@ -6,11 +6,11 @@ use super::Permission;
 /// This still needs a lot of work. It's currently mostly a placeholder.
 #[derive(Clone)]
 pub struct DefaultPermissionHandler {
-    root: Certificate,
+    root: RootCertificate,
 }
 
 impl DefaultPermissionHandler {
-    pub fn new(root: Certificate) -> Self {
+    pub fn new(root: RootCertificate) -> Self {
         Self { root }
     }
 }

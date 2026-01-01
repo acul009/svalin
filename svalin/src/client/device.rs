@@ -81,7 +81,7 @@ impl Device {
     }
 
     pub(crate) fn update(&self, new_item: AgentListItem) {
-        if new_item.is_online {
+        if new_item.online_status {
             self.data.realtime.restart_if_offline();
             self.data.install_info.restart_if_offline();
         }

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
@@ -7,7 +7,7 @@ use anyhow::{Context, Result, anyhow};
 use quinn::EndpointConfig;
 use quinn::crypto::rustls::QuicServerConfig;
 use quinn::rustls::crypto::CryptoProvider;
-use svalin_pki::{Certificate, Credential};
+use svalin_pki::{Certificate, Credential, SpkiHash};
 use tokio::select;
 use tokio::sync::{Mutex, broadcast};
 use tokio::time::error::Elapsed;
@@ -53,7 +53,7 @@ pub struct ClientConnectionStatus {
 
 #[derive(Debug)]
 struct ServerConnectionData {
-    latest_connections: BTreeMap<Certificate, DirectConnection>,
+    latest_connections: HashMap<SpkiHash, DirectConnection>,
 }
 
 #[derive(Debug, Clone)]
@@ -127,7 +127,7 @@ impl RpcServer {
         Ok(Arc::new(Self {
             endpoint,
             connection_data: Mutex::new(ServerConnectionData {
-                latest_connections: BTreeMap::new(),
+                latest_connections: HashMap::new(),
             }),
             client_status_broadcast: br_send,
             config,
@@ -139,7 +139,7 @@ impl RpcServer {
         let priv_key = config.credentials.keypair().rustls_private_key();
 
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
-            config.credentials.get_certificate().to_der().to_owned(),
+            config.credentials.get_certificate().as_der().to_owned(),
         )];
 
         let crypto = rustls::ServerConfig::builder()
@@ -224,7 +224,8 @@ impl RpcServer {
         if let Peer::Certificate(cert) = conn.peer() {
             debug!("noting down connection for peer");
             let mut lock = self.connection_data.lock().await;
-            lock.latest_connections.insert(cert.clone(), conn.clone());
+            lock.latest_connections
+                .insert(cert.spki_hash().clone(), conn.clone());
             let _ = self.client_status_broadcast.send(ClientConnectionStatus {
                 client: cert.clone(),
                 online: true,
@@ -252,9 +253,9 @@ impl RpcServer {
         if let Peer::Certificate(cert) = conn.peer() {
             debug!("removing connection data for peer after close");
             let mut lock = self.connection_data.lock().await;
-            if let Some(latest_peer_conn) = lock.latest_connections.get(cert) {
+            if let Some(latest_peer_conn) = lock.latest_connections.get(cert.spki_hash()) {
                 if latest_peer_conn.eq(&conn) {
-                    lock.latest_connections.remove(cert);
+                    lock.latest_connections.remove(cert.spki_hash());
                     let _ = self.client_status_broadcast.send(ClientConnectionStatus {
                         client: cert.clone(),
                         online: false,
@@ -276,7 +277,7 @@ impl RpcServer {
         result
     }
 
-    pub async fn open_session_with(&self, peer: Certificate) -> Result<Session> {
+    pub async fn open_session_with(&self, peer: SpkiHash) -> Result<Session> {
         let lock = self.connection_data.lock().await;
 
         let conn = lock
@@ -295,7 +296,7 @@ impl RpcServer {
         self.client_status_broadcast.subscribe()
     }
 
-    pub async fn get_current_connected_clients(&self) -> BTreeSet<Certificate> {
+    pub async fn get_current_connected_clients(&self) -> HashSet<SpkiHash> {
         self.connection_data
             .lock()
             .await
@@ -310,6 +311,6 @@ impl RpcServer {
             .lock()
             .await
             .latest_connections
-            .contains_key(client)
+            .contains_key(client.spki_hash())
     }
 }

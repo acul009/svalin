@@ -49,7 +49,7 @@ impl EncryptedCredential {
 
         debug!("credentials decrypted");
 
-        Credential::new(decrypted_keypair, self.certificate.mark_as_trusted())
+        Credential::new(decrypted_keypair, self.certificate)
             .map_err(DecodeCredentialsError::CreateCredentialsError)
     }
 
@@ -68,6 +68,8 @@ pub enum CreateCredentialsError {
     SelfSignError(rcgen::Error),
     #[error("error creating certificate: {0}")]
     CreateCertificateError(#[from] CreateCertificateError),
+    #[error("the given certificates spki hash does not match the keypair")]
+    KeyMismatch,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -95,21 +97,20 @@ pub enum DecodeCredentialsError {
 impl Credential {
     pub(crate) fn new(
         keypair: KeyPair,
-        certificate: Certificate,
+        certificate: UnverifiedCertificate,
     ) -> Result<Self, CreateCredentialsError> {
-        // TODO: check if keypair and certificate belong together
+        let keypair_spki_hash = UnverifiedCertificate::compute_spki_hash(
+            &keypair.export_public_key().subject_public_key_info(),
+        );
 
-        // println!("{:?}", keypair.public_key().as_ref());
-        // println!("{:?}", certificate.borrow_public_key());
-
-        // if *keypair.public_key().as_ref() != *certificate.borrow_public_key() {
-        //     bail!(crate::Error::KeyMismatch)
-        // }
+        if &keypair_spki_hash != certificate.spki_hash() {
+            return Err(CreateCredentialsError::KeyMismatch);
+        }
 
         Ok(Credential {
             data: Arc::new(CredentialData {
                 keypair,
-                certificate,
+                certificate: certificate.mark_as_trusted(),
             }),
         })
     }
@@ -144,7 +145,7 @@ impl Credential {
         let certificate = UnverifiedCertificate::from_der(certificate.der().to_vec())
             .map_err(CreateCertificateError::CertificateParseError)?;
 
-        let temp = Self::new(keypair, certificate.mark_as_trusted())?;
+        let temp = Self::new(keypair, certificate)?;
 
         Ok(temp)
     }
@@ -186,14 +187,14 @@ impl Credential {
         let certificate = UnverifiedCertificate::from_der(certificate.der().to_vec())
             .map_err(CreateCertificateError::CertificateParseError)?;
 
-        let root = Self::new(keypair, certificate.mark_as_trusted())?;
+        let root = Self::new(keypair, certificate)?;
 
         Ok(root)
     }
 
     fn issuer<'a>(&'a self) -> Result<Issuer<'a, rcgen::KeyPair>, rcgen::Error> {
         Issuer::from_ca_cert_der(
-            &self.data.certificate.to_der().into(),
+            &self.data.certificate.as_der().into(),
             self.data.keypair.rcgen_clone(),
         )
     }
@@ -202,7 +203,7 @@ impl Credential {
         &self,
         public_key: &ExportedPublicKey,
         certificate_type: CertificateType,
-    ) -> Result<Certificate, CreateCertificateError> {
+    ) -> Result<UnverifiedCertificate, CreateCertificateError> {
         let mut leaf_parameters = rcgen::CertificateParams::default();
         leaf_parameters.not_before = OffsetDateTime::now_utc();
         leaf_parameters.not_after =
@@ -239,7 +240,7 @@ impl Credential {
 
         let leaf = UnverifiedCertificate::from_der(certificate.der().to_vec())?;
 
-        Ok(leaf.mark_as_trusted())
+        Ok(leaf)
     }
 
     /// Creates a certificate with the given public key.
@@ -248,14 +249,18 @@ impl Credential {
         &self,
         public_key: &ExportedPublicKey,
     ) -> Result<Certificate, CreateCertificateError> {
-        self.create_certificate_for_key(public_key, CertificateType::Agent)
+        Ok(self
+            .create_certificate_for_key(public_key, CertificateType::Agent)?
+            .mark_as_trusted())
     }
 
     pub fn create_server_certificate_for_key(
         &self,
         public_key: &ExportedPublicKey,
     ) -> Result<Certificate, CreateCertificateError> {
-        self.create_certificate_for_key(public_key, CertificateType::Server)
+        Ok(self
+            .create_certificate_for_key(public_key, CertificateType::Server)?
+            .mark_as_trusted())
     }
 
     pub fn create_user_device_credential(&self) -> Result<Self, CreateCredentialsError> {

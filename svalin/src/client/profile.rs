@@ -4,6 +4,7 @@ use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
     Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
+    RootCertificate, UnverifiedCertificate, get_current_timestamp,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::sync::watch;
@@ -12,7 +13,7 @@ use tracing::{debug, error};
 
 use crate::{
     client::tunnel_manager::TunnelManager, shared::commands::agent_list::UpdateAgentList,
-    util::location::Location, verifier::upstream_verifier::UpstreamVerifier,
+    util::location::Location, verifier::remote_agent_verifier::RemoteAgentVerifier,
 };
 
 use super::Client;
@@ -21,8 +22,8 @@ use super::Client;
 pub(crate) struct Profile {
     pub(crate) username: String,
     pub(crate) upstream_address: String,
-    pub(crate) upstream_certificate: Certificate,
-    pub(crate) root_certificate: Certificate,
+    pub(crate) upstream_certificate: UnverifiedCertificate,
+    pub(crate) root_certificate: UnverifiedCertificate,
     pub(crate) user_credential: EncryptedCredential,
     pub(crate) device_credential: EncryptedCredential,
 }
@@ -32,15 +33,15 @@ impl Profile {
         username: String,
         upstream_address: String,
         upstream_certificate: Certificate,
-        root_certificate: Certificate,
+        root_certificate: RootCertificate,
         user_credential: EncryptedCredential,
         device_credential: EncryptedCredential,
     ) -> Self {
         Self {
             username,
             upstream_address,
-            upstream_certificate,
-            root_certificate,
+            upstream_certificate: upstream_certificate.to_unverified(),
+            root_certificate: root_certificate.to_unverified(),
             user_credential,
             device_credential,
         }
@@ -83,7 +84,7 @@ impl Client {
         username: String,
         upstream_address: String,
         upstream_certificate: Certificate,
-        root_certificate: Certificate,
+        root_certificate: RootCertificate,
         user_credentials: Credential,
         device_credentials: Credential,
         password: Vec<u8>,
@@ -155,12 +156,13 @@ impl Client {
             let user_credential = profile.user_credential.decrypt(password.clone()).await?;
             let device_credential = profile.device_credential.decrypt(password).await?;
 
+            let root_certificate = profile.root_certificate.use_as_root()?;
+            let upstream_certificate = profile
+                .upstream_certificate
+                .verify_signature(&root_certificate, get_current_timestamp())?;
+
             debug!("creating verifier");
-            let verifier = UpstreamVerifier::new(
-                profile.root_certificate.clone(),
-                profile.upstream_certificate.clone(),
-            )
-            .to_tls_verifier();
+            let verifier = ExactVerififier::new(upstream_certificate.clone()).to_tls_verifier();
 
             debug!("connecting to server");
             let rpc = RpcClient::connect(
@@ -178,8 +180,8 @@ impl Client {
             let client = Arc::new(Self {
                 rpc,
                 _upstream_address: profile.upstream_address,
-                upstream_certificate: profile.upstream_certificate,
-                root_certificate: profile.root_certificate.clone(),
+                upstream_certificate,
+                root_certificate: root_certificate.clone(),
                 user_credential: user_credential,
                 _device_credential: device_credential.clone(),
                 device_list: watch::channel(BTreeMap::new()).0,
@@ -190,7 +192,6 @@ impl Client {
 
             let list_clone = client.device_list.clone();
             let sync_connection = client.rpc.upstream_connection();
-            let tunnel_manager = client.tunnel_manager.clone();
             let cancel = client.cancel.clone();
             let client2 = client.clone();
 
@@ -202,8 +203,10 @@ impl Client {
                         base_connection: sync_connection.clone(),
                         credentials: device_credential,
                         list: list_clone,
-                        verifier: ExactVerififier::new(profile.root_certificate),
-                        tunnel_manager,
+                        verifier: RemoteAgentVerifier::new(
+                            root_certificate.clone(),
+                            sync_connection.clone(),
+                        ),
                         cancel,
                     })
                     .await

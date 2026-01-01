@@ -56,7 +56,7 @@ impl UpdateInstaller {
         let recipe = WatchRecipe::new(
             format!(
                 "install-info-{:x?}",
-                device.item().public_data.cert.fingerprint()
+                device.item().certificate.cert.fingerprint()
             ),
             device.subscribe_install_info(),
             Message::Refresh,

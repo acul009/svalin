@@ -19,13 +19,13 @@ use crate::{
         },
         join_agent::add_agent::AddAgentHandler,
     },
-    verifier::load_session_chain::LoadSessionChainHandler,
+    verifier::load_certificate_chain::LoadCertificateChainHandler,
 };
 
 use super::{agent_store::AgentStore, user_store::UserStore};
 
 pub struct SvalinCommandBuilder {
-    pub root_cert: svalin_pki::Certificate,
+    pub root_cert: svalin_pki::RootCertificate,
     pub server_cert: svalin_pki::Certificate,
     pub agent_store: Arc<AgentStore>,
     pub user_store: Arc<UserStore>,
@@ -54,15 +54,19 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 self.root_cert.clone(),
                 self.server_cert.clone(),
             ))
-            .add(LoadSessionChainHandler::new(
+            .add(LoadCertificateChainHandler::new(
                 self.user_store.clone(),
+                self.agent_store.clone(),
                 self.session_store.clone(),
-                self.root_cert.clone(),
             ))
             .add(join_manager.create_request_handler())
             .add(join_manager.create_accept_handler())
             .add(ForwardHandler::new(server.clone()))
-            .add(AddAgentHandler::new(self.agent_store.clone())?)
+            .add(AddAgentHandler::new(
+                self.agent_store.clone(),
+                self.user_store.clone(),
+                self.root_cert.clone(),
+            )?)
             .add(AgentListHandler::new(
                 self.agent_store.clone(),
                 server.clone(),

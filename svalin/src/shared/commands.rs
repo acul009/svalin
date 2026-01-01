@@ -1,10 +1,10 @@
 // pub mod add_user;
 pub mod agent_list;
 pub mod get_key_packages;
-pub mod get_user_certs;
+// pub mod get_user_certs;
 pub mod init;
 pub mod login;
 pub mod public_server_status;
 pub mod realtime_status;
 pub mod terminal;
-pub mod upload_key_packages;
+// pub mod upload_key_packages;

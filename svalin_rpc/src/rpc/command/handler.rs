@@ -89,7 +89,7 @@ pub struct PermissionPrecursor<H>
 where
     H: TakeableCommandHandler,
 {
-    request: H::Request,
+    pub request: H::Request,
     handler: PhantomData<H>,
 }
 

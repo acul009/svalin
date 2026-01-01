@@ -4,8 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, DeriveKeyError, Credential};
+use svalin_pki::{Certificate, Credential, DeriveKeyError, RootCertificate};
 use svalin_rpc::rpc::{command::handler::PermissionPrecursor, session::Session};
 use tokio::task::AbortHandle;
 use tracing::field::debug;
@@ -18,17 +17,11 @@ pub mod accept_handler;
 pub mod add_agent;
 pub mod request_handler;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct PublicAgentData {
-    pub name: String,
-    pub cert: Certificate,
-}
-
 #[derive(Debug)]
 pub struct AgentInitPayload {
     pub address: String,
     pub credentials: Credential,
-    pub root: Certificate,
+    pub root: RootCertificate,
     pub upstream: Certificate,
 }
 

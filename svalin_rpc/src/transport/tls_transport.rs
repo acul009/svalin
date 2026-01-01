@@ -8,6 +8,7 @@ use quinn::rustls::pki_types::InvalidDnsNameError;
 use svalin_pki::{
     Certificate, CertificateParseError, CreateCredentialsError, Credential, DecryptError,
     EncryptError, EncryptedObject, ExactVerififier, KnownCertificateVerifier,
+    UnverifiedCertificate,
 };
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_rustls::{TlsAcceptor, TlsStream};
@@ -70,6 +71,8 @@ pub enum PresharedError {
     PostcardError(#[from] postcard::Error),
     #[error("error reading or writing to transport: {0}")]
     ReadWriteError(#[from] std::io::Error),
+    #[error("certificate did not pass validation as temporary credential")]
+    NotTemporaryCertificate,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -100,7 +103,7 @@ where
         credentials: &Credential,
     ) -> Result<Self, TlsClientError> {
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
-            credentials.get_certificate().to_der().to_owned(),
+            credentials.get_certificate().as_der().to_owned(),
         )];
 
         let key_der = credentials.keypair().rustls_private_key();
@@ -130,7 +133,7 @@ where
             .first()
             .ok_or(TlsClientError::MissingCertificateError)?;
 
-        let cert = Certificate::from_der(der.to_vec())?;
+        let cert = Certificate::dangerous_from_already_verified_der(der)?;
 
         let tls_stream = TlsStream::Client(client);
 
@@ -158,7 +161,7 @@ where
         credentials: &Credential,
     ) -> Result<Self, TlsServerError> {
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
-            credentials.get_certificate().to_der().to_owned(),
+            credentials.get_certificate().as_der().to_owned(),
         )];
 
         let key_der = credentials.keypair().rustls_private_key();
@@ -183,7 +186,7 @@ where
             .first()
             .ok_or(TlsServerError::MissingCertificateError)?;
 
-        let cert = Certificate::from_der(der.to_vec())?;
+        let cert = Certificate::dangerous_from_already_verified_der(der)?;
 
         let tls_stream = TlsStream::Server(server);
 
@@ -225,8 +228,10 @@ where
         let credentials = Credential::generate_temporary()?;
 
         // Write my cert
-        let encrypted =
-            EncryptedObject::encrypt_with_key(credentials.get_certificate(), preshared)?;
+        let encrypted = EncryptedObject::encrypt_with_key(
+            credentials.get_certificate().as_unverified(),
+            preshared,
+        )?;
         let encoded = postcard::to_stdvec(&encrypted)?;
 
         let length_bytes = (encoded.len() as u32).to_be_bytes();
@@ -241,9 +246,12 @@ where
 
         let mut encoded = vec![0u8; length];
         base_transport.read_exact(&mut encoded).await?;
-        let encrypted: EncryptedObject<Certificate> = postcard::from_bytes(&encoded)?;
+        let encrypted: EncryptedObject<UnverifiedCertificate> = postcard::from_bytes(&encoded)?;
 
-        let certificate: Certificate = encrypted.decrypt_with_key(preshared)?;
+        let unverified_certificate = encrypted.decrypt_with_key(preshared)?;
+        let certificate = unverified_certificate
+            .use_as_temporary()
+            .ok_or(PresharedError::NotTemporaryCertificate)?;
 
         Ok((credentials, certificate))
     }

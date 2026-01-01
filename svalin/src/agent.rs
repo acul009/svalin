@@ -3,7 +3,10 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, Credential, EncryptedCredential, KnownCertificateVerifier};
+use svalin_pki::{
+    Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
+    RootCertificate, UnverifiedCertificate, get_current_timestamp,
+};
 use svalin_rpc::commands::deauthenticate::DeauthenticateHandler;
 use svalin_rpc::commands::e2e::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
@@ -28,11 +31,10 @@ use crate::shared::join_agent::AgentInitPayload;
 use crate::util::key_storage::KeySource;
 use crate::util::location::Location;
 use crate::verifier::remote_session_verifier::RemoteSessionVerifier;
-use crate::verifier::upstream_verifier::UpstreamVerifier;
 
 pub struct Agent {
     rpc: Arc<RpcClient>,
-    root_certificate: Certificate,
+    root_certificate: RootCertificate,
     credentials: Credential,
     cancel: CancellationToken,
 }
@@ -56,12 +58,14 @@ impl Agent {
             .context("error decrypting credentials")?;
 
         debug!("building upstream verifier");
+        let root_certificate = config.root_certificate.use_as_root()?;
 
-        let verifier = UpstreamVerifier::new(
-            config.root_certificate.clone(),
-            config.upstream_certificate.clone(),
-        )
-        .to_tls_verifier();
+        let upstream_certificate = config
+            .upstream_certificate
+            .verify_signature(&root_certificate, get_current_timestamp())
+            .context("error verifying upstream certificate")?;
+
+        let verifier = ExactVerififier::new(upstream_certificate).to_tls_verifier();
 
         debug!("trying to connect to server");
 
@@ -78,7 +82,7 @@ impl Agent {
 
         Ok(Agent {
             credentials,
-            root_certificate: config.root_certificate,
+            root_certificate: root_certificate,
             rpc: Arc::new(rpc),
             cancel,
         })
@@ -111,7 +115,10 @@ impl Agent {
         let public_commands = HandlerCollection::new(permission_handler.clone());
 
         // Todo: proper upstream verifier
-        let verifier = RemoteSessionVerifier::new(self.root_certificate.clone(), self.rpc.clone());
+        let verifier = RemoteSessionVerifier::new(
+            self.root_certificate.clone(),
+            self.rpc.upstream_connection(),
+        );
 
         public_commands.chain().await.add(E2EHandler::new(
             self.credentials.clone(),
@@ -136,8 +143,8 @@ impl Agent {
         let key_source = KeySource::generate_builtin()?;
 
         let config = AgentConfig {
-            root_certificate: data.root,
-            upstream_certificate: data.upstream,
+            root_certificate: data.root.to_unverified(),
+            upstream_certificate: data.upstream.to_unverified(),
             encrypted_credentials: key_source.encrypt_credential(&data.credentials).await?,
             upstream_address: data.address,
             key_source,
@@ -191,8 +198,8 @@ impl Agent {
 #[derive(Serialize, Deserialize)]
 struct AgentConfig {
     upstream_address: String,
-    upstream_certificate: Certificate,
-    root_certificate: Certificate,
+    upstream_certificate: UnverifiedCertificate,
+    root_certificate: UnverifiedCertificate,
     encrypted_credentials: EncryptedCredential,
     key_source: KeySource,
 }

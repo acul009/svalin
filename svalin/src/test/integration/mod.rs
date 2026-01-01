@@ -156,7 +156,7 @@ async fn integration_tests() {
     debug!("waiting to receive confirm code");
 
     client_confirm
-        .confirm(confirm_recv.await.unwrap(), "test agent".into())
+        .confirm(confirm_recv.await.unwrap())
         .await
         .unwrap();
 
@@ -170,7 +170,7 @@ async fn integration_tests() {
 
     let device = device_list.borrow().first_key_value().unwrap().1.clone();
 
-    if !device.item().is_online {
+    if !device.item().online_status {
         panic!("Device is not online");
     }
 

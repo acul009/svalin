@@ -1,6 +1,6 @@
 use crate::{Certificate, SpkiHash};
 
-use super::{VerificationError, Verifier};
+use super::{Verifier, VerifyError};
 
 #[derive(Debug)]
 pub struct ExactVerififier {
@@ -18,17 +18,16 @@ impl Verifier for ExactVerififier {
         &self,
         spki_hash: &SpkiHash,
         time: u64,
-    ) -> impl std::future::Future<Output = Result<crate::Certificate, VerificationError>> + Send
-    {
+    ) -> impl std::future::Future<Output = Result<crate::Certificate, VerifyError>> + Send {
         async move {
             if spki_hash == self.expected.spki_hash() {
                 self.expected
                     .check_validity_at(time)
-                    .map_err(|err| VerificationError::TimerangeError(err))?;
+                    .map_err(|err| VerifyError::TimerangeError(err))?;
 
                 Ok(self.expected.clone())
             } else {
-                Err(VerificationError::CertificateMismatch)
+                Err(VerifyError::CertificateMismatch)
             }
         }
     }

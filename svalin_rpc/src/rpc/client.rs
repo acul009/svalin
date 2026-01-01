@@ -40,7 +40,7 @@ impl RpcClient {
         let rustls_conf = match identity {
             Some(id) => builder.with_client_auth_cert(
                 vec![rustls::pki_types::CertificateDer::from(
-                    id.get_certificate().to_der().to_owned(),
+                    id.get_certificate().as_der().to_owned(),
                 )],
                 id.keypair().rustls_private_key(),
             )?,

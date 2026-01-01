@@ -1,11 +1,10 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Certificate, Credential, KeyPair,
+    Credential, KeyPair,
     certificate::UnverifiedCertificate,
+    get_current_timestamp,
     keypair::ExportedPublicKey,
     signed_message::{Sign, Verify},
 };
@@ -53,7 +52,7 @@ pub fn serialization() {
     let perm_creds = Credential::generate_temporary().unwrap();
     let cert = perm_creds.get_certificate();
 
-    let seriaized = cert.to_der().to_owned();
+    let seriaized = cert.as_der().to_owned();
     let cert2 = UnverifiedCertificate::from_der(seriaized).unwrap();
     assert_eq!(cert, &cert2)
 }
@@ -61,12 +60,12 @@ pub fn serialization() {
 #[test]
 pub fn serde_serialization() {
     let perm_creds = Credential::generate_temporary().unwrap();
-    let cert = perm_creds.get_certificate().clone().to_unverified();
+    let cert = perm_creds.get_certificate().as_unverified();
 
     let serialized = postcard::to_extend(&cert, Vec::new()).unwrap();
 
     let cert2: UnverifiedCertificate = postcard::from_bytes(&serialized).unwrap();
-    assert_eq!(&cert, &cert2)
+    assert_eq!(cert, &cert2)
 }
 
 #[tokio::test]
@@ -112,12 +111,6 @@ async fn test_create_leaf() {
     let leaf: UnverifiedCertificate = postcard::from_bytes(&serialized).unwrap();
 
     let _verified = leaf
-        .verify_signature(
-            root.get_certificate(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-        )
+        .verify_signature(root.get_certificate(), get_current_timestamp())
         .unwrap();
 }

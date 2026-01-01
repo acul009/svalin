@@ -12,7 +12,7 @@ use crate::transport::session_transport::{SessionTransportReader, SessionTranspo
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Certificate, Credential};
+use svalin_pki::{Certificate, Credential, SpkiHash};
 use tokio::io::AsyncWriteExt;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
@@ -42,7 +42,7 @@ impl ForwardHandler {
 
 #[async_trait]
 impl CommandHandler for ForwardHandler {
-    type Request = Certificate;
+    type Request = SpkiHash;
 
     fn key() -> String {
         forward_key()
@@ -54,8 +54,6 @@ impl CommandHandler for ForwardHandler {
         target: Self::Request,
         cancel: CancellationToken,
     ) -> anyhow::Result<()> {
-        debug!("client requesting forward");
-
         debug!("received forward request to {:?}", target);
 
         match self.server.open_session_with(target).await {
@@ -109,8 +107,16 @@ impl CommandHandler for ForwardHandler {
     }
 }
 
-pub struct ForwardDispatcher<'a> {
-    pub target: &'a Certificate,
+pub struct ForwardDispatcher {
+    target: SpkiHash,
+}
+
+impl ForwardDispatcher {
+    pub fn new(target: &Certificate) -> Self {
+        Self {
+            target: target.spki_hash().clone(),
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -121,14 +127,14 @@ pub enum ForwardDispatchError {
     ForwardError(#[from] ForwardError),
 }
 
-impl<'a> TakeableCommandDispatcher for ForwardDispatcher<'a> {
+impl TakeableCommandDispatcher for ForwardDispatcher {
     type Output = (
         Box<dyn SessionTransportReader>,
         Box<dyn SessionTransportWriter>,
     );
     type InnerError = ForwardDispatchError;
 
-    type Request = &'a Certificate;
+    type Request = SpkiHash;
 
     fn key() -> String {
         forward_key()
@@ -207,10 +213,7 @@ where
         Box<dyn SessionTransportReader>,
         Box<dyn SessionTransportWriter>,
     )> {
-        let dispatcher = ForwardDispatcher {
-            target: &self.target,
-        };
-
+        let dispatcher = ForwardDispatcher::new(&self.target);
         let (read, write) = self.connection.dispatch(dispatcher).await?;
 
         let unencrypted = Session::new(read, write, self.peer().clone());

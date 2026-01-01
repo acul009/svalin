@@ -79,7 +79,7 @@ impl DirectConnection {
                 let der = der_list
                     .first()
                     .ok_or_else(|| anyhow!("expected certificate in some, but empty list found"))?;
-                let cert = Certificate::from_der(der.to_vec())?;
+                let cert = Certificate::dangerous_from_already_verified_der(der)?;
                 Peer::Certificate(cert)
             }
         };

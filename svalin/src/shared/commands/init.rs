@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use svalin_pki::{
     ArgonCost, Certificate, CreateCertificateError, CreateCredentialsError, Credential,
-    EncryptError, EncryptedCredential, ExportedPublicKey, KeyPair, Sha512, argon2::Argon2,
+    EncryptError, EncryptedCredential, ExportedPublicKey, KeyPair, RootCertificate, Sha512,
+    UnverifiedCertificate, argon2::Argon2,
 };
 
 use async_trait::async_trait;
@@ -23,12 +24,12 @@ use crate::server::user_store::{UserStore, serde_paramsstring};
 
 pub struct ServerInitSuccess {
     pub credential: Credential,
-    pub root: Certificate,
+    pub root: RootCertificate,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct InitRequest {
-    server_cert: Certificate,
+    server_cert: UnverifiedCertificate,
     encrypted_credential: EncryptedCredential,
     totp_secret: TOTP,
     /// The username of the user being added
@@ -81,8 +82,12 @@ impl CommandHandler for InitHandler {
         session.write_object(&public_key).await?;
 
         let init_request: InitRequest = session.read_object().await?;
+        let root = init_request
+            .encrypted_credential
+            .certificate()
+            .clone()
+            .use_as_root()?;
         let my_credential = keypair.upgrade(init_request.server_cert)?;
-        let root = init_request.encrypted_credential.certificate().clone();
 
         UserStore::add_root_user(
             &self.pool,
@@ -171,7 +176,7 @@ impl Init {
 
 impl CommandDispatcher for Init {
     type Output = ClientInitSuccess;
-    type Request = Certificate;
+    type Request = ();
     type Error = InitError;
 
     fn key() -> String {
@@ -179,7 +184,7 @@ impl CommandDispatcher for Init {
     }
 
     fn get_request(&self) -> &Self::Request {
-        self.root.get_certificate()
+        &()
     }
 
     async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {
@@ -232,7 +237,7 @@ impl CommandDispatcher for Init {
             encrypted_credential,
             params,
             secret_exponent,
-            server_cert: server_cert.clone(),
+            server_cert: server_cert.clone().to_unverified(),
             verifier,
         };
 

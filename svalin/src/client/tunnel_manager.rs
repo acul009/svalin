@@ -90,7 +90,7 @@ impl TunnelManager {
         Ok(())
     }
 
-    pub fn tunnels(&self) -> watch::Ref<HashMap<Certificate, HashMap<Uuid, Tunnel>>> {
+    pub fn tunnels(&self) -> watch::Ref<'_, HashMap<Certificate, HashMap<Uuid, Tunnel>>> {
         self.active_tunnels.borrow()
     }
 
