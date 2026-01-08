@@ -18,12 +18,9 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 x509-parser = { version = "0.18.0", features = ["ring", "validate", "verify"] }
 zeroize = { version = "1.8.2", features = ["aarch64", "derive", "std"] }
-openmls = { version = "0.7.1", features = ["openmls_rust_crypto", "sqlite-provider"] }
+openmls = { version = "0.7.1", features = ["openmls_rust_crypto"] }
 openmls_traits = "0.4.1"
 tls_codec = { version = "0.4.2" }
 sha2 = "0.10.9"
 openmls_rust_crypto = "0.4.1"
-openmls_sqlite_storage = "0.1.1"
-
-# [dev-dependencies]
-# serde_json = { workspace = true }
+openmls_sqlx_storage = { path = "../sqlx_storage" }

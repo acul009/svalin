@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 mod argon;
 mod certificate;
 mod certificate_chain;

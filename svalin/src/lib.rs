@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 pub use tracing_subscriber;
 
 // The segregation I wanted to use here doesn't really make sense in practice.

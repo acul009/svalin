@@ -9,6 +9,7 @@ members = [
     "svalin_rpc",
     "svalin_sysctl",
     "svalin_iced",
+    "sqlx_storage"
 ]
 
 [workspace.dependencies]

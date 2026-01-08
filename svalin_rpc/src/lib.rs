@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 // exposed used rustls
 pub use quinn::rustls;
 
