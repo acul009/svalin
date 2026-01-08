@@ -1,6 +1,5 @@
-use openmls::prelude::{
-    Ciphersuite, CredentialWithKey, KeyPackage, KeyPackageBundle, KeyPackageNewError,
-};
+use crate::mls::key_package::{KeyPackage, KeyPackageError};
+use openmls::prelude::{Ciphersuite, CredentialWithKey, KeyPackageNewError};
 use openmls_rust_crypto::RustCrypto;
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
@@ -57,6 +56,16 @@ impl OpenMlsProvider for SvalinProvider {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum CreateKeyPackageError {
+    #[error("error trying to create mls key package: {0}")]
+    KeyPackageNewError(#[from] KeyPackageNewError),
+    #[error("error trying to serialize mls key package: {0}")]
+    SerializationError(#[from] tls_codec::Error),
+    #[error("error trying to create mls key package: {0}")]
+    KeyPackageError(#[from] KeyPackageError),
+}
+
 pub struct MlsClient {
     provider: SvalinProvider,
     svalin_credential: Credential,
@@ -84,12 +93,21 @@ impl MlsClient {
         Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
     }
 
-    pub fn create_key_package(&self) -> Result<KeyPackageBundle, KeyPackageNewError> {
-        KeyPackage::builder().build(
-            self.ciphersuite(),
-            &self.provider,
-            &self.svalin_credential,
-            self.mls_credential_with_key.clone(),
-        )
+    pub fn create_key_package(&self) -> Result<KeyPackage, CreateKeyPackageError> {
+        let mls_key_package = openmls::prelude::KeyPackage::builder()
+            .build(
+                self.ciphersuite(),
+                &self.provider,
+                &self.svalin_credential,
+                self.mls_credential_with_key.clone(),
+            )?
+            .key_package()
+            .clone();
+        let key_package = KeyPackage::new(
+            self.svalin_credential.get_certificate().clone(),
+            mls_key_package,
+        )?;
+
+        Ok(key_package)
     }
 }

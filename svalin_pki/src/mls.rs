@@ -23,8 +23,8 @@ use rand::RngCore;
 use crate::{
     Certificate, Credential, DecryptError, EncryptError, EncryptedObject,
     mls::{
+        key_package::{KeyPackage, UnverifiedKeyPackage},
         message_types::{Invitation, InvitationError},
-        new_member::{UnverifiedNewMember, VerifyNewMemberError},
     },
     signed_message::CanSign,
 };
@@ -32,8 +32,8 @@ use crate::{
 pub mod client;
 pub mod delivery_service;
 mod group_defaults;
+pub mod key_package;
 pub mod message_types;
-pub mod new_member;
 
 impl From<&Certificate> for openmls::credentials::Credential {
     fn from(value: &Certificate) -> Self {
@@ -230,13 +230,13 @@ pub enum GroupError {
     #[error("Failed to handle invitation: {0}")]
     InvitationError(#[from] InvitationError),
     #[error("Failed to verify new member: {0}")]
-    VerifyNewMemberError(#[from] VerifyNewMemberError),
+    VerifyNewMemberError(#[from] KeyPackage),
 }
 
 impl Group {
     pub async fn add_members(
         &mut self,
-        new_members: impl IntoIterator<Item = UnverifiedNewMember>,
+        new_members: impl IntoIterator<Item = UnverifiedKeyPackage>,
     ) -> Result<(MlsMessageOut, Invitation), GroupError> {
         let mut key_packages = Vec::new();
 

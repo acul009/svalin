@@ -8,6 +8,8 @@ mod keypair;
 pub mod mls;
 mod signed_message;
 mod signed_object;
+#[cfg(test)]
+mod test;
 mod verifier;
 
 // pub mod tbrhl;
@@ -42,9 +44,6 @@ use ring::rand::{SecureRandom, SystemRandom};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use thiserror::Error;
-
-#[cfg(test)]
-mod test;
 
 #[derive(Error, Debug)]
 pub enum GenerateKeyError {

@@ -24,3 +24,6 @@ tls_codec = { version = "0.4.2" }
 sha2 = "0.10.9"
 openmls_rust_crypto = "0.4.1"
 openmls_sqlx_storage = { path = "../sqlx_storage" }
+
+[dev-dependencies]
+sqlx = { version = "0.8.6", features = ["sqlite", "migrate", "runtime-tokio"] }

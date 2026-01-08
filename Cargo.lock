@@ -6766,6 +6766,7 @@ dependencies = [
  "rustls",
  "serde",
  "sha2",
+ "sqlx",
  "thiserror 2.0.17",
  "time",
  "tls_codec",
