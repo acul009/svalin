@@ -6689,6 +6689,7 @@ dependencies = [
  "curve25519-dalek",
  "dashmap",
  "futures",
+ "openmls_sqlx_storage",
  "password-hash",
  "pin-project",
  "postcard",

@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use crate::mls::key_package::{KeyPackage, KeyPackageError};
 use openmls::prelude::{Ciphersuite, CredentialWithKey, KeyPackageNewError};
 use openmls_rust_crypto::RustCrypto;
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
+use tokio::task::JoinError;
 
 use crate::Credential;
 
@@ -64,10 +67,12 @@ pub enum CreateKeyPackageError {
     SerializationError(#[from] tls_codec::Error),
     #[error("error trying to create mls key package: {0}")]
     KeyPackageError(#[from] KeyPackageError),
+    #[error("error trying to join tokio blocking task: {0}")]
+    JoinError(#[from] JoinError),
 }
 
 pub struct MlsClient {
-    provider: SvalinProvider,
+    provider: Arc<SvalinProvider>,
     svalin_credential: Credential,
     mls_credential_with_key: CredentialWithKey,
 }
@@ -82,7 +87,7 @@ impl MlsClient {
             signature_key: credential.get_certificate().public_key().into(),
         };
         Self {
-            provider: SvalinProvider::new(storage_provider),
+            provider: Arc::new(SvalinProvider::new(storage_provider)),
             svalin_credential: credential,
             mls_credential_with_key: public_info,
         }
@@ -93,16 +98,23 @@ impl MlsClient {
         Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
     }
 
-    pub fn create_key_package(&self) -> Result<KeyPackage, CreateKeyPackageError> {
-        let mls_key_package = openmls::prelude::KeyPackage::builder()
-            .build(
-                self.ciphersuite(),
-                &self.provider,
-                &self.svalin_credential,
-                self.mls_credential_with_key.clone(),
-            )?
-            .key_package()
-            .clone();
+    pub async fn create_key_package(&self) -> Result<KeyPackage, CreateKeyPackageError> {
+        let cipher_suite = self.ciphersuite();
+        let provider = self.provider.clone();
+        let svalin_credential = self.svalin_credential.clone();
+        let mls_credential_with_key = self.mls_credential_with_key.clone();
+        let mls_key_package = tokio::task::spawn_blocking(move || {
+            let provider = provider;
+            openmls::prelude::KeyPackage::builder().build(
+                cipher_suite,
+                provider.as_ref(),
+                &svalin_credential,
+                mls_credential_with_key,
+            )
+        })
+        .await??
+        .key_package()
+        .clone();
         let key_package = KeyPackage::new(
             self.svalin_credential.get_certificate().clone(),
             mls_key_package,

@@ -54,7 +54,7 @@ impl<'a> CommandDispatcher for UploadKeyPackages<'a> {
 
         let mut new_packages = Vec::new();
         while current_key_packages < TARGET_KEY_PACKAGE_COUNT {
-            let new_package = self.0.create_key_package()?;
+            let new_package = self.0.create_key_package().await?;
             new_packages.push(new_package.to_unverified());
             current_key_packages += 1;
         }

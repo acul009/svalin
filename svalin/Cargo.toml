@@ -54,6 +54,7 @@ reqwest = { version = "0.13.1", features = [
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"] }
 zeroize = { version = "1.8.2", features = ["derive"] }
 dashmap = "6.1.0"
+openmls_sqlx_storage = { path = "../sqlx_storage" }
 
 [package.metadata.deb]
 depends = "libc6 (>= 2.31)"

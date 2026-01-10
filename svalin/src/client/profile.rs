@@ -1,10 +1,12 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::{Result, anyhow};
+use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
 use svalin_pki::{
     Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
-    RootCertificate, UnverifiedCertificate, get_current_timestamp,
+    RootCertificate, UnverifiedCertificate, get_current_timestamp, mls::client::MlsClient,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::sync::watch;
@@ -49,6 +51,10 @@ impl Profile {
 
     pub fn name(&self) -> String {
         format!("{}@{}", self.username, self.upstream_address)
+    }
+
+    pub async fn profile_dir(&self) -> Result<Location> {
+        Client::profile_dir(&self.name()).await
     }
 }
 
@@ -152,6 +158,7 @@ impl Client {
         debug!("Data from profile ready");
 
         if let Some(profile) = profile {
+            let db_path = profile.profile_dir().await?.push("mls-store.sqlite");
             debug!("unlocking profile");
             let user_credential = profile.user_credential.decrypt(password.clone()).await?;
             let device_credential = profile.device_credential.decrypt(password).await?;
@@ -175,6 +182,17 @@ impl Client {
 
             debug!("connected to server");
 
+            let pool = SqlitePool::connect(
+                db_path
+                    .as_path()
+                    .to_str()
+                    .ok_or_else(|| anyhow!("db_path was not valid UTF-8"))?,
+            )
+            .await?;
+            let storage_provider = SqliteStorageProvider::new(pool);
+            storage_provider.run_migrations().await?;
+            let mls = MlsClient::new(device_credential.clone(), storage_provider);
+
             let tunnel_manager = TunnelManager::new();
 
             let client = Arc::new(Self {
@@ -183,9 +201,9 @@ impl Client {
                 upstream_certificate,
                 root_certificate: root_certificate.clone(),
                 user_credential: user_credential,
-                _device_credential: device_credential.clone(),
                 device_list: watch::channel(BTreeMap::new()).0,
                 tunnel_manager,
+                mls,
                 background_tasks: TaskTracker::new(),
                 cancel: CancellationToken::new(),
             });

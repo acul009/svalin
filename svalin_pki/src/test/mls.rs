@@ -7,8 +7,8 @@ use crate::{Credential, mls::client::PostcardCodec};
 async fn test_key_package_creation() {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
     let mut storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
-    storage.run_migrations().unwrap();
+    storage.run_migrations().await.unwrap();
     let credential = Credential::generate_root().unwrap();
     let client = crate::mls::client::MlsClient::new(credential, storage);
-    let key_package = client.create_key_package().unwrap();
+    let key_package = client.create_key_package().await.unwrap();
 }
