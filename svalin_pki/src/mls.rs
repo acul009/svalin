@@ -11,9 +11,9 @@ use openmls::{
         StagedWelcome, WelcomeError,
     },
     prelude::{
-        Ciphersuite, CredentialType, CredentialWithKey, KeyPackage, KeyPackageBundle,
-        KeyPackageNewError, KeyPackageVerifyError, MlsMessageBodyIn, MlsMessageIn, MlsMessageOut,
-        PrivateMessageIn, ProcessedMessageContent, ProtocolMessage, ProtocolVersion, Welcome,
+        Ciphersuite, CredentialType, CredentialWithKey, KeyPackageBundle, KeyPackageNewError,
+        KeyPackageVerifyError, MlsMessageBodyIn, MlsMessageIn, MlsMessageOut, PrivateMessageIn,
+        ProcessedMessageContent, ProtocolMessage, Welcome,
     },
 };
 use openmls_rust_crypto::{MemoryStorage, MemoryStorageError, RustCrypto};
@@ -34,6 +34,8 @@ pub mod delivery_service;
 mod group_defaults;
 pub mod key_package;
 pub mod message_types;
+
+pub use openmls::prelude::{OpenMlsCrypto, ProtocolVersion};
 
 impl From<&Certificate> for openmls::credentials::Credential {
     fn from(value: &Certificate) -> Self {
@@ -184,7 +186,7 @@ impl MlsClient {
     }
 
     pub fn create_key_package(&self) -> Result<KeyPackageBundle, KeyPackageNewError> {
-        KeyPackage::builder().build(
+        openmls::prelude::KeyPackage::builder().build(
             self.cipher_suite,
             self.provider.deref(),
             &self.credential,
@@ -230,7 +232,7 @@ pub enum GroupError {
     #[error("Failed to handle invitation: {0}")]
     InvitationError(#[from] InvitationError),
     #[error("Failed to verify new member: {0}")]
-    VerifyNewMemberError(#[from] KeyPackage),
+    VerifyNewMemberError(#[from] crate::mls::key_package::KeyPackageError),
 }
 
 impl Group {

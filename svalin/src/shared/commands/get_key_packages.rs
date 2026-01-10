@@ -1,7 +1,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use async_trait::async_trait;
-use svalin_pki::{SpkiHash, mls::new_member::UnverifiedNewMember};
+use svalin_pki::{SpkiHash, mls::key_package::UnverifiedKeyPackage};
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::{Session, SessionReadError},
@@ -21,7 +21,7 @@ pub enum GetKeyPackagesError {
 }
 
 impl CommandDispatcher for GetKeyPackages {
-    type Output = Vec<UnverifiedNewMember>;
+    type Output = Vec<UnverifiedKeyPackage>;
 
     type Error = GetKeyPackagesError;
 
@@ -39,7 +39,7 @@ impl CommandDispatcher for GetKeyPackages {
         self,
         session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
-        let key_packages: Option<Vec<UnverifiedNewMember>> = session.read_object().await?;
+        let key_packages: Option<Vec<UnverifiedKeyPackage>> = session.read_object().await?;
         key_packages.ok_or_else(|| GetKeyPackagesError::ServerError)
     }
 }
@@ -75,7 +75,7 @@ impl CommandHandler for GetKeyPackagesHandler {
             }
             Err(err) => {
                 let _ = session
-                    .write_object(&Option::<Vec<UnverifiedNewMember>>::None)
+                    .write_object(&Option::<Vec<UnverifiedKeyPackage>>::None)
                     .await?;
                 Err(err.into())
             }

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use svalin_pki::{
     SpkiHash,
-    mls::new_member::{NewMember, UnverifiedNewMember},
+    mls::key_package::{KeyPackage, UnverifiedKeyPackage},
 };
 
 #[derive(Debug)]
@@ -15,10 +15,10 @@ impl KeyPackageStore {
         Self { pool }
     }
 
-    pub async fn add_key_package(&self, member: NewMember) -> anyhow::Result<()> {
-        let spki_hash = member.spki_hash().clone();
+    pub async fn add_key_package(&self, key_package: KeyPackage) -> anyhow::Result<()> {
+        let spki_hash = key_package.spki_hash().clone();
         let spki_hash = spki_hash.as_slice();
-        let member = member.to_unverified();
+        let member = key_package.to_unverified();
         let data = postcard::to_stdvec(&member)?;
         let id = uuid::Uuid::new_v4().as_hyphenated().to_string();
 
@@ -34,10 +34,22 @@ impl KeyPackageStore {
         Ok(())
     }
 
+    pub async fn count_key_packages(&self, spki_hash: &SpkiHash) -> anyhow::Result<u64> {
+        let spki_hash = spki_hash.as_slice();
+        let count = sqlx::query_scalar!(
+            "SELECT COUNT(*) as count FROM key_packages WHERE spki_hash = ?",
+            spki_hash
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(count as u64)
+    }
+
     pub async fn get_key_packages(
         &self,
         entities: &HashSet<SpkiHash>,
-    ) -> anyhow::Result<Vec<UnverifiedNewMember>> {
+    ) -> anyhow::Result<Vec<UnverifiedKeyPackage>> {
         let mut transaction = self.pool.begin().await?;
 
         let mut key_packages = Vec::new();

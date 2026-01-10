@@ -7,4 +7,4 @@ pub mod login;
 pub mod public_server_status;
 pub mod realtime_status;
 pub mod terminal;
-// pub mod upload_key_packages;
+pub mod upload_key_packages;
