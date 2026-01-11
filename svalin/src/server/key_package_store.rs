@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use svalin_pki::{
     SpkiHash,
@@ -11,8 +11,8 @@ pub struct KeyPackageStore {
 }
 
 impl KeyPackageStore {
-    pub async fn new(pool: sqlx::SqlitePool) -> Self {
-        Self { pool }
+    pub(crate) fn open(pool: sqlx::Pool<sqlx::Sqlite>) -> Arc<Self> {
+        Arc::new(Self { pool })
     }
 
     pub async fn add_key_package(&self, key_package: KeyPackage) -> anyhow::Result<()> {

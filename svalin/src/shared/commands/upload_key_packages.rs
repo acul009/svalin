@@ -66,16 +66,33 @@ impl<'a> CommandDispatcher for UploadKeyPackages<'a> {
     }
 }
 
-pub struct UploadKeyPackagesHandler<Crypto> {
+pub struct UploadKeyPackagesHandler<Provider> {
     key_package_store: Arc<KeyPackageStore>,
     protocol_version: mls::ProtocolVersion,
-    crypto: Crypto,
+    provider: Arc<Provider>,
+}
+
+impl<Provider> UploadKeyPackagesHandler<Provider>
+where
+    Provider: svalin_pki::mls::OpenMlsProvider,
+{
+    pub fn new(
+        key_package_store: Arc<KeyPackageStore>,
+        protocol_version: mls::ProtocolVersion,
+        provider: Arc<Provider>,
+    ) -> Self {
+        Self {
+            key_package_store,
+            protocol_version,
+            provider,
+        }
+    }
 }
 
 #[async_trait::async_trait]
-impl<Crypto> CommandHandler for UploadKeyPackagesHandler<Crypto>
+impl<Provider> CommandHandler for UploadKeyPackagesHandler<Provider>
 where
-    Crypto: svalin_pki::mls::OpenMlsCrypto,
+    Provider: svalin_pki::mls::OpenMlsProvider + Send + Sync,
 {
     type Request = ();
 
@@ -114,9 +131,9 @@ where
     }
 }
 
-impl<Crypto> UploadKeyPackagesHandler<Crypto>
+impl<Provider> UploadKeyPackagesHandler<Provider>
 where
-    Crypto: svalin_pki::mls::OpenMlsCrypto,
+    Provider: svalin_pki::mls::OpenMlsProvider + Send + Sync,
 {
     async fn verify_and_save(
         &self,
@@ -124,7 +141,7 @@ where
         unverified: UnverifiedKeyPackage,
     ) -> anyhow::Result<()> {
         let verified = unverified
-            .verify(&self.crypto, self.protocol_version, verifier)
+            .verify(self.provider.crypto(), self.protocol_version, verifier)
             .await?;
         self.key_package_store.add_key_package(verified).await?;
         Ok(())

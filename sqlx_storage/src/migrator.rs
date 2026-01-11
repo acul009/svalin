@@ -8,9 +8,9 @@ use sqlx::{
     query, query_as,
 };
 
-pub(super) struct MigratorWrapper<'a>(pub(super) &'a SqlitePool);
+pub(super) struct MigratorWrapper(pub(super) SqlitePool);
 
-impl<'a> Acquire<'a> for MigratorWrapper<'a> {
+impl<'a> Acquire<'a> for MigratorWrapper {
     type Database = Sqlite;
 
     type Connection = PoolConnection<Sqlite>;
@@ -28,7 +28,7 @@ impl<'a> Acquire<'a> for MigratorWrapper<'a> {
 // implementation for `SqliteConnection` in sqlx 8.6. The only adaptation is the
 // name of the migration table which is `_openmls_sqlx_migrations` instead of
 // `_sqlx_migrations`.
-impl<'a> Migrate for MigratorWrapper<'a> {
+impl Migrate for MigratorWrapper {
     fn ensure_migrations_table(&mut self) -> BoxFuture<'_, Result<(), MigrateError>> {
         Box::pin(async move {
             // language=SQLite
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS _openmls_sqlx_migrations (
             let row: Option<(i64,)> = query_as(
                 "SELECT version FROM _openmls_sqlx_migrations WHERE success = false ORDER BY version LIMIT 1",
             )
-            .fetch_optional(self.0)
+            .fetch_optional(&self.0)
             .await?;
 
             Ok(row.map(|r| r.0))
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS _openmls_sqlx_migrations (
             // language=SQLite
             let rows: Vec<(i64, Vec<u8>)> =
                 query_as("SELECT version, checksum FROM _openmls_sqlx_migrations ORDER BY version")
-                    .fetch_all(self.0)
+                    .fetch_all(&self.0)
                     .await?;
 
             let migrations = rows
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS _openmls_sqlx_migrations (
             )
             .bind(elapsed.as_nanos() as i64)
             .bind(migration.version)
-            .execute(self.0)
+            .execute(&self.0)
             .await?;
 
             Ok(elapsed)

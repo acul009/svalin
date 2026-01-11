@@ -31,10 +31,6 @@ pub enum KeyPackageError {
 }
 
 impl UnverifiedKeyPackage {
-    pub(crate) fn new(key_package: KeyPackageIn) -> Self {
-        UnverifiedKeyPackage { key_package }
-    }
-
     pub async fn verify(
         self,
         crypto: &impl OpenMlsCrypto,
@@ -94,9 +90,5 @@ impl KeyPackage {
 
     pub fn spki_hash(&self) -> &SpkiHash {
         self.certificate.spki_hash()
-    }
-
-    pub(crate) fn to_mls_key_package(self) -> openmls::prelude::KeyPackage {
-        self.key_package
     }
 }

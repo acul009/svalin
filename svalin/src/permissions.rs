@@ -9,7 +9,9 @@ use svalin_rpc::{
 };
 
 use crate::{
-    shared::commands::public_server_status::PublicStatusHandler,
+    shared::commands::{
+        public_server_status::PublicStatusHandler, upload_key_packages::UploadKeyPackagesHandler,
+    },
     verifier::load_certificate_chain::LoadCertificateChainHandler,
 };
 
@@ -19,6 +21,7 @@ pub mod default_permission_handler;
 pub enum Permission {
     RootOnlyPlaceholder,
     AgentOnlyPlaceholder,
+    UserOrSession,
     ViewPublicInformation,
     AuthenticatedOnly,
     AnonymousOnly,
@@ -70,5 +73,13 @@ impl<Nested: PermissionHandler> From<&PermissionPrecursor<DeauthenticateHandler<
 {
     fn from(_value: &PermissionPrecursor<DeauthenticateHandler<Nested>>) -> Self {
         Permission::AuthenticatedOnly
+    }
+}
+
+impl<Provider: svalin_pki::mls::OpenMlsProvider + Send + Sync>
+    From<&PermissionPrecursor<UploadKeyPackagesHandler<Provider>>> for Permission
+{
+    fn from(_value: &PermissionPrecursor<UploadKeyPackagesHandler<Provider>>) -> Self {
+        Permission::UserOrSession
     }
 }

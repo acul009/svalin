@@ -17,7 +17,7 @@ use openmls::{
     },
 };
 use openmls_rust_crypto::{MemoryStorage, MemoryStorageError, RustCrypto};
-use openmls_traits::{OpenMlsProvider, signatures::SignerError};
+use openmls_traits::signatures::SignerError;
 use rand::RngCore;
 
 use crate::{
@@ -35,7 +35,7 @@ mod group_defaults;
 pub mod key_package;
 pub mod message_types;
 
-pub use openmls::prelude::{OpenMlsCrypto, ProtocolVersion};
+pub use openmls::prelude::{OpenMlsProvider, ProtocolVersion};
 
 impl From<&Certificate> for openmls::credentials::Credential {
     fn from(value: &Certificate) -> Self {

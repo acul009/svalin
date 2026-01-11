@@ -56,7 +56,7 @@ impl<'a, C: Codec> SqliteStorageProvider<C> {
     /// migration support.
     pub async fn run_migrations(&self) -> Result<(), sqlx::migrate::MigrateError> {
         sqlx::migrate!("./migrations")
-            .run(MigratorWrapper(&self.pool))
+            .run(MigratorWrapper(self.pool.clone()))
             .await?;
         Ok(())
     }

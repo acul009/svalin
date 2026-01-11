@@ -11,7 +11,7 @@ async fn proposals() {
         .map(|i| TestProposal(format!("TestProposal{i}").as_bytes().to_vec()))
         .collect::<Vec<_>>();
     let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
-    let mut storage = SqliteStorageProvider::<JsonCodec>::new(pool);
+    let storage = SqliteStorageProvider::<JsonCodec>::new(pool);
 
     storage.run_migrations().await.unwrap();
 
@@ -81,7 +81,7 @@ async fn group_data_roundtrip() {
     let leaf_b = TestBlob(b"leaf-b".to_vec());
 
     let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
-    let mut storage = SqliteStorageProvider::<JsonCodec>::new(pool);
+    let storage = SqliteStorageProvider::<JsonCodec>::new(pool);
     storage.run_migrations().await.unwrap();
 
     storage
@@ -207,7 +207,7 @@ async fn key_material_roundtrip() {
     let leaf_index: u32 = 7;
 
     let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
-    let mut storage = SqliteStorageProvider::<JsonCodec>::new(pool);
+    let storage = SqliteStorageProvider::<JsonCodec>::new(pool);
     storage.run_migrations().await.unwrap();
 
     storage

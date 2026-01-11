@@ -27,13 +27,17 @@ impl PermissionHandler for DefaultPermissionHandler {
             svalin_rpc::rpc::peer::Peer::Certificate(certificate) => {
                 let allowed = match certificate.certificate_type() {
                     CertificateType::Root => false,
-                    CertificateType::User => false,
+                    CertificateType::User => match permission {
+                        Permission::UserOrSession => true,
+                        _ => false,
+                    },
                     CertificateType::UserDevice => match permission {
                         Permission::RootOnlyPlaceholder => {
                             certificate.issuer() == self.root.spki_hash()
                         }
                         Permission::AuthenticatedOnly => true,
                         Permission::ViewPublicInformation => true,
+                        Permission::UserOrSession => true,
                         _ => false,
                     },
                     CertificateType::Agent => match permission {
@@ -55,11 +59,14 @@ impl PermissionHandler for DefaultPermissionHandler {
                         Permission::RootOnlyPlaceholder => Err(PermissionCheckError::PermissionDenied(
                             "only the root user is allowed to do that".to_string(),
                         )),
+                        Permission::UserOrSession => Err(PermissionCheckError::PermissionDenied(
+                            "only the user or session is allowed to do that".to_string(),
+                        )),
                         Permission::AgentOnlyPlaceholder => Err(PermissionCheckError::PermissionDenied(
                             "only the agents are allowed to do that".to_string(),
                         )),
                         Permission::ViewPublicInformation => Err(PermissionCheckError::PermissionDenied(
-                            "everyone is should be allowed to do this, probably a bug".to_string(),
+                            "everyone should be allowed to do this, probably a bug".to_string(),
                         )),
                         Permission::AuthenticatedOnly => Err(PermissionCheckError::PermissionDenied(
                             "peer must be authenticated for this action".to_string()
@@ -71,10 +78,9 @@ impl PermissionHandler for DefaultPermissionHandler {
                 }
             }
             svalin_rpc::rpc::peer::Peer::Anonymous => match permission {
-                Permission::RootOnlyPlaceholder => Err(PermissionCheckError::PermissionDenied(
-                    "anonymous peers are not allowed to do that".to_string(),
-                )),
-                Permission::AgentOnlyPlaceholder => Err(PermissionCheckError::PermissionDenied(
+                Permission::RootOnlyPlaceholder
+                | Permission::AgentOnlyPlaceholder
+                | Permission::UserOrSession => Err(PermissionCheckError::PermissionDenied(
                     "anonymous peers are not allowed to do that".to_string(),
                 )),
                 Permission::ViewPublicInformation => Ok(()),

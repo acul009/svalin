@@ -4,11 +4,13 @@ use agent_store::AgentStore;
 use anyhow::{Context, Result, anyhow};
 use command_builder::SvalinCommandBuilder;
 use config_builder::ServerConfigBuilder;
+use openmls_sqlx_storage::SqliteStorageProvider;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
 use svalin_pki::{
     Credential, EncryptedCredential, KnownCertificateVerifier, UnverifiedCertificate,
+    mls::client::SvalinProvider,
 };
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},
@@ -23,7 +25,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
-    server::session_store::SessionStore,
+    server::{key_package_store::KeyPackageStore, session_store::SessionStore},
     shared::commands::{
         init::{InitHandler, ServerInitSuccess},
         public_server_status::{PublicStatus, PublicStatusHandler},
@@ -120,6 +122,24 @@ impl Server {
         Ok(pool)
     }
 
+    async fn open_mls_provider() -> Result<Arc<SvalinProvider>> {
+        let location = Self::data_dir().await?.push("mls-store.sqlite");
+        let url = format!("{}", &location);
+
+        debug!("database_url: {}", &url);
+
+        if !tokio::fs::try_exists(location.as_path()).await? {
+            sqlx::Sqlite::create_database(&url).await?;
+        }
+
+        let pool = SqlitePoolOptions::new().connect(&url).await?;
+        let storage_provider = SqliteStorageProvider::new(pool);
+        storage_provider.run_migrations().await?;
+        let provider = SvalinProvider::new(storage_provider);
+
+        Ok(Arc::new(provider))
+    }
+
     async fn start(config: ServerConfig) -> Result<Self> {
         let base_config = Self::get_base_config()
             .await
@@ -183,6 +203,8 @@ impl Server {
 
         let agent_store = AgentStore::open(pool.clone());
 
+        let key_package_store = KeyPackageStore::open(pool.clone());
+
         let credentials = base_config
             .key_source
             .decrypt_credentials(base_config.credentials)
@@ -198,12 +220,16 @@ impl Server {
 
         let verifier = TlsOptionalWrapper::new(verifier);
 
+        let mls_provider = Self::open_mls_provider().await?;
+
         let command_builder = SvalinCommandBuilder {
             root_cert: root,
             server_cert: credentials.get_certificate().clone(),
             user_store,
             agent_store,
             session_store,
+            key_package_store,
+            mls_provider,
         };
 
         let tasks = TaskTracker::new();
