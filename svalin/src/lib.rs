@@ -4,7 +4,7 @@ pub use tracing_subscriber;
 // The segregation I wanted to use here doesn't really make sense in practice.
 // TODO: refactor module locations
 pub mod agent;
-pub mod async_com;
+// pub mod async_com;
 pub mod client;
 pub mod device;
 pub mod permissions;
