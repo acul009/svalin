@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
 use svalin_pki::{
     Credential, EncryptedCredential, KnownCertificateVerifier, UnverifiedCertificate,
-    mls::client::SvalinProvider,
+    mls::provider::SvalinProvider,
 };
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},

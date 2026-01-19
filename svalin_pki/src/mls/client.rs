@@ -1,75 +1,20 @@
 use std::sync::Arc;
 
-use crate::mls::key_package::{KeyPackage, KeyPackageError};
-use openmls::prelude::{Ciphersuite, CredentialWithKey, KeyPackageNewError};
-use openmls_rust_crypto::RustCrypto;
+use crate::{
+    Certificate,
+    mls::{
+        key_package::{KeyPackage, KeyPackageError},
+        provider::{PostcardCodec, SvalinProvider},
+    },
+};
+use openmls::{
+    group::MlsGroup,
+    prelude::{Ciphersuite, CredentialWithKey, KeyPackageNewError},
+};
 use openmls_sqlx_storage::SqliteStorageProvider;
-use openmls_traits::OpenMlsProvider;
 use tokio::task::JoinError;
 
 use crate::Credential;
-
-#[derive(Default)]
-pub struct PostcardCodec {}
-
-impl openmls_sqlx_storage::Codec for PostcardCodec {
-    type Error = postcard::Error;
-
-    fn to_vec<T: serde::Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, Self::Error> {
-        postcard::to_stdvec(value)
-    }
-
-    fn from_slice<T: serde::de::DeserializeOwned + ?Sized>(slice: &[u8]) -> Result<T, Self::Error> {
-        postcard::from_bytes(slice)
-    }
-}
-
-pub struct SvalinProvider {
-    crypto: RustCrypto,
-    storage_provider: SqliteStorageProvider<PostcardCodec>,
-}
-
-impl SvalinProvider {
-    pub fn new(storage_provider: SqliteStorageProvider<PostcardCodec>) -> Self {
-        let crypto = RustCrypto::default();
-        Self {
-            crypto,
-            storage_provider,
-        }
-    }
-}
-
-impl OpenMlsProvider for SvalinProvider {
-    type CryptoProvider = RustCrypto;
-
-    type RandProvider = RustCrypto;
-
-    type StorageProvider = SqliteStorageProvider<PostcardCodec>;
-
-    fn storage(&self) -> &Self::StorageProvider {
-        &self.storage_provider
-    }
-
-    fn crypto(&self) -> &Self::CryptoProvider {
-        &self.crypto
-    }
-
-    fn rand(&self) -> &Self::RandProvider {
-        &self.crypto
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum CreateKeyPackageError {
-    #[error("error trying to create mls key package: {0}")]
-    KeyPackageNewError(#[from] KeyPackageNewError),
-    #[error("error trying to serialize mls key package: {0}")]
-    SerializationError(#[from] tls_codec::Error),
-    #[error("error trying to create mls key package: {0}")]
-    KeyPackageError(#[from] KeyPackageError),
-    #[error("error trying to join tokio blocking task: {0}")]
-    JoinError(#[from] JoinError),
-}
 
 pub struct MlsClient {
     provider: Arc<SvalinProvider>,
@@ -122,4 +67,42 @@ impl MlsClient {
 
         Ok(key_package)
     }
+
+    pub async fn create_device_group(
+        &self,
+        device: KeyPackage,
+        other_members: Vec<KeyPackage>,
+    ) -> Result<GroupCreationInfo, CreateDeviceGroupError> {
+        // I'm kind of in over my head again. So I'll try fighting my way through here in very small steps with a few comments.
+
+        // So the first step would be getting a list of all members for the group.
+        // These should be:
+        // - The target device
+        // - The current user
+        // - The current users sessions
+        // - The root user
+        // - The root users sessions
+        //
+        // And I just now notized, that I already need to have this info then creating this group.
+        // So now I gotta think about how to add these to the parameters nicely
+
+        // MlsGroup::builder()
+        todo!()
+    }
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum CreateKeyPackageError {
+    #[error("error trying to create mls key package: {0}")]
+    KeyPackageNewError(#[from] KeyPackageNewError),
+    #[error("error trying to serialize mls key package: {0}")]
+    SerializationError(#[from] tls_codec::Error),
+    #[error("error trying to create mls key package: {0}")]
+    KeyPackageError(#[from] KeyPackageError),
+    #[error("error trying to join tokio blocking task: {0}")]
+    JoinError(#[from] JoinError),
+}
+
+pub enum CreateDeviceGroupError {}
+
+pub struct GroupCreationInfo {}

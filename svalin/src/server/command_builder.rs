@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use svalin_pki::mls::{self, client::SvalinProvider};
+use svalin_pki::mls::{self, provider::SvalinProvider};
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
     rpc::{
