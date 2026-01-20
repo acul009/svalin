@@ -2,7 +2,7 @@ use openmls::prelude::{KeyPackageIn, KeyPackageVerifyError, OpenMlsCrypto, Proto
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Certificate, KnownCertificateVerifier, SpkiHash, Verifier, VerifyError,
+    Certificate, CertificateType, KnownCertificateVerifier, SpkiHash, Verifier, VerifyError,
     certificate::UnverifiedCertificate, get_current_timestamp,
 };
 
@@ -90,5 +90,13 @@ impl KeyPackage {
 
     pub fn spki_hash(&self) -> &SpkiHash {
         self.certificate.spki_hash()
+    }
+
+    pub fn user_spki_hash(&self) -> &SpkiHash {
+        if self.certificate.certificate_type() == CertificateType::UserDevice {
+            self.certificate.issuer()
+        } else {
+            self.certificate.spki_hash()
+        }
     }
 }
