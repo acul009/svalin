@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::server::key_package_store::KeyPackageStore;
 
-pub struct GetKeyPackagesForUsers(pub HashSet<SpkiHash>);
+pub struct GetKeyPackages(pub HashSet<SpkiHash>);
 
 #[derive(Debug, thiserror::Error)]
 pub enum GetKeyPackagesError {
@@ -20,7 +20,7 @@ pub enum GetKeyPackagesError {
     ServerError,
 }
 
-impl CommandDispatcher for GetKeyPackagesForUsers {
+impl CommandDispatcher for GetKeyPackages {
     type Output = Vec<UnverifiedKeyPackage>;
 
     type Error = GetKeyPackagesError;
@@ -28,7 +28,7 @@ impl CommandDispatcher for GetKeyPackagesForUsers {
     type Request = HashSet<SpkiHash>;
 
     fn key() -> String {
-        GetKeyPackagesForUsersHandler::key()
+        GetKeyPackagesHandler::key()
     }
 
     fn get_request(&self) -> &Self::Request {
@@ -44,18 +44,18 @@ impl CommandDispatcher for GetKeyPackagesForUsers {
     }
 }
 
-pub struct GetKeyPackagesForUsersHandler {
+pub struct GetKeyPackagesHandler {
     key_package_store: Arc<KeyPackageStore>,
 }
 
-impl GetKeyPackagesForUsersHandler {
+impl GetKeyPackagesHandler {
     pub fn new(key_package_store: Arc<KeyPackageStore>) -> Self {
         Self { key_package_store }
     }
 }
 
 #[async_trait]
-impl CommandHandler for GetKeyPackagesForUsersHandler {
+impl CommandHandler for GetKeyPackagesHandler {
     type Request = HashSet<SpkiHash>;
 
     fn key() -> String {

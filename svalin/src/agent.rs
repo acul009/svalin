@@ -2,7 +2,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow};
+use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
+use sqlx::migrate::MigrateDatabase;
+use sqlx::{Sqlite, SqlitePool};
+use svalin_pki::mls::provider::PostcardCodec;
 use svalin_pki::{
     Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
     RootCertificate, UnverifiedCertificate, get_current_timestamp,
@@ -29,7 +33,7 @@ use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::commands::terminal::RemoteTerminalHandler;
 use crate::shared::join_agent::AgentInitPayload;
 use crate::util::key_storage::KeySource;
-use crate::util::location::Location;
+use crate::util::location::{Location, LocationError};
 use crate::verifier::remote_session_verifier::RemoteSessionVerifier;
 
 pub struct Agent {
@@ -159,14 +163,14 @@ impl Agent {
         Ok(())
     }
 
-    async fn data_dir() -> Result<Location> {
+    async fn data_dir() -> Result<Location, LocationError> {
         Location::system_data_dir()?
             .push("agent")
             .ensure_exists()
             .await
     }
 
-    async fn config_path() -> Result<Location> {
+    async fn config_path() -> Result<Location, LocationError> {
         Ok(Self::data_dir().await?.push("config.json"))
     }
 
@@ -178,6 +182,31 @@ impl Agent {
         } else {
             Ok(None)
         }
+    }
+
+    async fn mls_db_path() -> Result<Location, LocationError> {
+        Ok(Self::data_dir().await?.push("mls-store.sqlite"))
+    }
+
+    pub async fn create_new_mls_store()
+    -> Result<SqliteStorageProvider<PostcardCodec>, CreateMlsStoreError> {
+        let location = Self::mls_db_path().await?;
+        if tokio::fs::try_exists(&location).await? {
+            return Err(CreateMlsStoreError::AlreadyExists);
+        }
+
+        let location = location
+            .as_path()
+            .to_str()
+            .ok_or_else(|| CreateMlsStoreError::LocationBroken)?;
+
+        Sqlite::create_database(location).await?;
+
+        let pool = SqlitePool::connect(location).await?;
+        let provider = SqliteStorageProvider::new(pool);
+        provider.run_migrations().await?;
+
+        Ok(provider)
     }
 
     async fn save_config(config: &AgentConfig) -> Result<()> {
@@ -202,4 +231,20 @@ struct AgentConfig {
     root_certificate: UnverifiedCertificate,
     encrypted_credentials: EncryptedCredential,
     key_source: KeySource,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CreateMlsStoreError {
+    #[error("found an existing mls data store")]
+    AlreadyExists,
+    #[error("error getting store location: {0}")]
+    LocationError(#[from] LocationError),
+    #[error("io error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("location did not give valid UTF-8 string")]
+    LocationBroken,
+    #[error("sqlx error: {0}")]
+    SqlxError(#[from] sqlx::Error),
+    #[error("sqlx migration error: {0}")]
+    MigrateError(#[from] sqlx::migrate::MigrateError),
 }

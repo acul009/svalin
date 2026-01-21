@@ -10,6 +10,12 @@ pub struct Location {
     path: PathBuf,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum LocationError {
+    #[error("io error: {0}")]
+    IoError(#[from] std::io::Error),
+}
+
 impl Location {
     pub fn new(path: impl AsRef<Path>) -> Self {
         Self {
@@ -17,7 +23,7 @@ impl Location {
         }
     }
 
-    pub fn system_data_dir() -> Result<Self> {
+    pub fn system_data_dir() -> Result<Self, LocationError> {
         #[cfg(test)]
         {
             Ok(Self::new(std::env::current_dir()?).push("test_data"))
@@ -93,7 +99,7 @@ impl Location {
         self
     }
 
-    pub async fn ensure_exists(self) -> Result<Self> {
+    pub async fn ensure_exists(self) -> Result<Self, LocationError> {
         if !self.path.exists() {
             tokio::fs::create_dir_all(&self.path).await?;
         }

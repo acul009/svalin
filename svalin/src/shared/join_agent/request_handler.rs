@@ -2,10 +2,12 @@ use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
+use openmls_sqlx_storage::SqliteStorageProvider;
 use rand::Rng;
 use svalin_pki::{
     CreateCredentialsError, Credential, DeriveKeyError, KeyPair, SignatureVerificationError,
     UnverifiedCertificate, UseAsRootError, get_current_timestamp,
+    mls::client::{CreateKeyPackageError, MlsClient},
 };
 use svalin_rpc::{
     rpc::{
@@ -25,6 +27,8 @@ use svalin_rpc::{
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
+
+use crate::agent::{Agent, CreateMlsStoreError};
 
 use super::{AgentInitPayload, ServerJoinManager};
 
@@ -112,6 +116,12 @@ pub enum RequestJoinError {
     UseRootError(#[source] UseAsRootError),
     #[error("error verifying upstream cert: {0}")]
     VerifyUpstreamCertError(#[source] SignatureVerificationError),
+    #[error("error creating mls store: {0}")]
+    MlsStoreError(#[from] CreateMlsStoreError),
+    #[error("error creating key package: {0}")]
+    CreateKeyPackageError(#[from] CreateKeyPackageError),
+    #[error("session write error: {0}")]
+    SessionWriteError(#[source] SessionWriteError),
 }
 
 pub struct RequestJoin {
@@ -244,6 +254,23 @@ impl TakeableCommandDispatcher for RequestJoin {
             let upstream = upstream
                 .verify_signature(&root, get_current_timestamp())
                 .map_err(RequestJoinError::VerifyUpstreamCertError)?;
+
+            let storage_provider = Agent::create_new_mls_store()
+                .await
+                .map_err(RequestJoinError::MlsStoreError)?;
+            let mls = MlsClient::new(my_credentials.clone(), storage_provider);
+            let key_package = mls
+                .create_key_package()
+                .await
+                .map_err(RequestJoinError::CreateKeyPackageError)?
+                .to_unverified();
+
+            session
+                .write_object(&key_package)
+                .await
+                .map_err(RequestJoinError::SessionWriteError)?;
+
+            compile_error!("Continue here!");
 
             debug!("received all neccessary data to initialize agent");
 
