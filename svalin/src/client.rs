@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Result, anyhow};
@@ -31,7 +32,7 @@ pub struct Client {
     upstream_certificate: Certificate,
     root_certificate: RootCertificate,
     user_credential: Credential,
-    mls: MlsClient,
+    mls: Arc<MlsClient>,
     device_list: watch::Sender<BTreeMap<SpkiHash, Device>>,
     tunnel_manager: TunnelManager,
     // TODO: These should not be required here, but should be created and canceled as needed

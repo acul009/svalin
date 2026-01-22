@@ -30,7 +30,10 @@ use crate::{
         init::{InitHandler, ServerInitSuccess},
         public_server_status::{PublicStatus, PublicStatusHandler},
     },
-    util::{key_storage::KeySource, location::Location},
+    util::{
+        key_storage::KeySource,
+        location::{Location, LocationError},
+    },
     verifier::{
         incoming_connection_verifier::IncomingConnectionVerifier,
         tls_optional_wrapper::TlsOptionalWrapper,
@@ -77,7 +80,7 @@ impl Server {
         config_builder::new()
     }
 
-    async fn data_dir() -> Result<Location> {
+    async fn data_dir() -> Result<Location, LocationError> {
         Location::system_data_dir()?
             .push("server")
             .ensure_exists()

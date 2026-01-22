@@ -14,6 +14,8 @@ pub struct Location {
 pub enum LocationError {
     #[error("io error: {0}")]
     IoError(#[from] std::io::Error),
+    #[error("Neither XDG_CONFIG_HOME nor HOME environment variables are set.")]
+    NoHomeSet,
 }
 
 impl Location {
@@ -51,7 +53,7 @@ impl Location {
         }
     }
 
-    pub fn user_data_dir() -> Result<Self> {
+    pub fn user_data_dir() -> Result<Self, LocationError> {
         #[cfg(test)]
         {
             Ok(Self::new(std::env::current_dir()?).push("test_data"))
@@ -84,9 +86,7 @@ impl Location {
                                 let config_dir = PathBuf::from(home_dir);
                                 Ok(Self::new(config_dir).push(".config").push("svalin"))
                             }
-                            None => Err(anyhow::anyhow!(
-                                "Neither XDG_CONFIG_HOME nor HOME environment variables are set."
-                            )),
+                            None => Err(LocationError::NoHomeSet),
                         }
                     }
                 }

@@ -9,7 +9,7 @@ use crate::{
 };
 use openmls::{
     group::MlsGroup,
-    prelude::{Ciphersuite, CredentialWithKey, KeyPackageNewError},
+    prelude::{Ciphersuite, CredentialWithKey, KeyPackageNewError, ProtocolVersion},
 };
 use openmls_sqlx_storage::SqliteStorageProvider;
 use tokio::task::JoinError;
@@ -41,6 +41,14 @@ impl MlsClient {
     fn ciphersuite(&self) -> Ciphersuite {
         // ChaCha20 icompatible with rust crypto
         Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
+    }
+
+    pub fn provider(&self) -> &SvalinProvider {
+        &self.provider
+    }
+
+    pub fn protocol_version(&self) -> ProtocolVersion {
+        self.provider.protocol_version()
     }
 
     pub async fn create_key_package(&self) -> Result<KeyPackage, CreateKeyPackageError> {

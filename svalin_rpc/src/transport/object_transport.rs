@@ -64,7 +64,7 @@ impl ObjectWriter {
         &mut self,
         object: &U,
     ) -> Result<(), ObjectWriterError> {
-        let encoded = postcard::to_extend(&object, Vec::new())?;
+        let encoded = postcard::to_extend(object, Vec::new())?;
 
         self.write.write_chunk(&encoded).await?;
 

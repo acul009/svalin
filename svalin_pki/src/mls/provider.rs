@@ -1,3 +1,4 @@
+use openmls::prelude::ProtocolVersion;
 use openmls_rust_crypto::RustCrypto;
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
@@ -20,6 +21,7 @@ impl openmls_sqlx_storage::Codec for PostcardCodec {
 pub struct SvalinProvider {
     crypto: RustCrypto,
     storage_provider: SqliteStorageProvider<PostcardCodec>,
+    protocol_version: ProtocolVersion,
 }
 
 impl SvalinProvider {
@@ -28,7 +30,12 @@ impl SvalinProvider {
         Self {
             crypto,
             storage_provider,
+            protocol_version: ProtocolVersion::Mls10,
         }
+    }
+
+    pub fn protocol_version(&self) -> ProtocolVersion {
+        self.protocol_version
     }
 }
 

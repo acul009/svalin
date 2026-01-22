@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use openmls_sqlx_storage::SqliteStorageProvider;
 use rand::Rng;
 use svalin_pki::{
     CreateCredentialsError, Credential, DeriveKeyError, KeyPair, SignatureVerificationError,

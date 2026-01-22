@@ -16,7 +16,7 @@ use tracing::{debug, error};
 use crate::{
     client::tunnel_manager::TunnelManager,
     shared::commands::{agent_list::UpdateAgentList, upload_key_packages::UploadKeyPackages},
-    util::location::Location,
+    util::location::{Location, LocationError},
     verifier::remote_agent_verifier::RemoteAgentVerifier,
 };
 
@@ -61,7 +61,7 @@ impl Profile {
 }
 
 impl Client {
-    async fn data_dir() -> Result<Location> {
+    async fn data_dir() -> Result<Location, LocationError> {
         Location::user_data_dir()?
             .push("client")
             .ensure_exists()
@@ -180,7 +180,7 @@ impl Client {
             let pool = SqlitePool::connect(url).await?;
             let storage_provider = SqliteStorageProvider::new(pool);
             storage_provider.run_migrations().await?;
-            let mls = MlsClient::new(device_credential.clone(), storage_provider);
+            let mls = Arc::new(MlsClient::new(device_credential.clone(), storage_provider));
 
             debug!("creating verifier");
             let verifier = ExactVerififier::new(upstream_certificate.clone()).to_tls_verifier();

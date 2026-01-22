@@ -1,6 +1,9 @@
 use std::fmt::Debug;
 
-use crate::shared::join_agent::{accept_handler::AcceptJoin, add_agent::AddAgent};
+use crate::shared::join_agent::{
+    accept_handler::{AcceptJoin, AcceptJoinError},
+    add_agent::AddAgent,
+};
 
 use super::Client;
 
@@ -19,13 +22,14 @@ impl Client {
         let root = self.root_certificate.clone();
         let upstream = self.upstream_certificate.clone();
         let credentials = self.user_credential.clone();
+        let mls = self.mls.clone();
 
         let (wait_for_confirm_send, wait_for_confirm_recv) = oneshot::channel::<Result<()>>();
 
         let (confirm_code_send, confirm_code_recv) = oneshot::channel::<String>();
 
         let (result_send, result_recv) =
-            oneshot::channel::<Result<Certificate, ConnectionDispatchError<anyhow::Error>>>();
+            oneshot::channel::<Result<Certificate, ConnectionDispatchError<AcceptJoinError>>>();
 
         tokio::spawn(async move {
             let result = connection
@@ -36,6 +40,7 @@ impl Client {
                     credentials: &credentials,
                     root: &root,
                     upstream: &upstream,
+                    mls: &mls,
                 })
                 .await;
 
@@ -55,7 +60,7 @@ impl Client {
 pub struct WaitingForConfirmCode {
     connection: DirectConnection,
     confirm_code_send: oneshot::Sender<String>,
-    result_revc: oneshot::Receiver<Result<Certificate, ConnectionDispatchError<anyhow::Error>>>,
+    result_revc: oneshot::Receiver<Result<Certificate, ConnectionDispatchError<AcceptJoinError>>>,
 }
 
 impl Debug for WaitingForConfirmCode {

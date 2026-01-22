@@ -1,6 +1,14 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use svalin_pki::{ArgonParams, Certificate, Credential, ExportedPublicKey, RootCertificate};
+use svalin_pki::{
+    ArgonParams, Certificate, CreateCertificateError, Credential, DeriveKeyError, ExactVerififier,
+    ExportedPublicKey, RootCertificate,
+    mls::{
+        OpenMlsProvider,
+        client::MlsClient,
+        key_package::{KeyPackageError, UnverifiedKeyPackage},
+    },
+};
 use svalin_rpc::{
     rpc::{
         command::{
@@ -8,12 +16,15 @@ use svalin_rpc::{
             handler::CommandHandler,
         },
         peer::Peer,
-        session::Session,
+        session::{Session, SessionReadError, SessionWriteError},
     },
-    transport::{combined_transport::CombinedTransport, tls_transport::TlsTransport},
+    transport::{
+        combined_transport::CombinedTransport,
+        tls_transport::{TlsClientError, TlsTransport},
+    },
     verifiers::skip_verify::SkipServerVerification,
 };
-use tokio::{io::copy_bidirectional, select};
+use tokio::{io::copy_bidirectional, select, sync::oneshot};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument};
 
@@ -79,18 +90,43 @@ impl CommandHandler for JoinAcceptHandler {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum AcceptJoinError {
+    #[error("Session read error: {0}")]
+    SessionReadError(#[from] SessionReadError),
+    #[error("Session write error: {0}")]
+    SessionWriteError(#[from] SessionWriteError),
+    #[error("Agent not found")]
+    AgentNotFound,
+    #[error("Agent did not aknowledge connection")]
+    NotAknowledged,
+    #[error("Recv error: {0}")]
+    RecvError(#[from] tokio::sync::oneshot::error::RecvError),
+    #[error("TLS client error: {0}")]
+    TlsClientError(#[from] TlsClientError),
+    #[error("Derive key error: {0}")]
+    DeriveKeyError(#[from] DeriveKeyError),
+    #[error("Confirm code mismatch")]
+    ConfirmCodeMismatch,
+    #[error("error creating agent certificate: {0}")]
+    CreateCertificateError(#[from] CreateCertificateError),
+    #[error("error verifying key package: {0}")]
+    KeyPackageError(#[from] KeyPackageError),
+}
+
 pub struct AcceptJoin<'a> {
     pub join_code: String,
-    pub waiting_for_confirm: tokio::sync::oneshot::Sender<Result<()>>,
-    pub confirm_code_channel: tokio::sync::oneshot::Receiver<String>,
+    pub waiting_for_confirm: oneshot::Sender<Result<()>>,
+    pub confirm_code_channel: oneshot::Receiver<String>,
     pub credentials: &'a Credential,
     pub root: &'a RootCertificate,
     pub upstream: &'a Certificate,
+    pub mls: &'a MlsClient,
 }
 
 impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
     type Output = Certificate;
-    type InnerError = anyhow::Error;
+    type InnerError = AcceptJoinError;
 
     type Request = ();
 
@@ -107,91 +143,107 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
         session: &mut Option<Session>,
     ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session) = session.take() {
-            let confirm_code_result =
-                prepare_agent_enroll(session, self.join_code, self.credentials)
-                    .await
-                    .context("error during enrollment preparation");
+            {
+                let confirm_code_result =
+                    prepare_agent_enroll(session, &self.join_code, self.credentials).await;
 
-            match confirm_code_result {
-                Err(err) => {
-                    let err_copy = anyhow!("{}", err);
-                    self.waiting_for_confirm.send(Err(err)).unwrap();
+                match confirm_code_result {
+                    Err(err) => {
+                        let err_copy = anyhow!("{}", err);
+                        self.waiting_for_confirm.send(Err(err_copy)).unwrap();
 
-                    Err(err_copy.into())
-                }
-                Ok((confirm_code, mut session_e2e)) => {
-                    self.waiting_for_confirm.send(Ok(())).unwrap();
-
-                    let remote_confirm_code = self
-                        .confirm_code_channel
-                        .await
-                        .map_err(|err| anyhow!(err))?;
-
-                    debug!("received confirm code from user: {remote_confirm_code}");
-
-                    if confirm_code != remote_confirm_code {
-                        return Err(anyhow!("Confirm Code did no match").into());
+                        Err(err)
                     }
-
-                    debug!("Confirm Codes match!");
-
-                    let public_key: ExportedPublicKey = session_e2e
-                        .read_object()
+                    Ok((confirm_code, session_e2e)) => {
+                        handle_agent_enroll(
+                            self.waiting_for_confirm,
+                            self.confirm_code_channel,
+                            self.credentials,
+                            self.root,
+                            self.upstream,
+                            session_e2e,
+                            confirm_code,
+                            self.mls,
+                        )
                         .await
-                        .map_err(|err| anyhow!(err))?;
-                    debug!("received public key: {:?}", public_key);
-                    let agent_cert = self
-                        .credentials
-                        .create_agent_certificate_for_key(&public_key)
-                        .map_err(|err| anyhow!(err))?;
-
-                    session_e2e
-                        .write_object(agent_cert.as_unverified())
-                        .await
-                        .map_err(|err| anyhow!(err))?;
-                    session_e2e
-                        .write_object(self.root.as_unverified())
-                        .await
-                        .map_err(|err| anyhow!(err))?;
-                    session_e2e
-                        .write_object(self.upstream.as_unverified())
-                        .await
-                        .map_err(|err| anyhow!(err))?;
-
-                    Ok(agent_cert)
+                    }
                 }
             }
+            .map_err(DispatcherError::Other)
         } else {
             Err(DispatcherError::NoneSession)
         }
     }
 }
 
+async fn handle_agent_enroll(
+    waiting_for_confirm: oneshot::Sender<Result<(), anyhow::Error>>,
+    confirm_code_channel: oneshot::Receiver<String>,
+    credentials: &Credential,
+    root: &RootCertificate,
+    upstream: &Certificate,
+    mut session_e2e: Session,
+    confirm_code: String,
+    mls: &MlsClient,
+) -> Result<Certificate, AcceptJoinError> {
+    waiting_for_confirm.send(Ok(())).unwrap();
+
+    let remote_confirm_code = confirm_code_channel.await?;
+
+    debug!("received confirm code from user: {remote_confirm_code}");
+
+    if confirm_code != remote_confirm_code {
+        return Err(AcceptJoinError::ConfirmCodeMismatch);
+    }
+
+    debug!("Confirm Codes match!");
+
+    let public_key: ExportedPublicKey = session_e2e.read_object().await?;
+    debug!("received public key: {:?}", public_key);
+    let agent_cert = credentials.create_agent_certificate_for_key(&public_key)?;
+
+    session_e2e.write_object(agent_cert.as_unverified()).await?;
+    session_e2e.write_object(root.as_unverified()).await?;
+    session_e2e.write_object(upstream.as_unverified()).await?;
+
+    let key_package: UnverifiedKeyPackage = session_e2e.read_object().await?;
+
+    let verifier = ExactVerififier::new(agent_cert.clone());
+
+    let key_package = key_package
+        .verify(mls.provider().crypto(), mls.protocol_version(), &verifier)
+        .await?;
+
+    compile_error!("Continue here!");
+
+    Ok(agent_cert)
+}
+
 #[instrument(skip_all)]
 async fn prepare_agent_enroll(
     mut session: Session,
-    join_code: String,
+    join_code: &String,
     credentials: &Credential,
-) -> anyhow::Result<(String, Session)> {
-    session.write_object(&join_code).await?;
+) -> Result<(String, Session), AcceptJoinError> {
+    session.write_object(join_code).await?;
 
     let found: std::result::Result<(), ()> = session.read_object().await?;
 
     if let Err(()) = found {
-        return Err(anyhow!("Agent not found"));
+        return Err(AcceptJoinError::AgentNotFound);
     }
 
     debug!("connected to agent, sending join code for confirmation");
 
     // confirm join code with agent
-    session.write_object(&join_code).await?;
+    session.write_object(join_code).await?;
 
     debug!("waiting for agent to confirm join code");
 
     let ready: std::result::Result<(), ()> = session.read_object().await?;
 
     if let Err(()) = ready {
-        return Err(anyhow!("Agent did not aknowledge connection"));
+        return Err(AcceptJoinError::NotAknowledged);
     }
 
     debug!("agent confirmed join code");
