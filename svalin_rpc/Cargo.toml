@@ -22,3 +22,4 @@ tokio-rustls = { version = "0.26.4", default-features = false, features = [
 ] }
 tokio-util = { workspace = true }
 thiserror = { workspace = true }
+aucpace = { version = "0.1.1", features = ["alloc", "serde"] }

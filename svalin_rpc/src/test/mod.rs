@@ -3,6 +3,8 @@ use std::{net::ToSocketAddrs, panic, process, time::Duration};
 use svalin_pki::Credential;
 use test_log::test;
 use tls_test_command::{TlsTest, TlsTestCommandHandler};
+mod aucpace_test_command;
+use aucpace_test_command::{AucPaceTest, AucPaceTestCommandHandler};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::debug;
 
@@ -120,10 +122,63 @@ async fn tls_test() {
 }
 
 #[test(tokio::test(flavor = "multi_thread"))]
+async fn aucpace_test() {
+    let hook = panic::take_hook();
+    panic::set_hook(Box::new(move |panic_info| {
+        hook(panic_info);
+        process::exit(1);
+    }));
+
+    println!("starting tls test");
+
+    let address = "127.0.0.1:1236";
+    let credentials = Credential::generate_root().unwrap();
+    let socket =
+        RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();
+
+    let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
+
+    let commands = HandlerCollection::new(permission_handler);
+    commands
+        .chain()
+        .await
+        .add(AucPaceTestCommandHandler::new().unwrap());
+
+    let server = RpcServer::build()
+        .credentials(credentials)
+        .commands(commands)
+        .client_cert_verifier(SkipClientVerification::new())
+        .cancellation_token(CancellationToken::new())
+        .task_tracker(TaskTracker::new())
+        .start_server(socket)
+        .await
+        .unwrap();
+
+    debug!("trying to connect client");
+
+    let client = RpcClient::connect(
+        address,
+        None,
+        SkipServerVerification::new(),
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+
+    debug!("client connected");
+
+    let connection = client.upstream_connection();
+
+    connection.dispatch(AucPaceTest).await.unwrap();
+
+    server.close(Duration::from_secs(1)).await.unwrap();
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn perm_test() {
     println!("starting permission test");
 
-    let address = "127.0.0.1:1236";
+    let address = "127.0.0.1:1237";
     let credentials = Credential::generate_root().unwrap();
     let socket =
         RpcServer::create_socket(address.to_socket_addrs().unwrap().next().unwrap()).unwrap();

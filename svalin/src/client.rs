@@ -47,6 +47,10 @@ impl Debug for Client {
 }
 
 impl Client {
+    pub(crate) fn user_credential(&self) -> &Credential {
+        &self.user_credential
+    }
+
     pub fn device(&self, spki_hash: &SpkiHash) -> Option<Device> {
         self.device_list.borrow().get(spki_hash).cloned()
     }

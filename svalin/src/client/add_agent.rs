@@ -16,73 +16,51 @@ use tokio::sync::oneshot;
 use tracing::debug;
 
 impl Client {
-    pub async fn add_agent_with_code(&self, join_code: String) -> Result<WaitingForConfirmCode> {
+    pub async fn add_agent_with_code(
+        &self,
+        join_code: String,
+        confirm_code: oneshot::Sender<oneshot::Sender<String>>,
+    ) -> Result<()> {
         let connection = self.rpc.upstream_connection();
 
-        let root = self.root_certificate.clone();
-        let upstream = self.upstream_certificate.clone();
-        let credentials = self.user_credential.clone();
-        let mls = self.mls.clone();
-
-        let (wait_for_confirm_send, wait_for_confirm_recv) = oneshot::channel::<Result<()>>();
-
-        let (confirm_code_send, confirm_code_recv) = oneshot::channel::<String>();
-
-        let (result_send, result_recv) =
-            oneshot::channel::<Result<Certificate, ConnectionDispatchError<AcceptJoinError>>>();
-
-        tokio::spawn(async move {
-            let result = connection
-                .dispatch(AcceptJoin {
-                    join_code,
-                    waiting_for_confirm: wait_for_confirm_send,
-                    confirm_code_channel: confirm_code_recv,
-                    credentials: &credentials,
-                    root: &root,
-                    upstream: &upstream,
-                    mls: &mls,
-                })
-                .await;
-
-            result_send.send(result).unwrap();
-        });
-
-        wait_for_confirm_recv.await??;
-
-        Ok(WaitingForConfirmCode {
-            confirm_code_send,
-            result_revc: result_recv,
-            connection: self.rpc.upstream_connection(),
-        })
-    }
-}
-
-pub struct WaitingForConfirmCode {
-    connection: DirectConnection,
-    confirm_code_send: oneshot::Sender<String>,
-    result_revc: oneshot::Receiver<Result<Certificate, ConnectionDispatchError<AcceptJoinError>>>,
-}
-
-impl Debug for WaitingForConfirmCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WaitingForConfirmCode").finish()
-    }
-}
-
-impl WaitingForConfirmCode {
-    pub async fn confirm(self, confirm_code: String) -> Result<()> {
-        self.confirm_code_send.send(confirm_code).unwrap();
-        let certificate = self.result_revc.await?.map_err(|err| anyhow!(err))?;
-
-        debug!("agent certificate successfully created and sent");
-
-        self.connection
-            .dispatch(AddAgent::new(&certificate))
-            .await
-            .map_err(|err| anyhow!(err))?;
-
-        debug!("agent is registered on server");
+        let result = connection
+            .dispatch(AcceptJoin {
+                client: &self,
+                join_code,
+                confirm_code,
+            })
+            .await;
 
         Ok(())
     }
 }
+
+// pub struct WaitingForConfirmCode {
+//     connection: DirectConnection,
+//     confirm_code_send: oneshot::Sender<String>,
+//     result_revc: oneshot::Receiver<Result<Certificate, ConnectionDispatchError<AcceptJoinError>>>,
+// }
+
+// impl Debug for WaitingForConfirmCode {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("WaitingForConfirmCode").finish()
+//     }
+// }
+
+// impl WaitingForConfirmCode {
+//     pub async fn confirm(self, confirm_code: String) -> Result<()> {
+//         self.confirm_code_send.send(confirm_code).unwrap();
+//         let certificate = self.result_revc.await?.map_err(|err| anyhow!(err))?;
+
+//         debug!("agent certificate successfully created and sent");
+
+//         self.connection
+//             .dispatch(AddAgent::new(&certificate))
+//             .await
+//             .map_err(|err| anyhow!(err))?;
+
+//         debug!("agent is registered on server");
+
+//         Ok(())
+//     }
+// }

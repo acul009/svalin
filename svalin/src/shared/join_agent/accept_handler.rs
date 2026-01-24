@@ -28,6 +28,8 @@ use tokio::{io::copy_bidirectional, select, sync::oneshot};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument};
 
+use crate::client::Client;
+
 use super::ServerJoinManager;
 
 pub struct JoinAcceptHandler {
@@ -116,12 +118,8 @@ pub enum AcceptJoinError {
 
 pub struct AcceptJoin<'a> {
     pub join_code: String,
-    pub waiting_for_confirm: oneshot::Sender<Result<()>>,
-    pub confirm_code_channel: oneshot::Receiver<String>,
-    pub credentials: &'a Credential,
-    pub root: &'a RootCertificate,
-    pub upstream: &'a Certificate,
-    pub mls: &'a MlsClient,
+    pub confirm_code: oneshot::Sender<oneshot::Sender<String>>,
+    pub client: &'a Client,
 }
 
 impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
@@ -145,12 +143,10 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
         if let Some(session) = session.take() {
             {
                 let confirm_code_result =
-                    prepare_agent_enroll(session, &self.join_code, self.credentials).await;
+                    prepare_agent_enroll(session, &self.join_code, self.client.user_credential()).await;
 
                 match confirm_code_result {
                     Err(err) => {
-                        let err_copy = anyhow!("{}", err);
-                        self.waiting_for_confirm.send(Err(err_copy)).unwrap();
 
                         Err(err)
                     }
@@ -213,6 +209,8 @@ async fn handle_agent_enroll(
     let key_package = key_package
         .verify(mls.provider().crypto(), mls.protocol_version(), &verifier)
         .await?;
+
+    mls.create_device_group(key_package)
 
     compile_error!("Continue here!");
 

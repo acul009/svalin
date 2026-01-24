@@ -203,7 +203,7 @@ impl CommandDispatcher for Init {
 
         // create aucpace login info
 
-        let mut pace_client = AuCPaceClient::<Sha512, Argon2, OsRng, 16>::new(OsRng);
+        let mut pace_client = AuCPaceClient::<Sha512, Argon2, OsRng, NONCE_LENGTH>::new(OsRng);
 
         let hasher = ArgonCost::strong().get_argon_hasher();
 

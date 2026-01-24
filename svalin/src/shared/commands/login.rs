@@ -3,23 +3,21 @@ use std::{str, sync::Arc};
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage};
-use curve25519_dalek::{
-    RistrettoPoint,
-    digest::{generic_array::GenericArray, typenum},
-};
-use password_hash::{
-    ParamsString,
-    rand_core::{OsRng, RngCore},
-};
+use password_hash::{ParamsString, rand_core::OsRng};
 use serde::{
     Deserialize, Serialize,
     de::{self},
+};
+use svalin_pki::curve25519_dalek::{
+    RistrettoPoint,
+    digest::{generic_array::GenericArray, typenum},
 };
 use svalin_pki::{
     ArgonCost, Certificate, CertificateChainBuilder, CreateCredentialsError, Credential,
     DecodeCredentialsError, DecryptError, EncryptError, EncryptedCredential,
     ParamsStringParseError, RootCertificate, Sha512, SignatureVerificationError,
     UnverifiedCertificate, UseAsRootError, argon2::Argon2, get_current_timestamp,
+    serde_paramsstring,
 };
 use svalin_rpc::{
     rpc::{
@@ -31,6 +29,9 @@ use svalin_rpc::{
         session::{Session, SessionReadError, SessionWriteError},
     },
     transport::{
+        aucpace_transport::{
+            Authenticator, MessageTransformError, NONCE_LENGTH, Nonce, PublicKey, key_to_array,
+        },
         combined_transport::CombinedTransport,
         tls_transport::{TlsClientError, TlsDeriveKeyError, TlsTransport},
     },
@@ -42,10 +43,7 @@ use tracing::debug;
 
 use crate::{
     permissions::Permission,
-    server::{
-        session_store::SessionStore,
-        user_store::{UserStore, serde_paramsstring},
-    },
+    server::{session_store::SessionStore, user_store::UserStore},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -84,46 +82,6 @@ impl LoginHandler {
     }
 }
 
-const NONCE_LENGTH: usize = 16;
-
-#[derive(Debug, thiserror::Error)]
-pub enum MessageTransformError {
-    #[error("wrong input variant")]
-    WrongInputVariant,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Nonce([u8; NONCE_LENGTH]);
-impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for Nonce {
-    type Error = MessageTransformError;
-
-    fn try_from(value: ServerMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
-        match value {
-            ServerMessage::Nonce(nonce) => Ok(Nonce(nonce)),
-            _ => Err(MessageTransformError::WrongInputVariant),
-        }
-    }
-}
-
-impl TryFrom<ClientMessage<'_, NONCE_LENGTH>> for Nonce {
-    type Error = MessageTransformError;
-
-    fn try_from(value: ClientMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
-        match value {
-            ClientMessage::Nonce(nonce) => Ok(Nonce(nonce)),
-            _ => Err(MessageTransformError::WrongInputVariant),
-        }
-    }
-}
-
-impl Nonce {
-    fn generate() -> Self {
-        let mut nonce = [0u8; NONCE_LENGTH];
-        password_hash::rand_core::OsRng.fill_bytes(&mut nonce);
-        Nonce(nonce)
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 struct StrongUsername {
     username: Vec<u8>,
@@ -140,132 +98,6 @@ impl TryFrom<ClientMessage<'_, NONCE_LENGTH>> for StrongUsername {
             }),
             _ => Err(MessageTransformError::WrongInputVariant),
         }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct ClientInfo {
-    /// J from the protocol definition
-    group: String,
-
-    /// X from the protocol definition
-    x_pub: RistrettoPoint,
-
-    /// the blinded salt used with the PBKDF
-    blinded_salt: RistrettoPoint,
-
-    /// the parameters for the PBKDF used - sigma from the protocol definition
-    #[serde(with = "serde_paramsstring")]
-    hash_params: ParamsString,
-}
-
-impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for ClientInfo {
-    type Error = MessageTransformError;
-    fn try_from(value: ServerMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
-        match value {
-            ServerMessage::StrongAugmentationInfo {
-                group,
-                x_pub,
-                blinded_salt,
-                pbkdf_params,
-            } => Ok(ClientInfo {
-                group: group.to_string(),
-                x_pub,
-                blinded_salt,
-                hash_params: pbkdf_params,
-            }),
-            _ => Err(MessageTransformError::WrongInputVariant),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct PublicKey(RistrettoPoint);
-
-impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for PublicKey {
-    type Error = MessageTransformError;
-
-    fn try_from(value: ServerMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
-        match value {
-            ServerMessage::PublicKey(pubkey) => Ok(PublicKey(pubkey)),
-            _ => Err(MessageTransformError::WrongInputVariant),
-        }
-    }
-}
-
-impl TryFrom<ClientMessage<'_, NONCE_LENGTH>> for PublicKey {
-    type Error = MessageTransformError;
-
-    fn try_from(value: ClientMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
-        match value {
-            ClientMessage::PublicKey(pubkey) => Ok(PublicKey(pubkey)),
-            _ => Err(MessageTransformError::WrongInputVariant),
-        }
-    }
-}
-
-struct Authenticator([u8; 64]);
-impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for Authenticator {
-    type Error = MessageTransformError;
-
-    fn try_from(value: ServerMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
-        match value {
-            ServerMessage::Authenticator(authenticator) => Ok(Authenticator(authenticator)),
-            _ => Err(MessageTransformError::WrongInputVariant),
-        }
-    }
-}
-
-impl TryFrom<ClientMessage<'_, NONCE_LENGTH>> for Authenticator {
-    type Error = MessageTransformError;
-
-    fn try_from(value: ClientMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
-        match value {
-            ClientMessage::Authenticator(authenticator) => Ok(Authenticator(authenticator)),
-            _ => Err(MessageTransformError::WrongInputVariant),
-        }
-    }
-}
-
-impl Serialize for Authenticator {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_bytes(&self.0)
-    }
-}
-impl<'de> Deserialize<'de> for Authenticator {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_byte_buf(AuthenticatorVisitor)
-    }
-}
-struct AuthenticatorVisitor;
-
-impl<'de> de::Visitor<'de> for AuthenticatorVisitor {
-    type Value = Authenticator;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an authenticator")
-    }
-
-    fn visit_byte_buf<E>(self, v: Vec<u8>) -> std::result::Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Authenticator(v.try_into().map_err(|vec: Vec<u8>| {
-            de::Error::invalid_length(vec.len(), &"64 bytes")
-        })?))
-    }
-
-    fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        self.visit_byte_buf(v.to_vec())
     }
 }
 
@@ -293,11 +125,7 @@ impl TakeableCommandHandler for LoginHandler {
 
             let tls_client_nonce: Nonce = session.read_object().await?;
 
-            let tls_combined_nonce: Vec<u8> = tls_server_nonce
-                .0
-                .into_iter()
-                .chain(tls_client_nonce.0.into_iter())
-                .collect();
+            let tls_combined_nonce = tls_server_nonce.combine(tls_client_nonce);
 
             // ===== Establish TLS Connection and generate common secret =====
 
@@ -346,7 +174,7 @@ impl TakeableCommandHandler for LoginHandler {
                 .await
                 .context("Failed to read client nonce")?;
 
-            let pake_server = pake_server.agree_ssid(client_nonce.0);
+            let pake_server = pake_server.agree_ssid(client_nonce.to_array());
 
             debug!("reading for strong username");
 
@@ -365,13 +193,13 @@ impl TakeableCommandHandler for LoginHandler {
                         strong_username.username,
                         strong_username.blinded,
                         user_store.as_ref(),
-                        password_hash::rand_core::OsRng,
+                        svalin_pki::password_hash::rand_core::OsRng,
                     )
                     .map_err(|err| anyhow!(err))
             })
             .await??;
 
-            let mut client_info = ClientInfo::try_from(client_info)?;
+            let mut client_info = StrongClientInfo::try_from(client_info)?;
             if client_info.hash_params.is_empty() {
                 client_info.hash_params = ArgonCost::strong().get_params().try_into()?;
             }
@@ -640,11 +468,7 @@ impl TakeableCommandDispatcher for Login {
                 .await
                 .map_err(LoginDispatcherError::ReadServerNonceError)?;
 
-            let tls_combined_nonce: Vec<u8> = tls_server_nonce
-                .0
-                .into_iter()
-                .chain(tls_client_nonce.0.into_iter())
-                .collect();
+            let tls_combined_nonce: Vec<u8> = tls_server_nonce.combine(tls_client_nonce);
 
             // ===== TLS Initialization =====
             let (read, write, _) = session.destructure_transport();
@@ -693,7 +517,7 @@ impl TakeableCommandDispatcher for Login {
                 .read_object()
                 .await
                 .map_err(LoginDispatcherError::ReadServerNonceError)?;
-            let client = client.agree_ssid(server_nonce.0);
+            let client = client.agree_ssid(server_nonce.to_array());
 
             let (username_send, username_recv) = oneshot::channel();
             let (client_info_send, client_info_recv) = oneshot::channel();
@@ -716,7 +540,7 @@ impl TakeableCommandDispatcher for Login {
                     .map_err(|_| LoginDispatcherError::ChannelSendError)?;
 
                 // Receive augmentation info
-                let client_info: ClientInfo = client_info_recv
+                let client_info: StrongClientInfo = client_info_recv
                     .blocking_recv()
                     .map_err(LoginDispatcherError::ChannelRecvError)?;
 
@@ -748,7 +572,7 @@ impl TakeableCommandDispatcher for Login {
 
             debug!("receiving client info");
 
-            let client_info: ClientInfo = session
+            let client_info: StrongClientInfo = session
                 .read_object()
                 .await
                 .map_err(LoginDispatcherError::ReadClientInfoError)?;
@@ -887,11 +711,38 @@ impl TakeableCommandDispatcher for Login {
     }
 }
 
-fn key_to_array(key: GenericArray<u8, typenum::U64>) -> [u8; 32] {
-    [
-        key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7], key[8], key[9], key[10],
-        key[11], key[12], key[13], key[14], key[15], key[16], key[17], key[18], key[19], key[20],
-        key[21], key[22], key[23], key[24], key[25], key[26], key[27], key[28], key[29], key[30],
-        key[31],
-    ]
+#[derive(Serialize, Deserialize)]
+pub struct StrongClientInfo {
+    /// J from the protocol definition
+    pub group: String,
+
+    /// X from the protocol definition
+    pub x_pub: RistrettoPoint,
+
+    /// the blinded salt used with the PBKDF
+    pub blinded_salt: RistrettoPoint,
+
+    /// the parameters for the PBKDF used - sigma from the protocol definition
+    #[serde(with = "serde_paramsstring")]
+    pub hash_params: ParamsString,
+}
+
+impl TryFrom<ServerMessage<'_, NONCE_LENGTH>> for StrongClientInfo {
+    type Error = MessageTransformError;
+    fn try_from(value: ServerMessage<'_, NONCE_LENGTH>) -> std::result::Result<Self, Self::Error> {
+        match value {
+            ServerMessage::StrongAugmentationInfo {
+                group,
+                x_pub,
+                blinded_salt,
+                pbkdf_params,
+            } => Ok(StrongClientInfo {
+                group: group.to_string(),
+                x_pub,
+                blinded_salt,
+                hash_params: pbkdf_params,
+            }),
+            _ => Err(MessageTransformError::WrongInputVariant),
+        }
+    }
 }

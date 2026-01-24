@@ -6,6 +6,8 @@ mod credential;
 mod encrypt;
 mod keypair;
 pub mod mls;
+pub mod serde_paramsstring;
+pub mod serde_saltstring;
 mod signed_message;
 mod signed_object;
 #[cfg(test)]
@@ -13,9 +15,11 @@ mod test;
 mod verifier;
 
 // pub mod tbrhl;
-pub use sha2::Sha512;
 
 // Re-Exports
+pub use curve25519_dalek;
+pub use password_hash;
+pub use sha2::Sha512;
 
 // Exports
 pub use argon::{ArgonCost, ArgonParams, DeriveKeyError, ParamsStringParseError, PasswordHash};
