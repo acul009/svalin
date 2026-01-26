@@ -65,6 +65,12 @@ pub fn generate_key() -> Result<[u8; 32], GenerateKeyError> {
     Ok(msg)
 }
 
+pub fn generate_short_code() -> String {
+    let rand = rand::random_range(0..10u32.pow(8));
+
+    format!("{:08}", rand)
+}
+
 pub fn get_current_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

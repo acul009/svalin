@@ -18,6 +18,7 @@ use svalin_rpc::{
         session::{Session, SessionReadError, SessionWriteError},
     },
     transport::{
+        aucpace_transport::{AucPaceServerError, AucPaceTransport},
         combined_transport::CombinedTransport,
         tls_transport::{TlsClientError, TlsServerError, TlsTransport},
     },
@@ -121,6 +122,8 @@ pub enum RequestJoinError {
     CreateKeyPackageError(#[from] CreateKeyPackageError),
     #[error("session write error: {0}")]
     SessionWriteError(#[source] SessionWriteError),
+    #[error("error in AucPace transport: {0}")]
+    AucPaceError(#[source] AucPaceServerError),
 }
 
 pub struct RequestJoin {
@@ -162,68 +165,17 @@ impl TakeableCommandDispatcher for RequestJoin {
 
             debug!("waiting for client to confirm join code");
 
-            let join_code_confirm: String = session
-                .read_object()
-                .await
-                .map_err(RequestJoinError::SecondJoinCodeReadError)?;
-
-            debug!("received join code from client: {join_code_confirm}");
-
-            if join_code != join_code_confirm {
-                debug!("join codes do not match!");
-                let answer: Result<(), ()> = Err(());
-                session
-                    .write_object(&answer)
-                    .await
-                    .map_err(RequestJoinError::SendConfirmStatusError)?;
-                return Err(DispatcherError::Other(RequestJoinError::ConfirmError));
-            } else {
-                debug!("join codes match!");
-                let answer: Result<(), ()> = Ok(());
-                session
-                    .write_object(&answer)
-                    .await
-                    .map_err(RequestJoinError::SendConfirmStatusError)?;
-            }
-
-            debug!("trying to establish tls connection");
-
-            let (read, write, _) = session.destructure_transport();
-
-            let temp_credentials =
-                Credential::generate_root().map_err(RequestJoinError::CreateCredentialsError)?;
-
-            let tls_transport = TlsTransport::server(
-                CombinedTransport::new(read, write),
-                SkipClientVerification::new(),
-                &temp_credentials,
-            )
-            .await
-            .map_err(RequestJoinError::TlsCreateServerError)?;
-
-            let mut key_material = [0u8; 32];
-            tls_transport
-                .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
-                .unwrap();
-
-            let (read, write) = tokio::io::split(tls_transport);
-
-            let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
-
-            debug!("server tls connection established");
-
-            let params = session
-                .read_object()
-                .await
-                .map_err(RequestJoinError::ReadParamsError)?;
-
-            let confirm_code = super::derive_confirm_code(params, &key_material)
-                .await
-                .map_err(RequestJoinError::DeriveKeyError)?;
+            let confirm_code = svalin_pki::generate_short_code();
 
             debug!("generated confirm code: {confirm_code}");
 
             self.confirm_code_channel.send(confirm_code).unwrap();
+
+            let (transport, _) = session.destructure();
+            let transport = AucPaceTransport::server(transport, confirm_code.into_bytes())
+                .await
+                .map_err(RequestJoinError::AucPaceError)?;
+            let session = Session::new(Box::new(transport), Peer::Anonymous);
 
             let keypair = KeyPair::generate();
             let public_key = keypair.export_public_key();

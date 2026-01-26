@@ -67,15 +67,13 @@ impl CommandHandler for JoinAcceptHandler {
 
                 debug!("forwarding session to agent");
 
-                let (read1, write1) = session.borrow_transport();
-                let (read2, write2) = agent_session.borrow_transport();
+                let transport1 = session.borrow_transport();
+                let transport2 = agent_session.borrow_transport();
 
-                let mut transport1 = CombinedTransport::new(read1, write1);
-                let mut transport2 = CombinedTransport::new(read2, write2);
 
                 select! {
                         _ = cancel.cancelled() => {}
-                        result = copy_bidirectional(&mut transport1, &mut transport2) => {result?;}
+                        result = copy_bidirectional(transport1,transport2) => {result?;}
                 }
 
                 debug!("finished forwarding join accept session");
