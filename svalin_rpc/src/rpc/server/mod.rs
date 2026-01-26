@@ -285,9 +285,9 @@ impl RpcServer {
             .get(&peer)
             .ok_or_else(|| anyhow!("no connection to requested peer"))?;
 
-        let (read, write) = conn.open_raw_session().await?;
+        let transport = conn.open_raw_session().await?;
 
-        let session = Session::new(read, write, conn.peer().clone());
+        let session = Session::new(transport, conn.peer().clone());
 
         Ok(session)
     }

@@ -17,8 +17,7 @@ use crate::{
         session::Session,
     },
     transport::{
-        combined_transport::CombinedTransport,
-        session_transport::{SessionTransportReader, SessionTransportWriter},
+        session_transport::SessionTransport,
         tls_transport::{TlsClientError, TlsTransport},
     },
 };
@@ -72,21 +71,15 @@ where
         cancel: CancellationToken,
     ) -> anyhow::Result<()> {
         if let Some(session_ready) = session.take() {
-            let (read, write, _) = session_ready.destructure_transport();
+            let (transport, _) = session_ready.destructure();
 
-            let tls_transport = TlsTransport::server(
-                CombinedTransport::new(read, write),
-                self.verifier.clone(),
-                &self.credentials,
-            )
-            .await?;
+            let tls_transport =
+                TlsTransport::server(transport, self.verifier.clone(), &self.credentials).await?;
 
             let peer = tls_transport.peer().clone();
 
-            let (read, write) = tokio::io::split(tls_transport);
-
             // TODO: after verifying this, set the correct peer
-            let session = Session::new(Box::new(read), Box::new(write), peer);
+            let session = Session::new(Box::new(tls_transport), peer);
 
             session.handle(&self.handler_collection, cancel).await
         } else {
@@ -107,10 +100,7 @@ pub struct E2EDispatcher<'b> {
 }
 
 impl<'b> TakeableCommandDispatcher for E2EDispatcher<'b> {
-    type Output = (
-        Box<dyn SessionTransportReader>,
-        Box<dyn SessionTransportWriter>,
-    );
+    type Output = (Box<dyn SessionTransport>);
     type InnerError = E2EDispatchError;
 
     type Request = ();
@@ -130,9 +120,9 @@ impl<'b> TakeableCommandDispatcher for E2EDispatcher<'b> {
         if let Some(session_ready) = session.take() {
             debug!("encrypting session");
 
-            let (read, write, _) = session_ready.destructure_transport();
+            let (transport, _) = session_ready.destructure();
             let tls_transport = TlsTransport::client(
-                CombinedTransport::new(read, write),
+                transport,
                 // ExactVerififier::new(self.peer.clone()).to_tls_verifier(),
                 ExactVerififier::new(self.peer.clone()).to_tls_verifier(),
                 self.credentials,
@@ -140,9 +130,7 @@ impl<'b> TakeableCommandDispatcher for E2EDispatcher<'b> {
             .await
             .map_err(E2EDispatchError::TlsError)?;
 
-            let (read, write) = tokio::io::split(tls_transport);
-
-            Ok((Box::new(read), Box::new(write)))
+            Ok(Box::new(tls_transport))
         } else {
             Err(DispatcherError::NoneSession)
         }

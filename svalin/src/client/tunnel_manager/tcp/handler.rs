@@ -1,12 +1,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_rpc::{
-    rpc::{
-        command::handler::{CommandHandler, PermissionPrecursor},
-        session::Session,
-    },
-    transport::combined_transport::CombinedTransport,
+use svalin_rpc::rpc::{
+    command::handler::{CommandHandler, PermissionPrecursor},
+    session::Session,
 };
 use thiserror::Error;
 use tokio::{
@@ -66,8 +63,7 @@ impl CommandHandler for TcpForwardHandler {
                     .write_object::<Result<(), TcpForwardError>>(&Ok(()))
                     .await?;
 
-                let (transport_read, transport_write) = session.borrow_transport();
-                let mut transport = CombinedTransport::new(transport_read, transport_write);
+                let mut transport = session.borrow_transport();
 
                 debug!("copying!");
 

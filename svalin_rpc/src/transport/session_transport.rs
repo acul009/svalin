@@ -14,29 +14,11 @@ where
     }
 }
 
-pub trait SessionTransportReader: AsyncRead + Send + Unpin + Send + Sync {
-    fn into_any(self: Box<Self>) -> Box<dyn Any>;
-}
-impl<T> SessionTransportReader for T
-where
-    T: AsyncRead + Send + Unpin + Send + Sync + 'static,
-{
-    fn into_any(self: Box<Self>) -> Box<dyn Any + 'static> {
-        self
-    }
-}
+pub trait SessionTransportReader: AsyncRead + Send + Unpin + Send + Sync {}
+impl<T> SessionTransportReader for T where T: AsyncRead + Send + Unpin + Send + Sync {}
 
-pub trait SessionTransportWriter: AsyncWrite + Send + Unpin + Send + Sync {
-    fn into_any(self: Box<Self>) -> Box<dyn Any>;
-}
-impl<T> SessionTransportWriter for T
-where
-    T: AsyncWrite + Send + Unpin + Send + Sync + 'static,
-{
-    fn into_any(self: Box<Self>) -> Box<dyn Any + 'static> {
-        self
-    }
-}
+pub trait SessionTransportWriter: AsyncWrite + Send + Unpin + Send + Sync {}
+impl<T> SessionTransportWriter for T where T: AsyncWrite + Send + Unpin + Send + Sync {}
 
 // #[async_trait]
 // impl SessionTransport for Box<dyn SessionTransport> {}

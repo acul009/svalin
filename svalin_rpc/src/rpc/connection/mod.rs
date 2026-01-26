@@ -9,7 +9,7 @@ use tracing::{debug, error};
 
 use crate::permissions::PermissionHandler;
 use crate::rpc::{command::handler::HandlerCollection, session::Session};
-use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
+use crate::transport::session_transport::SessionTransport;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectionDispatchError<DError> {
@@ -21,12 +21,7 @@ pub enum ConnectionDispatchError<DError> {
 
 #[async_trait]
 pub trait Connection: Send + Sync + Clone {
-    async fn open_raw_session(
-        &self,
-    ) -> Result<(
-        Box<dyn SessionTransportReader>,
-        Box<dyn SessionTransportWriter>,
-    )>;
+    async fn open_raw_session(&self) -> Result<Box<dyn SessionTransport>>;
 
     async fn dispatch<D: TakeableCommandDispatcher>(
         &self,
@@ -35,9 +30,9 @@ pub trait Connection: Send + Sync + Clone {
     where
         D::InnerError: Display,
     {
-        let (read, write) = self.open_raw_session().await?;
+        let transport = self.open_raw_session().await?;
 
-        let session = Session::new(read, write, self.peer().clone());
+        let session = Session::new(transport, self.peer().clone());
 
         Ok(session.dispatch(dispatcher).await?)
     }
@@ -55,12 +50,7 @@ pub mod direct_connection;
 
 #[async_trait]
 pub trait ServeableConnectionBase: Connection {
-    async fn accept_raw_session(
-        &self,
-    ) -> Result<(
-        Box<dyn SessionTransportReader>,
-        Box<dyn SessionTransportWriter>,
-    )>;
+    async fn accept_raw_session(&self) -> Result<Box<dyn SessionTransport>>;
 
     async fn close(&self);
 }
@@ -93,8 +83,8 @@ where
                 }
                 session = self.accept_raw_session() => {
                     match session {
-                        Ok((read, write)) => {
-                            let session = Session::new(read, write, self.peer().clone());
+                        Ok(transport) => {
+                            let session = Session::new(transport, self.peer().clone());
 
                             let commands2 = commands.clone();
                             open_sessions.spawn(async move {

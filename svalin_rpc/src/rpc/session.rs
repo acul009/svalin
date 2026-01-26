@@ -3,14 +3,16 @@ use std::fmt::Debug;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, instrument};
+use tracing::{debug, error};
 
 use crate::{
     permissions::PermissionHandler,
     rpc::command::handler::HandlerCollection,
     transport::{
-        object_transport::{ObjectReader, ObjectReaderError, ObjectWriter, ObjectWriterError},
-        session_transport::{SessionTransportReader, SessionTransportWriter},
+        object_transport::{
+            ObjectReader, ObjectReaderError, ObjectTransport, ObjectWriter, ObjectWriterError,
+        },
+        session_transport::{SessionTransport, SessionTransportReader, SessionTransportWriter},
     },
 };
 
@@ -20,8 +22,7 @@ use super::{
 };
 
 pub struct Session {
-    read: ObjectReader,
-    write: ObjectWriter,
+    transport: ObjectTransport,
     peer: Peer,
 }
 
@@ -75,16 +76,10 @@ pub enum SessionDispatchError<InnerError> {
 }
 
 impl Session {
-    pub fn new(
-        read: Box<dyn SessionTransportReader>,
-        write: Box<dyn SessionTransportWriter>,
-        peer: Peer,
-    ) -> Self {
-        let read = ObjectReader::new(read);
+    pub fn new(transport: Box<dyn SessionTransport>, peer: Peer) -> Self {
+        let transport = ObjectTransport::new(transport);
 
-        let write = ObjectWriter::new(write);
-
-        Self { read, write, peer }
+        Self { transport, peer }
     }
 
     pub(crate) async fn handle<P>(
@@ -162,7 +157,7 @@ impl Session {
         &mut self,
     ) -> Result<W, SessionReadError> {
         debug!("Reading: {}", std::any::type_name::<W>());
-        Ok(self.read.read_object().await?)
+        Ok(self.transport.read_object().await?)
     }
 
     pub async fn write_object<W: Serialize>(
@@ -170,36 +165,21 @@ impl Session {
         object: &W,
     ) -> Result<(), SessionWriteError> {
         debug!("Writing: {}", std::any::type_name::<W>());
-        Ok(self.write.write_object(object).await?)
+        Ok(self.transport.write_object(object).await?)
     }
 
     pub(crate) async fn shutdown(mut self) {
         debug!("Shutting down session");
-        if let Err(err) = self.write.shutdown().await {
+        if let Err(err) = self.transport.shutdown().await {
             error!("error shuting down session: {err}");
         }
     }
 
-    pub fn destructure_transport(
-        self,
-    ) -> (
-        Box<dyn SessionTransportReader>,
-        Box<dyn SessionTransportWriter>,
-        Peer,
-    ) {
-        (self.read.get_reader(), self.write.get_writer(), self.peer)
+    pub fn destructure(self) -> (Box<dyn SessionTransport>, Peer) {
+        (self.transport.into_transport(), self.peer)
     }
 
-    pub fn destructure(self) -> (ObjectReader, ObjectWriter, Peer) {
-        (self.read, self.write, self.peer)
-    }
-
-    pub fn borrow_transport(
-        &mut self,
-    ) -> (
-        &mut dyn SessionTransportReader,
-        &mut dyn SessionTransportWriter,
-    ) {
-        (self.read.borrow_reader(), self.write.borrow_writer())
+    pub fn borrow_transport(&mut self) -> (&mut dyn SessionTransport) {
+        self.transport.borrow_transport()
     }
 }

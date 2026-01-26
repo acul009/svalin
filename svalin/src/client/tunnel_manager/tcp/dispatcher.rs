@@ -1,10 +1,7 @@
 use anyhow::Result;
-use svalin_rpc::{
-    rpc::{
-        command::{dispatcher::CommandDispatcher, handler::CommandHandler},
-        session::{Session, SessionReadError},
-    },
-    transport::combined_transport::CombinedTransport,
+use svalin_rpc::rpc::{
+    command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    session::{Session, SessionReadError},
 };
 use tokio::{io::copy_bidirectional, net::TcpStream, select, sync::watch};
 
@@ -47,10 +44,9 @@ impl CommandDispatcher for TcpForwardDispatcher {
             .map_err(TcpForwardDispatcherError::ReadAnswerError)?
             .map_err(TcpForwardDispatcherError::ForwardError)?;
 
-        let (transport_read, transport_write) = session.borrow_transport();
-        let mut transport = CombinedTransport::new(transport_read, transport_write);
+        let transport = session.borrow_transport();
 
-        let copy_future = copy_bidirectional(&mut transport, &mut self.stream);
+        let copy_future = copy_bidirectional(transport, &mut self.stream);
 
         select! {
             copy_result = copy_future => {copy_result.map_err(TcpForwardDispatcherError::CopyError)?; return Ok(())},

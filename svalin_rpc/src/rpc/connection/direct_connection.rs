@@ -6,7 +6,7 @@ use tracing::debug;
 
 use crate::{
     rpc::peer::Peer,
-    transport::session_transport::{SessionTransportReader, SessionTransportWriter},
+    transport::{combined_transport::CombinedTransport, session_transport::SessionTransport},
 };
 
 use super::{Connection, ServeableConnectionBase};
@@ -19,15 +19,10 @@ pub struct DirectConnection {
 
 #[async_trait]
 impl Connection for DirectConnection {
-    async fn open_raw_session(
-        &self,
-    ) -> Result<(
-        Box<dyn SessionTransportReader>,
-        Box<dyn SessionTransportWriter>,
-    )> {
+    async fn open_raw_session(&self) -> Result<Box<dyn SessionTransport>> {
         let transport = self.conn.open_bi().await.map_err(|err| anyhow!(err))?;
 
-        Ok((Box::new(transport.1), Box::new(transport.0)))
+        Ok(Box::new(CombinedTransport::new(transport.1, transport.0)))
     }
 
     fn peer(&self) -> &Peer {
@@ -42,15 +37,10 @@ impl Connection for DirectConnection {
 
 #[async_trait]
 impl ServeableConnectionBase for DirectConnection {
-    async fn accept_raw_session(
-        &self,
-    ) -> Result<(
-        Box<dyn SessionTransportReader>,
-        Box<dyn SessionTransportWriter>,
-    )> {
+    async fn accept_raw_session(&self) -> Result<Box<dyn SessionTransport>> {
         let transport = self.conn.accept_bi().await.map_err(|err| anyhow!(err))?;
 
-        Ok((Box::new(transport.1), Box::new(transport.0)))
+        Ok(Box::new(CombinedTransport::new(transport.1, transport.0)))
     }
 
     async fn close(&self) {

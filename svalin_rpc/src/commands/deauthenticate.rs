@@ -53,9 +53,9 @@ where
         cancel: CancellationToken,
     ) -> Result<()> {
         if let Some(session) = session.take() {
-            let (read, write, _) = session.destructure_transport();
+            let (transport, _) = session.destructure();
 
-            let session2 = Session::new(read, write, Peer::Anonymous);
+            let session2 = Session::new(transport, Peer::Anonymous);
 
             debug!("session deauthenticated, handing to next handler");
 

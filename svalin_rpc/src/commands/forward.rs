@@ -7,14 +7,12 @@ use crate::rpc::connection::Connection;
 use crate::rpc::peer::Peer;
 use crate::rpc::session::SessionReadError;
 use crate::rpc::{command::handler::CommandHandler, server::RpcServer, session::Session};
-use crate::transport::combined_transport::CombinedTransport;
-use crate::transport::session_transport::{SessionTransportReader, SessionTransportWriter};
+use crate::transport::session_transport::SessionTransport;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, Credential, SpkiHash};
 use tokio::io::AsyncWriteExt;
-use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
@@ -58,26 +56,21 @@ impl CommandHandler for ForwardHandler {
 
         match self.server.open_session_with(target).await {
             Ok(forward_session) => match forward_session.dispatch(Deauthenticate).await {
-                Ok(forward_session) => {
+                Ok(mut forward_session) => {
                     debug!("deauth successful, forwarding session");
 
                     session
                         .write_object::<Result<(), ForwardError>>(&Ok(()))
                         .await?;
 
-                    let (read1, write1) = session.borrow_transport();
-                    let (read2, write2, _) = forward_session.destructure_transport();
+                    let transport1 = session.borrow_transport();
+                    let transport2 = forward_session.borrow_transport();
 
-                    let mut transport1 = CombinedTransport::new(read1, write1);
-                    let mut transport2 = CombinedTransport::new(read2, write2);
-
-                    tokio::io::copy_bidirectional(&mut transport1, &mut transport2).await?;
-
-                    select! {
-                        result = tokio::io::copy_bidirectional(&mut transport1, &mut transport2) => {
-                            result?;
-                        }
-                        _ = cancel.cancelled() => {}
+                    if let Some(result) = cancel
+                        .run_until_cancelled(tokio::io::copy_bidirectional(transport1, transport2))
+                        .await
+                    {
+                        result?;
                     }
 
                     let _ = transport1.shutdown().await;
@@ -128,10 +121,7 @@ pub enum ForwardDispatchError {
 }
 
 impl TakeableCommandDispatcher for ForwardDispatcher {
-    type Output = (
-        Box<dyn SessionTransportReader>,
-        Box<dyn SessionTransportWriter>,
-    );
+    type Output = (Box<dyn SessionTransport>);
     type InnerError = ForwardDispatchError;
 
     type Request = SpkiHash;
@@ -155,9 +145,9 @@ impl TakeableCommandDispatcher for ForwardDispatcher {
                 .map_err(ForwardDispatchError::AwaitForwardError)?
                 .map_err(ForwardDispatchError::ForwardError)?;
 
-            let (read, write, _) = session.destructure_transport();
+            let (transport, _) = session.destructure();
 
-            Ok((read, write))
+            Ok(transport)
         } else {
             Err(DispatcherError::NoneSession)
         }
@@ -188,44 +178,20 @@ impl<T> Connection for ForwardConnection<T>
 where
     T: Connection + Send,
 {
-    // async fn dispatch<D: TakeableCommandDispatcher>(&self, dispatcher: D) ->
-    // Result<D::Output> where
-    //     D::InnerError: Display + 'static,
-    // {
-    //     let dispatcher = ForwardDispatcher {
-    //         target: &self.target,
-    //         nested_dispatch: E2EDispatcher {
-    //             peer: self.target.clone(),
-    //             credentials: &self.credentials,
-    //             nested_dispatch: dispatcher,
-    //         },
-    //     };
-
-    //     self.connection
-    //         .dispatch(dispatcher)
-    //         .await
-    //         .map_err(|err| anyhow!(err.to_string()))
-    // }
-
-    async fn open_raw_session(
-        &self,
-    ) -> Result<(
-        Box<dyn SessionTransportReader>,
-        Box<dyn SessionTransportWriter>,
-    )> {
+    async fn open_raw_session(&self) -> Result<Box<dyn SessionTransport>> {
         let dispatcher = ForwardDispatcher::new(&self.target);
-        let (read, write) = self.connection.dispatch(dispatcher).await?;
+        let transport = self.connection.dispatch(dispatcher).await?;
 
-        let unencrypted = Session::new(read, write, self.peer().clone());
+        let unencrypted = Session::new(transport, self.peer().clone());
 
         let dispatcher = E2EDispatcher {
             peer: self.target.clone(),
             credentials: &self.credentials,
         };
 
-        let (read, write) = unencrypted.dispatch(dispatcher).await?;
+        let transport = unencrypted.dispatch(dispatcher).await?;
 
-        Ok((read, write))
+        Ok(transport)
     }
 
     fn peer(&self) -> &Peer {

@@ -1,6 +1,79 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+use crate::transport::session_transport::SessionTransport;
+
 use super::session_transport::{SessionTransportReader, SessionTransportWriter};
+
+pub struct ChunkTransport {
+    transport: Box<dyn SessionTransport>,
+}
+
+impl ChunkTransport {
+    pub fn new(transport: Box<dyn SessionTransport>) -> Self {
+        Self { transport }
+    }
+
+    pub async fn write_chunk(&mut self, chunk: &[u8]) -> Result<(), ChunkWriterError> {
+        let len = ChunkLength::from_usize(chunk.len());
+
+        self.transport
+            .write_all(len.as_bytes())
+            .await
+            .map_err(|err| ChunkWriterError::ExtendedLengthWriteError(err))?;
+
+        self.transport
+            .write_all(chunk)
+            .await
+            .map_err(|err| ChunkWriterError::BodyWriteError(err))?;
+
+        Ok(())
+    }
+
+    pub async fn read_chunk(&mut self) -> Result<Vec<u8>, ChunkReaderError> {
+        let short_len = self
+            .transport
+            .read_u8()
+            .await
+            .map_err(|err| ChunkReaderError::LengthReadError(err))?;
+
+        // println!("read short len: {}", short_len);
+
+        let len = match ChunkLength::try_from_byte(short_len) {
+            Some(len) => len,
+            None => {
+                let mut size = [short_len, 0, 0, 0];
+                self.transport
+                    .read_exact(&mut size[1..])
+                    .await
+                    .map_err(|err| ChunkReaderError::LengthReadError(err))?;
+                ChunkLength::from_4bytes(size)
+            }
+        };
+
+        let mut chunk = vec![0; len.to_usize()];
+
+        self.transport
+            .read_exact(&mut chunk)
+            .await
+            .map_err(|err| ChunkReaderError::BodyReadError(err))?;
+
+        // debug!("read chunk: {:x?}", &chunk);
+
+        Ok(chunk)
+    }
+
+    pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
+        self.transport.shutdown().await
+    }
+
+    pub fn borrow_transport(&mut self) -> &mut dyn SessionTransport {
+        &mut self.transport
+    }
+
+    pub fn into_transport(self) -> Box<dyn SessionTransport> {
+        self.transport
+    }
+}
 
 pub(crate) struct ChunkReader {
     read: Box<dyn SessionTransportReader>,

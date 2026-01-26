@@ -1,9 +1,54 @@
 use serde::{Serialize, de::DeserializeOwned};
 
+use crate::transport::{chunked_transport::ChunkTransport, session_transport::SessionTransport};
+
 use super::{
     chunked_transport::{ChunkReader, ChunkReaderError, ChunkWriter, ChunkWriterError},
     session_transport::{SessionTransportReader, SessionTransportWriter},
 };
+
+pub struct ObjectTransport {
+    transport: ChunkTransport,
+}
+
+impl ObjectTransport {
+    pub fn new(transport: Box<dyn SessionTransport>) -> Self {
+        Self {
+            transport: ChunkTransport::new(transport),
+        }
+    }
+
+    pub async fn write_object<U: Serialize>(
+        &mut self,
+        object: &U,
+    ) -> Result<(), ObjectWriterError> {
+        let encoded = postcard::to_extend(object, Vec::new())?;
+
+        self.transport.write_chunk(&encoded).await?;
+
+        Ok(())
+    }
+
+    pub async fn read_object<U: DeserializeOwned>(&mut self) -> Result<U, ObjectReaderError> {
+        let chunk = self.transport.read_chunk().await?;
+
+        let object: U = postcard::from_bytes(&chunk)?;
+
+        Ok(object)
+    }
+
+    pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
+        self.transport.shutdown().await
+    }
+
+    pub fn borrow_transport(&mut self) -> &mut dyn SessionTransport {
+        self.transport.borrow_transport()
+    }
+
+    pub fn into_transport(self) -> Box<dyn SessionTransport> {
+        self.transport.into_transport()
+    }
+}
 
 pub struct ObjectReader {
     read: ChunkReader,

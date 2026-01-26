@@ -16,7 +16,7 @@ use svalin_pki::{
     },
     serde_paramsstring, serde_saltstring,
 };
-use tokio::io::{AsyncRead, AsyncWrite, ReadHalf, WriteHalf};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::{debug, instrument};
 
 use crate::{
@@ -99,9 +99,7 @@ where
 {
     #[instrument(skip_all)]
     pub async fn client(transport: T, password: Vec<u8>) -> Result<Self, AucPaceClientError> {
-        let (read, write) = tokio::io::split(transport);
-
-        let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+        let mut session = Session::new(Box::new(transport), Peer::Anonymous);
 
         // ===== SSID Establishment =====
         let mut client = AuCPaceClient::<Sha512, Argon2, _, NONCE_LENGTH>::new(OsRng);
@@ -155,21 +153,17 @@ where
         let key = key_to_array(key);
 
         // ===== Create TLS Tunnel =====
-        let (read, write, _) = session.destructure_transport();
-        let read = read.into_any().downcast::<ReadHalf<T>>().unwrap();
-        let write = write.into_any().downcast::<WriteHalf<T>>().unwrap();
-        let transport = read.unsplit(*write);
+        let (transport, _) = session.destructure();
+        let transport = transport.into_any().downcast::<T>().unwrap();
 
-        let tls_transport = TlsTransport::client_preshared(transport, key).await?;
+        let tls_transport = TlsTransport::client_preshared(*transport, key).await?;
 
         Ok(Self { tls_transport })
     }
 
     #[instrument(skip_all)]
     pub async fn server(transport: T, password: Vec<u8>) -> Result<Self, AucPaceServerError> {
-        let (read, write) = tokio::io::split(transport);
-
-        let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+        let mut session = Session::new(Box::new(transport), Peer::Anonymous);
 
         // ===== Pseudo-Registration =====
         let mut pake_client: AuCPaceClient<Sha512, Argon2, OsRng, NONCE_LENGTH> =
@@ -257,12 +251,10 @@ where
 
         // ===== Create TLS Tunnel =====
         debug!("Creating TLS tunnel");
-        let (read, write, _) = session.destructure_transport();
-        let read = read.into_any().downcast::<ReadHalf<T>>().unwrap();
-        let write = write.into_any().downcast::<WriteHalf<T>>().unwrap();
-        let transport = read.unsplit(*write);
+        let (transport, _) = session.destructure();
+        let transport = transport.into_any().downcast::<T>().unwrap();
 
-        let tls_transport = TlsTransport::server_preshared(transport, key).await?;
+        let tls_transport = TlsTransport::server_preshared(*transport, key).await?;
 
         Ok(Self { tls_transport })
     }
