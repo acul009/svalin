@@ -1,14 +1,18 @@
 use anyhow::{Result, anyhow};
 use aucpace::{AuCPaceClient, ClientMessage};
-use curve25519_dalek::{RistrettoPoint, Scalar};
-use password_hash::{ParamsString, rand_core::OsRng};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
+use svalin_pki::password_hash::rand_core::OsRng;
 use svalin_pki::{
     ArgonCost, Certificate, CreateCertificateError, CreateCredentialsError, Credential,
     EncryptError, EncryptedCredential, ExportedPublicKey, KeyPair, RootCertificate, Sha512,
-    UnverifiedCertificate, argon2::Argon2,
+    UnverifiedCertificate, argon2::Argon2, serde_paramsstring,
 };
+use svalin_pki::{
+    curve25519_dalek::{RistrettoPoint, Scalar},
+    password_hash::ParamsString,
+};
+use svalin_rpc::transport::aucpace_transport::NONCE_LENGTH;
 
 use async_trait::async_trait;
 use svalin_rpc::rpc::{
@@ -20,7 +24,7 @@ use tokio_util::sync::CancellationToken;
 use totp_rs::TOTP;
 use tracing::debug;
 
-use crate::server::user_store::{UserStore, serde_paramsstring};
+use crate::server::user_store::UserStore;
 
 pub struct ServerInitSuccess {
     pub credential: Credential,

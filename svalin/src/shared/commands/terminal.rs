@@ -59,32 +59,12 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
             let size: TerminalSize = session.read_object().await?;
             let (pty, mut pty_reader) = PtyProcess::shell(size).await?;
 
-            let (mut read, mut write, _) = session.destructure();
-
-            tasks.spawn(async move {
-                loop {
-                    select! {
-                        output = pty_reader.recv() => {
-                            if let Err(err) = write.write_object(&output).await {
-                                tracing::error!("{err}");
-                                return;
-                            }
-
-                            if output.is_none() {
-                                let _ = write.shutdown().await;
-                                return;
-                            }
-                        }
-                    }
-                }
-            });
-
             loop {
                 select! {
                     _ = cancel.cancelled() => {
                         break;
                     }
-                    packet = read.read_object() => {
+                    packet = session.read_object() => {
                         let packet = packet?;
 
                         debug!("got terminal packet: {packet:?}");
@@ -100,6 +80,16 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
                             }
                             TerminalPacket::Resize(size) => pty.resize(size).await?,
                         };
+                    },
+                    output = pty_reader.recv() => {
+                        if let Err(err) = session.write_object(&output).await {
+                            tracing::error!("{err}");
+                            return Err(anyhow!(err));
+                        }
+
+                        if output.is_none() {
+                            return Ok(());
+                        }
                     }
                 }
             }

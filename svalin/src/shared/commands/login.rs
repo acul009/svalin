@@ -3,15 +3,8 @@ use std::{str, sync::Arc};
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage};
-use password_hash::{ParamsString, rand_core::OsRng};
-use serde::{
-    Deserialize, Serialize,
-    de::{self},
-};
-use svalin_pki::curve25519_dalek::{
-    RistrettoPoint,
-    digest::{generic_array::GenericArray, typenum},
-};
+use serde::{Deserialize, Serialize};
+use svalin_pki::password_hash::rand_core::OsRng;
 use svalin_pki::{
     ArgonCost, Certificate, CertificateChainBuilder, CreateCredentialsError, Credential,
     DecodeCredentialsError, DecryptError, EncryptError, EncryptedCredential,
@@ -19,6 +12,7 @@ use svalin_pki::{
     UnverifiedCertificate, UseAsRootError, argon2::Argon2, get_current_timestamp,
     serde_paramsstring,
 };
+use svalin_pki::{curve25519_dalek::RistrettoPoint, password_hash::ParamsString};
 use svalin_rpc::{
     rpc::{
         command::{
@@ -32,7 +26,6 @@ use svalin_rpc::{
         aucpace_transport::{
             Authenticator, MessageTransformError, NONCE_LENGTH, Nonce, PublicKey, key_to_array,
         },
-        combined_transport::CombinedTransport,
         tls_transport::{TlsClientError, TlsDeriveKeyError, TlsTransport},
     },
     verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
@@ -129,27 +122,22 @@ impl TakeableCommandHandler for LoginHandler {
 
             // ===== Establish TLS Connection and generate common secret =====
 
-            let (read, write, _) = session.destructure_transport();
+            let (transport, _) = session.destructure();
 
             let temp_credentials =
                 Credential::generate_root().context("Failed to generate temporary credentials")?;
 
-            let tls_transport = TlsTransport::server(
-                CombinedTransport::new(read, write),
-                SkipClientVerification::new(),
-                &temp_credentials,
-            )
-            .await
-            .context("Failed to establish TLS connection")?;
+            let tls_transport =
+                TlsTransport::server(transport, SkipClientVerification::new(), &temp_credentials)
+                    .await
+                    .context("Failed to establish TLS connection")?;
 
             let mut key_material = [0u8; 32];
             let key_material = tls_transport
                 .derive_key(&mut key_material, b"login", &tls_combined_nonce)
                 .context("Failed to derive key")?;
 
-            let (read, write) = tokio::io::split(tls_transport);
-
-            let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+            let mut session = Session::new(Box::new(tls_transport), Peer::Anonymous);
 
             debug!("server session recreated");
 
@@ -257,11 +245,9 @@ impl TakeableCommandHandler for LoginHandler {
 
             // Encrypt & Authenticate session
 
-            let (read, write, _) = session.destructure_transport();
-            let tls_transport =
-                TlsTransport::server_preshared(CombinedTransport::new(read, write), key).await?;
-            let (read, write) = tokio::io::split(tls_transport);
-            let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+            let (transport, _) = session.destructure();
+            let tls_transport = TlsTransport::server_preshared(transport, key).await?;
+            let mut session = Session::new(Box::new(tls_transport), Peer::Anonymous);
 
             // ===== TOTP =====
 
@@ -471,18 +457,15 @@ impl TakeableCommandDispatcher for Login {
             let tls_combined_nonce: Vec<u8> = tls_server_nonce.combine(tls_client_nonce);
 
             // ===== TLS Initialization =====
-            let (read, write, _) = session.destructure_transport();
+            let (transport, _) = session.destructure();
 
             let credentials =
                 Credential::generate_root().map_err(LoginDispatcherError::TempCredentialError)?;
 
-            let tls_transport = TlsTransport::client(
-                CombinedTransport::new(read, write),
-                SkipServerVerification::new(),
-                &credentials,
-            )
-            .await
-            .map_err(LoginDispatcherError::TlsClientError)?;
+            let tls_transport =
+                TlsTransport::client(transport, SkipServerVerification::new(), &credentials)
+                    .await
+                    .map_err(LoginDispatcherError::TlsClientError)?;
 
             debug!("tls transport created");
 
@@ -491,8 +474,7 @@ impl TakeableCommandDispatcher for Login {
                 .derive_key(&mut key_material, b"login", &tls_combined_nonce)
                 .map_err(LoginDispatcherError::DeriveKeyError)?;
 
-            let (read, write) = tokio::io::split(tls_transport);
-            let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+            let mut session = Session::new(Box::new(tls_transport), Peer::Anonymous);
 
             debug!("session recreated");
 
@@ -636,13 +618,11 @@ impl TakeableCommandDispatcher for Login {
 
             // Encrypt & Authenticate session
 
-            let (read, write, _) = session.destructure_transport();
-            let tls_transport =
-                TlsTransport::client_preshared(CombinedTransport::new(read, write), key)
-                    .await
-                    .map_err(LoginDispatcherError::TlsClientError)?;
-            let (read, write) = tokio::io::split(tls_transport);
-            let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
+            let (transport, _) = session.destructure();
+            let tls_transport = TlsTransport::client_preshared(transport, key)
+                .await
+                .map_err(LoginDispatcherError::TlsClientError)?;
+            let mut session = Session::new(Box::new(tls_transport), Peer::Anonymous);
 
             // TOTP
 

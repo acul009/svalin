@@ -2,13 +2,15 @@ use std::{fmt::Debug, sync::Arc};
 
 use anyhow::{Result, anyhow};
 use aucpace::StrongDatabase;
-use curve25519_dalek::{RistrettoPoint, Scalar};
-use password_hash::ParamsString;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use svalin_pki::{
     CertificateChainBuilder, CertificateType, EncryptedCredential, SpkiHash, UnverifiedCertificate,
     UnverifiedCertificateChain, serde_paramsstring,
+};
+use svalin_pki::{
+    curve25519_dalek::{self, RistrettoPoint, Scalar},
+    password_hash::ParamsString,
 };
 use totp_rs::TOTP;
 
