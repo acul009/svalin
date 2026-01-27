@@ -17,7 +17,9 @@ use crate::{
     client::tunnel_manager::TunnelManager,
     shared::commands::{agent_list::UpdateAgentList, upload_key_packages::UploadKeyPackages},
     util::location::{Location, LocationError},
-    verifier::remote_agent_verifier::RemoteAgentVerifier,
+    verifier::{
+        remote_agent_verifier::RemoteAgentVerifier, remote_session_verifier::RemoteSessionVerifier,
+    },
 };
 
 use super::Client;
@@ -180,7 +182,7 @@ impl Client {
             let pool = SqlitePool::connect(url).await?;
             let storage_provider = SqliteStorageProvider::new(pool);
             storage_provider.run_migrations().await?;
-            let mls = Arc::new(MlsClient::new(device_credential.clone(), storage_provider));
+            let mls = MlsClient::new(device_credential.clone(), storage_provider);
 
             debug!("creating verifier");
             let verifier = ExactVerififier::new(upstream_certificate.clone()).to_tls_verifier();
@@ -193,6 +195,9 @@ impl Client {
                 CancellationToken::new(),
             )
             .await?;
+
+            let session_verifier =
+                RemoteSessionVerifier::new(root_certificate.clone(), rpc.upstream_connection());
 
             debug!("connected to server");
 
@@ -209,6 +214,7 @@ impl Client {
                 mls,
                 background_tasks: TaskTracker::new(),
                 cancel: CancellationToken::new(),
+                session_verifier,
             });
 
             client

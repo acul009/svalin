@@ -52,16 +52,19 @@ impl KeyPackageStore {
     pub async fn get_key_packages(
         &self,
         entities: &HashSet<SpkiHash>,
+        ignore: &SpkiHash,
     ) -> anyhow::Result<Vec<UnverifiedKeyPackage>> {
         let mut transaction = self.pool.begin().await?;
 
         let mut key_packages = Vec::new();
+        let ignore = ignore.as_slice();
 
         for spki_hash in entities.iter() {
             let spki_hash = spki_hash.as_slice();
             let user_key_packages = sqlx::query!(
-                "SELECT id, data FROM key_packages WHERE user_spki_hash = ? GROUP BY owner_spki_hash",
+                "SELECT id, data FROM key_packages WHERE user_spki_hash = ? AND owner_spki_hash != ? GROUP BY owner_spki_hash",
                 spki_hash,
+                ignore
             ).fetch_all(&mut *transaction).await?;
             for key_package in user_key_packages {
                 sqlx::query!("DELETE FROM key_packages WHERE id = ?", key_package.id)

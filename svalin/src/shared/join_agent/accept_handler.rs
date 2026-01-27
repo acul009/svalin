@@ -14,13 +14,10 @@ use svalin_rpc::{
         command::{
             dispatcher::{DispatcherError, TakeableCommandDispatcher},
             handler::CommandHandler,
-        },
-        peer::Peer,
-        session::{Session, SessionReadError, SessionWriteError},
+        }, connection::ConnectionDispatchError, peer::Peer, session::{Session, SessionReadError, SessionWriteError}
     },
     transport::{
-        combined_transport::CombinedTransport,
-        tls_transport::{TlsClientError, TlsTransport},
+        aucpace_transport::{AucPaceClientError, AucPaceTransport}, combined_transport::CombinedTransport, session_transport::SessionTransport, tls_transport::{TlsClientError, TlsTransport}
     },
     verifiers::skip_verify::SkipServerVerification,
 };
@@ -28,7 +25,7 @@ use tokio::{io::copy_bidirectional, select, sync::oneshot};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument};
 
-use crate::client::Client;
+use crate::{client::{Client, GetKeyPackagesError}, shared::commands::get_key_packages::GetKeyPackagesDispatcherError};
 
 use super::ServerJoinManager;
 
@@ -112,6 +109,12 @@ pub enum AcceptJoinError {
     CreateCertificateError(#[from] CreateCertificateError),
     #[error("error verifying key package: {0}")]
     KeyPackageError(#[from] KeyPackageError),
+    #[error("user seems to have aborted this join process")]
+    Aborted,
+    #[error("error establishing encrypted tunnel: {0}")]
+    AucPaceError(#[from] AucPaceClientError),
+     #[error("error getting additional key packages from server: {0}")]
+    GetKeyPackagesError(#[from] GetKeyPackagesError)
 }
 
 pub struct AcceptJoin<'a> {
@@ -138,32 +141,42 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
         self,
         session: &mut Option<Session>,
     ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
-        if let Some(session) = session.take() {
-            {
-                let confirm_code_result =
-                    prepare_agent_enroll(session, &self.join_code, self.client.user_credential()).await;
+        if let Some(mut session) = session.take() {
 
-                match confirm_code_result {
-                    Err(err) => {
 
-                        Err(err)
-                    }
-                    Ok((confirm_code, session_e2e)) => {
-                        handle_agent_enroll(
-                            self.waiting_for_confirm,
-                            self.confirm_code_channel,
-                            self.credentials,
-                            self.root,
-                            self.upstream,
-                            session_e2e,
-                            confirm_code,
-                            self.mls,
-                        )
-                        .await
-                    }
+                // Sending join code to server
+                session.write_object(&self.join_code).await.map_err(AcceptJoinError::SessionWriteError)?;
+
+                // If the server sends back ok, it has found an agent with the given join code.
+                // After this point the connection will be patched through to the agent,
+                // so at this point we have a direct (but insecure) connection to the agent.
+                let found: std::result::Result<(), ()> = session.read_object().await.map_err(AcceptJoinError::SessionReadError)?;
+                if let Err(()) = found {
+                    return Err(AcceptJoinError::AgentNotFound.into());
                 }
-            }
-            .map_err(DispatcherError::Other)
+
+                // At this point the agent generates a random confirm code and displays it.
+                // Our application should inform the user that a client was reached successfully and
+                // that they should now input the confirm code.
+                // The user can obtain the code either themselves or get someone else to read it to them over the phone.
+                // That also means the code only a few digits long.
+
+                let (confirm_send, confirm_recv) = oneshot::channel();
+
+                let result = self.confirm_code.send(confirm_send);
+                if result.is_err() {
+                    return Err(AcceptJoinError::Aborted.into())
+                }
+
+                let confirm_code = confirm_recv.await.map_err(|_| AcceptJoinError::Aborted)?;
+
+                // Now that we have the confirmation code, we can open an encrypted tunnel using
+                // AucPace to ensure security even with this relatively insecure short code.
+
+                let (transport, _) = session.destructure();
+                let transport = AucPaceTransport::client(transport, confirm_code.into_bytes()).await.map_err(AcceptJoinError::AucPaceError)?;
+
+                handle_agent_enroll(transport, self.client).await.map_err(DispatcherError::Other)
         } else {
             Err(DispatcherError::NoneSession)
         }
@@ -171,110 +184,43 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
 }
 
 async fn handle_agent_enroll(
-    waiting_for_confirm: oneshot::Sender<Result<(), anyhow::Error>>,
-    confirm_code_channel: oneshot::Receiver<String>,
-    credentials: &Credential,
-    root: &RootCertificate,
-    upstream: &Certificate,
-    mut session_e2e: Session,
-    confirm_code: String,
-    mls: &MlsClient,
+    transport: AucPaceTransport<Box<dyn SessionTransport>>,
+    client: &Client,
 ) -> Result<Certificate, AcceptJoinError> {
-    waiting_for_confirm.send(Ok(())).unwrap();
-
-    let remote_confirm_code = confirm_code_channel.await?;
-
-    debug!("received confirm code from user: {remote_confirm_code}");
-
-    if confirm_code != remote_confirm_code {
-        return Err(AcceptJoinError::ConfirmCodeMismatch);
-    }
-
-    debug!("Confirm Codes match!");
+    let session_e2e = Session::new(Box::new(transport), Peer::Anonymous);
+    // At this point we have a secure channel to the agent.
+    // The first order of business is creating a certificate for the agent
+    // and providing the agent with the root and upstream certificates.
 
     let public_key: ExportedPublicKey = session_e2e.read_object().await?;
     debug!("received public key: {:?}", public_key);
-    let agent_cert = credentials.create_agent_certificate_for_key(&public_key)?;
 
+    // Creating certificate for agent
+    let agent_cert = client.user_credential().create_agent_certificate_for_key(&public_key)?;
+
+    // Sending all 3 required certificates to the agent
     session_e2e.write_object(agent_cert.as_unverified()).await?;
-    session_e2e.write_object(root.as_unverified()).await?;
-    session_e2e.write_object(upstream.as_unverified()).await?;
+    session_e2e.write_object(client.root_certificate().as_unverified()).await?;
+    session_e2e.write_object(client.upstream_certificate().as_unverified()).await?;
 
-    let key_package: UnverifiedKeyPackage = session_e2e.read_object().await?;
+    // Now the agent has it's credentials to both connect to the server and work with MLS.
+    // The next step here is to create an MLS group to both distribute system reports from the agent
+    // as well as record who has access to the system.
+    let mls = client.mls();
+
+    let agent_key_package: UnverifiedKeyPackage = session_e2e.read_object().await?;
 
     let verifier = ExactVerififier::new(agent_cert.clone());
 
-    let key_package = key_package
+    let agent_key_package = agent_key_package
         .verify(mls.provider().crypto(), mls.protocol_version(), &verifier)
         .await?;
 
-    mls.create_device_group(key_package)
+    let others = client.get_key_packages(&[client.user_credential().get_certificate().clone(), client.root_certificate().as_certificate().clone()]).await?;
+
+    mls.create_device_group(agent_key_package)
 
     compile_error!("Continue here!");
 
     Ok(agent_cert)
-}
-
-#[instrument(skip_all)]
-async fn prepare_agent_enroll(
-    mut session: Session,
-    join_code: &String,
-    credentials: &Credential,
-) -> Result<(String, Session), AcceptJoinError> {
-    session.write_object(join_code).await?;
-
-    let found: std::result::Result<(), ()> = session.read_object().await?;
-
-    if let Err(()) = found {
-        return Err(AcceptJoinError::AgentNotFound);
-    }
-
-    debug!("connected to agent, sending join code for confirmation");
-
-    // confirm join code with agent
-    session.write_object(join_code).await?;
-
-    debug!("waiting for agent to confirm join code");
-
-    let ready: std::result::Result<(), ()> = session.read_object().await?;
-
-    if let Err(()) = ready {
-        return Err(AcceptJoinError::NotAknowledged);
-    }
-
-    debug!("agent confirmed join code");
-
-    // establish tls session
-
-    debug!("trying to establish tls connection");
-
-    let (read, write, _) = session.destructure_transport();
-
-    let tls_transport = TlsTransport::client(
-        CombinedTransport::new(read, write),
-        SkipServerVerification::new(),
-        credentials,
-    )
-    .await?;
-
-    let mut key_material = [0u8; 32];
-    let key_material = tls_transport
-        .derive_key(&mut key_material, b"join_confirm_key", join_code.as_bytes())
-        .unwrap();
-
-    let (read, write) = tokio::io::split(tls_transport);
-
-    let mut session = Session::new(Box::new(read), Box::new(write), Peer::Anonymous);
-
-    debug!("client tls connection established");
-
-    let params = ArgonParams::basic();
-
-    session.write_object(&params).await?;
-
-    let confirm_code = super::derive_confirm_code(params, &key_material).await?;
-
-    debug!("client side confirm code: {confirm_code}");
-
-    Ok((confirm_code, session))
 }

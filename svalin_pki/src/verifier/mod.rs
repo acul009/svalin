@@ -7,6 +7,7 @@ use crate::{
 };
 
 pub mod exact;
+pub mod one_of;
 
 #[derive(Debug, Error)]
 pub enum VerifyError {

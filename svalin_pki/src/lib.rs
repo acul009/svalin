@@ -40,7 +40,10 @@ pub use encrypt::{DecryptError, EncryptError, EncryptedData, EncryptedObject};
 pub use keypair::{ExportedPublicKey, KeyPair};
 // pub use signed_object::{SignedObject, VerifiedObject};
 pub use signed_object::{SignedObject, VerifiedObject};
-pub use verifier::{KnownCertificateVerifier, Verifier, VerifyError, exact::ExactVerififier};
+pub use verifier::{
+    KnownCertificateVerifier, Verifier, VerifyError, exact::ExactVerififier,
+    one_of::OneOfVerififier,
+};
 
 // normal use statements
 use anyhow::Result;
