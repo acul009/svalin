@@ -8,10 +8,14 @@ use crate::{
     },
 };
 use openmls::{
-    group::MlsGroup,
+    group::{
+        AddMembersError, GroupId, MlsGroup, NewGroupError, OutgoingWireFormatPolicy,
+        PURE_CIPHERTEXT_WIRE_FORMAT_POLICY, WIRE_FORMAT_POLICIES,
+    },
     prelude::{Ciphersuite, CredentialWithKey, KeyPackageNewError, ProtocolVersion},
 };
 use openmls_sqlx_storage::SqliteStorageProvider;
+use openmls_traits::OpenMlsProvider;
 use tokio::task::JoinError;
 
 use crate::Credential;
@@ -94,7 +98,32 @@ impl MlsClient {
         // And I just now notized, that I already need to have this info then creating this group.
         // So now I gotta think about how to add these to the parameters nicely
 
-        // MlsGroup::builder()
+        let mut group = MlsGroup::builder()
+            .ciphersuite(self.provider().ciphersuite())
+            .with_group_id(GroupId::from_slice(device.spki_hash().as_slice()))
+            // No idea yet if this prevents the creation of public groups.
+            // If it does, I need to change it so the server can actually track group members.
+            .with_wire_format_policy(PURE_CIPHERTEXT_WIRE_FORMAT_POLICY)
+            .build(
+                self.provider(),
+                &self.svalin_credential,
+                self.mls_credential_with_key.clone(),
+            )?;
+
+        let mls_key_packages = other_members
+            .into_iter()
+            .chain([device].into_iter())
+            .map(|key_package| key_package.unpack())
+            .collect::<Vec<_>>();
+
+        let (_, welcome, _) = group.add_members(
+            self.provider(),
+            &self.svalin_credential,
+            mls_key_packages.as_slice(),
+        )?;
+
+        let ratchet_tree = group.export_ratchet_tree();
+
         todo!()
     }
 }
@@ -111,6 +140,17 @@ pub enum CreateKeyPackageError {
     JoinError(#[from] JoinError),
 }
 
-pub enum CreateDeviceGroupError {}
+#[derive(Debug, thiserror::Error)]
+pub enum CreateDeviceGroupError {
+    #[error("error trying to create mls group: {0}")]
+    NewGroupError(
+        #[from] NewGroupError<<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError>,
+    ),
+    #[error("error trying to add members to mls group: {0}")]
+    AddMembersError(
+        #[from]
+        AddMembersError<<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError>,
+    ),
+}
 
 pub struct GroupCreationInfo {}

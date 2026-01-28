@@ -99,4 +99,8 @@ impl KeyPackage {
             self.certificate.spki_hash()
         }
     }
+
+    pub(crate) fn unpack(self) -> openmls::prelude::KeyPackage {
+        self.key_package
+    }
 }

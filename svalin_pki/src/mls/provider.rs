@@ -1,4 +1,4 @@
-use openmls::prelude::ProtocolVersion;
+use openmls::prelude::{Ciphersuite, ProtocolVersion};
 use openmls_rust_crypto::RustCrypto;
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
@@ -36,6 +36,10 @@ impl SvalinProvider {
 
     pub fn protocol_version(&self) -> ProtocolVersion {
         self.protocol_version
+    }
+
+    pub fn ciphersuite(&self) -> Ciphersuite {
+        Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
     }
 }
 
