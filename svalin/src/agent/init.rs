@@ -70,7 +70,7 @@ impl Agent {
                             join_success_send.send(init_payload).unwrap();
                         }
                         Err(err) => {
-                            tracing::error!("failed to request join: {err:?}");
+                            tracing::error!("failed to request join: {err}");
                         }
                     }
                 });
