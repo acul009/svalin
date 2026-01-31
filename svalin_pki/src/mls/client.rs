@@ -10,9 +10,10 @@ use crate::{
 use openmls::{
     framing::errors::MlsMessageError,
     group::{
-        AddMembersError, ExportGroupInfoError, GroupId, JoinBuilder, MlsGroup, MlsGroupJoinConfig,
-        MlsGroupJoinConfigBuilder, NewGroupError, OutgoingWireFormatPolicy,
-        PURE_CIPHERTEXT_WIRE_FORMAT_POLICY, StagedWelcome, WIRE_FORMAT_POLICIES, WelcomeError,
+        AddMembersError, ExportGroupInfoError, GroupId, JoinBuilder, MergePendingCommitError,
+        MlsGroup, MlsGroupJoinConfig, MlsGroupJoinConfigBuilder, NewGroupError,
+        OutgoingWireFormatPolicy, PURE_CIPHERTEXT_WIRE_FORMAT_POLICY, StagedWelcome,
+        WIRE_FORMAT_POLICIES, WelcomeError,
     },
     prelude::{
         Ciphersuite, CredentialWithKey, KeyPackageNewError, MlsMessageBodyIn, MlsMessageIn,
@@ -135,6 +136,8 @@ impl MlsClient {
                 mls_key_packages.as_slice(),
             )?;
 
+            group.merge_pending_commit(provider.as_ref())?;
+
             let welcome = welcome.to_bytes()?;
 
             let group_info = group
@@ -185,7 +188,7 @@ impl MlsClient {
             welcome.welcome_sender()?.credential().deserialized()?;
 
         // TODO: check that members contains root
-        if creator.spki_hash() != &my_parent {
+        if creator.issuer() != &my_parent {
             return Err(JoinDeviceGroupError::WrongGroupCreator);
         }
 
@@ -271,6 +274,13 @@ pub enum CreateDeviceGroupError {
     AddMembersError(
         #[from]
         AddMembersError<<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError>,
+    ),
+    #[error("error trying to merge pending commit: {0}")]
+    MergePendingCommitError(
+        #[from]
+        MergePendingCommitError<
+            <SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError,
+        >,
     ),
     #[error("error trying to create mls message: {0}")]
     MlsMessageError(#[from] MlsMessageError),
