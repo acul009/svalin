@@ -15,6 +15,7 @@ use crate::{
     shared::{
         commands::{
             agent_list::AgentListHandler,
+            get_key_packages::GetKeyPackagesHandler,
             login::LoginHandler,
             public_server_status::{PublicStatus, PublicStatusHandler},
             upload_key_packages::UploadKeyPackagesHandler,
@@ -81,7 +82,8 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 self.key_package_store.clone(),
                 MLS_VERSION,
                 self.mls_provider.clone(),
-            ));
+            ))
+            .add(GetKeyPackagesHandler::new(self.key_package_store.clone()));
 
         Ok(commands)
     }

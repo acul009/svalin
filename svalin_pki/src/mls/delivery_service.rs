@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use openmls::{
-    group::{ProposalStore, PublicGroup},
+    group::{GroupId, ProposalStore, PublicGroup},
     prelude::{
         CreationFromExternalError, MlsMessageIn, ProtocolVersion, Verifiable,
         group_info::VerifiableGroupInfo,
@@ -9,50 +9,16 @@ use openmls::{
     treesync,
 };
 use openmls_rust_crypto::{MemoryStorage, MemoryStorageError, RustCrypto};
+use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
 
-#[derive(Debug)]
-pub struct DsProvider {
-    crypto: RustCrypto,
-    key_store: MemoryStorage,
-    protocol_version: ProtocolVersion,
-}
-
-impl DsProvider {
-    pub fn protocol_version(&self) -> ProtocolVersion {
-        self.protocol_version
-    }
-}
-
-impl OpenMlsProvider for DsProvider {
-    type CryptoProvider = RustCrypto;
-
-    type RandProvider = RustCrypto;
-
-    type StorageProvider = MemoryStorage;
-
-    fn storage(&self) -> &Self::StorageProvider {
-        &self.key_store
-    }
-
-    fn crypto(&self) -> &Self::CryptoProvider {
-        &self.crypto
-    }
-
-    fn rand(&self) -> &Self::RandProvider {
-        &self.crypto
-    }
-}
-
-impl DsProvider {
-    pub fn new() -> Self {
-        Self {
-            crypto: Default::default(),
-            key_store: MemoryStorage::default(),
-            protocol_version: ProtocolVersion::Mls10,
-        }
-    }
-}
+use crate::{
+    Certificate,
+    mls::{
+        client::{CreateDeviceGroupError, GroupCreationInfo, GroupCreationUnpackError},
+        provider::{PostcardCodec, SvalinProvider},
+    },
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum CreateRoomError {
@@ -68,72 +34,65 @@ pub enum CreateRoomError {
 pub enum AddNewMemberError {}
 
 pub struct DeliveryService {
-    provider: Arc<DsProvider>,
+    provider: Arc<SvalinProvider>,
 }
 
 impl DeliveryService {
-    pub fn new() -> Self {
+    pub fn new(storage_provider: SqliteStorageProvider<PostcardCodec>) -> Self {
         Self {
-            provider: Arc::new(DsProvider::new()),
+            provider: Arc::new(SvalinProvider::new(storage_provider)),
         }
     }
 
-    pub fn new_room(&self, group_info: VerifiableGroupInfo) -> Result<Room, CreateRoomError> {
+    pub fn new_device_group(
+        &self,
+        group_info: GroupCreationInfo,
+        device: Certificate,
+    ) -> Result<(), NewPublicDeviceGroupError> {
+        let provider = self.provider.clone();
+        let existing = PublicGroup::load(
+            provider.storage(),
+            &GroupId::from_slice(device.spki_hash().as_slice()),
+        )
+        .map_err(NewPublicDeviceGroupError::StorageError)?;
+
+        if existing.is_some() {
+            return Err(NewPublicDeviceGroupError::GroupAlreadyExists);
+        }
+
+        let group_info = group_info.group_info()?;
         let ratchet_tree = group_info
             .extensions()
             .ratchet_tree()
-            .ok_or(CreateRoomError::MissingRatchetTree)?
+            .ok_or_else(|| GroupCreationUnpackError::MissingRatchetTree)?
             .ratchet_tree()
             .clone();
-        let (group, _group_info) = PublicGroup::from_external(
-            self.provider.crypto(),
-            self.provider.storage(),
+
+        let (_group, _group_info) = PublicGroup::from_external(
+            provider.crypto(),
+            provider.storage(),
             ratchet_tree,
             group_info,
             ProposalStore::new(),
         )?;
 
-        let room = Room {
-            group,
-            provider: self.provider.clone(),
-        };
-
-        Ok(room)
+        Ok(())
     }
 }
 
-/// Room ID is the MLS group ID
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct RoomId(Vec<u8>);
-
-pub struct Room {
-    group: PublicGroup,
-    provider: Arc<DsProvider>,
-}
-
-impl Room {}
-
-fn test(message: &[u8]) {
-    use tls_codec::Deserialize;
-    let message = MlsMessageIn::tls_deserialize_exact(&message).unwrap();
-    let crypto = RustCrypto::default();
-    match message.extract() {
-        openmls::prelude::MlsMessageBodyIn::PublicMessage(public_message_in) => todo!(),
-        openmls::prelude::MlsMessageBodyIn::PrivateMessage(private_message_in) => todo!(),
-        openmls::prelude::MlsMessageBodyIn::Welcome(welcome) => todo!(),
-        openmls::prelude::MlsMessageBodyIn::GroupInfo(verifiable_group_info) => {
-            let group_info = verifiable_group_info.verify(&crypto, todo!()).unwrap();
-            let data = group_info
-                .group_context()
-                .extensions()
-                .ratchet_tree()
-                .unwrap()
-                .ratchet_tree()
-                .into_verified(todo!(), &crypto, todo!())
-                .unwrap();
-
-            ();
-        }
-        openmls::prelude::MlsMessageBodyIn::KeyPackage(key_package_in) => todo!(),
-    }
+#[derive(Debug, thiserror::Error)]
+pub enum NewPublicDeviceGroupError {
+    #[error("error unpacking group creation info: {0}")]
+    GroupCreationUnpackError(#[from] GroupCreationUnpackError),
+    #[error("error creating group from external: {0}")]
+    CreationFromExternalError(
+        #[from]
+        CreationFromExternalError<
+            <SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError,
+        >,
+    ),
+    #[error("error accessing MLS storage: {0}")]
+    StorageError(<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError),
+    #[error("group already exists")]
+    GroupAlreadyExists,
 }

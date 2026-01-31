@@ -75,10 +75,8 @@ impl KeyPackageStore {
             }
         }
 
-        if key_packages.len() < entities.len() {
-            transaction.rollback().await?;
-            return Err(anyhow::anyhow!("Not all key packages found"));
-        }
+        tracing::debug!("requested: {:#?}", entities);
+        tracing::debug!("found: {:#?}", key_packages);
 
         transaction.commit().await?;
 

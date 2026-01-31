@@ -149,14 +149,17 @@ async fn integration_tests() {
         debug!("agent has unexpectedly exited");
     });
 
-    let client_confirm = client.add_agent_with_code(join_code).await.unwrap();
+    let (send, recv) = oneshot::channel();
+    let client2 = client.clone();
+    let add_agent_handle =
+        tokio::spawn(async move { client2.add_agent_with_code(join_code, send).await });
 
     debug!("waiting to receive confirm code");
 
-    client_confirm
-        .confirm(confirm_recv.await.unwrap())
-        .await
-        .unwrap();
+    let confirm = recv.await.unwrap();
+    confirm.send(confirm_recv.await.unwrap()).unwrap();
+
+    add_agent_handle.await.unwrap().unwrap();
 
     let mut device_list = client.watch_device_list();
 

@@ -5,7 +5,7 @@ use svalin_pki::{
     ExportedPublicKey, RootCertificate,
     mls::{
         OpenMlsProvider,
-        client::MlsClient,
+        client::{CreateDeviceGroupError, MlsClient},
         key_package::{KeyPackageError, UnverifiedKeyPackage},
     },
 };
@@ -14,10 +14,16 @@ use svalin_rpc::{
         command::{
             dispatcher::{DispatcherError, TakeableCommandDispatcher},
             handler::CommandHandler,
-        }, connection::ConnectionDispatchError, peer::Peer, session::{Session, SessionReadError, SessionWriteError}
+        },
+        connection::ConnectionDispatchError,
+        peer::Peer,
+        session::{Session, SessionReadError, SessionWriteError},
     },
     transport::{
-        aucpace_transport::{AucPaceClientError, AucPaceTransport}, combined_transport::CombinedTransport, session_transport::SessionTransport, tls_transport::{TlsClientError, TlsTransport}
+        aucpace_transport::{AucPaceClientError, AucPaceTransport},
+        combined_transport::CombinedTransport,
+        session_transport::SessionTransport,
+        tls_transport::{TlsClientError, TlsTransport},
     },
     verifiers::skip_verify::SkipServerVerification,
 };
@@ -25,7 +31,10 @@ use tokio::{io::copy_bidirectional, select, sync::oneshot};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument};
 
-use crate::{client::{Client, GetKeyPackagesError}, shared::commands::get_key_packages::GetKeyPackagesDispatcherError};
+use crate::{
+    client::{Client, GetKeyPackagesError},
+    shared::commands::get_key_packages::GetKeyPackagesDispatcherError,
+};
 
 use super::ServerJoinManager;
 
@@ -66,7 +75,6 @@ impl CommandHandler for JoinAcceptHandler {
 
                 let transport1 = session.borrow_transport();
                 let transport2 = agent_session.borrow_transport();
-
 
                 select! {
                         _ = cancel.cancelled() => {}
@@ -113,8 +121,10 @@ pub enum AcceptJoinError {
     Aborted,
     #[error("error establishing encrypted tunnel: {0}")]
     AucPaceError(#[from] AucPaceClientError),
-     #[error("error getting additional key packages from server: {0}")]
-    GetKeyPackagesError(#[from] GetKeyPackagesError)
+    #[error("error getting additional key packages from server: {0}")]
+    GetKeyPackagesError(#[from] GetKeyPackagesError),
+    #[error("error creating device group: {0}")]
+    CreateDeviceGroupError(#[from] CreateDeviceGroupError),
 }
 
 pub struct AcceptJoin<'a> {
@@ -142,41 +152,49 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
         session: &mut Option<Session>,
     ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(mut session) = session.take() {
+            // Sending join code to server
+            session
+                .write_object(&self.join_code)
+                .await
+                .map_err(AcceptJoinError::SessionWriteError)?;
 
+            // If the server sends back ok, it has found an agent with the given join code.
+            // After this point the connection will be patched through to the agent,
+            // so at this point we have a direct (but insecure) connection to the agent.
+            let found: std::result::Result<(), ()> = session
+                .read_object()
+                .await
+                .map_err(AcceptJoinError::SessionReadError)?;
+            if let Err(()) = found {
+                return Err(AcceptJoinError::AgentNotFound.into());
+            }
 
-                // Sending join code to server
-                session.write_object(&self.join_code).await.map_err(AcceptJoinError::SessionWriteError)?;
+            // At this point the agent generates a random confirm code and displays it.
+            // Our application should inform the user that a client was reached successfully and
+            // that they should now input the confirm code.
+            // The user can obtain the code either themselves or get someone else to read it to them over the phone.
+            // That also means the code only a few digits long.
 
-                // If the server sends back ok, it has found an agent with the given join code.
-                // After this point the connection will be patched through to the agent,
-                // so at this point we have a direct (but insecure) connection to the agent.
-                let found: std::result::Result<(), ()> = session.read_object().await.map_err(AcceptJoinError::SessionReadError)?;
-                if let Err(()) = found {
-                    return Err(AcceptJoinError::AgentNotFound.into());
-                }
+            let (confirm_send, confirm_recv) = oneshot::channel();
 
-                // At this point the agent generates a random confirm code and displays it.
-                // Our application should inform the user that a client was reached successfully and
-                // that they should now input the confirm code.
-                // The user can obtain the code either themselves or get someone else to read it to them over the phone.
-                // That also means the code only a few digits long.
+            let result = self.confirm_code.send(confirm_send);
+            if result.is_err() {
+                return Err(AcceptJoinError::Aborted.into());
+            }
 
-                let (confirm_send, confirm_recv) = oneshot::channel();
+            let confirm_code = confirm_recv.await.map_err(|_| AcceptJoinError::Aborted)?;
 
-                let result = self.confirm_code.send(confirm_send);
-                if result.is_err() {
-                    return Err(AcceptJoinError::Aborted.into())
-                }
+            // Now that we have the confirmation code, we can open an encrypted tunnel using
+            // AucPace to ensure security even with this relatively insecure short code.
 
-                let confirm_code = confirm_recv.await.map_err(|_| AcceptJoinError::Aborted)?;
+            let (transport, _) = session.destructure();
+            let transport = AucPaceTransport::client(transport, confirm_code.into_bytes())
+                .await
+                .map_err(AcceptJoinError::AucPaceError)?;
 
-                // Now that we have the confirmation code, we can open an encrypted tunnel using
-                // AucPace to ensure security even with this relatively insecure short code.
-
-                let (transport, _) = session.destructure();
-                let transport = AucPaceTransport::client(transport, confirm_code.into_bytes()).await.map_err(AcceptJoinError::AucPaceError)?;
-
-                handle_agent_enroll(transport, self.client).await.map_err(DispatcherError::Other)
+            handle_agent_enroll(transport, self.client)
+                .await
+                .map_err(DispatcherError::Other)
         } else {
             Err(DispatcherError::NoneSession)
         }
@@ -187,7 +205,7 @@ async fn handle_agent_enroll(
     transport: AucPaceTransport<Box<dyn SessionTransport>>,
     client: &Client,
 ) -> Result<Certificate, AcceptJoinError> {
-    let session_e2e = Session::new(Box::new(transport), Peer::Anonymous);
+    let mut session_e2e = Session::new(Box::new(transport), Peer::Anonymous);
     // At this point we have a secure channel to the agent.
     // The first order of business is creating a certificate for the agent
     // and providing the agent with the root and upstream certificates.
@@ -196,12 +214,18 @@ async fn handle_agent_enroll(
     debug!("received public key: {:?}", public_key);
 
     // Creating certificate for agent
-    let agent_cert = client.user_credential().create_agent_certificate_for_key(&public_key)?;
+    let agent_cert = client
+        .user_credential()
+        .create_agent_certificate_for_key(&public_key)?;
 
     // Sending all 3 required certificates to the agent
     session_e2e.write_object(agent_cert.as_unverified()).await?;
-    session_e2e.write_object(client.root_certificate().as_unverified()).await?;
-    session_e2e.write_object(client.upstream_certificate().as_unverified()).await?;
+    session_e2e
+        .write_object(client.root_certificate().as_unverified())
+        .await?;
+    session_e2e
+        .write_object(client.upstream_certificate().as_unverified())
+        .await?;
 
     // Now the agent has it's credentials to both connect to the server and work with MLS.
     // The next step here is to create an MLS group to both distribute system reports from the agent
@@ -216,11 +240,16 @@ async fn handle_agent_enroll(
         .verify(mls.provider().crypto(), mls.protocol_version(), &verifier)
         .await?;
 
-    let others = client.get_key_packages(&[client.user_credential().get_certificate().clone(), client.root_certificate().as_certificate().clone()]).await?;
+    let others = client
+        .get_key_packages(&[
+            client.user_credential().get_certificate().clone(),
+            client.root_certificate().as_certificate().clone(),
+        ])
+        .await?;
 
-    mls.create_device_group(agent_key_package)
+    let group_info = mls.create_device_group(agent_key_package, others).await?;
 
-    compile_error!("Continue here!");
+    session_e2e.write_object(&group_info).await?;
 
     Ok(agent_cert)
 }

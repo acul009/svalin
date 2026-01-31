@@ -10,7 +10,8 @@ use svalin_rpc::{
 
 use crate::{
     shared::commands::{
-        public_server_status::PublicStatusHandler, upload_key_packages::UploadKeyPackagesHandler,
+        get_key_packages::GetKeyPackagesHandler, public_server_status::PublicStatusHandler,
+        upload_key_packages::UploadKeyPackagesHandler,
     },
     verifier::load_certificate_chain::LoadCertificateChainHandler,
 };
@@ -80,6 +81,12 @@ impl<Provider: svalin_pki::mls::OpenMlsProvider + Send + Sync>
     From<&PermissionPrecursor<UploadKeyPackagesHandler<Provider>>> for Permission
 {
     fn from(_value: &PermissionPrecursor<UploadKeyPackagesHandler<Provider>>) -> Self {
+        Permission::UserOrSession
+    }
+}
+
+impl From<&PermissionPrecursor<GetKeyPackagesHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<GetKeyPackagesHandler>) -> Self {
         Permission::UserOrSession
     }
 }

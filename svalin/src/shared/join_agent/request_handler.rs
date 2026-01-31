@@ -6,7 +6,7 @@ use rand::Rng;
 use svalin_pki::{
     CreateCredentialsError, Credential, DeriveKeyError, KeyPair, SignatureVerificationError,
     UnverifiedCertificate, UseAsRootError, get_current_timestamp,
-    mls::client::{CreateKeyPackageError, MlsClient},
+    mls::client::{CreateKeyPackageError, GroupCreationInfo, JoinDeviceGroupError, MlsClient},
 };
 use svalin_rpc::{
     rpc::{
@@ -122,8 +122,12 @@ pub enum RequestJoinError {
     CreateKeyPackageError(#[from] CreateKeyPackageError),
     #[error("session write error: {0}")]
     SessionWriteError(#[source] SessionWriteError),
+    #[error("session read error: {0}")]
+    SessionReadError(#[source] SessionReadError),
     #[error("error in AucPace transport: {0}")]
     AucPaceError(#[source] AucPaceServerError),
+    #[error("error joining device group: {0}")]
+    JoinDeviceGroupError(#[source] JoinDeviceGroupError),
 }
 
 pub struct RequestJoin {
@@ -169,13 +173,15 @@ impl TakeableCommandDispatcher for RequestJoin {
 
             debug!("generated confirm code: {confirm_code}");
 
-            self.confirm_code_channel.send(confirm_code).unwrap();
+            self.confirm_code_channel
+                .send(confirm_code.clone())
+                .unwrap();
 
             let (transport, _) = session.destructure();
             let transport = AucPaceTransport::server(transport, confirm_code.into_bytes())
                 .await
                 .map_err(RequestJoinError::AucPaceError)?;
-            let session = Session::new(Box::new(transport), Peer::Anonymous);
+            let mut session = Session::new(Box::new(transport), Peer::Anonymous);
 
             let keypair = KeyPair::generate();
             let public_key = keypair.export_public_key();
@@ -221,7 +227,14 @@ impl TakeableCommandDispatcher for RequestJoin {
                 .await
                 .map_err(RequestJoinError::SessionWriteError)?;
 
-            compile_error!("Continue here!");
+            let group_info: GroupCreationInfo = session
+                .read_object()
+                .await
+                .map_err(RequestJoinError::SessionReadError)?;
+
+            mls.join_my_device_group(group_info)
+                .await
+                .map_err(RequestJoinError::JoinDeviceGroupError)?;
 
             debug!("received all neccessary data to initialize agent");
 

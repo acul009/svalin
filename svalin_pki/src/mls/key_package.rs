@@ -6,7 +6,7 @@ use crate::{
     certificate::UnverifiedCertificate, get_current_timestamp,
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct UnverifiedKeyPackage {
     key_package: KeyPackageIn,
 }
