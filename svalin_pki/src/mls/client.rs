@@ -286,7 +286,7 @@ pub enum CreateDeviceGroupError {
 pub enum JoinDeviceGroupError {
     #[error("group creation unpack error: {0}")]
     GroupCreationUnpackError(#[from] GroupCreationUnpackError),
-    #[error("error while trying to parse welcome")]
+    #[error("error while trying to parse welcome: {0}")]
     WelcomeError(
         #[from] WelcomeError<<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError>,
     ),
