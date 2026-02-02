@@ -1,27 +1,24 @@
 use std::sync::Arc;
 
 use crate::{
-    Certificate, SpkiHash, UnverifiedCertificate,
+    CertificateType, UnverifiedCertificate,
     mls::{
         key_package::{KeyPackage, KeyPackageError},
-        provider::{self, PostcardCodec, SvalinProvider},
+        provider::{PostcardCodec, SvalinProvider},
     },
 };
 use openmls::{
     framing::errors::MlsMessageError,
     group::{
-        AddMembersError, ExportGroupInfoError, GroupId, JoinBuilder, MergePendingCommitError,
-        MlsGroup, MlsGroupJoinConfig, MlsGroupJoinConfigBuilder, NewGroupError,
-        OutgoingWireFormatPolicy, PURE_CIPHERTEXT_WIRE_FORMAT_POLICY, StagedWelcome,
-        WIRE_FORMAT_POLICIES, WelcomeError,
+        AddMembersError, ExportGroupInfoError, GroupId, MergePendingCommitError, MlsGroup,
+        MlsGroupJoinConfig, NewGroupError, PURE_CIPHERTEXT_WIRE_FORMAT_POLICY, StagedWelcome,
+        WelcomeError,
     },
     prelude::{
         Ciphersuite, CredentialWithKey, KeyPackageNewError, MlsMessageBodyIn, MlsMessageIn,
-        OpenMlsCrypto, OpenMlsSignaturePublicKey, ProtocolVersion, RatchetTreeIn,
-        SenderRatchetConfiguration, Verifiable, Welcome,
-        group_info::{GroupInfo, VerifiableGroupInfo},
+        ProtocolVersion, RatchetTreeIn, SenderRatchetConfiguration, Welcome,
+        group_info::VerifiableGroupInfo,
     },
-    treesync::RatchetTree,
 };
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
@@ -96,7 +93,7 @@ impl MlsClient {
         &self,
         device: KeyPackage,
         other_members: Vec<KeyPackage>,
-    ) -> Result<GroupCreationInfo, CreateDeviceGroupError> {
+    ) -> Result<DeviceGroupCreationInfo, CreateDeviceGroupError> {
         let provider = self.provider.clone();
         let svalin_credential = self.svalin_credential.clone();
         let credential_with_key = self.mls_credential_with_key.clone();
@@ -115,6 +112,8 @@ impl MlsClient {
             // So now I gotta think about how to add these to the parameters nicely
             //
             // Update: I managed it :D
+
+            let certificate = device.certificate().clone();
 
             let mut group = MlsGroup::builder()
                 .ciphersuite(provider.ciphersuite())
@@ -144,7 +143,8 @@ impl MlsClient {
                 .export_group_info(provider.crypto(), &svalin_credential, true)?
                 .to_bytes()?;
 
-            Ok(GroupCreationInfo {
+            Ok(DeviceGroupCreationInfo {
+                certificate: certificate.to_unverified(),
                 welcome,
                 group_info,
             })
@@ -156,7 +156,7 @@ impl MlsClient {
 
     pub async fn join_my_device_group(
         &self,
-        group_info: GroupCreationInfo,
+        group_info: DeviceGroupCreationInfo,
     ) -> Result<(), JoinDeviceGroupError> {
         let provider = self.provider.clone();
         let me = self.svalin_credential.get_certificate().spki_hash().clone();
@@ -187,6 +187,23 @@ impl MlsClient {
         let creator: UnverifiedCertificate =
             welcome.welcome_sender()?.credential().deserialized()?;
 
+        // Ensure there are only sessions any myself in the group
+        welcome
+            .members()
+            .map(|member| -> Result<(), JoinDeviceGroupError> {
+                let certificate: UnverifiedCertificate = member.credential.deserialized()?;
+                if certificate.spki_hash() == &me {
+                    return Ok(());
+                }
+
+                if certificate.certificate_type() != CertificateType::UserDevice {
+                    return Err(JoinDeviceGroupError::WrongMemberType);
+                }
+
+                Ok(())
+            })
+            .collect::<Result<(), JoinDeviceGroupError>>()?;
+
         // TODO: check that members contains root
         if creator.issuer() != &my_parent {
             return Err(JoinDeviceGroupError::WrongGroupCreator);
@@ -199,12 +216,13 @@ impl MlsClient {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct GroupCreationInfo {
+pub struct DeviceGroupCreationInfo {
+    certificate: UnverifiedCertificate,
     welcome: Vec<u8>,
     group_info: Vec<u8>,
 }
 
-impl GroupCreationInfo {
+impl DeviceGroupCreationInfo {
     pub fn welcome(&self) -> Result<Welcome, GroupCreationUnpackError> {
         let message = MlsMessageIn::tls_deserialize_exact_bytes(&self.welcome.as_slice())?;
 
@@ -235,6 +253,10 @@ impl GroupCreationInfo {
             .clone();
 
         Ok(ratchet_tree)
+    }
+
+    pub fn certificate(&self) -> &UnverifiedCertificate {
+        &self.certificate
     }
 }
 
@@ -308,4 +330,6 @@ pub enum JoinDeviceGroupError {
     WrongGroupCreator,
     #[error("wrong group id, not my group")]
     WrongGroupId,
+    #[error("wrong member type")]
+    WrongMemberType,
 }

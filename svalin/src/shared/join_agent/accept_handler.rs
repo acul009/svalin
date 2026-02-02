@@ -1,11 +1,10 @@
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use async_trait::async_trait;
 use svalin_pki::{
-    ArgonParams, Certificate, CreateCertificateError, Credential, DeriveKeyError, ExactVerififier,
-    ExportedPublicKey, RootCertificate,
+    Certificate, CreateCertificateError, DeriveKeyError, ExactVerififier, ExportedPublicKey,
     mls::{
         OpenMlsProvider,
-        client::{CreateDeviceGroupError, MlsClient},
+        client::CreateDeviceGroupError,
         key_package::{KeyPackageError, UnverifiedKeyPackage},
     },
 };
@@ -21,19 +20,17 @@ use svalin_rpc::{
     },
     transport::{
         aucpace_transport::{AucPaceClientError, AucPaceTransport},
-        combined_transport::CombinedTransport,
         session_transport::SessionTransport,
-        tls_transport::{TlsClientError, TlsTransport},
+        tls_transport::TlsClientError,
     },
-    verifiers::skip_verify::SkipServerVerification,
 };
 use tokio::{io::copy_bidirectional, select, sync::oneshot};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, instrument};
+use tracing::debug;
 
 use crate::{
     client::{Client, GetKeyPackagesError},
-    shared::commands::get_key_packages::GetKeyPackagesDispatcherError,
+    shared::join_agent::add_agent::UploadAgentCommandError,
 };
 
 use super::ServerJoinManager;
@@ -125,6 +122,10 @@ pub enum AcceptJoinError {
     GetKeyPackagesError(#[from] GetKeyPackagesError),
     #[error("error creating device group: {0}")]
     CreateDeviceGroupError(#[from] CreateDeviceGroupError),
+    #[error("agent encountered error during device group join")]
+    AgentMlsJoinError,
+    #[error("error uploading agent data to server: {0}")]
+    UploadToServerError(#[from] ConnectionDispatchError<UploadAgentCommandError>),
 }
 
 pub struct AcceptJoin<'a> {
@@ -250,6 +251,19 @@ async fn handle_agent_enroll(
     let group_info = mls.create_device_group(agent_key_package, others).await?;
 
     session_e2e.write_object(&group_info).await?;
+
+    let join_result: Result<(), ()> = session_e2e.read_object().await?;
+    join_result.map_err(|_| AcceptJoinError::AgentMlsJoinError)?;
+
+    let upload_result = client.upload_agent(&group_info).await;
+
+    match upload_result {
+        Ok(_) => session_e2e.write_object::<Result<(), ()>>(&Ok(())).await?,
+        Err(e) => {
+            let _ = session_e2e.write_object::<Result<(), ()>>(&Err(())).await;
+            return Err(e.into());
+        }
+    }
 
     Ok(agent_cert)
 }

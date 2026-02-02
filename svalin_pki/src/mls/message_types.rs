@@ -1,7 +1,6 @@
 use openmls::prelude::{MlsMessageIn, MlsMessageOut, Welcome};
 use tls_codec::{DeserializeBytes, Serialize};
 
-use crate::Certificate;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Invitation {

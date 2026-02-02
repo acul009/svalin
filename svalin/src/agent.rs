@@ -137,6 +137,8 @@ impl Agent {
             .await
             .add(DeauthenticateHandler::new(public_commands));
 
+        debug!("Agent will now start serving requests");
+
         self.rpc
             .serve(server_commands)
             .await

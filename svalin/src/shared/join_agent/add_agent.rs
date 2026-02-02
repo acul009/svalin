@@ -4,15 +4,15 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Certificate, CertificateChainBuilder, RootCertificate, UnverifiedCertificate,
-    get_current_timestamp,
+    CertificateChainBuilder, RootCertificate, get_current_timestamp,
+    mls::client::DeviceGroupCreationInfo,
 };
 use svalin_rpc::rpc::{
     command::{
         dispatcher::CommandDispatcher,
         handler::{CommandHandler, PermissionPrecursor},
     },
-    session::Session,
+    session::{Session, SessionReadError, SessionWriteError},
 };
 use tokio_util::sync::CancellationToken;
 
@@ -22,7 +22,7 @@ use crate::{
 };
 
 #[derive(Serialize, Deserialize, Debug, thiserror::Error)]
-enum AddAgentError {
+pub enum AddAgentError {
     #[error("Error adding agent to store")]
     StoreError,
     #[error("Error verifying agent certificate")]
@@ -57,7 +57,7 @@ impl AddAgentHandler {
 
 #[async_trait]
 impl CommandHandler for AddAgentHandler {
-    type Request = UnverifiedCertificate;
+    type Request = DeviceGroupCreationInfo;
 
     fn key() -> String {
         "add_agent".to_owned()
@@ -69,7 +69,7 @@ impl CommandHandler for AddAgentHandler {
         request: Self::Request,
         _: CancellationToken,
     ) -> Result<()> {
-        let cert_chain = CertificateChainBuilder::new(request);
+        let cert_chain = CertificateChainBuilder::new(request.certificate().clone());
         let cert_chain = match self.user_store.complete_certificate_chain(cert_chain).await {
             Err(err) => {
                 session
@@ -116,33 +116,41 @@ impl CommandHandler for AddAgentHandler {
     }
 }
 
-pub struct AddAgent<'a> {
-    agent: &'a UnverifiedCertificate,
+pub struct UploadAgent<'a> {
+    group_info: &'a DeviceGroupCreationInfo,
 }
 
-impl<'a> AddAgent<'a> {
-    pub fn new(agent: &'a Certificate) -> Self {
-        Self {
-            agent: agent.as_unverified(),
-        }
+impl<'a> UploadAgent<'a> {
+    pub fn new(group_info: &'a DeviceGroupCreationInfo) -> Self {
+        Self { group_info }
     }
 }
 
-impl<'a> CommandDispatcher for AddAgent<'a> {
-    type Output = ();
-    type Error = anyhow::Error;
+#[derive(Debug, thiserror::Error)]
+pub enum UploadAgentCommandError {
+    #[error("error reading from session: {0}")]
+    SessionReadError(#[from] SessionReadError),
+    #[error("error writing to session: {0}")]
+    SessionWriteError(#[from] SessionWriteError),
+    #[error("error adding agent: {0}")]
+    AddAgentError(#[from] AddAgentError),
+}
 
-    type Request = &'a UnverifiedCertificate;
+impl<'a> CommandDispatcher for UploadAgent<'a> {
+    type Output = ();
+    type Error = UploadAgentCommandError;
+
+    type Request = &'a DeviceGroupCreationInfo;
 
     fn get_request(&self) -> &Self::Request {
-        &self.agent
+        &self.group_info
     }
 
     fn key() -> String {
         AddAgentHandler::key()
     }
 
-    async fn dispatch(self, session: &mut Session) -> Result<Self::Output> {
+    async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {
         session.read_object::<Result<(), AddAgentError>>().await??;
 
         Ok(())

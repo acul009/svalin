@@ -24,7 +24,7 @@ clean:
 # Restart the database by recreating it
 restart: clean setup
 
-test $RUST_LOG="debug":
+test $RUST_LOG="svalin=debug":
     cargo test -p svalin_pki -p svalin_rpc -p svalin -- --nocapture
 
 server $RUST_LOG="debug":

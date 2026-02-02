@@ -4,9 +4,11 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use rand::Rng;
 use svalin_pki::{
-    CreateCredentialsError, Credential, DeriveKeyError, KeyPair, SignatureVerificationError,
+    CreateCredentialsError, DeriveKeyError, KeyPair, SignatureVerificationError,
     UnverifiedCertificate, UseAsRootError, get_current_timestamp,
-    mls::client::{CreateKeyPackageError, GroupCreationInfo, JoinDeviceGroupError, MlsClient},
+    mls::client::{
+        CreateKeyPackageError, DeviceGroupCreationInfo, JoinDeviceGroupError, MlsClient,
+    },
 };
 use svalin_rpc::{
     rpc::{
@@ -19,10 +21,8 @@ use svalin_rpc::{
     },
     transport::{
         aucpace_transport::{AucPaceServerError, AucPaceTransport},
-        combined_transport::CombinedTransport,
-        tls_transport::{TlsClientError, TlsServerError, TlsTransport},
+        tls_transport::{TlsClientError, TlsServerError},
     },
-    verifiers::skip_verify::SkipClientVerification,
 };
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
@@ -128,6 +128,8 @@ pub enum RequestJoinError {
     AucPaceError(#[source] AucPaceServerError),
     #[error("error joining device group: {0}")]
     JoinDeviceGroupError(#[source] JoinDeviceGroupError),
+    #[error("initializing client reported error when adding the agent to the server")]
+    UploadToServerError,
 }
 
 pub struct RequestJoin {
@@ -227,14 +229,33 @@ impl TakeableCommandDispatcher for RequestJoin {
                 .await
                 .map_err(RequestJoinError::SessionWriteError)?;
 
-            let group_info: GroupCreationInfo = session
+            let group_info: DeviceGroupCreationInfo = session
                 .read_object()
                 .await
                 .map_err(RequestJoinError::SessionReadError)?;
 
-            mls.join_my_device_group(group_info)
+            let join_group_result = mls
+                .join_my_device_group(group_info)
                 .await
-                .map_err(RequestJoinError::JoinDeviceGroupError)?;
+                .map_err(RequestJoinError::JoinDeviceGroupError);
+
+            match join_group_result {
+                Ok(()) => session
+                    .write_object::<Result<(), ()>>(&Ok(()))
+                    .await
+                    .map_err(RequestJoinError::SessionWriteError)?,
+                Err(err) => {
+                    let _ = session.write_object::<Result<(), ()>>(&Err(())).await;
+                    return Err(err.into());
+                }
+            }
+
+            let upload_to_server_result: Result<(), ()> = session
+                .read_object()
+                .await
+                .map_err(RequestJoinError::SessionReadError)?;
+
+            upload_to_server_result.map_err(|_| RequestJoinError::UploadToServerError)?;
 
             debug!("received all neccessary data to initialize agent");
 

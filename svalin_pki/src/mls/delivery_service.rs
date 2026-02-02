@@ -2,20 +2,17 @@ use std::sync::Arc;
 
 use openmls::{
     group::{GroupId, ProposalStore, PublicGroup},
-    prelude::{
-        CreationFromExternalError, MlsMessageIn, ProtocolVersion, Verifiable,
-        group_info::VerifiableGroupInfo,
-    },
+    prelude::CreationFromExternalError,
     treesync,
 };
-use openmls_rust_crypto::{MemoryStorage, MemoryStorageError, RustCrypto};
+use openmls_rust_crypto::MemoryStorageError;
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
 
 use crate::{
     Certificate,
     mls::{
-        client::{CreateDeviceGroupError, GroupCreationInfo, GroupCreationUnpackError},
+        client::{DeviceGroupCreationInfo, GroupCreationUnpackError},
         provider::{PostcardCodec, SvalinProvider},
     },
 };
@@ -46,7 +43,7 @@ impl DeliveryService {
 
     pub fn new_device_group(
         &self,
-        group_info: GroupCreationInfo,
+        group_info: DeviceGroupCreationInfo,
         device: Certificate,
     ) -> Result<(), NewPublicDeviceGroupError> {
         let provider = self.provider.clone();

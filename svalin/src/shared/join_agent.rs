@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
-use svalin_pki::{Certificate, Credential, DeriveKeyError, RootCertificate};
+use svalin_pki::{Certificate, Credential,  RootCertificate};
 use svalin_rpc::rpc::{command::handler::PermissionPrecursor, session::Session};
 use tokio::task::AbortHandle;
 use tracing::field::debug;

@@ -100,6 +100,10 @@ impl KeyPackage {
         }
     }
 
+    pub fn certificate(&self) -> &Certificate {
+        &self.certificate
+    }
+
     pub(crate) fn unpack(self) -> openmls::prelude::KeyPackage {
         self.key_package
     }
