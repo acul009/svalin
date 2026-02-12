@@ -5,6 +5,7 @@ use svalin_pki::{
     mls::{
         self,
         client::{CreateKeyPackageError, MlsClient},
+        delivery_service::DeliveryService,
         key_package::UnverifiedKeyPackage,
     },
 };
@@ -66,34 +67,28 @@ impl<'a> CommandDispatcher for UploadKeyPackages<'a> {
     }
 }
 
-pub struct UploadKeyPackagesHandler<Provider> {
+pub struct UploadKeyPackagesHandler {
     key_package_store: Arc<KeyPackageStore>,
     protocol_version: mls::ProtocolVersion,
-    provider: Arc<Provider>,
+    delivery_service: Arc<DeliveryService>,
 }
 
-impl<Provider> UploadKeyPackagesHandler<Provider>
-where
-    Provider: svalin_pki::mls::OpenMlsProvider,
-{
+impl UploadKeyPackagesHandler {
     pub fn new(
         key_package_store: Arc<KeyPackageStore>,
         protocol_version: mls::ProtocolVersion,
-        provider: Arc<Provider>,
+        delivery_service: Arc<DeliveryService>,
     ) -> Self {
         Self {
             key_package_store,
             protocol_version,
-            provider,
+            delivery_service,
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<Provider> CommandHandler for UploadKeyPackagesHandler<Provider>
-where
-    Provider: svalin_pki::mls::OpenMlsProvider + Send + Sync,
-{
+impl CommandHandler for UploadKeyPackagesHandler {
     type Request = ();
 
     fn key() -> String {
@@ -131,17 +126,18 @@ where
     }
 }
 
-impl<Provider> UploadKeyPackagesHandler<Provider>
-where
-    Provider: svalin_pki::mls::OpenMlsProvider + Send + Sync,
-{
+impl UploadKeyPackagesHandler {
     async fn verify_and_save(
         &self,
         verifier: &impl Verifier,
         unverified: UnverifiedKeyPackage,
     ) -> anyhow::Result<()> {
         let verified = unverified
-            .verify(self.provider.crypto(), self.protocol_version, verifier)
+            .verify(
+                self.delivery_service.crypto(),
+                self.protocol_version,
+                verifier,
+            )
             .await?;
         self.key_package_store.add_key_package(verified).await?;
         Ok(())

@@ -149,6 +149,8 @@ async fn integration_tests() {
         debug!("agent has unexpectedly exited");
     });
 
+    let mut device_list = client.watch_device_list();
+
     let (send, recv) = oneshot::channel();
     let client2 = client.clone();
     let add_agent_handle =
@@ -160,14 +162,15 @@ async fn integration_tests() {
     confirm.send(confirm_recv.await.unwrap()).unwrap();
 
     add_agent_handle.await.unwrap().unwrap();
-
-    let mut device_list = client.watch_device_list();
+    debug!("agent was added");
 
     // The first change is caused by the agent being added to the device list
     device_list.changed().await.unwrap();
+    debug!("first device list update");
     // The second change is caused by the agent connecting and therefore switching
     // to online
     device_list.changed().await.unwrap();
+    debug!("second device list update");
 
     let device = device_list.borrow().first_key_value().unwrap().1.clone();
 

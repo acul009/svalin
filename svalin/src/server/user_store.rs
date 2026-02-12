@@ -5,8 +5,8 @@ use aucpace::StrongDatabase;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use svalin_pki::{
-    CertificateChainBuilder, CertificateType, EncryptedCredential, SpkiHash, UnverifiedCertificate,
-    UnverifiedCertificateChain, serde_paramsstring,
+    AddCertificateError, CertificateChainBuilder, CertificateType, EncryptedCredential, SpkiHash,
+    UnverifiedCertificate, UnverifiedCertificateChain, serde_paramsstring,
 };
 use svalin_pki::{
     curve25519_dalek::{self, RistrettoPoint, Scalar},
@@ -117,10 +117,10 @@ impl UserStore {
     pub async fn complete_certificate_chain(
         &self,
         mut cert_chain: CertificateChainBuilder,
-    ) -> Result<UnverifiedCertificateChain> {
+    ) -> Result<UnverifiedCertificateChain, CompleteCertChainError> {
         while let Some(issuer_spki) = cert_chain.requested_issuer() {
             let Some(issuer) = self.get_cert_by_spki_hash(&issuer_spki).await? else {
-                return Err(anyhow!("issuer with spki hash {} not found", issuer_spki));
+                return Err(CompleteCertChainError::NotFound(issuer_spki.clone()));
             };
 
             cert_chain.push_parent(issuer)?;
@@ -134,7 +134,7 @@ impl UserStore {
     pub async fn get_cert_by_spki_hash(
         &self,
         spki_hash: &SpkiHash,
-    ) -> anyhow::Result<Option<UnverifiedCertificate>> {
+    ) -> anyhow::Result<Option<UnverifiedCertificate>, GetBySpkiHashError> {
         let spki_hash = spki_hash.as_slice();
         let user_data =
             sqlx::query_scalar!("SELECT data FROM users WHERE spki_hash = ?", spki_hash)
@@ -148,6 +148,24 @@ impl UserStore {
             }
         }
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CompleteCertChainError {
+    #[error("error loading by spki_hash: {0}")]
+    GetError(#[from] GetBySpkiHashError),
+    #[error("issuer with spki hash {0} not found")]
+    NotFound(SpkiHash),
+    #[error("error adding cert to chain: {0}")]
+    AddCertificateError(#[from] AddCertificateError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum GetBySpkiHashError {
+    #[error("sqlx error: {0}")]
+    SqlxError(#[from] sqlx::Error),
+    #[error("postcard decode error: {0}")]
+    PostcardError(#[from] postcard::Error),
 }
 
 impl StrongDatabase for UserStore {

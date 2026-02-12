@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use svalin_pki::mls::{self, provider::SvalinProvider};
+use svalin_pki::mls::{self, delivery_service::DeliveryService, provider::SvalinProvider};
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
     rpc::{
@@ -34,7 +34,7 @@ pub struct SvalinCommandBuilder {
     pub user_store: Arc<UserStore>,
     pub session_store: Arc<SessionStore>,
     pub key_package_store: Arc<KeyPackageStore>,
-    pub mls_provider: Arc<SvalinProvider>,
+    pub delivery_service: Arc<DeliveryService>,
 }
 
 const MLS_VERSION: mls::ProtocolVersion = mls::ProtocolVersion::Mls10;
@@ -73,6 +73,7 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 self.agent_store.clone(),
                 self.user_store.clone(),
                 self.root_cert.clone(),
+                self.delivery_service.clone(),
             )?)
             .add(AgentListHandler::new(
                 self.agent_store.clone(),
@@ -81,7 +82,7 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             .add(UploadKeyPackagesHandler::new(
                 self.key_package_store.clone(),
                 MLS_VERSION,
-                self.mls_provider.clone(),
+                self.delivery_service.clone(),
             ))
             .add(GetKeyPackagesHandler::new(self.key_package_store.clone()));
 

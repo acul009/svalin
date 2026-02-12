@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
 use svalin_pki::{
     Credential, EncryptedCredential, KnownCertificateVerifier, UnverifiedCertificate,
-    mls::provider::SvalinProvider,
+    mls::{
+        delivery_service::{self, DeliveryService},
+        provider::SvalinProvider,
+    },
 };
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},
@@ -125,7 +128,7 @@ impl Server {
         Ok(pool)
     }
 
-    async fn open_mls_provider() -> Result<Arc<SvalinProvider>> {
+    async fn open_delivery_service() -> Result<Arc<DeliveryService>> {
         let location = Self::data_dir().await?.push("mls-store.sqlite");
         let url = format!("{}", &location);
 
@@ -138,9 +141,10 @@ impl Server {
         let pool = SqlitePoolOptions::new().connect(&url).await?;
         let storage_provider = SqliteStorageProvider::new(pool);
         storage_provider.run_migrations().await?;
-        let provider = SvalinProvider::new(storage_provider);
 
-        Ok(Arc::new(provider))
+        let delivery_service = DeliveryService::new(storage_provider);
+
+        Ok(Arc::new(delivery_service))
     }
 
     async fn start(config: ServerConfig) -> Result<Self> {
@@ -223,7 +227,7 @@ impl Server {
 
         let verifier = TlsOptionalWrapper::new(verifier);
 
-        let mls_provider = Self::open_mls_provider().await?;
+        let delivery_service = Self::open_delivery_service().await?;
 
         let command_builder = SvalinCommandBuilder {
             root_cert: root,
@@ -232,7 +236,7 @@ impl Server {
             agent_store,
             session_store,
             key_package_store,
-            mls_provider,
+            delivery_service,
         };
 
         let tasks = TaskTracker::new();

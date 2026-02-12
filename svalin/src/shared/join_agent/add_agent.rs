@@ -4,8 +4,11 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    CertificateChainBuilder, RootCertificate, get_current_timestamp,
-    mls::client::DeviceGroupCreationInfo,
+    CertificateChainBuilder, RootCertificate, VerifyChainError, get_current_timestamp,
+    mls::{
+        client::DeviceGroupCreationInfo,
+        delivery_service::{self, DeliveryService, NewPublicDeviceGroupError},
+    },
 };
 use svalin_rpc::rpc::{
     command::{
@@ -18,7 +21,10 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     permissions::Permission,
-    server::{agent_store::AgentStore, user_store::UserStore},
+    server::{
+        agent_store::{self, AgentStore},
+        user_store::{CompleteCertChainError, UserStore},
+    },
 };
 
 #[derive(Serialize, Deserialize, Debug, thiserror::Error)]
@@ -29,10 +35,23 @@ pub enum AddAgentError {
     VerificationError,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum InternalAddAgentError {
+    #[error("error building certificate chain: {0}")]
+    CompleteCertChainError(#[from] CompleteCertChainError),
+    #[error("error verifying loaded chain: {0}")]
+    VerifyChainError(#[from] VerifyChainError),
+    #[error("error saving agent to database: {0}")]
+    AddAgentError(#[from] agent_store::AddAgentError),
+    #[error("error creating public device group")]
+    NewDeviceGroupError(#[from] NewPublicDeviceGroupError),
+}
+
 pub struct AddAgentHandler {
     agent_store: Arc<AgentStore>,
     user_store: Arc<UserStore>,
     root: RootCertificate,
+    delivery_service: Arc<DeliveryService>,
 }
 
 impl From<&PermissionPrecursor<AddAgentHandler>> for Permission {
@@ -46,11 +65,13 @@ impl AddAgentHandler {
         agent_store: Arc<AgentStore>,
         user_store: Arc<UserStore>,
         root: RootCertificate,
+        delivery_service: Arc<DeliveryService>,
     ) -> Result<Self> {
         Ok(Self {
             agent_store,
             user_store,
             root,
+            delivery_service,
         })
     }
 }
@@ -69,48 +90,39 @@ impl CommandHandler for AddAgentHandler {
         request: Self::Request,
         _: CancellationToken,
     ) -> Result<()> {
-        let cert_chain = CertificateChainBuilder::new(request.certificate().clone());
-        let cert_chain = match self.user_store.complete_certificate_chain(cert_chain).await {
-            Err(err) => {
-                session
-                    .write_object::<Result<(), AddAgentError>>(&Err(
-                        AddAgentError::VerificationError,
-                    ))
-                    .await?;
-
-                return Err(err);
-            }
-            Ok(cert_chain) => cert_chain,
-        };
-
-        let agent_cert_chain = match cert_chain.verify(&self.root, get_current_timestamp()) {
-            Err(err) => {
-                session
-                    .write_object::<Result<(), AddAgentError>>(&Err(
-                        AddAgentError::VerificationError,
-                    ))
-                    .await?;
-
-                return Err(anyhow!(err));
-            }
-            Ok(cert_chain) => cert_chain,
-        };
-
-        if let Err(err) = self
-            .agent_store
-            .add_agent(agent_cert_chain.take_leaf())
-            .await
-        {
+        if let Err(err) = self.add_agent(request).await {
             session
                 .write_object::<Result<(), AddAgentError>>(&Err(AddAgentError::StoreError))
                 .await?;
 
-            return Err(err);
-        } else {
-            session
-                .write_object::<Result<(), AddAgentError>>(&Ok(()))
-                .await?;
+            return Err(err.into());
         }
+
+        session
+            .write_object::<Result<(), AddAgentError>>(&Ok(()))
+            .await?;
+
+        Ok(())
+    }
+}
+
+impl AddAgentHandler {
+    async fn add_agent(
+        &self,
+        group_info: DeviceGroupCreationInfo,
+    ) -> Result<(), InternalAddAgentError> {
+        let cert_chain = CertificateChainBuilder::new(group_info.certificate().clone());
+        let cert_chain = self
+            .user_store
+            .complete_certificate_chain(cert_chain)
+            .await?;
+        let agent_cert_chain = cert_chain.verify(&self.root, get_current_timestamp())?;
+
+        self.agent_store
+            .add_agent(agent_cert_chain.take_leaf())
+            .await?;
+
+        self.delivery_service.new_device_group(group_info).await?;
 
         Ok(())
     }

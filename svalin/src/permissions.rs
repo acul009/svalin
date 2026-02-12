@@ -77,10 +77,8 @@ impl<Nested: PermissionHandler> From<&PermissionPrecursor<DeauthenticateHandler<
     }
 }
 
-impl<Provider: svalin_pki::mls::OpenMlsProvider + Send + Sync>
-    From<&PermissionPrecursor<UploadKeyPackagesHandler<Provider>>> for Permission
-{
-    fn from(_value: &PermissionPrecursor<UploadKeyPackagesHandler<Provider>>) -> Self {
+impl From<&PermissionPrecursor<UploadKeyPackagesHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<UploadKeyPackagesHandler>) -> Self {
         Permission::UserOrSession
     }
 }

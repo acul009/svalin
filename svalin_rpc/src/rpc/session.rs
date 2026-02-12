@@ -156,7 +156,7 @@ impl Session {
     pub async fn read_object<W: serde::de::DeserializeOwned>(
         &mut self,
     ) -> Result<W, SessionReadError> {
-        debug!("Reading: {}", std::any::type_name::<W>());
+        // debug!("Reading: {}", std::any::type_name::<W>());
         Ok(self.transport.read_object().await?)
     }
 
@@ -164,7 +164,7 @@ impl Session {
         &mut self,
         object: &W,
     ) -> Result<(), SessionWriteError> {
-        debug!("Writing: {}", std::any::type_name::<W>());
+        // debug!("Writing: {}", std::any::type_name::<W>());
         Ok(self.transport.write_object(object).await?)
     }
 

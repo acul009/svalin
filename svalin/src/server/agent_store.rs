@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{Ok, Result, anyhow};
+use anyhow::{Result, anyhow};
 use sqlx::SqlitePool;
 use svalin_pki::{Certificate, SpkiHash, UnverifiedCertificate};
 use tokio::sync::broadcast;
@@ -38,7 +38,7 @@ impl AgentStore {
         }
     }
 
-    pub async fn add_agent(&self, agent: Certificate) -> Result<()> {
+    pub async fn add_agent(&self, agent: Certificate) -> Result<(), AddAgentError> {
         let spki_hash = agent.spki_hash().as_slice();
         let certificate = agent.as_der();
 
@@ -50,7 +50,7 @@ impl AgentStore {
         .execute(&self.pool)
         .await?;
 
-        self.broadcast.send(AgentUpdate::Add(agent))?;
+        let _ = self.broadcast.send(AgentUpdate::Add(agent));
 
         Ok(())
     }
@@ -73,4 +73,10 @@ impl AgentStore {
     pub fn subscribe(&self) -> broadcast::Receiver<AgentUpdate> {
         self.broadcast.subscribe()
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AddAgentError {
+    #[error("error inserting into DB: {0}")]
+    SqlxError(#[from] sqlx::Error),
 }

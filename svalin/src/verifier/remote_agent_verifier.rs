@@ -6,6 +6,7 @@ use svalin_pki::{
     get_current_timestamp,
 };
 use svalin_rpc::rpc::connection::{Connection, direct_connection::DirectConnection};
+use tracing::debug;
 
 use crate::verifier::load_certificate_chain::ChainRequest;
 
@@ -38,17 +39,28 @@ impl Verifier for RemoteAgentVerifier {
         time: u64,
     ) -> Result<svalin_pki::Certificate, svalin_pki::VerifyError> {
         tracing::debug!("entering remote agent verifier");
+        let mut found = false;
         if let Some(cached) = self.cache.get(spki_hash) {
-            cached.check_validity_at(get_current_timestamp())?;
-            return Ok(cached.clone());
+            found = true;
+            debug!("found in cache");
+            if cached.check_validity_at(get_current_timestamp()).is_ok() {
+                debug!("returning from cache");
+                return Ok(cached.clone());
+            }
+            debug!("cache not valid anymore!");
+        }
+        if found {
+            self.cache.remove(spki_hash);
         }
 
+        debug!("dispatching chain request");
         let unverified_chain = self
             .connection
             .dispatch(ChainRequest::Agent(spki_hash.clone()))
             .await
             .map_err(|err| VerifyError::InternalError(err.into()))?;
 
+        debug!("verifying received chain");
         let chain = unverified_chain.verify(&self.root, time)?;
 
         let leaf = chain.take_leaf();

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use svalin_pki::{
     Certificate, CertificateChainBuilder, RootCertificate, SpkiHash, Verifier, VerifyError,
 };
@@ -51,7 +52,8 @@ impl Verifier for IncomingConnectionVerifier {
         let cert_chain = self
             .user_store
             .complete_certificate_chain(cert_chain)
-            .await?;
+            .await
+            .map_err(|err| anyhow!(err))?;
 
         let cert_chain = cert_chain.verify(&self.root, time)?;
 
