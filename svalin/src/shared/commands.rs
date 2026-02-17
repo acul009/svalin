@@ -1,6 +1,7 @@
 // pub mod add_user;
 pub mod agent_list;
 pub mod get_key_packages;
+pub mod update_system_report;
 // pub mod get_user_certs;
 pub mod init;
 pub mod login;

@@ -6,6 +6,8 @@ use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
 use sqlx::migrate::MigrateDatabase;
 use sqlx::{Sqlite, SqlitePool};
+use svalin_pki::mls::agent::MlsAgent;
+use svalin_pki::mls::client::MlsClient;
 use svalin_pki::mls::provider::PostcardCodec;
 use svalin_pki::{
     Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
@@ -16,6 +18,8 @@ use svalin_rpc::commands::e2e::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::command::handler::HandlerCollection;
+use svalin_rpc::rpc::connection::Connection;
+use svalin_sysctl::sytem_report::SystemReport;
 use tokio::time::error::Elapsed;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument};
@@ -31,6 +35,7 @@ use crate::client::tunnel_manager::tcp::handler::TcpForwardHandler;
 use crate::permissions::default_permission_handler::DefaultPermissionHandler;
 use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::commands::terminal::RemoteTerminalHandler;
+use crate::shared::commands::update_system_report::UpdateSystemReport;
 use crate::shared::join_agent::AgentInitPayload;
 use crate::util::key_storage::KeySource;
 use crate::util::location::{Location, LocationError};
@@ -41,6 +46,7 @@ pub struct Agent {
     root_certificate: RootCertificate,
     credentials: Credential,
     cancel: CancellationToken,
+    mls: MlsAgent<SystemReport>,
 }
 
 impl Agent {
@@ -71,6 +77,10 @@ impl Agent {
 
         let verifier = ExactVerififier::new(upstream_certificate).to_tls_verifier();
 
+        let storage_provider = Self::open_mls_store().await?;
+
+        let mls = MlsAgent::new(credentials.clone(), storage_provider).await?;
+
         debug!("trying to connect to server");
 
         let rpc = RpcClient::connect(
@@ -89,6 +99,7 @@ impl Agent {
             root_certificate: root_certificate,
             rpc: Arc::new(rpc),
             cancel,
+            mls,
         })
     }
 
@@ -142,7 +153,9 @@ impl Agent {
         self.rpc
             .serve(server_commands)
             .await
-            .context("error serving rpc")
+            .context("error serving rpc")?;
+
+        Ok(())
     }
 
     pub async fn init_with(data: AgentInitPayload) -> Result<()> {
@@ -161,6 +174,20 @@ impl Agent {
         }
 
         Self::save_config(&config).await?;
+
+        Ok(())
+    }
+
+    pub async fn update_system_report(&self) -> anyhow::Result<()> {
+        let report = SystemReport::create().await?;
+
+        let encoded = self.mls.create_new_report(&report).await?;
+
+        self.rpc
+            .upstream_connection()
+            .dispatch(UpdateSystemReport(encoded))
+            .await
+            .map_err(|err| anyhow!(err))?;
 
         Ok(())
     }
@@ -211,6 +238,22 @@ impl Agent {
         Ok(provider)
     }
 
+    pub async fn open_mls_store() -> Result<SqliteStorageProvider<PostcardCodec>, OpenMlsStoreError>
+    {
+        let location = Self::mls_db_path().await?;
+
+        let location = location
+            .as_path()
+            .to_str()
+            .ok_or_else(|| OpenMlsStoreError::LocationBroken)?;
+
+        let pool = SqlitePool::connect(location).await?;
+        let provider = SqliteStorageProvider::new(pool);
+        provider.run_migrations().await?;
+
+        Ok(provider)
+    }
+
     async fn save_config(config: &AgentConfig) -> Result<()> {
         let location = Self::config_path().await?;
         let config = serde_json::to_vec_pretty(config)?;
@@ -239,6 +282,20 @@ struct AgentConfig {
 pub enum CreateMlsStoreError {
     #[error("found an existing mls data store")]
     AlreadyExists,
+    #[error("error getting store location: {0}")]
+    LocationError(#[from] LocationError),
+    #[error("io error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("location did not give valid UTF-8 string")]
+    LocationBroken,
+    #[error("sqlx error: {0}")]
+    SqlxError(#[from] sqlx::Error),
+    #[error("sqlx migration error: {0}")]
+    MigrateError(#[from] sqlx::migrate::MigrateError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum OpenMlsStoreError {
     #[error("error getting store location: {0}")]
     LocationError(#[from] LocationError),
     #[error("io error: {0}")]

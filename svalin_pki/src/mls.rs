@@ -3,6 +3,7 @@ use openmls_traits::signatures::SignerError;
 
 use crate::{Certificate, Credential, signed_message::CanSign};
 
+pub mod agent;
 pub mod client;
 pub mod delivery_service;
 pub mod key_package;
