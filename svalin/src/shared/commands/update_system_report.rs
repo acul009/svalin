@@ -7,6 +7,8 @@ use svalin_rpc::rpc::{
 use svalin_sysctl::sytem_report::SystemReport;
 use tokio_util::sync::CancellationToken;
 
+use crate::server::message_store::MessageStore;
+
 pub struct UpdateSystemReport(pub EncodedReport<SystemReport>);
 
 impl CommandDispatcher for UpdateSystemReport {
@@ -33,7 +35,8 @@ impl CommandDispatcher for UpdateSystemReport {
 }
 
 pub struct UpdateSystemReportHandler {
-    mls: DeliveryService,
+    mls: Arc<DeliveryService>,
+    message_store: Arc<MessageStore>,
 }
 
 #[async_trait]

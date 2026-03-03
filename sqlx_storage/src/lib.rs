@@ -42,7 +42,7 @@ pub struct SqliteStorageProvider<C> {
     codec: PhantomData<C>,
 }
 
-impl<'a, C: Codec> SqliteStorageProvider<C> {
+impl<C: Codec> SqliteStorageProvider<C> {
     /// Create a new [`SqliteStorageProvider`] based on the given
     /// [`SqliteConnection`].
     pub fn new(connection: SqlitePool) -> Self {

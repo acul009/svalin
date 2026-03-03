@@ -51,6 +51,7 @@ pub mod agent_store;
 pub mod command_builder;
 pub mod config_builder;
 pub mod key_package_store;
+pub mod message_store;
 pub mod session_store;
 pub mod user_store;
 

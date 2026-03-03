@@ -98,7 +98,8 @@ impl MlsClient {
         let svalin_credential = self.svalin_credential.clone();
         let credential_with_key = self.mls_credential_with_key.clone();
         tokio::task::spawn_blocking(move || {
-            // I'm kind of in over my head again. So I'll try fighting my way through here in very small steps with a few comments.
+            // I'm kind of in over my head again. So I'll try fighting my way through here
+            // in very small steps with a few comments.
 
             // So the first step would be getting a list of all members for the group.
             // These should be:
@@ -108,8 +109,9 @@ impl MlsClient {
             // - The root user
             // - The root users sessions
             //
-            // And I just now notized, that I already need to have this info then creating this group.
-            // So now I gotta think about how to add these to the parameters nicely
+            // And I just now notized, that I already need to have this info then creating
+            // this group. So now I gotta think about how to add these to the
+            // parameters nicely
             //
             // Update: I managed it :D
 
@@ -212,6 +214,10 @@ impl MlsClient {
         let _group = welcome.into_group(provider.as_ref())?;
 
         Ok(())
+    }
+
+    pub(crate) fn signer(&self) -> &Credential {
+        &self.svalin_credential
     }
 }
 

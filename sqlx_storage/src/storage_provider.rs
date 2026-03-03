@@ -685,7 +685,6 @@ impl<C: Codec> StorageProvider<CURRENT_VERSION> for SqliteStorageProvider<C> {
         application_export_tree: &ApplicationExportTree,
     ) -> Result<(), Self::Error> {
         let storable = StorableGroupDataRef(application_export_tree);
-        let mut connection = self.connection.borrow_mut();
         let task =
             storable.store::<_, C>(&self.pool, group_id, GroupDataType::ApplicationExportTree);
         block_async_in_place(task)
@@ -699,7 +698,6 @@ impl<C: Codec> StorageProvider<CURRENT_VERSION> for SqliteStorageProvider<C> {
         &self,
         group_id: &GroupId,
     ) -> Result<Option<ApplicationExportTree>, Self::Error> {
-        let mut connection = self.connection.borrow_mut();
         let task = StorableGroupData::load::<_, C>(
             &self.pool,
             group_id,
@@ -717,7 +715,6 @@ impl<C: Codec> StorageProvider<CURRENT_VERSION> for SqliteStorageProvider<C> {
         group_id: &GroupId,
     ) -> Result<(), Self::Error> {
         let storable = self.wrap_storable_group_id_ref(group_id);
-        let mut connection = self.connection.borrow_mut();
         let task = storable.delete_group_data(&self.pool, GroupDataType::ApplicationExportTree);
         block_async_in_place(task)
     }
@@ -1247,9 +1244,10 @@ impl<PskId: Key<CURRENT_VERSION>> StorablePskIdRef<'_, PskId> {
 
 /// Runs and waits for the given future to complete in a synchronous context.
 ///
-/// Note that even though this function is called in a synchronous context, at some point down the
-/// stack it must be called in a multi-threaded asynchronous context. In particular, tests must be
-/// asynchronous and of flavor `multi_thread`.
+/// Note that even though this function is called in a synchronous context, at
+/// some point down the stack it must be called in a multi-threaded asynchronous
+/// context. In particular, tests must be asynchronous and of flavor
+/// `multi_thread`.
 pub(super) fn block_async_in_place<F>(task: F) -> F::Output
 where
     F: Future,

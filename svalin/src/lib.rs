@@ -7,6 +7,7 @@ pub mod agent;
 // pub mod async_com;
 pub mod client;
 pub mod device;
+pub mod mls;
 pub mod permissions;
 pub mod server;
 pub mod shared;
