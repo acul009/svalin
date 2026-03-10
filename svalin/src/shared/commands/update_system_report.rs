@@ -1,7 +1,11 @@
+use std::sync::Arc;
+
+use anyhow::anyhow;
 use async_trait::async_trait;
 use svalin_pki::mls::{agent::EncodedReport, client::MlsClient, delivery_service::DeliveryService};
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    peer::Peer,
     session::Session,
 };
 use svalin_sysctl::sytem_report::SystemReport;
@@ -52,6 +56,13 @@ impl CommandHandler for UpdateSystemReportHandler {
         request: Self::Request,
         cancel: CancellationToken,
     ) -> anyhow::Result<()> {
+        let Peer::Certificate(peer) = session.peer() else {
+            return Err(anyhow!("unexpected anonymous peer"));
+        };
+        let report = request.raw();
+        self.mls
+            .process_device_group_message(peer.spki_hash(), &report)
+            .await?;
         todo!()
     }
 }

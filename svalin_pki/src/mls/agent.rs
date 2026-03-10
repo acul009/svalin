@@ -100,6 +100,12 @@ pub struct EncodedReport<Report> {
     report: PhantomData<Report>,
 }
 
+impl<Report> EncodedReport<Report> {
+    pub fn raw(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum CreateSystemreportError {
     #[error("postcard error: {0}")]
