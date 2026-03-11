@@ -8,13 +8,16 @@ use openmls::{
     group::{
         GroupId, MergeCommitError, MlsGroup, ProposalStore, PublicGroup, PublicProcessMessageError,
     },
-    prelude::{CreationFromExternalError, MlsMessageIn, OpenMlsCrypto, ProtocolMessage, Sender},
+    prelude::{
+        CreationFromExternalError, MlsMessageBodyIn, MlsMessageIn, OpenMlsCrypto, ProtocolMessage,
+        PublicMessageIn, Sender,
+    },
     treesync,
 };
 use openmls_rust_crypto::MemoryStorageError;
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
-use rustls::lock;
+use rustls::{lock, server::ParsedCertificate};
 use tls_codec::{Deserialize, DeserializeBytes};
 
 use crate::{
@@ -97,7 +100,7 @@ impl DeliveryService {
         &self,
         device: &SpkiHash,
         message: &[u8],
-    ) -> Result<(), ProcessMessageError> {
+    ) -> Result<Vec<SpkiHash>, ProcessMessageError> {
         let mut guard = self.device_groups.lock().unwrap();
         let group = guard.get(device);
         let group = if let Some(group) = group {
@@ -120,66 +123,82 @@ impl DeliveryService {
         };
         drop(guard);
 
-        let message: ProtocolMessage =
-            MlsMessageIn::tls_deserialize_exact_bytes(message)?.try_into_protocol_message()?;
-
+        let message = MlsMessageIn::tls_deserialize_exact_bytes(message)?.extract();
         let mut guard = group.lock().unwrap();
-        let message = guard.process_message(self.provider.crypto(), message)?;
 
-        // check if sender may even send this message;
-        let message_sender_check = match message.content() {
-            openmls::prelude::ProcessedMessageContent::ApplicationMessage(message) => {
-                todo!("check what to do with this one");
-            }
-            openmls::prelude::ProcessedMessageContent::ProposalMessage(queued_proposal) => {
-                if let Sender::Member(member) = queued_proposal.sender() {
-                    if let Some(leaf) = guard.leaf(*member) {
-                        let certificate = UnverifiedCertificate::from_der(
-                            leaf.credential().serialized_content().to_vec(),
-                        )?;
-                        if certificate.spki_hash() == device {
-                            todo!("check if device may send this message")
+        if let MlsMessageBodyIn::PublicMessage(message) = message {
+            let message = guard.process_message(self.provider.crypto(), message)?;
+
+            // check if sender may even send this message;
+            let message_sender_check = match message.content() {
+                openmls::prelude::ProcessedMessageContent::ApplicationMessage(message) => {
+                    todo!("check what to do with this one");
+                }
+                openmls::prelude::ProcessedMessageContent::ProposalMessage(queued_proposal) => {
+                    if let Sender::Member(member) = queued_proposal.sender() {
+                        if let Some(leaf) = guard.leaf(*member) {
+                            let certificate = UnverifiedCertificate::from_der(
+                                leaf.credential().serialized_content().to_vec(),
+                            )?;
+                            if certificate.spki_hash() == device {
+                                todo!("check if device may send this message")
+                            } else {
+                                todo!("check if member may send this message")
+                            }
                         } else {
-                            todo!("check if member may send this message")
+                            Err(ProcessMessageError::MemberMessageByNonMember)
                         }
                     } else {
-                        Err(ProcessMessageError::MemberMessageByNonMember)
+                        Err(ProcessMessageError::MessageTypeNotAllowed)
                     }
-                } else {
-                    Err(ProcessMessageError::MessageTypeNotAllowed)
                 }
-            }
-            openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
-                queued_proposal,
-            ) => Err(ProcessMessageError::MessageTypeNotAllowed),
-            openmls::prelude::ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
-                todo!("check when I need this one")
-            }
-        };
+                openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
+                    queued_proposal,
+                ) => Err(ProcessMessageError::MessageTypeNotAllowed),
+                openmls::prelude::ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
+                    todo!("check when I need this one")
+                }
+            };
 
-        // return error of message was not allowed
-        message_sender_check?;
+            // return error of message was not allowed
+            message_sender_check?;
 
-        match message.into_content() {
-            openmls::prelude::ProcessedMessageContent::ApplicationMessage(application_message) => {
-                // Nothing more to do, only clients can read messages, not the DS
-            }
-            openmls::prelude::ProcessedMessageContent::ProposalMessage(queued_proposal) => {
-                guard
-                    .add_proposal(self.provider.storage(), *queued_proposal)
-                    .map_err(ProcessMessageError::StorageError)?;
-            }
-            openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
-                queued_proposal,
-            ) => unreachable!(),
-            openmls::prelude::ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
-                guard
-                    .merge_commit(self.provider.storage(), *staged_commit)
-                    .map_err(ProcessMessageError::MergeCommitError)?;
+            match message.into_content() {
+                openmls::prelude::ProcessedMessageContent::ApplicationMessage(
+                    application_message,
+                ) => {
+                    // Nothing more to do, only clients can read messages, not the DS
+                }
+                openmls::prelude::ProcessedMessageContent::ProposalMessage(queued_proposal) => {
+                    guard
+                        .add_proposal(self.provider.storage(), *queued_proposal)
+                        .map_err(ProcessMessageError::StorageError)?;
+                }
+                openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
+                    queued_proposal,
+                ) => unreachable!(),
+                openmls::prelude::ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
+                    guard
+                        .merge_commit(self.provider.storage(), *staged_commit)
+                        .map_err(ProcessMessageError::MergeCommitError)?;
+                }
             }
         }
 
-        Ok(())
+        let members = guard
+            .members()
+            .map(|member| {
+                let spki_hash = UnverifiedCertificate::from_der(
+                    member.credential.serialized_content().to_vec(),
+                )?
+                .spki_hash()
+                .clone();
+
+                Ok(spki_hash)
+            })
+            .collect::<Result<Vec<_>, CertificateParseError>>()?;
+
+        Ok(members)
     }
 }
 

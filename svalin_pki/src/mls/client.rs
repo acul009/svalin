@@ -11,7 +11,7 @@ use openmls::{
     framing::errors::MlsMessageError,
     group::{
         AddMembersError, ExportGroupInfoError, GroupId, MergePendingCommitError, MlsGroup,
-        MlsGroupJoinConfig, NewGroupError, PURE_CIPHERTEXT_WIRE_FORMAT_POLICY, StagedWelcome,
+        MlsGroupJoinConfig, NewGroupError, PURE_PLAINTEXT_WIRE_FORMAT_POLICY, StagedWelcome,
         WelcomeError,
     },
     prelude::{
@@ -122,7 +122,7 @@ impl MlsClient {
                 .with_group_id(GroupId::from_slice(device.spki_hash().as_slice()))
                 // No idea yet if this prevents the creation of public groups.
                 // If it does, I need to change it so the server can actually track group members.
-                .with_wire_format_policy(PURE_CIPHERTEXT_WIRE_FORMAT_POLICY)
+                .with_wire_format_policy(PURE_PLAINTEXT_WIRE_FORMAT_POLICY)
                 .build(provider.as_ref(), &svalin_credential, credential_with_key)?;
 
             let mls_key_packages = other_members
@@ -171,7 +171,7 @@ impl MlsClient {
         let join_config = MlsGroupJoinConfig::builder()
             .max_past_epochs(0)
             .use_ratchet_tree_extension(false)
-            .wire_format_policy(PURE_CIPHERTEXT_WIRE_FORMAT_POLICY)
+            .wire_format_policy(PURE_PLAINTEXT_WIRE_FORMAT_POLICY)
             .sender_ratchet_configuration(SenderRatchetConfiguration::new(0, 0))
             .build();
 
@@ -189,7 +189,7 @@ impl MlsClient {
         let creator: UnverifiedCertificate =
             welcome.welcome_sender()?.credential().deserialized()?;
 
-        // Ensure there are only sessions any myself in the group
+        // Ensure there are only sessions and myself in the group
         welcome
             .members()
             .map(|member| -> Result<(), JoinDeviceGroupError> {
@@ -222,6 +222,7 @@ impl MlsClient {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(test, derive(Clone))]
 pub struct DeviceGroupCreationInfo {
     certificate: UnverifiedCertificate,
     welcome: Vec<u8>,

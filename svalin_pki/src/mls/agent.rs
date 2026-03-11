@@ -13,7 +13,8 @@ use tokio::task::JoinError;
 use crate::{
     Certificate, CertificateType, Credential,
     mls::{
-        client::MlsClient,
+        client::{CreateKeyPackageError, MlsClient},
+        key_package::KeyPackage,
         provider::{PostcardCodec, SvalinProvider},
     },
 };
@@ -73,6 +74,10 @@ where
             group: tokio::sync::Mutex::new(group),
             report: PhantomData,
         })
+    }
+
+    pub async fn create_key_package(&self) -> Result<KeyPackage, CreateKeyPackageError> {
+        self.mls.create_key_package().await
     }
 
     pub async fn create_new_report(

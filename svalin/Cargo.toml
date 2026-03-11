@@ -45,7 +45,7 @@ reqwest = { version = "0.13.1", features = [
     "rustls",
     "stream",
 ], default-features = false }
-sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"] }
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite", "uuid"] }
 zeroize = { version = "1.8.2", features = ["derive"] }
 dashmap = "6.1.0"
 openmls_sqlx_storage = { path = "../sqlx_storage" }

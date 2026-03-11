@@ -32,9 +32,9 @@ impl CommandDispatcher for UpdateSystemReport {
 
     async fn dispatch(
         self,
-        session: &mut svalin_rpc::rpc::session::Session,
+        _session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
-        todo!()
+        Ok(())
     }
 }
 
@@ -54,15 +54,23 @@ impl CommandHandler for UpdateSystemReportHandler {
         &self,
         session: &mut Session,
         request: Self::Request,
-        cancel: CancellationToken,
+        _cancel: CancellationToken,
     ) -> anyhow::Result<()> {
         let Peer::Certificate(peer) = session.peer() else {
             return Err(anyhow!("unexpected anonymous peer"));
         };
         let report = request.raw();
-        self.mls
+
+        let receivers = self
+            .mls
             .process_device_group_message(peer.spki_hash(), &report)
-            .await?;
-        todo!()
+            .await?
+            .into_iter()
+            .filter(|member| member != peer.spki_hash())
+            .collect::<Vec<_>>();
+
+        self.message_store.add_message(&report, &receivers).await?;
+
+        Ok(())
     }
 }
