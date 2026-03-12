@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    CertificateType, UnverifiedCertificate,
+    CertificateType, SpkiHash, UnverifiedCertificate,
     mls::{
+        agent::EncodedReport,
         key_package::{KeyPackage, KeyPackageError},
         provider::{PostcardCodec, SvalinProvider},
     },
@@ -22,7 +23,7 @@ use openmls::{
 };
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tls_codec::DeserializeBytes;
 use tokio::task::JoinError;
 
@@ -214,6 +215,14 @@ impl MlsClient {
         let _group = welcome.into_group(provider.as_ref())?;
 
         Ok(())
+    }
+
+    pub fn decode_system_report<T: DeserializeOwned>(
+        &self,
+        device: &SpkiHash,
+        report: EncodedReport<T>,
+    ) -> T {
+        todo!()
     }
 
     pub(crate) fn signer(&self) -> &Credential {

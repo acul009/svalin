@@ -83,5 +83,7 @@ async fn test_device_group() {
         client_credential.get_certificate().spki_hash()
     );
 
-    compile_error!("client now needs to decode this value")
+    client.decode_system_report(agent_credential.get_certificate().spki_hash(), encoded);
+
+    // compile_error!("client now needs to decode this value")
 }
