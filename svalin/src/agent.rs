@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::migrate::MigrateDatabase;
 use sqlx::{Sqlite, SqlitePool};
 use svalin_pki::mls::agent::MlsAgent;
-use svalin_pki::mls::client::MlsClient;
+use svalin_pki::mls::processor::MlsProcessor;
 use svalin_pki::mls::provider::PostcardCodec;
 use svalin_pki::{
     Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,

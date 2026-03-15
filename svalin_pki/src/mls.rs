@@ -8,6 +8,7 @@ pub mod client;
 pub mod delivery_service;
 pub mod key_package;
 pub mod message_types;
+pub mod processor;
 pub mod provider;
 
 pub use openmls::prelude::{OpenMlsProvider, ProtocolVersion};

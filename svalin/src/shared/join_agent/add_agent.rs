@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use svalin_pki::{
     CertificateChainBuilder, RootCertificate, VerifyChainError, get_current_timestamp,
     mls::{
-        client::DeviceGroupCreationInfo,
         delivery_service::{self, DeliveryService, NewPublicDeviceGroupError},
+        processor::DeviceGroupCreationInfo,
     },
 };
 use svalin_rpc::rpc::{

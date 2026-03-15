@@ -4,8 +4,8 @@ use svalin_pki::{
     Certificate, CreateCertificateError, DeriveKeyError, ExactVerififier, ExportedPublicKey,
     mls::{
         OpenMlsProvider,
-        client::CreateDeviceGroupError,
         key_package::{KeyPackageError, UnverifiedKeyPackage},
+        processor::CreateDeviceGroupError,
     },
 };
 use svalin_rpc::{

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, migrate::MigrateDatabase};
 use svalin_pki::{
     Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
-    RootCertificate, UnverifiedCertificate, get_current_timestamp, mls::client::MlsClient,
+    RootCertificate, UnverifiedCertificate, get_current_timestamp, mls::processor::MlsProcessor,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::sync::watch;
@@ -182,7 +182,7 @@ impl Client {
             let pool = SqlitePool::connect(url).await?;
             let storage_provider = SqliteStorageProvider::new(pool);
             storage_provider.run_migrations().await?;
-            let mls = MlsClient::new(device_credential.clone(), storage_provider);
+            let mls = MlsProcessor::new(device_credential.clone(), storage_provider);
 
             debug!("creating verifier");
             let verifier = ExactVerififier::new(upstream_certificate.clone()).to_tls_verifier();

@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
-use svalin_pki::mls::{agent::EncodedReport, client::MlsClient, delivery_service::DeliveryService};
+use svalin_pki::mls::{
+    agent::EncodedReport, delivery_service::DeliveryService, processor::MlsProcessor,
+};
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     peer::Peer,

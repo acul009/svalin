@@ -5,8 +5,9 @@ use crate::{
     Credential, KeyPair,
     mls::{
         agent::MlsAgent,
-        client::MlsClient,
         delivery_service::{self, DeliveryService},
+        key_package,
+        processor::MlsProcessor,
         provider::PostcardCodec,
     },
 };
@@ -17,8 +18,26 @@ async fn test_key_package_creation() {
     let storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
     storage.run_migrations().await.unwrap();
     let credential = Credential::generate_root().unwrap();
-    let client = crate::mls::client::MlsClient::new(credential, storage);
+    let client = crate::mls::processor::MlsProcessor::new(credential, storage);
     let key_package = client.create_key_package().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_basic_group_logic() {
+    let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+    let storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
+    storage.run_migrations().await.unwrap();
+    let credential = Credential::generate_root().unwrap();
+    let client = crate::mls::processor::MlsProcessor::new(credential.clone(), storage);
+
+    let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+    let storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
+    storage.run_migrations().await.unwrap();
+    let credential = Credential::generate_root().unwrap();
+    let client2 = crate::mls::processor::MlsProcessor::new(credential.clone(), storage);
+    let key_package = client2.create_key_package().await.unwrap();
+
+    client.create_group(vec![key_package], "test".as_bytes());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -28,7 +47,7 @@ async fn test_device_group() {
     storage.run_migrations().await.unwrap();
     let user_credential = Credential::generate_root().unwrap();
     let client_credential = user_credential.create_user_device_credential().unwrap();
-    let client = crate::mls::client::MlsClient::new(client_credential.clone(), storage);
+    let client = crate::mls::processor::MlsProcessor::new(client_credential.clone(), storage);
 
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
     let storage = SqliteStorageProvider::<PostcardCodec>::new(pool.clone());
@@ -39,7 +58,7 @@ async fn test_device_group() {
         .create_agent_certificate_for_key(&public_key)
         .unwrap();
     let agent_credential = keypair.upgrade(cert.to_unverified()).unwrap();
-    let agent = crate::mls::client::MlsClient::new(agent_credential.clone(), storage);
+    let agent = crate::mls::processor::MlsProcessor::new(agent_credential.clone(), storage);
 
     let key_package = agent.create_key_package().await.unwrap();
 
@@ -83,7 +102,7 @@ async fn test_device_group() {
         client_credential.get_certificate().spki_hash()
     );
 
-    client.decode_system_report(agent_credential.get_certificate().spki_hash(), encoded);
+    // client.decode_system_report(agent_credential.get_certificate().spki_hash(), encoded);
 
     // compile_error!("client now needs to decode this value")
 }

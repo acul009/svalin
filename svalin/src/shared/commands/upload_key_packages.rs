@@ -4,9 +4,9 @@ use svalin_pki::{
     ExactVerififier, Verifier,
     mls::{
         self,
-        client::{CreateKeyPackageError, MlsClient},
         delivery_service::DeliveryService,
         key_package::UnverifiedKeyPackage,
+        processor::{CreateKeyPackageError, MlsProcessor},
     },
 };
 use svalin_rpc::rpc::{
@@ -17,7 +17,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::server::key_package_store::KeyPackageStore;
 
-pub struct UploadKeyPackages<'a>(pub &'a MlsClient);
+pub struct UploadKeyPackages<'a>(pub &'a MlsProcessor);
 
 const TARGET_KEY_PACKAGE_COUNT: u64 = 10;
 

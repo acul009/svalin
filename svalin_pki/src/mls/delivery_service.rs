@@ -24,7 +24,7 @@ use crate::{
     Certificate, CertificateParseError, SpkiHash, UnverifiedCertificate,
     mls::{
         agent::EncodedReport,
-        client::{DeviceGroupCreationInfo, GroupCreationUnpackError},
+        processor::{DeviceGroupCreationInfo, GroupCreationUnpackError},
         provider::{PostcardCodec, SvalinProvider},
     },
 };

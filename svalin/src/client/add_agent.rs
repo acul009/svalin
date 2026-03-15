@@ -6,7 +6,7 @@ use crate::shared::join_agent::{
 use super::Client;
 
 use anyhow::Result;
-use svalin_pki::{Certificate, mls::client::DeviceGroupCreationInfo};
+use svalin_pki::{Certificate, mls::processor::DeviceGroupCreationInfo};
 use svalin_rpc::rpc::connection::{Connection, ConnectionDispatchError};
 use tokio::sync::oneshot;
 

@@ -11,18 +11,19 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tokio::task::JoinError;
 
 use crate::{
-    Certificate, CertificateType, Credential,
+    Certificate, CertificateType, Credential, SpkiHash,
     mls::{
-        client::{CreateKeyPackageError, MlsClient},
         key_package::KeyPackage,
+        processor::{
+            CreateGroupMessageError, CreateKeyPackageError, GroupMessage, MlsProcessorHandle,
+        },
         provider::{PostcardCodec, SvalinProvider},
     },
 };
 
-pub struct MlsAgent<Report> {
-    mls: MlsClient,
-    group: tokio::sync::Mutex<MlsGroup>,
-    report: PhantomData<Report>,
+pub struct MlsAgent {
+    mls: MlsProcessorHandle,
+    id: SpkiHash,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -37,10 +38,7 @@ pub enum MlsAgentCreateError {
     JoinError(#[from] JoinError),
 }
 
-impl<Report> MlsAgent<Report>
-where
-    Report: Serialize + DeserializeOwned,
-{
+impl MlsAgent {
     pub async fn new(
         credential: Credential,
         storage_provider: SqliteStorageProvider<PostcardCodec>,
@@ -51,49 +49,27 @@ where
             ));
         }
 
-        let group_id = GroupId::from_slice(credential.get_certificate().spki_hash().as_slice());
+        let id = credential.get_certificate().spki_hash().clone();
 
-        let (group, storage_provider) = tokio::task::spawn_blocking(move || {
-            let group_id = group_id;
-            (
-                MlsGroup::load(&storage_provider, &group_id)
-                    .map_err(MlsAgentCreateError::StorageError)
-                    .map(|opt| opt.ok_or_else(|| MlsAgentCreateError::MissingMyGroup))
-                    .flatten(),
-                storage_provider,
-            )
-        })
-        .await?;
+        let mls = MlsProcessorHandle::new_processor(credential, storage_provider);
 
-        let group = group?;
-
-        let mls = MlsClient::new(credential, storage_provider);
-
-        Ok(Self {
-            mls,
-            group: tokio::sync::Mutex::new(group),
-            report: PhantomData,
-        })
+        Ok(Self { id, mls })
     }
 
     pub async fn create_key_package(&self) -> Result<KeyPackage, CreateKeyPackageError> {
         self.mls.create_key_package().await
     }
 
-    pub async fn create_new_report(
+    pub async fn create_new_report<Report: Serialize>(
         &self,
         report: &Report,
     ) -> Result<EncodedReport<Report>, CreateSystemreportError> {
         let report = postcard::to_stdvec(report)?;
 
-        let mut guard = self.group.lock().await;
-
-        let message = guard.create_message(self.mls.provider(), self.mls.signer(), &report)?;
-
-        let bytes = message.to_bytes()?;
+        let message = self.mls.create_message(self.id.to_vec(), report).await?;
 
         Ok(EncodedReport {
-            bytes,
+            message,
             report: PhantomData,
         })
     }
@@ -101,14 +77,8 @@ where
 
 #[derive(Serialize, serde::Deserialize)]
 pub struct EncodedReport<Report> {
-    bytes: Vec<u8>,
+    message: GroupMessage,
     report: PhantomData<Report>,
-}
-
-impl<Report> EncodedReport<Report> {
-    pub fn raw(self) -> Vec<u8> {
-        self.bytes
-    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -116,7 +86,5 @@ pub enum CreateSystemreportError {
     #[error("postcard error: {0}")]
     PostcardError(#[from] postcard::Error),
     #[error("create message error: {0}")]
-    CreateMessageError(#[from] CreateMessageError),
-    #[error("mls message error")]
-    MlsError(#[from] MlsMessageError),
+    CreateMessageError(#[from] CreateGroupMessageError),
 }
