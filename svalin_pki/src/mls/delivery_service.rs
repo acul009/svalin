@@ -155,110 +155,164 @@ impl DeliveryService {
     //     Ok(())
     // }
 
-    pub async fn process_device_group_message(
-        &self,
-        device: &SpkiHash,
+    fn get_group<'a>(
+        cache: &'a mut HashMap<GroupId, PublicGroup>,
+        storage: &<SvalinProvider as OpenMlsProvider>::StorageProvider,
+        group_id: GroupId,
+    ) -> Result<&'a mut PublicGroup, GetPublicGroupError> {
+        let group = match cache.entry(group_id) {
+            std::collections::hash_map::Entry::Occupied(occupied_entry) => {
+                occupied_entry.into_mut()
+            }
+            std::collections::hash_map::Entry::Vacant(vacant_entry) => {
+                let Some(mls_group) = PublicGroup::load(storage, vacant_entry.key())
+                    .map_err(GetPublicGroupError::StorageError)?
+                else {
+                    return Err(GetPublicGroupError::UnknownGroup);
+                };
+
+                vacant_entry.insert(mls_group)
+            }
+        };
+
+        Ok(group)
+    }
+
+    fn process_message(
+        &mut self,
+        group_id: &[u8],
         message: &[u8],
     ) -> Result<Vec<SpkiHash>, ProcessMessageError> {
-        let mut guard = self.device_groups.lock().unwrap();
-        let group = guard.get(device);
-        let group = if let Some(group) = group {
-            group.clone()
-        } else {
-            let group = PublicGroup::load(
-                self.provider.storage(),
-                &GroupId::from_slice(device.as_slice()),
-            )
-            .map_err(ProcessMessageError::StorageError)?;
-            let Some(group) = group else {
-                return Err(ProcessMessageError::DeviceGroupUnknown);
-            };
+        let group_id = GroupId::from_slice(&group_id);
+        let group = Self::get_group(&mut self.group_cache, self.provider.storage(), group_id)?;
 
-            let group = Arc::new(Mutex::new(group));
+        let message = MlsMessageIn::tls_deserialize_exact_bytes(message)?;
 
-            guard.insert(device.clone(), group.clone());
+        let processed =
+            group.process_message(self.provider.crypto(), message.try_into_protocol_message()?)?;
 
-            group
-        };
-        drop(guard);
-
-        let message = MlsMessageIn::tls_deserialize_exact_bytes(message)?.extract();
-        let mut guard = group.lock().unwrap();
-
-        if let MlsMessageBodyIn::PublicMessage(message) = message {
-            let message = guard.process_message(self.provider.crypto(), message)?;
-
-            // check if sender may even send this message;
-            let message_sender_check = match message.content() {
-                openmls::prelude::ProcessedMessageContent::ApplicationMessage(message) => {
-                    todo!("check what to do with this one");
-                }
-                openmls::prelude::ProcessedMessageContent::ProposalMessage(queued_proposal) => {
-                    if let Sender::Member(member) = queued_proposal.sender() {
-                        if let Some(leaf) = guard.leaf(*member) {
-                            let certificate = UnverifiedCertificate::from_der(
-                                leaf.credential().serialized_content().to_vec(),
-                            )?;
-                            if certificate.spki_hash() == device {
-                                todo!("check if device may send this message")
-                            } else {
-                                todo!("check if member may send this message")
-                            }
-                        } else {
-                            Err(ProcessMessageError::MemberMessageByNonMember)
-                        }
-                    } else {
-                        Err(ProcessMessageError::MessageTypeNotAllowed)
-                    }
-                }
-                openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
-                    queued_proposal,
-                ) => Err(ProcessMessageError::MessageTypeNotAllowed),
-                openmls::prelude::ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
-                    todo!("check when I need this one")
-                }
-            };
-
-            // return error of message was not allowed
-            message_sender_check?;
-
-            match message.into_content() {
-                openmls::prelude::ProcessedMessageContent::ApplicationMessage(
-                    application_message,
-                ) => {
-                    // Nothing more to do, only clients can read messages, not the DS
-                }
-                openmls::prelude::ProcessedMessageContent::ProposalMessage(queued_proposal) => {
-                    guard
-                        .add_proposal(self.provider.storage(), *queued_proposal)
-                        .map_err(ProcessMessageError::StorageError)?;
-                }
-                openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
-                    queued_proposal,
-                ) => unreachable!(),
-                openmls::prelude::ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
-                    guard
-                        .merge_commit(self.provider.storage(), *staged_commit)
-                        .map_err(ProcessMessageError::MergeCommitError)?;
-                }
+        match processed.into_content() {
+            openmls::prelude::ProcessedMessageContent::ApplicationMessage(application_message) => {
+                let raw = application_message.into_bytes()
+                println!("public application message: {}")
+                todo!()
+            }
+            openmls::prelude::ProcessedMessageContent::ProposalMessage(queued_proposal) => todo!(),
+            openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
+                queued_proposal,
+            ) => todo!(),
+            openmls::prelude::ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
+                todo!()
             }
         }
 
-        let members = guard
-            .members()
-            .map(|member| {
-                let spki_hash = UnverifiedCertificate::from_der(
-                    member.credential.serialized_content().to_vec(),
-                )?
-                .spki_hash()
-                .clone();
-
-                Ok(spki_hash)
-            })
-            .collect::<Result<Vec<_>, CertificateParseError>>()?;
-
-        Ok(members)
+        todo!()
     }
+
+    // pub async fn process_device_group_message(
+    //     &self,
+    //     device: &SpkiHash,
+    //     message: &[u8],
+    // ) -> Result<Vec<SpkiHash>, ProcessMessageError> {
+    //     let mut guard = self.device_groups.lock().unwrap();
+    //     let group = guard.get(device);
+    //     let group = if let Some(group) = group {
+    //         group.clone()
+    //     } else {
+    //         let group = PublicGroup::load(
+    //             self.provider.storage(),
+    //             &GroupId::from_slice(device.as_slice()),
+    //         )
+    //         .map_err(ProcessMessageError::StorageError)?;
+    //         let Some(group) = group else {
+    //             return Err(ProcessMessageError::DeviceGroupUnknown);
+    //         };
+
+    //         let group = Arc::new(Mutex::new(group));
+
+    //         guard.insert(device.clone(), group.clone());
+
+    //         group
+    //     };
+    //     drop(guard);
+
+    //     let message = MlsMessageIn::tls_deserialize_exact_bytes(message)?.extract();
+    //     let mut guard = group.lock().unwrap();
+
+    //     if let MlsMessageBodyIn::PublicMessage(message) = message {
+    //         let message = guard.process_message(self.provider.crypto(), message)?;
+
+    //         // check if sender may even send this message;
+    //         let message_sender_check = match message.content() {
+    //             openmls::prelude::ProcessedMessageContent::ApplicationMessage(message) => {
+    //                 todo!("check what to do with this one");
+    //             }
+    //             openmls::prelude::ProcessedMessageContent::ProposalMessage(queued_proposal) => {
+    //                 if let Sender::Member(member) = queued_proposal.sender() {
+    //                     if let Some(leaf) = guard.leaf(*member) {
+    //                         let certificate = UnverifiedCertificate::from_der(
+    //                             leaf.credential().serialized_content().to_vec(),
+    //                         )?;
+    //                         if certificate.spki_hash() == device {
+    //                             todo!("check if device may send this message")
+    //                         } else {
+    //                             todo!("check if member may send this message")
+    //                         }
+    //                     } else {
+    //                         Err(ProcessMessageError::MemberMessageByNonMember)
+    //                     }
+    //                 } else {
+    //                     Err(ProcessMessageError::MessageTypeNotAllowed)
+    //                 }
+    //             }
+    //             openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
+    //                 queued_proposal,
+    //             ) => Err(ProcessMessageError::MessageTypeNotAllowed),
+    //             openmls::prelude::ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
+    //                 todo!("check when I need this one")
+    //             }
+    //         };
+
+    //         // return error of message was not allowed
+    //         message_sender_check?;
+
+    //         match message.into_content() {
+    //             openmls::prelude::ProcessedMessageContent::ApplicationMessage(
+    //                 application_message,
+    //             ) => {
+    //                 // Nothing more to do, only clients can read messages, not the DS
+    //             }
+    //             openmls::prelude::ProcessedMessageContent::ProposalMessage(queued_proposal) => {
+    //                 guard
+    //                     .add_proposal(self.provider.storage(), *queued_proposal)
+    //                     .map_err(ProcessMessageError::StorageError)?;
+    //             }
+    //             openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
+    //                 queued_proposal,
+    //             ) => unreachable!(),
+    //             openmls::prelude::ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
+    //                 guard
+    //                     .merge_commit(self.provider.storage(), *staged_commit)
+    //                     .map_err(ProcessMessageError::MergeCommitError)?;
+    //             }
+    //         }
+    //     }
+
+    //     let members = guard
+    //         .members()
+    //         .map(|member| {
+    //             let spki_hash = UnverifiedCertificate::from_der(
+    //                 member.credential.serialized_content().to_vec(),
+    //             )?
+    //             .spki_hash()
+    //             .clone();
+
+    //             Ok(spki_hash)
+    //         })
+    //         .collect::<Result<Vec<_>, CertificateParseError>>()?;
+
+    //     Ok(members)
+    // }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -279,7 +333,17 @@ pub enum NewPublicGroupError {
 }
 
 #[derive(Debug, thiserror::Error)]
+pub enum GetPublicGroupError {
+    #[error("give group does not exist")]
+    UnknownGroup,
+    #[error("storage error: {0}")]
+    StorageError(<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError),
+}
+
+#[derive(Debug, thiserror::Error)]
 pub enum ProcessMessageError {
+    #[error("error getting group: {0}")]
+    GetPublicGroupError(#[from] GetPublicGroupError),
     #[error("error accessing MLS storage: {0}")]
     StorageError(#[source] <SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError),
     #[error("inner error: {0}")]

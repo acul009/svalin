@@ -346,11 +346,7 @@ impl MlsProcessor {
         message: &[u8],
     ) -> Result<Vec<u8>, ProcessGroupMessageError> {
         let group_id = GroupId::from_slice(&group_id);
-        let group = Self::get_group(
-            &mut self.group_cache,
-            self.provider.storage(),
-            group_id.clone(),
-        )?;
+        let group = Self::get_group(&mut self.group_cache, self.provider.storage(), group_id)?;
 
         let message = MlsMessageIn::tls_deserialize_exact_bytes(message)?;
 
