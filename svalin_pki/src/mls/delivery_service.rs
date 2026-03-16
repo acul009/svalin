@@ -19,61 +19,83 @@ use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
 use rustls::{lock, server::ParsedCertificate};
 use tls_codec::{Deserialize, DeserializeBytes};
+use tokio::sync::{mpsc, oneshot};
 
 use crate::{
     Certificate, CertificateParseError, SpkiHash, UnverifiedCertificate,
     mls::{
         agent::EncodedReport,
-        processor::{DeviceGroupCreationInfo, GroupCreationUnpackError},
+        processor::{GroupCreationInfo, GroupCreationUnpackError},
         provider::{PostcardCodec, SvalinProvider},
     },
 };
 
-#[derive(Debug, thiserror::Error)]
-pub enum CreateRoomError {
-    #[error("Missing ratchet tree in group info")]
-    MissingRatchetTree,
-    #[error("Treesync Ratchet tree error: {0}")]
-    RatchetTreeError(#[from] treesync::RatchetTreeError),
-    #[error("Public Group creation error: {0}")]
-    CreateFromExternalError(#[from] CreationFromExternalError<MemoryStorageError>),
+pub struct DeliveryServiceHandle {
+    channel: mpsc::Sender<DeliveryServiceRequest>,
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum AddNewMemberError {}
+impl DeliveryServiceHandle {
+    pub fn new(storage_provider: SqliteStorageProvider<PostcardCodec>) -> Self {
+        let (send, mut recv) = mpsc::channel(10);
 
-pub struct DeliveryService {
+        let delivery_service = DeliveryService {
+            provider: Arc::new(SvalinProvider::new(storage_provider)),
+            group_cache: HashMap::new(),
+        };
+
+        std::thread::spawn(move || {
+            let mut delivery_service = delivery_service;
+            while let Some(recv) = recv.blocking_recv() {
+                match recv {
+                    DeliveryServiceRequest::NewGroup {
+                        group_info,
+                        response,
+                    } => {
+                        let result = delivery_service.new_group(group_info);
+                        let _ = response.send(result);
+                    }
+                }
+            }
+        });
+
+        Self { channel: send }
+    }
+
+    pub async fn new_group(
+        &self,
+        group_info: GroupCreationInfo,
+    ) -> Result<(), NewPublicGroupError> {
+        let (send, recv) = oneshot::channel();
+
+        self.channel
+            .send(DeliveryServiceRequest::NewGroup {
+                group_info,
+                response: send,
+            })
+            .await;
+
+        recv.await?
+    }
+}
+
+enum DeliveryServiceRequest {
+    NewGroup {
+        group_info: GroupCreationInfo,
+        response: oneshot::Sender<Result<(), NewPublicGroupError>>,
+    },
+}
+
+struct DeliveryService {
     provider: Arc<SvalinProvider>,
-    device_groups: Mutex<HashMap<SpkiHash, Arc<Mutex<PublicGroup>>>>,
+    group_cache: HashMap<GroupId, PublicGroup>, // device_groups: Mutex<HashMap<SpkiHash, Arc<Mutex<PublicGroup>>>>,
 }
 
 impl DeliveryService {
-    pub fn new(storage_provider: SqliteStorageProvider<PostcardCodec>) -> Self {
-        Self {
-            provider: Arc::new(SvalinProvider::new(storage_provider)),
-            device_groups: Mutex::new(HashMap::new()),
-        }
-    }
-
     pub fn crypto(&self) -> &impl OpenMlsCrypto {
         self.provider.crypto()
     }
 
-    pub async fn new_device_group(
-        &self,
-        group_info: DeviceGroupCreationInfo,
-    ) -> Result<(), NewPublicDeviceGroupError> {
-        let spki_hash = group_info.certificate().spki_hash().clone();
-        let existing = PublicGroup::load(
-            self.provider.storage(),
-            &GroupId::from_slice(spki_hash.as_slice()),
-        )
-        .map_err(NewPublicDeviceGroupError::StorageError)?;
-
-        if existing.is_some() {
-            return Err(NewPublicDeviceGroupError::GroupAlreadyExists);
-        }
-
+    fn new_group(&mut self, group_info: GroupCreationInfo) -> Result<(), NewPublicGroupError> {
         let group_info = group_info.group_info()?;
         let ratchet_tree = group_info
             .extensions()
@@ -82,7 +104,7 @@ impl DeliveryService {
             .ratchet_tree()
             .clone();
 
-        let (group, _group_info) = PublicGroup::from_external(
+        let (group, group_info) = PublicGroup::from_external(
             self.provider.crypto(),
             self.provider.storage(),
             ratchet_tree,
@@ -90,11 +112,48 @@ impl DeliveryService {
             ProposalStore::new(),
         )?;
 
-        let mut guard = self.device_groups.lock().unwrap();
-        guard.insert(spki_hash, Arc::new(Mutex::new(group)));
+        self.group_cache
+            .insert(group_info.group_context().group_id().clone(), group);
 
         Ok(())
     }
+
+    // pub async fn new_device_group(
+    //     &self,
+    //     group_info: DeviceGroupCreationInfo,
+    // ) -> Result<(), NewPublicDeviceGroupError> {
+    //     let spki_hash = group_info.certificate().spki_hash().clone();
+    //     let existing = PublicGroup::load(
+    //         self.provider.storage(),
+    //         &GroupId::from_slice(spki_hash.as_slice()),
+    //     )
+    //     .map_err(NewPublicDeviceGroupError::StorageError)?;
+
+    //     if existing.is_some() {
+    //         return Err(NewPublicDeviceGroupError::GroupAlreadyExists);
+    //     }
+
+    //     let group_info = group_info.group_info()?;
+    //     let ratchet_tree = group_info
+    //         .extensions()
+    //         .ratchet_tree()
+    //         .ok_or_else(|| GroupCreationUnpackError::MissingRatchetTree)?
+    //         .ratchet_tree()
+    //         .clone();
+
+    //     let (group, _group_info) = PublicGroup::from_external(
+    //         self.provider.crypto(),
+    //         self.provider.storage(),
+    //         ratchet_tree,
+    //         group_info,
+    //         ProposalStore::new(),
+    //     )?;
+
+    //     let mut guard = self.device_groups.lock().unwrap();
+    //     guard.insert(spki_hash, Arc::new(Mutex::new(group)));
+
+    //     Ok(())
+    // }
 
     pub async fn process_device_group_message(
         &self,
@@ -200,6 +259,23 @@ impl DeliveryService {
 
         Ok(members)
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum NewPublicGroupError {
+    #[error("error unpacking group creation info: {0}")]
+    GroupCreationUnpackError(#[from] GroupCreationUnpackError),
+    #[error("error creating group from external: {0}")]
+    CreationFromExternalError(
+        #[from]
+        CreationFromExternalError<
+            <SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError,
+        >,
+    ),
+    #[error("error accessing MLS storage: {0}")]
+    StorageError(<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError),
+    #[error("error receiving from delivery service")]
+    RecvError(#[from] oneshot::error::RecvError),
 }
 
 #[derive(Debug, thiserror::Error)]

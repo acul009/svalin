@@ -1,23 +1,19 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
-use crate::{
-    CertificateType, UnverifiedCertificate,
-    mls::{
-        key_package::{KeyPackage, KeyPackageError},
-        provider::{PostcardCodec, SvalinProvider},
-    },
+use crate::mls::{
+    key_package::{KeyPackage, KeyPackageError},
+    provider::{PostcardCodec, SvalinProvider},
 };
 use openmls::{
-    framing::errors::MlsMessageError,
+    framing::errors::{MlsMessageError, ProtocolMessageError},
     group::{
         AddMembersError, CreateMessageError, ExportGroupInfoError, GroupId,
         MergePendingCommitError, MlsGroup, MlsGroupJoinConfig, NewGroupError,
-        PURE_PLAINTEXT_WIRE_FORMAT_POLICY, StagedWelcome, WelcomeError,
+        PURE_PLAINTEXT_WIRE_FORMAT_POLICY, ProcessMessageError, StagedWelcome, WelcomeError,
     },
     prelude::{
-        Ciphersuite, CredentialWithKey, KeyPackageNewError, MlsMessageBodyIn, MlsMessageIn,
-        ProtocolVersion, RatchetTreeIn, SenderRatchetConfiguration, Welcome,
-        group_info::VerifiableGroupInfo,
+        CredentialWithKey, KeyPackageNewError, MlsMessageBodyIn, MlsMessageIn, RatchetTreeIn,
+        SenderRatchetConfiguration, Welcome, group_info::VerifiableGroupInfo,
     },
 };
 use openmls_sqlx_storage::SqliteStorageProvider;
@@ -43,19 +39,18 @@ impl MlsProcessorHandle {
             signature_key: credential.get_certificate().public_key().into(),
         };
 
-        let (send, recv) = mpsc::channel(10);
+        let (send, mut recv) = mpsc::channel(10);
 
         let client = MlsProcessor {
-            provider: Arc::new(SvalinProvider::new(storage_provider)),
+            provider: SvalinProvider::new(storage_provider),
             svalin_credential: credential,
             mls_credential_with_key: public_info,
             group_cache: HashMap::new(),
-            receiver: recv,
         };
 
         std::thread::spawn(move || {
             let mut client = client;
-            while let Some(request) = client.receiver.blocking_recv() {
+            while let Some(request) = recv.blocking_recv() {
                 match request {
                     MlsProcessorRequest::CreateKeyPackage { response } => {
                         let result = client.create_key_package();
@@ -69,12 +64,27 @@ impl MlsProcessorHandle {
                         let result = client.create_group(members, &group_id);
                         let _ = response.send(result);
                     }
+                    MlsProcessorRequest::JoinGroup {
+                        group_info,
+                        response,
+                    } => {
+                        let result = client.join_group(group_info);
+                        let _ = response.send(result);
+                    }
                     MlsProcessorRequest::CreateMessage {
                         group_id,
                         message,
                         response,
                     } => {
                         let result = client.create_message(&group_id, &message);
+                        let _ = response.send(result);
+                    }
+                    MlsProcessorRequest::ProcessMessage {
+                        group_id,
+                        message,
+                        response,
+                    } => {
+                        let result = client.process_message(&group_id, &message);
                         let _ = response.send(result);
                     }
                 }
@@ -114,6 +124,20 @@ impl MlsProcessorHandle {
         recv.await?
     }
 
+    pub async fn join_group(&self, group_info: GroupCreationInfo) -> Result<(), JoinGroupError> {
+        let (send, recv) = oneshot::channel();
+
+        let _ = self
+            .channel
+            .send(MlsProcessorRequest::JoinGroup {
+                group_info,
+                response: send,
+            })
+            .await;
+
+        recv.await?
+    }
+
     pub async fn create_message(
         &self,
         group_id: Vec<u8>,
@@ -124,6 +148,25 @@ impl MlsProcessorHandle {
         let _ = self
             .channel
             .send(MlsProcessorRequest::CreateMessage {
+                group_id,
+                message,
+                response: send,
+            })
+            .await;
+
+        recv.await?
+    }
+
+    pub async fn process_message(
+        &mut self,
+        group_id: Vec<u8>,
+        message: Vec<u8>,
+    ) -> Result<Vec<u8>, ProcessGroupMessageError> {
+        let (send, recv) = oneshot::channel();
+
+        let _ = self
+            .channel
+            .send(MlsProcessorRequest::ProcessMessage {
                 group_id,
                 message,
                 response: send,
@@ -148,15 +191,23 @@ enum MlsProcessorRequest {
         message: Vec<u8>,
         response: oneshot::Sender<Result<GroupMessage, CreateGroupMessageError>>,
     },
+    JoinGroup {
+        group_info: GroupCreationInfo,
+        response: oneshot::Sender<Result<(), JoinGroupError>>,
+    },
+    ProcessMessage {
+        group_id: Vec<u8>,
+        message: Vec<u8>,
+        response: oneshot::Sender<Result<Vec<u8>, ProcessGroupMessageError>>,
+    },
 }
 
 struct MlsProcessor {
     // Needs to be an Arc so `spawn_blocking` works.
-    provider: Arc<SvalinProvider>,
+    provider: SvalinProvider,
     svalin_credential: Credential,
     mls_credential_with_key: CredentialWithKey,
     group_cache: HashMap<GroupId, MlsGroup>,
-    receiver: mpsc::Receiver<MlsProcessorRequest>,
 }
 
 impl MlsProcessor {
@@ -164,7 +215,7 @@ impl MlsProcessor {
         let mls_key_package = openmls::prelude::KeyPackage::builder()
             .build(
                 self.provider.ciphersuite(),
-                self.provider.as_ref(),
+                &self.provider,
                 &self.svalin_credential,
                 self.mls_credential_with_key.clone(),
             )?
@@ -192,7 +243,7 @@ impl MlsProcessor {
             // Needs to be plaintext so the server can track the group members
             .with_wire_format_policy(PURE_PLAINTEXT_WIRE_FORMAT_POLICY)
             .build(
-                self.provider.as_ref(),
+                &self.provider,
                 &self.svalin_credential,
                 self.mls_credential_with_key.clone(),
             )?;
@@ -206,12 +257,12 @@ impl MlsProcessor {
             .collect::<Vec<_>>();
 
         let (_, welcome, _) = group.add_members(
-            self.provider.as_ref(),
+            &self.provider,
             &self.svalin_credential,
             mls_key_packages.as_slice(),
         )?;
 
-        group.merge_pending_commit(self.provider.as_ref())?;
+        group.merge_pending_commit(&self.provider)?;
 
         let welcome = welcome.to_bytes()?;
 
@@ -225,36 +276,99 @@ impl MlsProcessor {
         })
     }
 
+    fn join_group(&mut self, group_info: GroupCreationInfo) -> Result<(), JoinGroupError> {
+        let join_config = MlsGroupJoinConfig::builder()
+            .max_past_epochs(0)
+            .use_ratchet_tree_extension(false)
+            .wire_format_policy(PURE_PLAINTEXT_WIRE_FORMAT_POLICY)
+            .sender_ratchet_configuration(SenderRatchetConfiguration::new(0, 0))
+            .build();
+
+        let welcome = StagedWelcome::new_from_welcome(
+            &self.provider,
+            &join_config,
+            group_info.welcome()?,
+            Some(group_info.ratchet_tree()?),
+        )?;
+
+        let group = welcome.into_group(&self.provider)?;
+
+        self.group_cache.insert(group.group_id().clone(), group);
+
+        Ok(())
+    }
+
+    fn get_group<'a>(
+        cache: &'a mut HashMap<GroupId, MlsGroup>,
+        storage: &<SvalinProvider as OpenMlsProvider>::StorageProvider,
+        group_id: GroupId,
+    ) -> Result<&'a mut MlsGroup, GetGroupError> {
+        let group = match cache.entry(group_id) {
+            std::collections::hash_map::Entry::Occupied(occupied_entry) => {
+                occupied_entry.into_mut()
+            }
+            std::collections::hash_map::Entry::Vacant(vacant_entry) => {
+                let Some(mls_group) = MlsGroup::load(storage, vacant_entry.key())
+                    .map_err(GetGroupError::StorageError)?
+                else {
+                    return Err(GetGroupError::UnknownGroup);
+                };
+
+                vacant_entry.insert(mls_group)
+            }
+        };
+
+        Ok(group)
+    }
+
     fn create_message(
         &mut self,
         group_id: &[u8],
         message: &[u8],
     ) -> Result<GroupMessage, CreateGroupMessageError> {
         let group_id = GroupId::from_slice(&group_id);
-        let group = if let Some(group) = self.group_cache.get_mut(&group_id) {
-            group
-        } else {
-            let Some(mls_group) = MlsGroup::load(self.provider.storage(), &group_id)
-                .map_err(CreateGroupMessageError::StorageError)?
-            else {
-                return Err(CreateGroupMessageError::UnknownGroup);
-            };
-
-            self.group_cache.insert(group_id.clone(), mls_group);
-            self.group_cache
-                .get_mut(&group_id)
-                .expect("just inserted value cannot be missing")
-        };
+        let group = Self::get_group(
+            &mut self.group_cache,
+            self.provider.storage(),
+            group_id.clone(),
+        )?;
 
         let message = group
-            .create_message(self.provider.as_ref(), &self.svalin_credential, message)?
+            .create_message(&self.provider, &self.svalin_credential, message)?
             .to_bytes()?;
 
         Ok(GroupMessage { group_id, message })
     }
 
-    fn join_group(&self, group_info: GroupCreationInfo) -> Result<(), JoinGroupError> {
-        todo!()
+    fn process_message(
+        &mut self,
+        group_id: &[u8],
+        message: &[u8],
+    ) -> Result<Vec<u8>, ProcessGroupMessageError> {
+        let group_id = GroupId::from_slice(&group_id);
+        let group = Self::get_group(
+            &mut self.group_cache,
+            self.provider.storage(),
+            group_id.clone(),
+        )?;
+
+        let message = MlsMessageIn::tls_deserialize_exact_bytes(message)?;
+
+        let processed =
+            group.process_message(&self.provider, message.try_into_protocol_message()?)?;
+
+        match processed.into_content() {
+            openmls::prelude::ProcessedMessageContent::ApplicationMessage(application_message) => {
+                return Ok(application_message.into_bytes());
+            }
+            openmls::prelude::ProcessedMessageContent::ProposalMessage(_queued_proposal) => todo!(),
+            openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
+                _queued_proposal,
+            ) => todo!(),
+            openmls::prelude::ProcessedMessageContent::StagedCommitMessage(_staged_commit) => {
+                todo!()
+            }
+        }
     }
 
     // pub async fn join_my_device_group(
@@ -322,6 +436,14 @@ impl MlsProcessor {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum GetGroupError {
+    #[error("give group does not exist")]
+    UnknownGroup,
+    #[error("storage error: {0}")]
+    StorageError(<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError),
+}
+
 #[derive(Serialize, Deserialize)]
 #[cfg_attr(test, derive(Clone))]
 pub struct GroupCreationInfo {
@@ -363,51 +485,51 @@ impl GroupCreationInfo {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[cfg_attr(test, derive(Clone))]
-pub struct DeviceGroupCreationInfo {
-    certificate: UnverifiedCertificate,
-    welcome: Vec<u8>,
-    group_info: Vec<u8>,
-}
+// #[derive(Serialize, Deserialize)]
+// #[cfg_attr(test, derive(Clone))]
+// pub struct DeviceGroupCreationInfo {
+//     certificate: UnverifiedCertificate,
+//     welcome: Vec<u8>,
+//     group_info: Vec<u8>,
+// }
 
-impl DeviceGroupCreationInfo {
-    pub fn welcome(&self) -> Result<Welcome, GroupCreationUnpackError> {
-        let message = MlsMessageIn::tls_deserialize_exact_bytes(&self.welcome.as_slice())?;
+// impl DeviceGroupCreationInfo {
+//     pub fn welcome(&self) -> Result<Welcome, GroupCreationUnpackError> {
+//         let message = MlsMessageIn::tls_deserialize_exact_bytes(&self.welcome.as_slice())?;
 
-        let MlsMessageBodyIn::Welcome(welcome) = message.extract() else {
-            return Err(GroupCreationUnpackError::WrongMessageType);
-        };
+//         let MlsMessageBodyIn::Welcome(welcome) = message.extract() else {
+//             return Err(GroupCreationUnpackError::WrongMessageType);
+//         };
 
-        Ok(welcome)
-    }
+//         Ok(welcome)
+//     }
 
-    pub fn group_info(&self) -> Result<VerifiableGroupInfo, GroupCreationUnpackError> {
-        let message = MlsMessageIn::tls_deserialize_exact_bytes(&self.group_info.as_slice())?;
+//     pub fn group_info(&self) -> Result<VerifiableGroupInfo, GroupCreationUnpackError> {
+//         let message = MlsMessageIn::tls_deserialize_exact_bytes(&self.group_info.as_slice())?;
 
-        let MlsMessageBodyIn::GroupInfo(group_info) = message.extract() else {
-            return Err(GroupCreationUnpackError::WrongMessageType);
-        };
+//         let MlsMessageBodyIn::GroupInfo(group_info) = message.extract() else {
+//             return Err(GroupCreationUnpackError::WrongMessageType);
+//         };
 
-        Ok(group_info)
-    }
+//         Ok(group_info)
+//     }
 
-    pub fn ratchet_tree(&self) -> Result<RatchetTreeIn, GroupCreationUnpackError> {
-        let group_info = self.group_info()?;
-        let ratchet_tree = group_info
-            .extensions()
-            .ratchet_tree()
-            .ok_or_else(|| GroupCreationUnpackError::MissingRatchetTree)?
-            .ratchet_tree()
-            .clone();
+//     pub fn ratchet_tree(&self) -> Result<RatchetTreeIn, GroupCreationUnpackError> {
+//         let group_info = self.group_info()?;
+//         let ratchet_tree = group_info
+//             .extensions()
+//             .ratchet_tree()
+//             .ok_or_else(|| GroupCreationUnpackError::MissingRatchetTree)?
+//             .ratchet_tree()
+//             .clone();
 
-        Ok(ratchet_tree)
-    }
+//         Ok(ratchet_tree)
+//     }
 
-    pub fn certificate(&self) -> &UnverifiedCertificate {
-        &self.certificate
-    }
-}
+//     pub fn certificate(&self) -> &UnverifiedCertificate {
+//         &self.certificate
+//     }
+// }
 
 #[derive(Debug, thiserror::Error)]
 pub enum GroupCreationUnpackError {
@@ -459,7 +581,7 @@ pub enum CreateGroupError {
     TlsCodecError(#[from] tls_codec::Error),
     #[error("error trying to export group info: {0}")]
     ExportGroupInfoError(#[from] ExportGroupInfoError),
-    #[error("error receiving from mlsclient")]
+    #[error("error receiving from mlsprocessor")]
     RecvError(#[from] oneshot::error::RecvError),
 }
 
@@ -471,51 +593,63 @@ pub struct GroupMessage {
 
 #[derive(Debug, thiserror::Error)]
 pub enum CreateGroupMessageError {
-    #[error("give group does not exist")]
-    UnknownGroup,
-    #[error("storage error: {0}")]
-    StorageError(<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError),
+    #[error("error loading group: {0}")]
+    GetGroupError(#[from] GetGroupError),
     #[error("mls error: {0}")]
     Inner(#[from] CreateMessageError),
     #[error("encoding error")]
     EncodeError(#[from] MlsMessageError),
-    #[error("error receiving from mlsclient")]
+    #[error("error receiving from mlsprocessor")]
     RecvError(#[from] oneshot::error::RecvError),
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum CreateDeviceGroupError {
-    #[error("error trying to create mls group: {0}")]
-    NewGroupError(
-        #[from] NewGroupError<<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError>,
-    ),
-    #[error("error trying to add members to mls group: {0}")]
-    AddMembersError(
+pub enum ProcessGroupMessageError {
+    #[error("error loading group: {0}")]
+    GetGroupError(#[from] GetGroupError),
+    #[error("error decoding message: {0}")]
+    DecodeError(#[from] tls_codec::Error),
+    #[error("protocol message error: {0}")]
+    ProtocolMessageError(#[from] ProtocolMessageError),
+    #[error("process message error: {0}")]
+    ProcessError(
         #[from]
-        AddMembersError<<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError>,
+        ProcessMessageError<<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError>,
     ),
-    #[error("error trying to merge pending commit: {0}")]
-    MergePendingCommitError(
-        #[from]
-        MergePendingCommitError<
-            <SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError,
-        >,
-    ),
-    #[error("error trying to create mls message: {0}")]
-    MlsMessageError(#[from] MlsMessageError),
-    #[error("error in tls codec: {0}")]
-    TlsCodecError(#[from] tls_codec::Error),
-    #[error("error trying to export group info: {0}")]
-    ExportGroupInfoError(#[from] ExportGroupInfoError),
-    #[error("error trying to join task: {0}")]
-    TokioJoinError(#[from] tokio::task::JoinError),
+    #[error("error receiving from mlsprocessor")]
+    RecvError(#[from] oneshot::error::RecvError),
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum JoinGroupError {}
+// #[derive(Debug, thiserror::Error)]
+// pub enum CreateDeviceGroupError {
+//     #[error("error trying to create mls group: {0}")]
+//     NewGroupError(
+//         #[from] NewGroupError<<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError>,
+//     ),
+//     #[error("error trying to add members to mls group: {0}")]
+//     AddMembersError(
+//         #[from]
+//         AddMembersError<<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError>,
+//     ),
+//     #[error("error trying to merge pending commit: {0}")]
+//     MergePendingCommitError(
+//         #[from]
+//         MergePendingCommitError<
+//             <SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError,
+//         >,
+//     ),
+//     #[error("error trying to create mls message: {0}")]
+//     MlsMessageError(#[from] MlsMessageError),
+//     #[error("error in tls codec: {0}")]
+//     TlsCodecError(#[from] tls_codec::Error),
+//     #[error("error trying to export group info: {0}")]
+//     ExportGroupInfoError(#[from] ExportGroupInfoError),
+//     #[error("error trying to join task: {0}")]
+//     TokioJoinError(#[from] tokio::task::JoinError),
+// }
 
 #[derive(Debug, thiserror::Error)]
-pub enum JoinDeviceGroupError {
+pub enum JoinGroupError {
     #[error("group creation unpack error: {0}")]
     GroupCreationUnpackError(#[from] GroupCreationUnpackError),
     #[error("error while trying to parse welcome: {0}")]
@@ -526,10 +660,26 @@ pub enum JoinDeviceGroupError {
     LibraryError(#[from] openmls::error::LibraryError),
     #[error("error in tls codec: {0}")]
     TlsCodecError(#[from] tls_codec::Error),
-    #[error("wrong group creator")]
-    WrongGroupCreator,
-    #[error("wrong group id, not my group")]
-    WrongGroupId,
-    #[error("wrong member type")]
-    WrongMemberType,
+    #[error("error receiving from mlsprocessor")]
+    RecvError(#[from] oneshot::error::RecvError),
 }
+
+// #[derive(Debug, thiserror::Error)]
+// pub enum JoinDeviceGroupError {
+//     #[error("group creation unpack error: {0}")]
+//     GroupCreationUnpackError(#[from] GroupCreationUnpackError),
+//     #[error("error while trying to parse welcome: {0}")]
+//     WelcomeError(
+//         #[from] WelcomeError<<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError>,
+//     ),
+//     #[error("error in openmls library: {0}")]
+//     LibraryError(#[from] openmls::error::LibraryError),
+//     #[error("error in tls codec: {0}")]
+//     TlsCodecError(#[from] tls_codec::Error),
+//     #[error("wrong group creator")]
+//     WrongGroupCreator,
+//     #[error("wrong group id, not my group")]
+//     WrongGroupId,
+//     #[error("wrong member type")]
+//     WrongMemberType,
+// }
