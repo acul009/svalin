@@ -48,7 +48,7 @@ impl MlsProcessorHandle {
             group_cache: HashMap::new(),
         };
 
-        std::thread::spawn(move || {
+        tokio::task::spawn_blocking(move || {
             let mut client = client;
             while let Some(request) = recv.blocking_recv() {
                 match request {
@@ -79,12 +79,8 @@ impl MlsProcessorHandle {
                         let result = client.create_message(&group_id, &message);
                         let _ = response.send(result);
                     }
-                    MlsProcessorRequest::ProcessMessage {
-                        group_id,
-                        message,
-                        response,
-                    } => {
-                        let result = client.process_message(&group_id, &message);
+                    MlsProcessorRequest::ProcessMessage { message, response } => {
+                        let result = client.process_message(&message);
                         let _ = response.send(result);
                     }
                 }
@@ -158,16 +154,14 @@ impl MlsProcessorHandle {
     }
 
     pub async fn process_message(
-        &mut self,
-        group_id: Vec<u8>,
-        message: Vec<u8>,
+        &self,
+        message: GroupMessage,
     ) -> Result<Vec<u8>, ProcessGroupMessageError> {
         let (send, recv) = oneshot::channel();
 
         let _ = self
             .channel
             .send(MlsProcessorRequest::ProcessMessage {
-                group_id,
                 message,
                 response: send,
             })
@@ -196,8 +190,7 @@ enum MlsProcessorRequest {
         response: oneshot::Sender<Result<(), JoinGroupError>>,
     },
     ProcessMessage {
-        group_id: Vec<u8>,
-        message: Vec<u8>,
+        message: GroupMessage,
         response: oneshot::Sender<Result<Vec<u8>, ProcessGroupMessageError>>,
     },
 }
@@ -342,13 +335,12 @@ impl MlsProcessor {
 
     fn process_message(
         &mut self,
-        group_id: &[u8],
-        message: &[u8],
+        message: &GroupMessage,
     ) -> Result<Vec<u8>, ProcessGroupMessageError> {
-        let group_id = GroupId::from_slice(&group_id);
+        let group_id = GroupId::from_slice(message.group_id.as_slice());
         let group = Self::get_group(&mut self.group_cache, self.provider.storage(), group_id)?;
 
-        let message = MlsMessageIn::tls_deserialize_exact_bytes(message)?;
+        let message = MlsMessageIn::tls_deserialize_exact_bytes(message.message.as_slice())?;
 
         let processed =
             group.process_message(&self.provider, message.try_into_protocol_message()?)?;
@@ -427,9 +419,9 @@ impl MlsProcessor {
     //     Ok(())
     // }
 
-    pub(crate) fn signer(&self) -> &Credential {
-        &self.svalin_credential
-    }
+    // pub(crate) fn signer(&self) -> &Credential {
+    //     &self.svalin_credential
+    // }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -581,10 +573,10 @@ pub enum CreateGroupError {
     RecvError(#[from] oneshot::error::RecvError),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct GroupMessage {
-    group_id: GroupId,
-    message: Vec<u8>,
+    pub(crate) group_id: GroupId,
+    pub(crate) message: Vec<u8>,
 }
 
 #[derive(Debug, thiserror::Error)]

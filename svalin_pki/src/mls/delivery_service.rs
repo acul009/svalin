@@ -1,31 +1,19 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex, PoisonError},
-};
+use std::{collections::HashMap, sync::Arc};
 
 use openmls::{
     framing::errors::ProtocolMessageError,
-    group::{
-        GroupId, MergeCommitError, MlsGroup, ProposalStore, PublicGroup, PublicProcessMessageError,
-    },
-    prelude::{
-        CreationFromExternalError, MlsMessageBodyIn, MlsMessageIn, OpenMlsCrypto, ProtocolMessage,
-        PublicMessageIn, Sender,
-    },
-    treesync,
+    group::{GroupId, MergeCommitError, ProposalStore, PublicGroup, PublicProcessMessageError},
+    prelude::{CreationFromExternalError, MlsMessageBodyIn, MlsMessageIn, OpenMlsCrypto, Sender},
 };
-use openmls_rust_crypto::MemoryStorageError;
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
-use rustls::{lock, server::ParsedCertificate};
-use tls_codec::{Deserialize, DeserializeBytes};
+use tls_codec::DeserializeBytes;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-    Certificate, CertificateParseError, SpkiHash, UnverifiedCertificate,
+    CertificateParseError, SpkiHash, UnverifiedCertificate,
     mls::{
-        agent::EncodedReport,
-        processor::{GroupCreationInfo, GroupCreationUnpackError},
+        processor::{GroupCreationInfo, GroupCreationUnpackError, GroupMessage},
         provider::{PostcardCodec, SvalinProvider},
     },
 };
@@ -43,7 +31,7 @@ impl DeliveryServiceHandle {
             group_cache: HashMap::new(),
         };
 
-        std::thread::spawn(move || {
+        tokio::task::spawn_blocking(move || {
             let mut delivery_service = delivery_service;
             while let Some(recv) = recv.blocking_recv() {
                 match recv {
@@ -52,6 +40,10 @@ impl DeliveryServiceHandle {
                         response,
                     } => {
                         let result = delivery_service.new_group(group_info);
+                        let _ = response.send(result);
+                    }
+                    DeliveryServiceRequest::ProcessMessage { message, response } => {
+                        let result = delivery_service.process_message(&message);
                         let _ = response.send(result);
                     }
                 }
@@ -64,12 +56,30 @@ impl DeliveryServiceHandle {
     pub async fn new_group(
         &self,
         group_info: GroupCreationInfo,
-    ) -> Result<(), NewPublicGroupError> {
+    ) -> Result<Vec<SpkiHash>, NewPublicGroupError> {
         let (send, recv) = oneshot::channel();
 
-        self.channel
+        let _ = self
+            .channel
             .send(DeliveryServiceRequest::NewGroup {
                 group_info,
+                response: send,
+            })
+            .await;
+
+        recv.await?
+    }
+
+    pub async fn process_message(
+        &self,
+        message: GroupMessage,
+    ) -> Result<Vec<SpkiHash>, ProcessMessageError> {
+        let (send, recv) = oneshot::channel();
+
+        let _ = self
+            .channel
+            .send(DeliveryServiceRequest::ProcessMessage {
+                message,
                 response: send,
             })
             .await;
@@ -81,7 +91,11 @@ impl DeliveryServiceHandle {
 enum DeliveryServiceRequest {
     NewGroup {
         group_info: GroupCreationInfo,
-        response: oneshot::Sender<Result<(), NewPublicGroupError>>,
+        response: oneshot::Sender<Result<Vec<SpkiHash>, NewPublicGroupError>>,
+    },
+    ProcessMessage {
+        message: GroupMessage,
+        response: oneshot::Sender<Result<Vec<SpkiHash>, ProcessMessageError>>,
     },
 }
 
@@ -91,11 +105,14 @@ struct DeliveryService {
 }
 
 impl DeliveryService {
-    pub fn crypto(&self) -> &impl OpenMlsCrypto {
-        self.provider.crypto()
-    }
+    // pub fn crypto(&self) -> &impl OpenMlsCrypto {
+    //     self.provider.crypto()
+    // }
 
-    fn new_group(&mut self, group_info: GroupCreationInfo) -> Result<(), NewPublicGroupError> {
+    fn new_group(
+        &mut self,
+        group_info: GroupCreationInfo,
+    ) -> Result<Vec<SpkiHash>, NewPublicGroupError> {
         let group_info = group_info.group_info()?;
         let ratchet_tree = group_info
             .extensions()
@@ -112,10 +129,18 @@ impl DeliveryService {
             ProposalStore::new(),
         )?;
 
+        let members = group
+            .members()
+            .map(|member| {
+                let cert: UnverifiedCertificate = member.credential.deserialized()?;
+                Ok(cert.spki_hash().clone())
+            })
+            .collect::<Result<_, tls_codec::Error>>()?;
+
         self.group_cache
             .insert(group_info.group_context().group_id().clone(), group);
 
-        Ok(())
+        Ok(members)
     }
 
     // pub async fn new_device_group(
@@ -180,22 +205,31 @@ impl DeliveryService {
 
     fn process_message(
         &mut self,
-        group_id: &[u8],
-        message: &[u8],
+        message: &GroupMessage,
     ) -> Result<Vec<SpkiHash>, ProcessMessageError> {
-        let group_id = GroupId::from_slice(&group_id);
+        let group_id = GroupId::from_slice(message.group_id.as_slice());
         let group = Self::get_group(&mut self.group_cache, self.provider.storage(), group_id)?;
 
-        let message = MlsMessageIn::tls_deserialize_exact_bytes(message)?;
+        let members = group
+            .members()
+            .map(|member| {
+                let cert: UnverifiedCertificate = member.credential.deserialized()?;
+                Ok(cert.spki_hash().clone())
+            })
+            .collect::<Result<_, tls_codec::Error>>()?;
 
-        let processed =
-            group.process_message(self.provider.crypto(), message.try_into_protocol_message()?)?;
+        let message = MlsMessageIn::tls_deserialize_exact_bytes(message.message.as_slice())?;
+        let MlsMessageBodyIn::PublicMessage(message) = message.extract() else {
+            return Ok(members);
+        };
+
+        let processed = group.process_message(self.provider.crypto(), message)?;
 
         match processed.into_content() {
             openmls::prelude::ProcessedMessageContent::ApplicationMessage(application_message) => {
-                let raw = application_message.into_bytes()
-                println!("public application message: {}")
-                todo!()
+                let raw = application_message.into_bytes();
+                let as_str = String::from_utf8_lossy(&raw);
+                println!("public application message: {}", as_str);
             }
             openmls::prelude::ProcessedMessageContent::ProposalMessage(queued_proposal) => todo!(),
             openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
@@ -206,7 +240,7 @@ impl DeliveryService {
             }
         }
 
-        todo!()
+        Ok(members)
     }
 
     // pub async fn process_device_group_message(
@@ -328,6 +362,8 @@ pub enum NewPublicGroupError {
     ),
     #[error("error accessing MLS storage: {0}")]
     StorageError(<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError),
+    #[error("error decoding credential: {0}")]
+    TlsCodecError(#[from] tls_codec::Error),
     #[error("error receiving from delivery service")]
     RecvError(#[from] oneshot::error::RecvError),
 }
@@ -352,12 +388,6 @@ pub enum ProcessMessageError {
     ProtocolMessageError(#[from] ProtocolMessageError),
     #[error("tls codec error: {0}")]
     TlsCodecError(#[from] tls_codec::Error),
-    #[error("security violation: this message type is not allowed, possible cyber attack")]
-    MessageTypeNotAllowed,
-    #[error("a member message was sent by a non member, probably a bug")]
-    MemberMessageByNonMember,
-    #[error("device group is not known by storage")]
-    DeviceGroupUnknown,
     #[error("error deserializing certificate: {0}")]
     CredentialError(#[from] CertificateParseError),
     #[error("error merging commit: {0}")]
@@ -365,6 +395,8 @@ pub enum ProcessMessageError {
         #[from]
         MergeCommitError<<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError>,
     ),
+    #[error("error receiving from delivery service")]
+    RecvError(#[from] oneshot::error::RecvError),
 }
 
 #[derive(Debug, thiserror::Error)]
