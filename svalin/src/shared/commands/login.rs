@@ -4,7 +4,7 @@ use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage};
 use serde::{Deserialize, Serialize};
-use svalin_pki::password_hash::rand_core::OsRng;
+use svalin_pki::argon2::password_hash::rand_core::OsRng;
 use svalin_pki::{
     ArgonCost, Certificate, CertificateChainBuilder, CreateCredentialsError, Credential,
     DecodeCredentialsError, DecryptError, EncryptError, EncryptedCredential,
@@ -12,7 +12,7 @@ use svalin_pki::{
     UnverifiedCertificate, UseAsRootError, argon2::Argon2, get_current_timestamp,
     serde_paramsstring,
 };
-use svalin_pki::{curve25519_dalek::RistrettoPoint, password_hash::ParamsString};
+use svalin_pki::{argon2::password_hash::ParamsString, curve25519_dalek::RistrettoPoint};
 use svalin_rpc::{
     rpc::{
         command::{
@@ -181,7 +181,7 @@ impl TakeableCommandHandler for LoginHandler {
                         strong_username.username,
                         strong_username.blinded,
                         user_store.as_ref(),
-                        svalin_pki::password_hash::rand_core::OsRng,
+                        svalin_pki::argon2::password_hash::rand_core::OsRng,
                     )
                     .map_err(|err| anyhow!(err))
             })

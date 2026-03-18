@@ -18,7 +18,6 @@ mod verifier;
 
 // Re-Exports
 pub use curve25519_dalek;
-pub use password_hash;
 pub use sha2::Sha512;
 
 // Exports

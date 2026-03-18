@@ -1,5 +1,5 @@
+use argon2::password_hash::SaltString;
 use core::fmt;
-use password_hash::SaltString;
 use serde::de::{Error, Visitor};
 use serde::{Deserializer, Serializer};
 

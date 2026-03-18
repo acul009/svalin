@@ -52,7 +52,7 @@ pub enum AucPaceClientError {
     #[error("Join error: {0}")]
     JoinError(#[from] tokio::task::JoinError),
     #[error("password hash error: {0}")]
-    PasswordHashError(#[from] svalin_pki::password_hash::Error),
+    PasswordHashError(#[from] svalin_pki::argon2::password_hash::Error),
     #[error("authentication failed: {0}")]
     AuthenticationFailed(aucpace::Error),
     #[error("params string parse error: {0}")]
@@ -82,7 +82,7 @@ pub enum AucPaceServerError {
     #[error("Join error: {0}")]
     JoinError(#[from] tokio::task::JoinError),
     #[error("password hash error: {0}")]
-    PasswordHashError(#[from] svalin_pki::password_hash::Error),
+    PasswordHashError(#[from] svalin_pki::argon2::password_hash::Error),
     #[error("authentication failed: {0}")]
     AuthenticationFailed(aucpace::Error),
 }

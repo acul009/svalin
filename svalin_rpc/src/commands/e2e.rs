@@ -100,7 +100,7 @@ pub struct E2EDispatcher<'b> {
 }
 
 impl<'b> TakeableCommandDispatcher for E2EDispatcher<'b> {
-    type Output = (Box<dyn SessionTransport>);
+    type Output = Box<dyn SessionTransport>;
     type InnerError = E2EDispatchError;
 
     type Request = ();

@@ -121,7 +121,7 @@ pub enum ForwardDispatchError {
 }
 
 impl TakeableCommandDispatcher for ForwardDispatcher {
-    type Output = (Box<dyn SessionTransport>);
+    type Output = Box<dyn SessionTransport>;
     type InnerError = ForwardDispatchError;
 
     type Request = SpkiHash;

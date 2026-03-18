@@ -1,6 +1,6 @@
 use anyhow::Result;
 use argon2::{Argon2, Params, password_hash::ParamsString};
-use rand::Rng;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zeroize::Zeroize;

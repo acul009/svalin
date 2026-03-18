@@ -2,15 +2,15 @@ use anyhow::{Result, anyhow};
 use aucpace::{AuCPaceClient, ClientMessage};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use svalin_pki::password_hash::rand_core::OsRng;
+use svalin_pki::argon2::password_hash::rand_core::OsRng;
 use svalin_pki::{
     ArgonCost, Certificate, CreateCertificateError, CreateCredentialsError, Credential,
     EncryptError, EncryptedCredential, ExportedPublicKey, KeyPair, RootCertificate, Sha512,
     UnverifiedCertificate, argon2::Argon2, serde_paramsstring,
 };
 use svalin_pki::{
+    argon2::password_hash::ParamsString,
     curve25519_dalek::{RistrettoPoint, Scalar},
-    password_hash::ParamsString,
 };
 use svalin_rpc::transport::aucpace_transport::NONCE_LENGTH;
 
