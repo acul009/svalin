@@ -232,7 +232,7 @@ impl Server {
 
         let command_builder = SvalinCommandBuilder {
             root_cert: root,
-            server_cert: credentials.get_certificate().clone(),
+            server_cert: credentials.certificate().clone(),
             user_store,
             agent_store,
             session_store,

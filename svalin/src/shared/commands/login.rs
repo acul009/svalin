@@ -656,7 +656,7 @@ impl TakeableCommandDispatcher for Login {
                 .map_err(LoginDispatcherError::CreateSessionError)?;
 
             session
-                .write_object(device_credential.get_certificate().as_unverified())
+                .write_object(device_credential.certificate().as_unverified())
                 .await
                 .map_err(LoginDispatcherError::WriteSessionError)?;
 

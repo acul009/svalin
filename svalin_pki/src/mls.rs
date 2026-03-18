@@ -7,8 +7,9 @@ pub mod agent;
 pub mod client;
 pub mod delivery_service;
 pub mod key_package;
+pub mod key_retriever;
 pub mod message_types;
-pub mod processor;
+pub(crate) mod processor;
 pub mod provider;
 
 pub use openmls::prelude::{OpenMlsProvider, ProtocolVersion};

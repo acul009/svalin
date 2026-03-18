@@ -176,7 +176,7 @@ pub enum SignatureVerificationError {
 }
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize, PartialOrd, Ord, Hash)]
-pub struct SpkiHash([u8; 32]);
+pub struct SpkiHash(pub(crate) [u8; 32]);
 impl Display for SpkiHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for byte in self.0.iter() {

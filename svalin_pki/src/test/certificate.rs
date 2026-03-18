@@ -21,8 +21,8 @@ fn test_certificate_serde_serialization() {
     let credentials2 = Credential::generate_temporary().unwrap();
 
     let test_struct = SerializationTestStruct {
-        cert1: credentials.get_certificate().to_owned().to_unverified(),
-        cert2: credentials2.get_certificate().to_owned().to_unverified(),
+        cert1: credentials.certificate().to_owned().to_unverified(),
+        cert2: credentials2.certificate().to_owned().to_unverified(),
     };
 
     let encoded = postcard::to_extend(&test_struct, Vec::new()).unwrap();
@@ -42,7 +42,7 @@ pub fn cert_verify_message() {
 
     let signed = credentials.sign(&msg).unwrap();
 
-    let msg2 = credentials.get_certificate().verify(&signed).unwrap();
+    let msg2 = credentials.certificate().verify(&signed).unwrap();
 
     assert_eq!(msg, msg2.as_ref());
 }
@@ -50,7 +50,7 @@ pub fn cert_verify_message() {
 #[test]
 pub fn serialization() {
     let perm_creds = Credential::generate_temporary().unwrap();
-    let cert = perm_creds.get_certificate();
+    let cert = perm_creds.certificate();
 
     let seriaized = cert.as_der().to_owned();
     let cert2 = UnverifiedCertificate::from_der(seriaized).unwrap();
@@ -60,7 +60,7 @@ pub fn serialization() {
 #[test]
 pub fn serde_serialization() {
     let perm_creds = Credential::generate_temporary().unwrap();
-    let cert = perm_creds.get_certificate().as_unverified();
+    let cert = perm_creds.certificate().as_unverified();
 
     let serialized = postcard::to_extend(&cert, Vec::new()).unwrap();
 
@@ -88,7 +88,7 @@ async fn test_on_disk_storage() {
 
     let copy = encrypted_credentials.decrypt(pw.into()).await.unwrap();
 
-    assert_eq!(copy.get_certificate(), original.get_certificate());
+    assert_eq!(copy.certificate(), original.certificate());
 }
 
 #[tokio::test]
@@ -111,6 +111,6 @@ async fn test_create_leaf() {
     let leaf: UnverifiedCertificate = postcard::from_bytes(&serialized).unwrap();
 
     let _verified = leaf
-        .verify_signature(root.get_certificate(), get_current_timestamp())
+        .verify_signature(root.certificate(), get_current_timestamp())
         .unwrap();
 }

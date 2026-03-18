@@ -29,7 +29,7 @@ where
 
         Ok(Self {
             raw,
-            singer_spki_hash: credentials.get_certificate().spki_hash().clone(),
+            singer_spki_hash: credentials.certificate().spki_hash().clone(),
             phantom: PhantomData,
         })
     }
@@ -126,7 +126,7 @@ mod tests {
         let encoded = postcard::to_extend(&signed, Vec::new()).unwrap();
         let signed2: SignedObject<TestSign> = postcard::from_bytes(&encoded).unwrap();
 
-        let verifier = ExactVerififier::new(credentials.get_certificate().clone());
+        let verifier = ExactVerififier::new(credentials.certificate().clone());
 
         let verified = signed2
             .verify(&verifier, get_current_timestamp())
@@ -147,7 +147,7 @@ mod tests {
         let credentials = Credential::generate_root().unwrap();
 
         let mut signed = super::SignedObject::new(&object, &credentials).unwrap();
-        let verifier = ExactVerififier::new(credentials.get_certificate().clone());
+        let verifier = ExactVerififier::new(credentials.certificate().clone());
 
         let object2 = TestSign {
             name: "tset".to_string(),
@@ -177,7 +177,7 @@ mod tests {
         let credentials2 = Credential::generate_root().unwrap();
 
         let signed = super::SignedObject::new(&object, &credentials).unwrap();
-        let verifier = ExactVerififier::new(credentials2.get_certificate().clone());
+        let verifier = ExactVerififier::new(credentials2.certificate().clone());
 
         let _verified_err = signed
             .verify(&verifier, get_current_timestamp())

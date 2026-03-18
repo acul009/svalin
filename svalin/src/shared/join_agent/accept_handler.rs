@@ -243,7 +243,7 @@ async fn handle_agent_enroll(
 
     let others = client
         .get_key_packages(&[
-            client.user_credential().get_certificate().clone(),
+            client.user_credential().certificate().clone(),
             client.root_certificate().as_certificate().clone(),
         ])
         .await?;

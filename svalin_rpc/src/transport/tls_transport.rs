@@ -103,7 +103,7 @@ where
         credentials: &Credential,
     ) -> Result<Self, TlsClientError> {
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
-            credentials.get_certificate().as_der().to_owned(),
+            credentials.certificate().as_der().to_owned(),
         )];
 
         let key_der = credentials.keypair().rustls_private_key();
@@ -161,7 +161,7 @@ where
         credentials: &Credential,
     ) -> Result<Self, TlsServerError> {
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
-            credentials.get_certificate().as_der().to_owned(),
+            credentials.certificate().as_der().to_owned(),
         )];
 
         let key_der = credentials.keypair().rustls_private_key();
@@ -229,7 +229,7 @@ where
 
         // Write my cert
         let encrypted = EncryptedObject::encrypt_with_key(
-            credentials.get_certificate().as_unverified(),
+            credentials.certificate().as_unverified(),
             preshared,
         )?;
         let encoded = postcard::to_stdvec(&encrypted)?;

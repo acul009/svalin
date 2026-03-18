@@ -139,7 +139,7 @@ impl RpcServer {
         let priv_key = config.credentials.keypair().rustls_private_key();
 
         let cert_chain = vec![rustls::pki_types::CertificateDer::from(
-            config.credentials.get_certificate().as_der().to_owned(),
+            config.credentials.certificate().as_der().to_owned(),
         )];
 
         let crypto = rustls::ServerConfig::builder()

@@ -284,7 +284,7 @@ impl Credential {
         Ok(on_disk)
     }
 
-    pub fn get_certificate(&self) -> &Certificate {
+    pub fn certificate(&self) -> &Certificate {
         &self.data.certificate
     }
 
