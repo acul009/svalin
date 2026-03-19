@@ -1,7 +1,7 @@
 use openmls::prelude::CredentialType;
 use openmls_traits::signatures::SignerError;
 
-use crate::{Certificate, Credential, signed_message::CanSign};
+use crate::{Certificate, Credential, SpkiHash, signed_message::CanSign};
 
 pub mod agent;
 pub mod client;
@@ -11,14 +11,15 @@ pub mod key_retriever;
 pub mod message_types;
 pub(crate) mod processor;
 pub mod provider;
+pub mod transport_types;
 
 pub use openmls::prelude::{OpenMlsProvider, ProtocolVersion};
 
-impl From<&Certificate> for openmls::credentials::Credential {
-    fn from(value: &Certificate) -> Self {
+impl From<&SpkiHash> for openmls::credentials::Credential {
+    fn from(value: &SpkiHash) -> Self {
         // While there is the X509 credential type, it is not yet supported my openmls.
         // For now we'll have to use basic and handle verification ourselfves
-        Self::new(CredentialType::Basic, value.as_der().to_vec())
+        Self::new(CredentialType::Basic, value.to_vec())
     }
 }
 

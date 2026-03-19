@@ -1,6 +1,9 @@
 use std::marker::PhantomData;
 
-use openmls::{group::GroupId, prelude::MlsMessageOut};
+use openmls::{
+    group::GroupId,
+    prelude::{MlsMessageOut, Welcome, group_info::GroupInfo},
+};
 use openmls_sqlx_storage::SqliteStorageProvider;
 
 use crate::{
@@ -8,6 +11,7 @@ use crate::{
     mls::{
         processor::{CreateGroupError, MlsProcessorHandle},
         provider::PostcardCodec,
+        transport_types::MessageToServerTransport,
     },
 };
 
@@ -35,7 +39,7 @@ impl MlsClient {
     pub async fn create_device_group(
         &self,
         device: Certificate,
-    ) -> Result<(MlsMessageOut, MlsMessageOut), CreateDeviceGroupError> {
+    ) -> Result<MessageToServerTransport, CreateDeviceGroupError> {
         if device.certificate_type() != CertificateType::Agent {
             return Err(CreateDeviceGroupError::WrongCertificateType(
                 device.certificate_type(),

@@ -1,10 +1,7 @@
 use openmls::prelude::{KeyPackageIn, KeyPackageVerifyError, OpenMlsCrypto, ProtocolVersion};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    Certificate, CertificateType, KnownCertificateVerifier, SpkiHash, Verifier, VerifyError,
-    certificate::UnverifiedCertificate, get_current_timestamp,
-};
+use crate::{Certificate, CertificateType, SpkiHash, Verifier, VerifyError, get_current_timestamp};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UnverifiedKeyPackage {
@@ -27,7 +24,7 @@ pub enum KeyPackageError {
     #[error("Certificate verification error: {0}")]
     CertificateVerificationError(#[from] VerifyError),
     #[error("Certificate mismatch")]
-    CertificateMismatch,
+    SpkiHashMismatch,
 }
 
 impl UnverifiedKeyPackage {
@@ -39,21 +36,20 @@ impl UnverifiedKeyPackage {
     ) -> Result<KeyPackage, KeyPackageError> {
         let key_package = self.key_package.validate(crypto, protocol_version)?;
 
-        let unverified_cert: UnverifiedCertificate =
-            key_package.leaf_node().credential().deserialized()?;
+        let spki_hash: SpkiHash = key_package.leaf_node().credential().deserialized()?;
+
+        let certificate = verifier
+            .verify_spki_hash(&spki_hash, get_current_timestamp())
+            .await?;
 
         let signature_key = key_package.leaf_node().signature_key();
-        if signature_key.as_slice() != unverified_cert.public_key() {
+        if signature_key.as_slice() != certificate.public_key() {
             return Err(KeyPackageError::SignatureKeyMismatch);
         }
 
-        let verified_cert = verifier
-            .verify_known_certificate(&unverified_cert, get_current_timestamp())
-            .await?;
-
         Ok(KeyPackage {
             key_package,
-            certificate: verified_cert,
+            certificate,
         })
     }
 }
@@ -69,11 +65,10 @@ impl KeyPackage {
         certificate: Certificate,
         key_package: openmls::prelude::KeyPackage,
     ) -> Result<Self, KeyPackageError> {
-        let unverified_cert: UnverifiedCertificate =
-            key_package.leaf_node().credential().deserialized()?;
+        let spki_hash: SpkiHash = key_package.leaf_node().credential().deserialized()?;
 
-        if unverified_cert != certificate {
-            return Err(KeyPackageError::CertificateMismatch);
+        if &spki_hash != certificate.spki_hash() {
+            return Err(KeyPackageError::SpkiHashMismatch);
         }
 
         Ok(Self {

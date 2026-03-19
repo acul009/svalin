@@ -10,6 +10,7 @@ use serde::de::Visitor;
 use serde::{Deserialize, Serialize, de};
 use thiserror::Error;
 use time::Duration;
+use tls_codec::{TlsDeserialize, TlsSerialize, TlsSize};
 use x509_parser::error::X509Error;
 use x509_parser::prelude::Validity;
 use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
@@ -175,7 +176,19 @@ pub enum SignatureVerificationError {
     ValidityError(#[from] ValidityError),
 }
 
-#[derive(PartialEq, Eq, Clone, Serialize, Deserialize, PartialOrd, Ord, Hash)]
+#[derive(
+    PartialEq,
+    Eq,
+    Clone,
+    Serialize,
+    Deserialize,
+    TlsSize,
+    TlsSerialize,
+    TlsDeserialize,
+    PartialOrd,
+    Ord,
+    Hash,
+)]
 pub struct SpkiHash(pub(crate) [u8; 32]);
 impl Display for SpkiHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -518,37 +531,6 @@ impl<'de> Visitor<'de> for CertificateVisitor {
         }
 
         self.visit_byte_buf(der)
-    }
-}
-
-impl tls_codec::Size for UnverifiedCertificate {
-    fn tls_serialized_len(&self) -> usize {
-        self.as_der().len()
-    }
-}
-
-impl tls_codec::Serialize for UnverifiedCertificate {
-    fn tls_serialize<W: std::io::Write>(
-        &self,
-        writer: &mut W,
-    ) -> std::result::Result<usize, tls_codec::Error> {
-        writer
-            .write(self.as_der())
-            .map_err(|err| tls_codec::Error::EncodingError(err.to_string()))
-    }
-}
-
-impl tls_codec::Deserialize for UnverifiedCertificate {
-    fn tls_deserialize<R: std::io::Read>(
-        bytes: &mut R,
-    ) -> std::result::Result<Self, tls_codec::Error>
-    where
-        Self: Sized,
-    {
-        let mut buffer = Vec::new();
-        bytes.read_to_end(&mut buffer)?;
-        UnverifiedCertificate::from_der(buffer)
-            .map_err(|err| tls_codec::Error::DecodingError(err.to_string()))
     }
 }
 

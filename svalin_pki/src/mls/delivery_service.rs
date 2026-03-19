@@ -1,26 +1,20 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::{HashMap, HashSet};
 
 use openmls::{
     framing::errors::ProtocolMessageError,
-    group::{
-        GroupId, MergeCommitError, MlsGroupJoinConfig, PURE_PLAINTEXT_WIRE_FORMAT_POLICY,
-        ProcessedWelcome, ProposalStore, PublicGroup, PublicProcessMessageError, WelcomeError,
-    },
-    prelude::{
-        CreationFromExternalError, MlsMessageBodyIn, MlsMessageIn, OpenMlsCrypto, ProtocolMessage,
-        Sender, SenderRatchetConfiguration, Welcome, group_info::VerifiableGroupInfo,
-    },
+    group::{GroupId, MergeCommitError, ProposalStore, PublicGroup, PublicProcessMessageError},
+    prelude::{CreationFromExternalError, group_info::VerifiableGroupInfo},
 };
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
-use tls_codec::DeserializeBytes;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-    CertificateParseError, SpkiHash, UnverifiedCertificate,
+    CertificateParseError, SpkiHash,
     mls::{
-        processor::GroupCreationUnpackError,
+        client::{ParseGroupIdError, SvalinGroupId},
         provider::{PostcardCodec, SvalinProvider},
+        transport_types::{MessageToMemberTransport, MessageToSend, MessageToServer},
     },
 };
 
@@ -41,11 +35,8 @@ impl DeliveryServiceHandle {
             let mut delivery_service = delivery_service;
             while let Some(recv) = recv.blocking_recv() {
                 match recv {
-                    // DeliveryServiceRequest::NewGroup {
-                    //     group_info,
-                    //     response,
-                    // } => {
-                    //     let result = delivery_service.new_group(group_info);
+                    // DeliveryServiceRequest::ProcessMessageOld { message, response } => {
+                    //     let result = delivery_service.process_message_old(message);
                     //     let _ = response.send(result);
                     // }
                     DeliveryServiceRequest::ProcessMessage { message, response } => {
@@ -61,8 +52,8 @@ impl DeliveryServiceHandle {
 
     pub async fn process_message(
         &self,
-        message: MlsMessageIn,
-    ) -> Result<Vec<SpkiHash>, ProcessMessageError> {
+        message: MessageToServer,
+    ) -> Result<MessageToSend, ProcessMessageError> {
         let (send, recv) = oneshot::channel();
 
         let _ = self
@@ -75,12 +66,33 @@ impl DeliveryServiceHandle {
 
         recv.await?
     }
+
+    // pub async fn process_message_old(
+    //     &self,
+    //     message: MlsMessageIn,
+    // ) -> Result<Vec<SpkiHash>, ProcessMessageErrorOld> {
+    //     let (send, recv) = oneshot::channel();
+
+    //     let _ = self
+    //         .channel
+    //         .send(DeliveryServiceRequest::ProcessMessageOld {
+    //             message,
+    //             response: send,
+    //         })
+    //         .await;
+
+    //     recv.await?
+    // }
 }
 
 enum DeliveryServiceRequest {
+    // ProcessMessageOld {
+    //     message: MlsMessageIn,
+    //     response: oneshot::Sender<Result<Vec<SpkiHash>, ProcessMessageErrorOld>>,
+    // },
     ProcessMessage {
-        message: MlsMessageIn,
-        response: oneshot::Sender<Result<Vec<SpkiHash>, ProcessMessageError>>,
+        message: MessageToServer,
+        response: oneshot::Sender<Result<MessageToSend, ProcessMessageError>>,
     },
 }
 
@@ -188,105 +200,153 @@ impl DeliveryService {
         Ok(group)
     }
 
+    // fn process_message_old(
+    //     &mut self,
+    //     message: MlsMessageIn,
+    // ) -> Result<Vec<SpkiHash>, ProcessMessageErrorOld> {
+    //     let message: ProtocolMessage = match message.extract() {
+    //         MlsMessageBodyIn::PublicMessage(public_message_in) => public_message_in.into(),
+    //         MlsMessageBodyIn::PrivateMessage(private_message_in) => private_message_in.into(),
+    //         MlsMessageBodyIn::Welcome(welcome) => todo!(),
+    //         MlsMessageBodyIn::GroupInfo(verifiable_group_info) => todo!(),
+    //         MlsMessageBodyIn::KeyPackage(key_package_in) => todo!(),
+    //     };
+
+    //     let group_id = message.group_id().clone();
+    //     let group = Self::get_group(&mut self.group_cache, self.provider.storage(), group_id)?;
+
+    //     let members = group
+    //         .members()
+    //         .map(|member| {
+    //             let spki_hash: SpkiHash = member.credential.deserialized()?;
+    //             Ok(spki_hash)
+    //         })
+    //         .collect::<Result<_, tls_codec::Error>>()?;
+
+    //     let processed = group.process_message(self.provider.crypto(), message)?;
+
+    //     match processed.into_content() {
+    //         openmls::prelude::ProcessedMessageContent::ApplicationMessage(application_message) => {
+    //             let raw = application_message.into_bytes();
+    //             let as_str = String::from_utf8_lossy(&raw);
+    //             println!("public application message: {}", as_str);
+    //         }
+    //         openmls::prelude::ProcessedMessageContent::ProposalMessage(queued_proposal) => todo!(),
+    //         openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
+    //             queued_proposal,
+    //         ) => todo!(),
+    //         openmls::prelude::ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
+    //             todo!()
+    //         }
+    //     }
+
+    //     Ok(members)
+    // }
+
     fn process_message(
         &mut self,
-        message: MlsMessageIn,
-    ) -> Result<Vec<SpkiHash>, ProcessMessageError> {
-        let message: ProtocolMessage = match message.extract() {
-            MlsMessageBodyIn::PublicMessage(public_message_in) => public_message_in.into(),
-            MlsMessageBodyIn::PrivateMessage(private_message_in) => private_message_in.into(),
-            MlsMessageBodyIn::Welcome(welcome) => {
-                return self.process_welcome(welcome).map_err(Into::into);
+        message: MessageToServer,
+    ) -> Result<MessageToSend, ProcessMessageError> {
+        let to_send = match message {
+            MessageToServer::NewGroup {
+                group_info,
+                welcome,
+            } => {
+                let members = self.add_group(group_info)?;
+
+                MessageToSend {
+                    receivers: members,
+                    message: MessageToMemberTransport::Welcome(welcome),
+                }
             }
-            MlsMessageBodyIn::GroupInfo(verifiable_group_info) => todo!(),
-            MlsMessageBodyIn::KeyPackage(key_package_in) => todo!(),
+            MessageToServer::GroupMessage { group_id, message } => {
+                let members = self.get_group_members(group_id)?;
+
+                MessageToSend {
+                    receivers: members,
+                    message: MessageToMemberTransport::GroupMessage(message),
+                }
+            }
         };
 
-        let group_id = message.group_id().clone();
+        Ok(to_send)
+    }
+
+    fn add_group(
+        &mut self,
+        group_info: VerifiableGroupInfo,
+    ) -> Result<Vec<SpkiHash>, AddGroupError> {
+        let group_id = group_info.group_id();
+        match Self::get_group(
+            &mut self.group_cache,
+            self.provider.storage(),
+            group_id.clone(),
+        ) {
+            Ok(_) => return Err(AddGroupError::GroupExists),
+            Err(GetPublicGroupError::UnknownGroup) => (),
+            Err(err) => return Err(AddGroupError::GetPublicGroupError(err)),
+        }
+
+        let Some(ratchet_tree) = group_info.extensions().ratchet_tree() else {
+            return Err(AddGroupError::MissingRatchetTree);
+        };
+
+        let (group, _) = PublicGroup::from_external(
+            self.provider.crypto(),
+            self.provider.storage(),
+            ratchet_tree.ratchet_tree().clone(),
+            group_info,
+            ProposalStore::new(),
+        )?;
+
+        let members = group
+            .members()
+            .map(|member| {
+                let spki_hash: SpkiHash = member.credential.deserialized()?;
+                Ok(spki_hash)
+            })
+            .collect::<Result<Vec<SpkiHash>, tls_codec::Error>>()?;
+
+        Ok(members)
+
+        // let svalin_id = SvalinGroupId::from_group_id(group.group_id())?;
+
+        // match svalin_id {
+        //     SvalinGroupId::DeviceGroup(spki_hash) => {
+        //         // TODO: get the required members in a smarter way
+        //         let mut required_members = HashSet::new();
+        //         required_members.insert(spki_hash);
+
+        //         let members = group
+        //             .members()
+        //             .map(|member| {
+        //                 let spki_hash: SpkiHash = member.credential.deserialized()?;
+        //                 required_members.remove(&spki_hash);
+        //                 Ok(spki_hash)
+        //             })
+        //             .collect::<Result<Vec<SpkiHash>, tls_codec::Error>>()?;
+
+        //         if !required_members.is_empty() {
+        //             return Err(AddGroupError::MissingRequiredMembers);
+        //         }
+
+        //         Ok(members)
+        //     }
+        // }
+    }
+
+    fn get_group_members(&mut self, group_id: GroupId) -> Result<Vec<SpkiHash>, GetMembersError> {
         let group = Self::get_group(&mut self.group_cache, self.provider.storage(), group_id)?;
 
         let members = group
             .members()
             .map(|member| {
-                let cert: UnverifiedCertificate = member.credential.deserialized()?;
-                Ok(cert.spki_hash().clone())
+                let spki_hash: SpkiHash = member.credential.deserialized()?;
+                Ok(spki_hash)
             })
             .collect::<Result<_, tls_codec::Error>>()?;
 
-        let processed = group.process_message(self.provider.crypto(), message)?;
-
-        match processed.into_content() {
-            openmls::prelude::ProcessedMessageContent::ApplicationMessage(application_message) => {
-                let raw = application_message.into_bytes();
-                let as_str = String::from_utf8_lossy(&raw);
-                println!("public application message: {}", as_str);
-            }
-            openmls::prelude::ProcessedMessageContent::ProposalMessage(queued_proposal) => todo!(),
-            openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
-                queued_proposal,
-            ) => todo!(),
-            openmls::prelude::ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
-                todo!()
-            }
-        }
-
         Ok(members)
-    }
-    
-    fn process_group_info(&mut self, group_info: VerifiableGroupInfo) -> Result<(), ProcessGroupInfo> {
-        let group_id = group_info.group_id();
-        let Some(ratchet_tree) = group_info.extensions().ratchet_tree() else {
-            return Err(ProcessWelcomeError::MissingRatchetTree);
-        };
-    }
-
-    fn process_welcome(&mut self, welcome: Welcome) -> Result<Vec<SpkiHash>, ProcessWelcomeError> {
-        let join_config = MlsGroupJoinConfig::builder()
-            .max_past_epochs(0)
-            .use_ratchet_tree_extension(false)
-            .wire_format_policy(PURE_PLAINTEXT_WIRE_FORMAT_POLICY)
-            .sender_ratchet_configuration(SenderRatchetConfiguration::new(0, 0))
-            .build();
-        let welcome = ProcessedWelcome::new_from_welcome(&self.provider, &join_config, welcome)?;
-
-        let group_info = welcome.unverified_group_info();
-        let group_id = group_info.group_id();
-        let Some(ratchet_tree) = group_info.extensions().ratchet_tree() else {
-            return Err(ProcessWelcomeError::MissingRatchetTree);
-        };
-
-        let group = match self.group_cache.entry(group_id.clone()) {
-            // Found group in cache
-            std::collections::hash_map::Entry::Occupied(occupied_entry) => {
-                occupied_entry.into_mut()
-            }
-            std::collections::hash_map::Entry::Vacant(vacant_entry) => {
-                // found group in store, loading into cache
-                let mls_group = if let Some(mls_group) =
-                    PublicGroup::load(self.provider.storage(), vacant_entry.key())
-                        .map_err(ProcessWelcomeError::StorageError)?
-                {
-                    mls_group
-                } else {
-                    // group doesn't exist yet, create it instead
-                    let (public_group, _group_info) = PublicGroup::from_external(
-                        self.provider.crypto(),
-                        self.provider.storage(),
-                        ratchet_tree.ratchet_tree().clone(),
-                        group_info.clone(),
-                        ProposalStore::new(),
-                    )?;
-
-                    // Todo: check if the group may even be created and if the members are as expected
-
-                    public_group
-                };
-
-                vacant_entry.insert(mls_group)
-            }
-        };
-
-        todo!()
     }
 
     // pub async fn process_device_group_message(
@@ -396,9 +456,23 @@ impl DeliveryService {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum NewPublicGroupError {
-    #[error("error unpacking group creation info: {0}")]
-    GroupCreationUnpackError(#[from] GroupCreationUnpackError),
+pub enum ProcessMessageError {
+    #[error("error adding new group: {0}")]
+    AddGroupError(#[from] AddGroupError),
+    #[error("error getting members: {0}")]
+    GetMembersError(#[from] GetMembersError),
+    #[error("error receiving from delivery service")]
+    RecvError(#[from] oneshot::error::RecvError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AddGroupError {
+    #[error("the given group already exists")]
+    GroupExists,
+    #[error("the group info is missing the ratchet tree extension")]
+    MissingRatchetTree,
+    #[error("error getting group: {0}")]
+    GetPublicGroupError(#[from] GetPublicGroupError),
     #[error("error creating group from external: {0}")]
     CreationFromExternalError(
         #[from]
@@ -406,12 +480,20 @@ pub enum NewPublicGroupError {
             <SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError,
         >,
     ),
-    #[error("error accessing MLS storage: {0}")]
-    StorageError(<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError),
-    #[error("error decoding credential: {0}")]
+    #[error("error parsing group id: {0}")]
+    ParseGroupIdError(#[from] ParseGroupIdError),
+    #[error("tls codec error: {0}")]
     TlsCodecError(#[from] tls_codec::Error),
-    #[error("error receiving from delivery service")]
-    RecvError(#[from] oneshot::error::RecvError),
+    #[error("group does not contain all required members")]
+    MissingRequiredMembers,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum GetMembersError {
+    #[error("error getting group: {0}")]
+    GetPublicGroupError(#[from] GetPublicGroupError),
+    #[error("tls codec error: {0}")]
+    TlsCodecError(#[from] tls_codec::Error),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -423,9 +505,7 @@ pub enum GetPublicGroupError {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ProcessMessageError {
-    #[error("error processing welcome: {0}")]
-    ProcessWelcomeError(#[from] ProcessWelcomeError),
+pub enum ProcessMessageErrorOld {
     #[error("error getting group: {0}")]
     GetPublicGroupError(#[from] GetPublicGroupError),
     #[error("error accessing MLS storage: {0}")]
@@ -445,42 +525,4 @@ pub enum ProcessMessageError {
     ),
     #[error("error receiving from delivery service")]
     RecvError(#[from] oneshot::error::RecvError),
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum ProcessWelcomeError {
-    #[error("error while trying to parse welcome: {0}")]
-    WelcomeError(
-        #[from] WelcomeError<<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError>,
-    ),
-    #[error("the required ratchet tree expansion is not enabled")]
-    MissingRatchetTree,
-    #[error("storage error: {0}")]
-    StorageError(<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError),
-    #[error("error creating not yet existing group from welcome: {0}")]
-    CreationFromExternalError(
-        #[from]
-        CreationFromExternalError<
-            <SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError,
-        >,
-    ),
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum NewPublicDeviceGroupError {
-    #[error("error unpacking group creation info: {0}")]
-    GroupCreationUnpackError(#[from] GroupCreationUnpackError),
-    #[error("error creating group from external: {0}")]
-    CreationFromExternalError(
-        #[from]
-        CreationFromExternalError<
-            <SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError,
-        >,
-    ),
-    #[error("error accessing MLS storage: {0}")]
-    StorageError(<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError),
-    #[error("group already exists")]
-    GroupAlreadyExists,
-    #[error("join error: {0}")]
-    JoinError(#[from] tokio::task::JoinError),
 }
