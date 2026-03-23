@@ -1,13 +1,11 @@
 use std::fmt::Debug;
 
-use svalin_pki::{CertificateType, RootCertificate, SpkiHash, Verifier, VerifyError};
-use svalin_rpc::rpc::connection::{Connection, direct_connection::DirectConnection};
+use svalin_pki::{CertificateType, SpkiHash, Verifier, VerifyError};
 
-use crate::verifier::load_certificate_chain::ChainRequest;
+use crate::verifier::remote_verifier::RemoteVerifier;
 
 pub struct RemoteSessionVerifier {
-    root: RootCertificate,
-    connection: DirectConnection,
+    inner: RemoteVerifier,
 }
 
 impl Debug for RemoteSessionVerifier {
@@ -17,8 +15,8 @@ impl Debug for RemoteSessionVerifier {
 }
 
 impl RemoteSessionVerifier {
-    pub fn new(root: RootCertificate, connection: DirectConnection) -> Self {
-        Self { root, connection }
+    pub fn new(inner: RemoteVerifier) -> Self {
+        Self { inner }
     }
 }
 
@@ -28,20 +26,10 @@ impl Verifier for RemoteSessionVerifier {
         spki_hash: &SpkiHash,
         time: u64,
     ) -> Result<svalin_pki::Certificate, svalin_pki::VerifyError> {
-        tracing::debug!("entering remote session verifier");
-        let unverified_chain = self
-            .connection
-            .dispatch(ChainRequest::Session(spki_hash.clone()))
-            .await
-            .map_err(|err| VerifyError::InternalError(err.into()))?;
+        let certificate = self.inner.verify_spki_hash(spki_hash, time).await?;
 
-        let chain = unverified_chain.verify(&self.root, time)?;
-
-        let leaf = chain.take_leaf();
-
-        tracing::debug!("exiting remote session verifier");
-        if leaf.certificate_type() == CertificateType::UserDevice {
-            Ok(leaf)
+        if certificate.certificate_type() == CertificateType::UserDevice {
+            Ok(certificate)
         } else {
             Err(VerifyError::IncorrectCertificateType)
         }

@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use svalin_pki::{
     SpkiHash,
@@ -51,32 +51,27 @@ impl KeyPackageStore {
 
     pub async fn get_key_packages(
         &self,
-        entities: &HashSet<SpkiHash>,
-        ignore: &SpkiHash,
+        entities: impl ExactSizeIterator<Item = &SpkiHash>,
     ) -> anyhow::Result<Vec<UnverifiedKeyPackage>> {
         let mut transaction = self.pool.begin().await?;
 
-        let mut key_packages = Vec::new();
-        let ignore = ignore.as_slice();
+        let mut key_packages = Vec::with_capacity(entities.len());
 
-        for spki_hash in entities.iter() {
+        for spki_hash in entities {
             let spki_hash = spki_hash.as_slice();
-            let user_key_packages = sqlx::query!(
-                "SELECT id, data FROM key_packages WHERE user_spki_hash = ? AND owner_spki_hash != ? GROUP BY owner_spki_hash",
+            let key_package = sqlx::query!(
+                "SELECT id, data FROM key_packages WHERE owner_spki_hash != ?",
                 spki_hash,
-                ignore
-            ).fetch_all(&mut *transaction).await?;
-            for key_package in user_key_packages {
-                sqlx::query!("DELETE FROM key_packages WHERE id = ?", key_package.id)
-                    .execute(&mut *transaction)
-                    .await?;
-                let member = postcard::from_bytes(&key_package.data)?;
-                key_packages.push(member);
-            }
-        }
+            )
+            .fetch_one(&mut *transaction)
+            .await?;
 
-        tracing::debug!("requested: {:#?}", entities);
-        tracing::debug!("found: {:#?}", key_packages);
+            sqlx::query!("DELETE FROM key_packages WHERE id = ?", key_package.id)
+                .execute(&mut *transaction)
+                .await?;
+            let key_package = postcard::from_bytes(&key_package.data)?;
+            key_packages.push(key_package);
+        }
 
         transaction.commit().await?;
 

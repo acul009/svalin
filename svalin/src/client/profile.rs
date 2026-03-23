@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, migrate::MigrateDatabase};
 use svalin_pki::{
     Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
-    RootCertificate, UnverifiedCertificate, get_current_timestamp, mls::processor::MlsProcessor,
+    RootCertificate, UnverifiedCertificate, get_current_timestamp,
+    mls::{client::MlsClient, key_retriever},
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::sync::watch;
@@ -15,10 +16,12 @@ use tracing::{debug, error};
 
 use crate::{
     client::tunnel_manager::TunnelManager,
+    remote_key_retriever::RemoteKeyRetriever,
     shared::commands::{agent_list::UpdateAgentList, upload_key_packages::UploadKeyPackages},
     util::location::{Location, LocationError},
     verifier::{
         remote_agent_verifier::RemoteAgentVerifier, remote_session_verifier::RemoteSessionVerifier,
+        remote_verifier::RemoteVerifier,
     },
 };
 
@@ -171,19 +174,6 @@ impl Client {
                 .upstream_certificate
                 .verify_signature(&root_certificate, get_current_timestamp())?;
 
-            debug!("opening sqlite database: {}", db_path.display());
-            let url = db_path
-                .as_path()
-                .to_str()
-                .ok_or_else(|| anyhow!("db_path was not valid UTF-8"))?;
-            if !tokio::fs::try_exists(db_path.as_path()).await? {
-                sqlx::Sqlite::create_database(&url).await?;
-            }
-            let pool = SqlitePool::connect(url).await?;
-            let storage_provider = SqliteStorageProvider::new(pool);
-            storage_provider.run_migrations().await?;
-            let mls = MlsProcessor::new(device_credential.clone(), storage_provider);
-
             debug!("creating verifier");
             let verifier = ExactVerififier::new(upstream_certificate.clone()).to_tls_verifier();
 
@@ -196,10 +186,31 @@ impl Client {
             )
             .await?;
 
-            let session_verifier =
-                RemoteSessionVerifier::new(root_certificate.clone(), rpc.upstream_connection());
+            let remote_verifier =
+                RemoteVerifier::new(root_certificate.clone(), rpc.upstream_connection());
 
             debug!("connected to server");
+
+            debug!("opening sqlite database: {}", db_path.display());
+            let url = db_path
+                .as_path()
+                .to_str()
+                .ok_or_else(|| anyhow!("db_path was not valid UTF-8"))?;
+            if !tokio::fs::try_exists(db_path.as_path()).await? {
+                sqlx::Sqlite::create_database(&url).await?;
+            }
+            let pool = SqlitePool::connect(url).await?;
+            let storage_provider = SqliteStorageProvider::new(pool);
+            storage_provider.run_migrations().await?;
+            let key_retriever =
+                RemoteKeyRetriever::new(rpc.upstream_connection(), root_certificate.clone());
+
+            let mls = MlsClient::new(
+                device_credential.clone(),
+                storage_provider,
+                key_retriever,
+                remote_verifier.clone(),
+            )?;
 
             let tunnel_manager = TunnelManager::new();
 
@@ -214,7 +225,6 @@ impl Client {
                 mls,
                 background_tasks: TaskTracker::new(),
                 cancel: CancellationToken::new(),
-                session_verifier,
             });
 
             client
@@ -236,10 +246,7 @@ impl Client {
                         base_connection: sync_connection.clone(),
                         credentials: device_credential,
                         list: list_clone,
-                        verifier: RemoteAgentVerifier::new(
-                            root_certificate.clone(),
-                            sync_connection.clone(),
-                        ),
+                        verifier: remote_verifier.agent_only(),
                         cancel,
                     })
                     .await

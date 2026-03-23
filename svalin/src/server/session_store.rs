@@ -68,9 +68,9 @@ impl SessionStore {
 
     pub async fn list_user_sessions(
         &self,
-        user: &Certificate,
+        user: &SpkiHash,
     ) -> anyhow::Result<Vec<UnverifiedCertificate>> {
-        let spki_hash = user.spki_hash().as_slice();
+        let spki_hash = user.as_slice();
         let session_ders = sqlx::query_scalar!(
             "SELECT certificate FROM sessions WHERE issuer = ?",
             spki_hash

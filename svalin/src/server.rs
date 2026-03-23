@@ -5,15 +5,12 @@ use anyhow::{Context, Result, anyhow};
 use command_builder::SvalinCommandBuilder;
 use config_builder::ServerConfigBuilder;
 use openmls_sqlx_storage::SqliteStorageProvider;
-use rand::Rng;
+use rand::{Rng, RngExt};
 use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
 use svalin_pki::{
     Credential, EncryptedCredential, KnownCertificateVerifier, UnverifiedCertificate,
-    mls::{
-        delivery_service::{self, DeliveryService},
-        provider::SvalinProvider,
-    },
+    mls::{key_retriever, provider::SvalinProvider},
 };
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},
@@ -28,7 +25,10 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
-    server::{key_package_store::KeyPackageStore, session_store::SessionStore},
+    server::{
+        chain_loader::ChainLoader, key_package_store::KeyPackageStore,
+        local_key_retriever::LocalKeyRetriever, session_store::SessionStore,
+    },
     shared::commands::{
         init::{InitHandler, ServerInitSuccess},
         public_server_status::{PublicStatus, PublicStatusHandler},
@@ -37,10 +37,7 @@ use crate::{
         key_storage::KeySource,
         location::{Location, LocationError},
     },
-    verifier::{
-        incoming_connection_verifier::IncomingConnectionVerifier,
-        tls_optional_wrapper::TlsOptionalWrapper,
-    },
+    verifier::{local_verifier::LocalVerifier, tls_optional_wrapper::TlsOptionalWrapper},
 };
 
 use svalin_rpc::rpc::server::RpcServer;
@@ -48,12 +45,16 @@ use svalin_rpc::rpc::server::RpcServer;
 use self::user_store::UserStore;
 
 pub mod agent_store;
+pub mod chain_loader;
 pub mod command_builder;
 pub mod config_builder;
 pub mod key_package_store;
+pub mod local_key_retriever;
 pub mod message_store;
 pub mod session_store;
 pub mod user_store;
+
+pub type MlsServer = svalin_pki::mls::server::MlsServer<LocalVerifier, LocalKeyRetriever>;
 
 #[derive(Debug)]
 pub struct ServerConfig {
@@ -129,7 +130,10 @@ impl Server {
         Ok(pool)
     }
 
-    async fn open_delivery_service() -> Result<Arc<DeliveryService>> {
+    async fn open_mls_server(
+        verifier: LocalVerifier,
+        key_retriever: LocalKeyRetriever,
+    ) -> Result<Arc<MlsServer>> {
         let location = Self::data_dir().await?.push("mls-store.sqlite");
         let url = format!("{}", &location);
 
@@ -143,9 +147,9 @@ impl Server {
         let storage_provider = SqliteStorageProvider::new(pool);
         storage_provider.run_migrations().await?;
 
-        let delivery_service = DeliveryService::new(storage_provider);
+        let mls = MlsServer::new(storage_provider, verifier, key_retriever);
 
-        Ok(Arc::new(delivery_service))
+        Ok(Arc::new(mls))
     }
 
     async fn start(config: ServerConfig) -> Result<Self> {
@@ -218,17 +222,25 @@ impl Server {
             .decrypt_credentials(base_config.credentials)
             .await?;
 
-        let verifier = IncomingConnectionVerifier::new(
+        let loader = ChainLoader::new(
+            user_store.clone(),
+            agent_store.clone(),
+            session_store.clone(),
+        );
+
+        let verifier = LocalVerifier::new(root.clone(), loader.clone());
+
+        let key_retriever = LocalKeyRetriever::new(
             root.clone(),
+            agent_store.clone(),
             user_store.clone(),
             session_store.clone(),
-            agent_store.clone(),
-        )
-        .to_tls_verifier();
+            key_package_store.clone(),
+        );
 
-        let verifier = TlsOptionalWrapper::new(verifier);
+        let mls = Self::open_mls_server(verifier.clone(), key_retriever).await?;
 
-        let delivery_service = Self::open_delivery_service().await?;
+        let verifier = TlsOptionalWrapper::new(verifier.to_tls_verifier());
 
         let command_builder = SvalinCommandBuilder {
             root_cert: root,
@@ -237,7 +249,7 @@ impl Server {
             agent_store,
             session_store,
             key_package_store,
-            delivery_service,
+            mls,
         };
 
         let tasks = TaskTracker::new();

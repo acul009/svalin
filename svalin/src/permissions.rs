@@ -8,12 +8,9 @@ use svalin_rpc::{
     rustls::server::danger::ClientCertVerifier,
 };
 
-use crate::{
-    shared::commands::{
-        get_key_packages::GetKeyPackagesHandler, public_server_status::PublicStatusHandler,
-        upload_key_packages::UploadKeyPackagesHandler,
-    },
-    verifier::load_certificate_chain::LoadCertificateChainHandler,
+use crate::shared::commands::{
+    get_key_packages::GetKeyPackagesHandler, load_certificate_chain::LoadCertificateChainHandler,
+    public_server_status::PublicStatusHandler, upload_key_packages::UploadKeyPackagesHandler,
 };
 
 pub mod default_permission_handler;
@@ -47,15 +44,8 @@ impl From<&PermissionPrecursor<ForwardHandler>> for Permission {
 }
 
 impl From<&PermissionPrecursor<LoadCertificateChainHandler>> for Permission {
-    fn from(value: &PermissionPrecursor<LoadCertificateChainHandler>) -> Self {
-        match value.request {
-            crate::verifier::load_certificate_chain::ChainRequest::Session(_) => {
-                Permission::AgentOnlyPlaceholder
-            }
-            crate::verifier::load_certificate_chain::ChainRequest::Agent(_) => {
-                Permission::RootOnlyPlaceholder
-            }
-        }
+    fn from(_value: &PermissionPrecursor<LoadCertificateChainHandler>) -> Self {
+        Self::AuthenticatedOnly
     }
 }
 

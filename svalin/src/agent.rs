@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use sqlx::migrate::MigrateDatabase;
 use sqlx::{Sqlite, SqlitePool};
 use svalin_pki::mls::agent::MlsAgent;
-use svalin_pki::mls::processor::MlsProcessor;
 use svalin_pki::mls::provider::PostcardCodec;
 use svalin_pki::{
     Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
@@ -18,8 +17,6 @@ use svalin_rpc::commands::e2e::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::command::handler::HandlerCollection;
-use svalin_rpc::rpc::connection::Connection;
-use svalin_sysctl::sytem_report::SystemReport;
 use tokio::time::error::Elapsed;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, instrument};
@@ -35,18 +32,17 @@ use crate::client::tunnel_manager::tcp::handler::TcpForwardHandler;
 use crate::permissions::default_permission_handler::DefaultPermissionHandler;
 use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::commands::terminal::RemoteTerminalHandler;
-use crate::shared::commands::update_system_report::UpdateSystemReport;
 use crate::shared::join_agent::AgentInitPayload;
 use crate::util::key_storage::KeySource;
 use crate::util::location::{Location, LocationError};
-use crate::verifier::remote_session_verifier::RemoteSessionVerifier;
+use crate::verifier::remote_verifier::RemoteVerifier;
 
 pub struct Agent {
     rpc: Arc<RpcClient>,
     root_certificate: RootCertificate,
     credentials: Credential,
     cancel: CancellationToken,
-    mls: MlsAgent<SystemReport>,
+    mls: MlsAgent,
 }
 
 impl Agent {
@@ -129,11 +125,11 @@ impl Agent {
 
         let public_commands = HandlerCollection::new(permission_handler.clone());
 
-        // Todo: proper upstream verifier
-        let verifier = RemoteSessionVerifier::new(
+        let verifier = RemoteVerifier::new(
             self.root_certificate.clone(),
             self.rpc.upstream_connection(),
-        );
+        )
+        .session_only();
 
         public_commands.chain().await.add(E2EHandler::new(
             self.credentials.clone(),
@@ -174,20 +170,6 @@ impl Agent {
         }
 
         Self::save_config(&config).await?;
-
-        Ok(())
-    }
-
-    pub async fn update_system_report(&self) -> anyhow::Result<()> {
-        let report = SystemReport::create().await?;
-
-        let encoded = self.mls.create_new_report(&report).await?;
-
-        self.rpc
-            .upstream_connection()
-            .dispatch(UpdateSystemReport(encoded))
-            .await
-            .map_err(|err| anyhow!(err))?;
 
         Ok(())
     }

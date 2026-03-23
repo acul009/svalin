@@ -1,14 +1,11 @@
 use std::sync::Arc;
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    CertificateChainBuilder, RootCertificate, VerifyChainError, get_current_timestamp,
-    mls::{
-        delivery_service::{self, DeliveryService, NewPublicDeviceGroupError},
-        processor::DeviceGroupCreationInfo,
-    },
+    Certificate, CertificateChainBuilder, RootCertificate, UnverifiedCertificate, VerifyChainError,
+    get_current_timestamp, mls::transport_types::NewGroup,
 };
 use svalin_rpc::rpc::{
     command::{
@@ -22,6 +19,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     permissions::Permission,
     server::{
+        MlsServer,
         agent_store::{self, AgentStore},
         user_store::{CompleteCertChainError, UserStore},
     },
@@ -43,42 +41,40 @@ pub enum InternalAddAgentError {
     VerifyChainError(#[from] VerifyChainError),
     #[error("error saving agent to database: {0}")]
     AddAgentError(#[from] agent_store::AddAgentError),
-    #[error("error creating public device group")]
-    NewDeviceGroupError(#[from] NewPublicDeviceGroupError),
 }
 
-pub struct AddAgentHandler {
+pub struct UploadAgentHandler {
     agent_store: Arc<AgentStore>,
     user_store: Arc<UserStore>,
     root: RootCertificate,
-    delivery_service: Arc<DeliveryService>,
+    mls: Arc<MlsServer>,
 }
 
-impl From<&PermissionPrecursor<AddAgentHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<AddAgentHandler>) -> Self {
+impl From<&PermissionPrecursor<UploadAgentHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<UploadAgentHandler>) -> Self {
         Permission::RootOnlyPlaceholder
     }
 }
 
-impl AddAgentHandler {
+impl UploadAgentHandler {
     pub fn new(
         agent_store: Arc<AgentStore>,
         user_store: Arc<UserStore>,
         root: RootCertificate,
-        delivery_service: Arc<DeliveryService>,
+        mls: Arc<MlsServer>,
     ) -> Result<Self> {
         Ok(Self {
             agent_store,
             user_store,
             root,
-            delivery_service,
+            mls,
         })
     }
 }
 
 #[async_trait]
-impl CommandHandler for AddAgentHandler {
-    type Request = DeviceGroupCreationInfo;
+impl CommandHandler for UploadAgentHandler {
+    type Request = UploadAgentData;
 
     fn key() -> String {
         "add_agent".to_owned()
@@ -106,12 +102,9 @@ impl CommandHandler for AddAgentHandler {
     }
 }
 
-impl AddAgentHandler {
-    async fn add_agent(
-        &self,
-        group_info: DeviceGroupCreationInfo,
-    ) -> Result<(), InternalAddAgentError> {
-        let cert_chain = CertificateChainBuilder::new(group_info.certificate().clone());
+impl UploadAgentHandler {
+    async fn add_agent(&self, data: UploadAgentData) -> Result<(), InternalAddAgentError> {
+        let cert_chain = CertificateChainBuilder::new(data.certificate);
         let cert_chain = self
             .user_store
             .complete_certificate_chain(cert_chain)
@@ -122,19 +115,26 @@ impl AddAgentHandler {
             .add_agent(agent_cert_chain.take_leaf())
             .await?;
 
-        self.delivery_service.new_device_group(group_info).await?;
+        self.mls.new_device_group(group_info).await?;
 
         Ok(())
     }
 }
 
-pub struct UploadAgent<'a> {
-    group_info: &'a DeviceGroupCreationInfo,
+#[derive(Serialize, Deserialize)]
+struct UploadAgentData {
+    certificate: UnverifiedCertificate,
+    device_group: NewGroup,
 }
 
-impl<'a> UploadAgent<'a> {
-    pub fn new(group_info: &'a DeviceGroupCreationInfo) -> Self {
-        Self { group_info }
+pub struct UploadAgent(UploadAgentData);
+
+impl UploadAgent {
+    pub fn new(device: Certificate, device_group: NewGroup) -> Self {
+        Self(UploadAgentData {
+            certificate: device.to_unverified(),
+            device_group,
+        })
     }
 }
 
@@ -148,18 +148,18 @@ pub enum UploadAgentCommandError {
     AddAgentError(#[from] AddAgentError),
 }
 
-impl<'a> CommandDispatcher for UploadAgent<'a> {
+impl CommandDispatcher for UploadAgent {
     type Output = ();
     type Error = UploadAgentCommandError;
 
-    type Request = &'a DeviceGroupCreationInfo;
+    type Request = UploadAgentData;
 
     fn get_request(&self) -> &Self::Request {
-        &self.group_info
+        &self.0
     }
 
     fn key() -> String {
-        AddAgentHandler::key()
+        UploadAgentHandler::key()
     }
 
     async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {

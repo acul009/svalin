@@ -9,6 +9,7 @@ pub mod client;
 pub mod device;
 pub mod mls;
 pub mod permissions;
+pub mod remote_key_retriever;
 pub mod server;
 pub mod shared;
 pub mod util;

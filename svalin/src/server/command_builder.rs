@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use svalin_pki::mls::{self, delivery_service::DeliveryService, provider::SvalinProvider};
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
     rpc::{
@@ -11,18 +10,21 @@ use svalin_rpc::{
 
 use crate::{
     permissions::default_permission_handler::DefaultPermissionHandler,
-    server::{key_package_store::KeyPackageStore, session_store::SessionStore},
+    server::{
+        MlsServer, chain_loader::ChainLoader, key_package_store::KeyPackageStore,
+        session_store::SessionStore,
+    },
     shared::{
         commands::{
             agent_list::AgentListHandler,
             get_key_packages::GetKeyPackagesHandler,
+            load_certificate_chain::LoadCertificateChainHandler,
             login::LoginHandler,
             public_server_status::{PublicStatus, PublicStatusHandler},
             upload_key_packages::UploadKeyPackagesHandler,
         },
-        join_agent::add_agent::AddAgentHandler,
+        join_agent::add_agent::UploadAgentHandler,
     },
-    verifier::load_certificate_chain::LoadCertificateChainHandler,
 };
 
 use super::{agent_store::AgentStore, user_store::UserStore};
@@ -34,10 +36,8 @@ pub struct SvalinCommandBuilder {
     pub user_store: Arc<UserStore>,
     pub session_store: Arc<SessionStore>,
     pub key_package_store: Arc<KeyPackageStore>,
-    pub delivery_service: Arc<DeliveryService>,
+    pub mls: Arc<MlsServer>,
 }
-
-const MLS_VERSION: mls::ProtocolVersion = mls::ProtocolVersion::Mls10;
 
 impl RpcCommandBuilder for SvalinCommandBuilder {
     type PH = DefaultPermissionHandler;
@@ -61,19 +61,19 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 self.root_cert.clone(),
                 self.server_cert.clone(),
             ))
-            .add(LoadCertificateChainHandler::new(
+            .add(LoadCertificateChainHandler::new(ChainLoader::new(
                 self.user_store.clone(),
                 self.agent_store.clone(),
                 self.session_store.clone(),
-            ))
+            )))
             .add(join_manager.create_request_handler())
             .add(join_manager.create_accept_handler())
             .add(ForwardHandler::new(server.clone()))
-            .add(AddAgentHandler::new(
+            .add(UploadAgentHandler::new(
                 self.agent_store.clone(),
                 self.user_store.clone(),
                 self.root_cert.clone(),
-                self.delivery_service.clone(),
+                self.mls.clone(),
             )?)
             .add(AgentListHandler::new(
                 self.agent_store.clone(),
@@ -81,8 +81,7 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             ))
             .add(UploadKeyPackagesHandler::new(
                 self.key_package_store.clone(),
-                MLS_VERSION,
-                self.delivery_service.clone(),
+                self.mls,
             ))
             .add(GetKeyPackagesHandler::new(self.key_package_store.clone()));
 

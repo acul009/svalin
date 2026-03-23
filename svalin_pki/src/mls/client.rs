@@ -2,27 +2,41 @@ use std::marker::PhantomData;
 
 use openmls::{
     group::GroupId,
-    prelude::{MlsMessageOut, Welcome, group_info::GroupInfo},
+    prelude::{MlsMessageOut, ProtocolVersion, Welcome, group_info::GroupInfo},
 };
+use openmls_rust_crypto::RustCrypto;
 use openmls_sqlx_storage::SqliteStorageProvider;
 
 use crate::{
     Certificate, CertificateType, Credential, SpkiHash,
     mls::{
-        processor::{CreateGroupError, MlsProcessorHandle},
+        group_id::SvalinGroupId,
+        key_package::{KeyPackage, KeyPackageError},
+        key_retriever::{self, KeyRetriever},
+        processor::{CreateGroupError, CreateKeyPackageError, MlsProcessorHandle},
         provider::PostcardCodec,
-        transport_types::MessageToServerTransport,
+        transport_types::{MessageToServer, NewGroup, NewGroupTransport},
     },
 };
 
-pub struct MlsClient {
+pub struct MlsClient<KeyRetriever, Verifier> {
     processor: MlsProcessorHandle,
+    key_retriever: KeyRetriever,
+    verifier: Verifier,
+    crypto: RustCrypto,
+    protocol_version: ProtocolVersion,
 }
 
-impl MlsClient {
+impl<KeyRetriever, Verifier> MlsClient<KeyRetriever, Verifier>
+where
+    KeyRetriever: crate::mls::key_retriever::KeyRetriever,
+    Verifier: crate::Verifier,
+{
     pub fn new(
         credential: Credential,
         storage_provider: SqliteStorageProvider<PostcardCodec>,
+        key_retriever: KeyRetriever,
+        verifier: Verifier,
     ) -> Result<Self, CreateClientError> {
         match credential.certificate().certificate_type() {
             crate::CertificateType::Root => (),
@@ -33,13 +47,19 @@ impl MlsClient {
 
         let processor = MlsProcessorHandle::new_processor(credential, storage_provider);
 
-        Ok(Self { processor })
+        Ok(Self {
+            processor,
+            key_retriever,
+            verifier,
+            crypto: RustCrypto::default(),
+            protocol_version: ProtocolVersion::default(),
+        })
     }
 
     pub async fn create_device_group(
         &self,
         device: Certificate,
-    ) -> Result<MessageToServerTransport, CreateDeviceGroupError> {
+    ) -> Result<NewGroupTransport, CreateDeviceGroupError<KeyRetriever::Error>> {
         if device.certificate_type() != CertificateType::Agent {
             return Err(CreateDeviceGroupError::WrongCertificateType(
                 device.certificate_type(),
@@ -48,7 +68,25 @@ impl MlsClient {
 
         let group_id = SvalinGroupId::DeviceGroup(device.spki_hash().clone());
 
-        let members = todo!();
+        let required_members = self
+            .key_retriever
+            .get_required_device_group_members(device.spki_hash())
+            .await
+            .map_err(CreateDeviceGroupError::KeyRetrieverError)?;
+
+        let unverified = self
+            .key_retriever
+            .get_key_packages(&required_members)
+            .await
+            .map_err(CreateDeviceGroupError::KeyRetrieverError)?;
+
+        let mut members = Vec::with_capacity(unverified.len());
+        for member in unverified {
+            let member = member
+                .verify(&self.crypto, self.protocol_version, &self.verifier)
+                .await?;
+            members.push(member);
+        }
 
         let messages = self
             .processor
@@ -57,44 +95,10 @@ impl MlsClient {
 
         Ok(messages)
     }
-}
 
-pub(crate) enum SvalinGroupId {
-    DeviceGroup(SpkiHash),
-}
-
-impl SvalinGroupId {
-    pub fn to_group_id(&self) -> GroupId {
-        match self {
-            SvalinGroupId::DeviceGroup(spki_hash) => {
-                let mut bytes = b"device/".to_vec();
-                bytes.extend_from_slice(spki_hash.as_slice());
-                GroupId::from_slice(&bytes)
-            }
-        }
+    pub async fn create_key_package(&self) -> Result<KeyPackage, CreateKeyPackageError> {
+        self.processor.create_key_package().await
     }
-
-    pub fn from_group_id(group_id: &GroupId) -> Result<Self, ParseGroupIdError> {
-        if group_id.as_slice().starts_with(b"device/") {
-            if group_id.as_slice().len() != 39 {
-                return Err(ParseGroupIdError::WrongSliceLength);
-            }
-            let raw_spki_hash: [u8; 32] = group_id.as_slice()[7..39]
-                .try_into()
-                .expect("already checked length");
-            Ok(Self::DeviceGroup(SpkiHash(raw_spki_hash)))
-        } else {
-            Err(ParseGroupIdError::UnknownGroupType)
-        }
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum ParseGroupIdError {
-    #[error("wrong group id length")]
-    WrongSliceLength,
-    #[error("unknown group type")]
-    UnknownGroupType,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -104,9 +108,13 @@ pub enum CreateClientError {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum CreateDeviceGroupError {
+pub enum CreateDeviceGroupError<KeyRetrieverError> {
     #[error("wrong certificate type: {0}, expected agent")]
     WrongCertificateType(CertificateType),
     #[error("error creating mls group: {0}")]
     CreateGroupError(#[from] CreateGroupError),
+    #[error("error during key retrieval: {0}")]
+    KeyRetrieverError(#[source] KeyRetrieverError),
+    #[error("error verifying key package: {0}")]
+    KeyPackageError(#[from] KeyPackageError),
 }

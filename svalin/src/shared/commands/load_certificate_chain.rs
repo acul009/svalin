@@ -1,41 +1,27 @@
-use std::sync::Arc;
-
+use anyhow::anyhow;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{CertificateChainBuilder, SpkiHash, UnverifiedCertificateChain};
+use svalin_pki::{SpkiHash, UnverifiedCertificateChain};
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::{Session, SessionReadError, SessionWriteError},
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::server::{agent_store::AgentStore, session_store::SessionStore, user_store::UserStore};
+use crate::server::chain_loader::ChainLoader;
 
 pub struct LoadCertificateChainHandler {
-    user_store: Arc<UserStore>,
-    session_store: Arc<SessionStore>,
-    agent_store: Arc<AgentStore>,
+    loader: ChainLoader,
 }
 
 impl LoadCertificateChainHandler {
-    pub fn new(
-        user_store: Arc<UserStore>,
-        agent_store: Arc<AgentStore>,
-        session_store: Arc<SessionStore>,
-    ) -> Self {
-        Self {
-            user_store,
-            session_store,
-            agent_store,
-        }
+    pub fn new(loader: ChainLoader) -> Self {
+        Self { loader }
     }
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum ChainRequest {
-    Session(SpkiHash),
-    Agent(SpkiHash),
-}
+pub struct ChainRequest(pub SpkiHash);
 
 #[async_trait]
 impl CommandHandler for LoadCertificateChainHandler {
@@ -51,10 +37,11 @@ impl CommandHandler for LoadCertificateChainHandler {
         request: Self::Request,
         _cancel: CancellationToken,
     ) -> anyhow::Result<()> {
-        let chain_result = self.get_certificate_chain(&request).await;
+        let chain_result = self.loader.load_certificate_chain(&request.0).await;
 
         let (chain, result) = match chain_result {
-            Ok(chain) => (Some(chain), Ok(())),
+            Ok(Some(chain)) => (Some(chain), Ok(())),
+            Ok(None) => (None, Err(anyhow!("Certificate not found"))),
             Err(e) => (None, Err(e)),
         };
 
@@ -66,31 +53,6 @@ impl CommandHandler for LoadCertificateChainHandler {
         result?;
 
         Ok(())
-    }
-}
-
-impl LoadCertificateChainHandler {
-    async fn get_certificate_chain(
-        &self,
-        request: &ChainRequest,
-    ) -> Result<UnverifiedCertificateChain, anyhow::Error> {
-        let certificate = match request {
-            ChainRequest::Session(spki_hash) => self.session_store.get_session(spki_hash).await?,
-            ChainRequest::Agent(spki_hash) => self.agent_store.get_agent(spki_hash).await?,
-        };
-
-        let Some(certificate) = certificate else {
-            return Err(anyhow::anyhow!("Certificate not found"));
-        };
-
-        let cert_chain = CertificateChainBuilder::new(certificate);
-
-        let cert_chain = self
-            .user_store
-            .complete_certificate_chain(cert_chain)
-            .await?;
-
-        Ok(cert_chain)
     }
 }
 

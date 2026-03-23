@@ -28,7 +28,7 @@ pub enum KeyPackageError {
 }
 
 impl UnverifiedKeyPackage {
-    pub async fn verify(
+    pub(crate) async fn verify(
         self,
         crypto: &impl OpenMlsCrypto,
         protocol_version: ProtocolVersion,
@@ -51,6 +51,15 @@ impl UnverifiedKeyPackage {
             key_package,
             certificate,
         })
+    }
+
+    pub fn spki_hash(&self) -> Result<SpkiHash, KeyPackageError> {
+        let spki_hash: SpkiHash = self
+            .key_package
+            .unverified_credential()
+            .credential
+            .deserialized()?;
+        Ok(spki_hash)
     }
 }
 

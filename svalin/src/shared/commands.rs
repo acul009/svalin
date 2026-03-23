@@ -1,9 +1,10 @@
 // pub mod add_user;
 pub mod agent_list;
 pub mod get_key_packages;
-pub mod update_system_report;
 // pub mod get_user_certs;
 pub mod init;
+pub mod list_user_sessions;
+pub mod load_certificate_chain;
 pub mod login;
 pub mod public_server_status;
 pub mod realtime_status;

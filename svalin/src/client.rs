@@ -13,14 +13,11 @@ mod profile;
 
 use device::Device;
 pub use first_connect::*;
-use futures::{StreamExt, TryStreamExt};
-use svalin_pki::mls::OpenMlsProvider;
-use svalin_pki::mls::key_package::{KeyPackage, KeyPackageError};
-use svalin_pki::mls::processor::MlsProcessor;
+use svalin_pki::mls::client::MlsClient;
 use svalin_pki::{Certificate, Credential, RootCertificate, SpkiHash};
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
-use svalin_rpc::rpc::connection::{Connection, ConnectionDispatchError};
+use svalin_rpc::rpc::connection::Connection;
 use tokio::sync::watch;
 use tokio::time::error::Elapsed;
 use tokio::time::timeout;
@@ -28,8 +25,8 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tunnel_manager::TunnelManager;
 
-use crate::shared::commands::get_key_packages::{GetKeyPackages, GetKeyPackagesDispatcherError};
-use crate::verifier::remote_session_verifier::RemoteSessionVerifier;
+use crate::remote_key_retriever::RemoteKeyRetriever;
+use crate::verifier::remote_verifier::RemoteVerifier;
 
 pub struct Client {
     rpc: RpcClient,
@@ -37,13 +34,12 @@ pub struct Client {
     upstream_certificate: Certificate,
     root_certificate: RootCertificate,
     user_credential: Credential,
-    mls: MlsProcessor,
+    mls: MlsClient<RemoteKeyRetriever, RemoteVerifier>,
     device_list: watch::Sender<BTreeMap<SpkiHash, Device>>,
     tunnel_manager: TunnelManager,
     // TODO: These should not be required here, but should be created and canceled as needed
     background_tasks: TaskTracker,
     cancel: CancellationToken,
-    session_verifier: RemoteSessionVerifier,
 }
 
 impl Debug for Client {
@@ -65,7 +61,7 @@ impl Client {
         &self.upstream_certificate
     }
 
-    pub(crate) fn mls(&self) -> &MlsProcessor {
+    pub(crate) fn mls(&self) -> &MlsClient<RemoteKeyRetriever, RemoteVerifier> {
         &self.mls
     }
 
@@ -114,37 +110,4 @@ impl Client {
             Ok(()) => result2,
         }
     }
-
-    pub(crate) async fn get_key_packages(
-        &self,
-        entities: &[Certificate],
-    ) -> Result<Vec<KeyPackage>, GetKeyPackagesError> {
-        let key_packages = self
-            .rpc
-            .upstream_connection()
-            .dispatch(GetKeyPackages::new(entities))
-            .await?;
-
-        let key_packages = futures::stream::iter(key_packages.into_iter())
-            .map(|key_package| {
-                key_package.verify(
-                    self.mls().provider().crypto(),
-                    self.mls().protocol_version(),
-                    &self.session_verifier,
-                )
-            })
-            .buffer_unordered(10)
-            .try_collect::<Vec<_>>()
-            .await?;
-
-        Ok(key_packages)
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum GetKeyPackagesError {
-    #[error("error in dispatcher: {0}")]
-    Dispatcher(#[from] ConnectionDispatchError<GetKeyPackagesDispatcherError>),
-    #[error("error verifying key package: {0}")]
-    VerifyError(#[from] KeyPackageError),
 }

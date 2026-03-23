@@ -2,12 +2,7 @@ use std::sync::Arc;
 
 use svalin_pki::{
     ExactVerififier, Verifier,
-    mls::{
-        self,
-        delivery_service::DeliveryService,
-        key_package::UnverifiedKeyPackage,
-        processor::{CreateKeyPackageError, MlsProcessor},
-    },
+    mls::{client::MlsClient, key_package::UnverifiedKeyPackage, processor::CreateKeyPackageError},
 };
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
@@ -15,9 +10,15 @@ use svalin_rpc::rpc::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::server::key_package_store::KeyPackageStore;
+use crate::{
+    remote_key_retriever::RemoteKeyRetriever,
+    server::{
+        MlsServer, key_package_store::KeyPackageStore, local_key_retriever::LocalKeyRetriever,
+    },
+    verifier::{local_verifier::LocalVerifier, remote_verifier::RemoteVerifier},
+};
 
-pub struct UploadKeyPackages<'a>(pub &'a MlsProcessor);
+pub struct UploadKeyPackages<'a>(pub &'a MlsClient<RemoteKeyRetriever, RemoteVerifier>);
 
 const TARGET_KEY_PACKAGE_COUNT: u64 = 10;
 
@@ -69,20 +70,14 @@ impl<'a> CommandDispatcher for UploadKeyPackages<'a> {
 
 pub struct UploadKeyPackagesHandler {
     key_package_store: Arc<KeyPackageStore>,
-    protocol_version: mls::ProtocolVersion,
-    delivery_service: Arc<DeliveryService>,
+    mls_server: Arc<MlsServer>,
 }
 
 impl UploadKeyPackagesHandler {
-    pub fn new(
-        key_package_store: Arc<KeyPackageStore>,
-        protocol_version: mls::ProtocolVersion,
-        delivery_service: Arc<DeliveryService>,
-    ) -> Self {
+    pub fn new(key_package_store: Arc<KeyPackageStore>, mls_server: Arc<MlsServer>) -> Self {
         Self {
             key_package_store,
-            protocol_version,
-            delivery_service,
+            mls_server,
         }
     }
 }
@@ -132,12 +127,9 @@ impl UploadKeyPackagesHandler {
         verifier: &impl Verifier,
         unverified: UnverifiedKeyPackage,
     ) -> anyhow::Result<()> {
-        let verified = unverified
-            .verify(
-                self.delivery_service.crypto(),
-                self.protocol_version,
-                verifier,
-            )
+        let verified = self
+            .mls_server
+            .verify_key_package(unverified, verifier)
             .await?;
         self.key_package_store.add_key_package(verified).await?;
         Ok(())

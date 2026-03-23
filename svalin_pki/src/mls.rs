@@ -5,12 +5,14 @@ use crate::{Certificate, Credential, SpkiHash, signed_message::CanSign};
 
 pub mod agent;
 pub mod client;
-pub mod delivery_service;
+pub(crate) mod group_id;
 pub mod key_package;
 pub mod key_retriever;
 pub mod message_types;
-pub(crate) mod processor;
+pub mod processor;
 pub mod provider;
+pub mod public_processor;
+pub mod server;
 pub mod transport_types;
 
 pub use openmls::prelude::{OpenMlsProvider, ProtocolVersion};

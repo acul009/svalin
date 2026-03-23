@@ -2,7 +2,7 @@ use std::{collections::HashSet, sync::Arc};
 
 use async_trait::async_trait;
 use svalin_pki::{
-    Certificate, SpkiHash,
+    SpkiHash,
     mls::key_package::{KeyPackageError, UnverifiedKeyPackage},
 };
 use svalin_rpc::rpc::{
@@ -13,21 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::server::key_package_store::KeyPackageStore;
 
-pub struct GetKeyPackages {
-    request: HashSet<SpkiHash>,
-}
-
-impl GetKeyPackages {
-    pub fn new(entities: &[Certificate]) -> Self {
-        Self {
-            request: entities
-                .iter()
-                .map(|cert| cert.spki_hash())
-                .cloned()
-                .collect(),
-        }
-    }
-}
+pub struct GetKeyPackages(pub Vec<SpkiHash>);
 
 #[derive(Debug, thiserror::Error)]
 pub enum GetKeyPackagesDispatcherError {
@@ -35,6 +21,8 @@ pub enum GetKeyPackagesDispatcherError {
     SessionRead(#[from] SessionReadError),
     #[error("Server error")]
     ServerError,
+    #[error("server did not return all requested key packages")]
+    MissingKeyPackages,
     #[error("Key package verify error: {0}")]
     VerifyError(#[from] KeyPackageError),
 }
@@ -44,21 +32,33 @@ impl CommandDispatcher for GetKeyPackages {
 
     type Error = GetKeyPackagesDispatcherError;
 
-    type Request = HashSet<SpkiHash>;
+    type Request = Vec<SpkiHash>;
 
     fn key() -> String {
         GetKeyPackagesHandler::key()
     }
 
     fn get_request(&self) -> &Self::Request {
-        &self.request
+        &self.0
     }
 
     async fn dispatch(
         self,
         session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
+        // TODO: check if all requested members were returned
         let key_packages: Option<Vec<UnverifiedKeyPackage>> = session.read_object().await?;
+        if let Some(packages) = &key_packages {
+            let received_packages = packages
+                .iter()
+                .map(|key_package| key_package.spki_hash())
+                .collect::<Result<HashSet<SpkiHash>, _>>()?;
+            for requested in self.0 {
+                if !received_packages.contains(&requested) {
+                    return Err(GetKeyPackagesDispatcherError::MissingKeyPackages);
+                }
+            }
+        }
         key_packages.ok_or_else(|| GetKeyPackagesDispatcherError::ServerError)
     }
 }
@@ -89,14 +89,7 @@ impl CommandHandler for GetKeyPackagesHandler {
     ) -> anyhow::Result<()> {
         match self
             .key_package_store
-            .get_key_packages(
-                &request,
-                session
-                    .peer()
-                    .certificate()
-                    .expect("only verified peers should be able to call this")
-                    .spki_hash(),
-            )
+            .get_key_packages(request.iter())
             .await
         {
             Ok(key_packages) => {

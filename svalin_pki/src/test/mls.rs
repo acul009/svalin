@@ -9,9 +9,9 @@ use tls_codec::DeserializeBytes;
 use crate::{
     Credential, KeyPair,
     mls::{
-        delivery_service::{self, DeliveryServiceHandle},
         processor::{MlsProcessorHandle, ProcessedMessage},
         provider::PostcardCodec,
+        public_processor::{self, PublicProcessorHandle},
     },
 };
 
@@ -23,11 +23,11 @@ async fn create_processor(credential: Credential) -> MlsProcessorHandle {
     handle
 }
 
-async fn create_delivery_service() -> DeliveryServiceHandle {
+async fn create_public_processor() -> PublicProcessorHandle {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
     let storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
     storage.run_migrations().await.unwrap();
-    let handle = DeliveryServiceHandle::new(storage);
+    let handle = PublicProcessorHandle::new(storage);
     handle
 }
 
@@ -84,7 +84,7 @@ async fn test_group() {
 }
 
 #[tokio::test]
-async fn test_delivery_service() {
+async fn test_public_processor() {
     let credential1 = Credential::generate_root().unwrap();
     let spki_hash1 = credential1.certificate().spki_hash().clone();
     let member1 = create_processor(credential1).await;
@@ -96,16 +96,16 @@ async fn test_delivery_service() {
 
     let group_id = GroupId::from_slice(b"test");
 
-    let welcome = member1
+    let new_group = member1
         .create_group(vec![key_package], group_id.clone())
         .await
         .unwrap()
         .unpack()
         .unwrap();
 
-    let delivery_service = create_delivery_service().await;
+    let public_processor = create_public_processor().await;
 
-    let to_send = delivery_service.process_message(welcome).await.unwrap();
+    let to_send = public_processor.add_group(new_group).await.unwrap();
     let members = to_send
         .receivers
         .into_iter()
@@ -128,11 +128,9 @@ async fn test_delivery_service() {
     let message = member2
         .create_message(group_id, test_text.clone())
         .await
-        .unwrap()
-        .unpack()
         .unwrap();
 
-    let to_send = delivery_service.process_message(message).await.unwrap();
+    let to_send = public_processor.process_message(message).await.unwrap();
 
     let members = to_send
         .receivers
@@ -195,14 +193,14 @@ async fn test_device_group() {
     // let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
     // let storage = SqliteStorageProvider::<PostcardCodec>::new(pool.clone());
     // storage.run_migrations().await.unwrap();
-    // let delivery_service = DeliveryService::new(storage);
+    // let public_processor = PublicProcessor::new(storage);
 
-    // delivery_service.new_device_group(info).await.unwrap();
+    // public_processor.new_device_group(info).await.unwrap();
 
     // let report = "Test Data".to_string();
     // let encoded = agent.create_new_report(&report).await.unwrap();
 
-    // let receivers = delivery_service
+    // let receivers = public_processor
     //     .process_device_group_message(
     //         agent_credential.get_certificate().spki_hash(),
     //         encoded.raw().as_slice(),

@@ -22,6 +22,10 @@ pub struct CertificateChain {
 }
 
 impl CertificateChain {
+    pub fn iter(&self) -> std::slice::Iter<'_, Certificate> {
+        self.certificates.iter()
+    }
+
     pub fn take_leaf(mut self) -> Certificate {
         self.certificates
             .pop()
