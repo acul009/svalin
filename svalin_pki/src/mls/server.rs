@@ -60,8 +60,11 @@ where
         new_group: NewGroupTransport,
     ) -> Result<(), AddDeviceGroupError> {
         // I somehow need to inspect this group without creating it, but that means I have to manually verify it and therefore get the public key myself...
+        //
+        // So I found 2 ways to do this:
+        // - Either I gather the public key by hand, which might be doable from just getting the peer certificate from the session
+        // - Or I just create the group, inspect it and then delete it if it's not up to my expectations.
         let new_group = new_group.unpack()?;
-        let new_group.group_info.unsigned_payload()
 
         todo!()
     }
