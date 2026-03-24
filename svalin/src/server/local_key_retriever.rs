@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use svalin_pki::{
     CertificateChainBuilder, RootCertificate, get_current_timestamp,
-    mls::key_retriever::KeyRetriever,
+    mls::{SvalinGroupId, key_retriever::KeyRetriever},
 };
 
 use crate::server::{
@@ -40,43 +40,47 @@ impl LocalKeyRetriever {
 impl KeyRetriever for LocalKeyRetriever {
     type Error = anyhow::Error;
 
-    async fn get_required_device_group_members(
+    async fn get_required_group_members(
         &self,
-        device: &svalin_pki::SpkiHash,
+        id: &SvalinGroupId,
     ) -> Result<Vec<svalin_pki::SpkiHash>, Self::Error> {
-        let agent = self
-            .agent_store
-            .get_agent(&device)
-            .await?
-            .ok_or_else(|| anyhow!("agent not found"))?;
-        let chain = CertificateChainBuilder::new(agent);
+        match id {
+            SvalinGroupId::DeviceGroup(spki_hash) => {
+                let agent = self
+                    .agent_store
+                    .get_agent(&spki_hash)
+                    .await?
+                    .ok_or_else(|| anyhow!("agent not found"))?;
+                let chain = CertificateChainBuilder::new(agent);
 
-        let timestamp = get_current_timestamp();
+                let timestamp = get_current_timestamp();
 
-        let chain = self.user_store.complete_certificate_chain(chain).await?;
-        let chain = chain.verify(&self.root, timestamp)?;
+                let chain = self.user_store.complete_certificate_chain(chain).await?;
+                let chain = chain.verify(&self.root, timestamp)?;
 
-        let mut required_members = vec![device.clone()];
+                let mut required_members = vec![spki_hash.clone()];
 
-        for user_certificate in chain.iter().rev().skip(1) {
-            required_members.push(user_certificate.spki_hash().clone());
-            let sessions = self
-                .session_store
-                .list_user_sessions(user_certificate.spki_hash())
-                .await?;
+                for user_certificate in chain.iter().rev().skip(1) {
+                    required_members.push(user_certificate.spki_hash().clone());
+                    let sessions = self
+                        .session_store
+                        .list_user_sessions(user_certificate.spki_hash())
+                        .await?;
 
-            for session in sessions.into_iter() {
-                match session.verify_signature(user_certificate, timestamp) {
-                    Ok(certificate) => {
-                        required_members.push(certificate.spki_hash().clone());
+                    for session in sessions.into_iter() {
+                        match session.verify_signature(user_certificate, timestamp) {
+                            Ok(certificate) => {
+                                required_members.push(certificate.spki_hash().clone());
+                            }
+                            // TODO: report this error somewhere
+                            Err(_) => {}
+                        }
                     }
-                    // TODO: report this error somewhere
-                    Err(_) => {}
                 }
+
+                Ok(required_members)
             }
         }
-
-        Ok(required_members)
     }
 
     async fn get_key_packages(

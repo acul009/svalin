@@ -28,15 +28,4 @@ impl Client {
 
         Ok(certificate)
     }
-
-    pub(crate) async fn upload_agent(
-        &self,
-        group_info: &DeviceGroupCreationInfo,
-    ) -> Result<(), ConnectionDispatchError<UploadAgentCommandError>> {
-        let connection = self.rpc.upstream_connection();
-
-        connection.dispatch(UploadAgent::new(&group_info)).await?;
-
-        Ok(())
-    }
 }

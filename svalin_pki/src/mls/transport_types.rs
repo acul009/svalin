@@ -4,7 +4,7 @@ use openmls::prelude::{
 use serde::{Deserialize, Serialize};
 use tls_codec::DeserializeBytes;
 
-use crate::SpkiHash;
+use crate::{SpkiHash, UnverifiedCertificate};
 
 #[derive(Serialize, Deserialize)]
 pub enum MessageToServer {
@@ -76,6 +76,7 @@ impl NewGroupTransport {
     }
 }
 
+#[derive(Clone)]
 pub struct NewGroup {
     pub(crate) group_info: VerifiableGroupInfo,
     pub(crate) welcome: Vec<u8>,

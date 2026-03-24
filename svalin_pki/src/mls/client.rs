@@ -70,7 +70,7 @@ where
 
         let required_members = self
             .key_retriever
-            .get_required_device_group_members(device.spki_hash())
+            .get_required_group_members(&group_id)
             .await
             .map_err(CreateDeviceGroupError::KeyRetrieverError)?;
 

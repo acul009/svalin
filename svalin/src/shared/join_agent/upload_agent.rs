@@ -5,7 +5,8 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
     Certificate, CertificateChainBuilder, RootCertificate, UnverifiedCertificate, VerifyChainError,
-    get_current_timestamp, mls::transport_types::NewGroup,
+    get_current_timestamp,
+    mls::{server::AddDeviceGroupError, transport_types::NewGroupTransport},
 };
 use svalin_rpc::rpc::{
     command::{
@@ -41,6 +42,8 @@ pub enum InternalAddAgentError {
     VerifyChainError(#[from] VerifyChainError),
     #[error("error saving agent to database: {0}")]
     AddAgentError(#[from] agent_store::AddAgentError),
+    #[error("error adding device group")]
+    AddDeviceGroupError(AddDeviceGroupError<anyhow::Error>),
 }
 
 pub struct UploadAgentHandler {
@@ -110,12 +113,15 @@ impl UploadAgentHandler {
             .complete_certificate_chain(cert_chain)
             .await?;
         let agent_cert_chain = cert_chain.verify(&self.root, get_current_timestamp())?;
+        let agent_cert = agent_cert_chain.take_leaf();
+        let spki_hash = agent_cert.spki_hash().clone();
 
-        self.agent_store
-            .add_agent(agent_cert_chain.take_leaf())
-            .await?;
+        self.agent_store.add_agent(agent_cert).await?;
 
-        self.mls.new_device_group(group_info).await?;
+        self.mls
+            .add_device_group(data.device_group, &spki_hash)
+            .await
+            .map_err(InternalAddAgentError::AddDeviceGroupError)?;
 
         Ok(())
     }
@@ -124,13 +130,13 @@ impl UploadAgentHandler {
 #[derive(Serialize, Deserialize)]
 struct UploadAgentData {
     certificate: UnverifiedCertificate,
-    device_group: NewGroup,
+    device_group: NewGroupTransport,
 }
 
 pub struct UploadAgent(UploadAgentData);
 
 impl UploadAgent {
-    pub fn new(device: Certificate, device_group: NewGroup) -> Self {
+    pub fn new(device: Certificate, device_group: NewGroupTransport) -> Self {
         Self(UploadAgentData {
             certificate: device.to_unverified(),
             device_group,

@@ -5,12 +5,11 @@ use anyhow::{Context, Result, anyhow};
 use command_builder::SvalinCommandBuilder;
 use config_builder::ServerConfigBuilder;
 use openmls_sqlx_storage::SqliteStorageProvider;
-use rand::{Rng, RngExt};
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use sqlx::{SqlitePool, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
 use svalin_pki::{
     Credential, EncryptedCredential, KnownCertificateVerifier, UnverifiedCertificate,
-    mls::{key_retriever, provider::SvalinProvider},
 };
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},

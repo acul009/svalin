@@ -1,10 +1,14 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Add,
+};
 
 use openmls::{
     framing::errors::ProtocolMessageError,
     group::{GroupId, MergeCommitError, ProposalStore, PublicGroup, PublicProcessMessageError},
     prelude::{CreationFromExternalError, MlsMessageIn, group_info::VerifiableGroupInfo},
 };
+use openmls_rust_crypto::{MemoryStorage, MemoryStorageError};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
 use tls_codec::DeserializeBytes;
@@ -39,6 +43,13 @@ impl PublicProcessorHandle {
                         let result = public_processor.process_message(message);
                         let _ = response.send(result);
                     }
+                    PublicProcessorRequest::CheckGroup {
+                        new_group,
+                        response,
+                    } => {
+                        let result = public_processor.check_group(new_group);
+                        let _ = response.send(result);
+                    }
                     PublicProcessorRequest::AddGroup {
                         new_group,
                         response,
@@ -70,6 +81,20 @@ impl PublicProcessorHandle {
         recv.await?
     }
 
+    pub async fn check_group(&self, new_group: NewGroup) -> Result<PublicGroup, AddGroupError> {
+        let (send, recv) = oneshot::channel();
+
+        let _ = self
+            .channel
+            .send(PublicProcessorRequest::CheckGroup {
+                new_group,
+                response: send,
+            })
+            .await;
+
+        recv.await?
+    }
+
     pub async fn add_group(&self, new_group: NewGroup) -> Result<MessageToSend, AddGroupError> {
         let (send, recv) = oneshot::channel();
 
@@ -93,6 +118,10 @@ enum PublicProcessorRequest {
     AddGroup {
         new_group: NewGroup,
         response: oneshot::Sender<Result<MessageToSend, AddGroupError>>,
+    },
+    CheckGroup {
+        new_group: NewGroup,
+        response: oneshot::Sender<Result<PublicGroup, AddGroupError>>,
     },
 }
 
@@ -146,18 +175,26 @@ impl PublicProcessor {
         Ok(to_send)
     }
 
-    fn add_group(&mut self, new_group: NewGroup) -> Result<MessageToSend, AddGroupError> {
-        let group_id = new_group.group_info.group_id();
-        match Self::get_group(
-            &mut self.group_cache,
-            self.provider.storage(),
-            group_id.clone(),
-        ) {
-            Ok(_) => return Err(AddGroupError::GroupExists),
-            Err(GetPublicGroupError::UnknownGroup) => (),
-            Err(err) => return Err(AddGroupError::GetPublicGroupError(err)),
-        }
+    fn check_group(&mut self, new_group: NewGroup) -> Result<PublicGroup, AddGroupError> {
+        let Some(ratchet_tree) = new_group.group_info.extensions().ratchet_tree() else {
+            return Err(AddGroupError::MissingRatchetTree);
+        };
 
+        let temp_storage = MemoryStorage::default();
+
+        let (group, _) = PublicGroup::from_external(
+            self.provider.crypto(),
+            &temp_storage,
+            ratchet_tree.ratchet_tree().clone(),
+            new_group.group_info,
+            ProposalStore::new(),
+        )
+        .map_err(AddGroupError::TempCreationFromExternalError)?;
+
+        Ok(group)
+    }
+
+    fn add_group(&mut self, new_group: NewGroup) -> Result<MessageToSend, AddGroupError> {
         let Some(ratchet_tree) = new_group.group_info.extensions().ratchet_tree() else {
             return Err(AddGroupError::MissingRatchetTree);
         };
@@ -168,7 +205,8 @@ impl PublicProcessor {
             ratchet_tree.ratchet_tree().clone(),
             new_group.group_info,
             ProposalStore::new(),
-        )?;
+        )
+        .map_err(AddGroupError::CreationFromExternalError)?;
 
         let members = group
             .members()
@@ -213,15 +251,15 @@ pub enum ProcessMessageError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum AddGroupError {
-    #[error("the given group already exists")]
-    GroupExists,
     #[error("the group info is missing the ratchet tree extension")]
     MissingRatchetTree,
     #[error("error getting group: {0}")]
     GetPublicGroupError(#[from] GetPublicGroupError),
     #[error("error creating group from external: {0}")]
+    TempCreationFromExternalError(#[source] CreationFromExternalError<MemoryStorageError>),
+    #[error("error creating group from external: {0}")]
     CreationFromExternalError(
-        #[from]
+        #[source]
         CreationFromExternalError<
             <SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError,
         >,

@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
-use svalin_pki::{Certificate, Credential,  RootCertificate};
+use svalin_pki::{Certificate, Credential, RootCertificate};
 use svalin_rpc::rpc::{command::handler::PermissionPrecursor, session::Session};
 use tokio::task::AbortHandle;
 use tracing::field::debug;
@@ -14,8 +14,8 @@ use crate::permissions::Permission;
 use self::{accept_handler::JoinAcceptHandler, request_handler::JoinRequestHandler};
 
 pub mod accept_handler;
-pub mod add_agent;
 pub mod request_handler;
+pub mod upload_agent;
 
 #[derive(Debug)]
 pub struct AgentInitPayload {

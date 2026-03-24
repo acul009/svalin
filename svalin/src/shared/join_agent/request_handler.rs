@@ -2,13 +2,11 @@ use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use rand::Rng;
+use rand::{Rng, RngExt};
 use svalin_pki::{
     CreateCredentialsError, DeriveKeyError, KeyPair, SignatureVerificationError,
     UnverifiedCertificate, UseAsRootError, get_current_timestamp,
-    mls::processor::{
-        CreateKeyPackageError, DeviceGroupCreationInfo, JoinDeviceGroupError, MlsProcessor,
-    },
+    mls::processor::CreateKeyPackageError,
 };
 use svalin_rpc::{
     rpc::{

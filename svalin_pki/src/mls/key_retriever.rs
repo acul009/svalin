@@ -1,16 +1,19 @@
-use std::pin::Pin;
+use std::{fmt::Display, pin::Pin};
 
 use crate::{
     SpkiHash,
-    mls::key_package::{KeyPackage, UnverifiedKeyPackage},
+    mls::{
+        group_id::SvalinGroupId,
+        key_package::{KeyPackage, UnverifiedKeyPackage},
+    },
 };
 
 pub trait KeyRetriever {
-    type Error;
+    type Error: Display;
 
-    fn get_required_device_group_members(
+    fn get_required_group_members(
         &self,
-        device: &SpkiHash,
+        id: &SvalinGroupId,
     ) -> impl Future<Output = Result<Vec<SpkiHash>, Self::Error>>;
     fn get_key_packages(
         &self,

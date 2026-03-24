@@ -2,12 +2,12 @@ use openmls::group::GroupId;
 
 use crate::SpkiHash;
 
-pub(crate) enum SvalinGroupId {
+pub enum SvalinGroupId {
     DeviceGroup(SpkiHash),
 }
 
 impl SvalinGroupId {
-    pub fn to_group_id(&self) -> GroupId {
+    pub(crate) fn to_group_id(&self) -> GroupId {
         match self {
             SvalinGroupId::DeviceGroup(spki_hash) => {
                 let mut bytes = b"device/".to_vec();
@@ -17,7 +17,7 @@ impl SvalinGroupId {
         }
     }
 
-    pub fn from_group_id(group_id: &GroupId) -> Result<Self, ParseGroupIdError> {
+    pub(crate) fn from_group_id(group_id: &GroupId) -> Result<Self, ParseGroupIdError> {
         if group_id.as_slice().starts_with(b"device/") {
             if group_id.as_slice().len() != 39 {
                 return Err(ParseGroupIdError::WrongSliceLength);

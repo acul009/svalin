@@ -1,11 +1,6 @@
-use std::sync::Arc;
+use svalin_pki::{Certificate, RootCertificate, SpkiHash, Verifier, VerifyError};
 
-use anyhow::anyhow;
-use svalin_pki::{
-    Certificate, CertificateChainBuilder, RootCertificate, SpkiHash, Verifier, VerifyError,
-};
-
-use crate::server::{chain_loader::ChainLoader, user_store::UserStore};
+use crate::server::chain_loader::ChainLoader;
 
 #[derive(Debug, Clone)]
 pub struct LocalVerifier {

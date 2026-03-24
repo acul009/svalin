@@ -15,6 +15,8 @@ pub mod public_processor;
 pub mod server;
 pub mod transport_types;
 
+pub use group_id::SvalinGroupId;
+
 pub use openmls::prelude::{OpenMlsProvider, ProtocolVersion};
 
 impl From<&SpkiHash> for openmls::credentials::Credential {
