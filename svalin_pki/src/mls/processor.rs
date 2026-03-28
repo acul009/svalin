@@ -370,7 +370,7 @@ impl MlsProcessor {
 
         let message = group.create_message(&self.provider, &self.svalin_credential, message)?;
 
-        let MlsMessageBodyOut::PrivateMessage(message) = message.body() else {
+        let MlsMessageBodyOut::PrivateMessage(_) = message.body() else {
             panic!("expected private message");
         };
 

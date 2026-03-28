@@ -1,5 +1,6 @@
 use openmls::prelude::{
-    PrivateMessageIn, ProtocolMessage, Welcome, group_info::VerifiableGroupInfo,
+    MlsMessageBodyIn, MlsMessageIn, PrivateMessageIn, ProtocolMessage, Welcome,
+    group_info::VerifiableGroupInfo,
 };
 use serde::{Deserialize, Serialize};
 use tls_codec::DeserializeBytes;
@@ -40,7 +41,12 @@ impl MessageToMemberTransport {
                 MessageToMember::Welcome(Welcome::tls_deserialize_exact_bytes(&welcome)?)
             }
             MessageToMemberTransport::GroupMessage(message) => {
-                let private_message = PrivateMessageIn::tls_deserialize_exact_bytes(&message)?;
+                let message = MlsMessageIn::tls_deserialize_exact_bytes(&message)?;
+                let MlsMessageBodyIn::PrivateMessage(private_message) = message.extract() else {
+                    return Err(tls_codec::Error::DecodingError(
+                        "Expected a Private MLS message, but got something else".into(),
+                    ));
+                };
                 MessageToMember::GroupMessage(private_message)
             }
         };
