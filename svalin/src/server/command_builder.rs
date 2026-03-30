@@ -23,7 +23,7 @@ use crate::{
             public_server_status::{PublicStatus, PublicStatusHandler},
             upload_key_packages::UploadKeyPackagesHandler,
         },
-        join_agent::add_agent::UploadAgentHandler,
+        join_agent::upload_agent::UploadAgentHandler,
     },
 };
 

@@ -1,4 +1,7 @@
-use std::{fmt::Display, pin::Pin};
+use std::{
+    fmt::{Debug, Display},
+    pin::Pin,
+};
 
 use crate::{
     SpkiHash,
@@ -9,7 +12,7 @@ use crate::{
 };
 
 pub trait KeyRetriever {
-    type Error: Display;
+    type Error: Display + Debug;
 
     fn get_required_group_members(
         &self,

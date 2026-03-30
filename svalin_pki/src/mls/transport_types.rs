@@ -2,7 +2,7 @@ use openmls::prelude::{
     MlsMessageBodyIn, MlsMessageIn, PrivateMessageIn, ProtocolMessage, Welcome,
     group_info::VerifiableGroupInfo,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tls_codec::DeserializeBytes;
 
 use crate::{SpkiHash, UnverifiedCertificate};
@@ -86,4 +86,9 @@ impl NewGroupTransport {
 pub struct NewGroup {
     pub(crate) group_info: VerifiableGroupInfo,
     pub(crate) welcome: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum DeviceMessage<Report> {
+    Report(Report),
 }

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Certificate, CertificateType, SpkiHash, Verifier, VerifyError, get_current_timestamp};
 
+#[cfg_attr(test, derive(Clone))]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UnverifiedKeyPackage {
     key_package: KeyPackageIn,

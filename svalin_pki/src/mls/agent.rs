@@ -1,8 +1,10 @@
-use std::marker::PhantomData;
+use std::{collections::HashSet, marker::PhantomData};
 
 use openmls::{
+    error::LibraryError,
     framing::errors::MlsMessageError,
-    group::{CreateMessageError, GroupId, MlsGroup},
+    group::{CreateMessageError, GroupId, MlsGroup, StagedWelcome},
+    prelude::Welcome,
     storage::StorageProvider,
 };
 use openmls_sqlx_storage::SqliteStorageProvider;
@@ -13,15 +15,22 @@ use tokio::task::JoinError;
 use crate::{
     Certificate, CertificateType, Credential, SpkiHash,
     mls::{
+        SvalinGroupId,
+        group_id::ParseGroupIdError,
         key_package::KeyPackage,
-        processor::{CreateGroupMessageError, CreateKeyPackageError, MlsProcessorHandle},
+        processor::{
+            CreateGroupMessageError, CreateKeyPackageError, JoinGroupError, MlsProcessorHandle,
+        },
         provider::{PostcardCodec, SvalinProvider},
+        transport_types::{DeviceMessage, MessageToMember, MessageToServer},
     },
 };
 
-pub struct MlsAgent {
-    mls: MlsProcessorHandle,
-    id: SpkiHash,
+pub struct MlsAgent<KeyRetriever, Verifier> {
+    processor: MlsProcessorHandle,
+    key_retriever: KeyRetriever,
+    verifier: Verifier,
+    me: Certificate,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -36,26 +45,96 @@ pub enum MlsAgentCreateError {
     JoinError(#[from] JoinError),
 }
 
-impl MlsAgent {
+impl<KeyRetriever, Verifier> MlsAgent<KeyRetriever, Verifier>
+where
+    KeyRetriever: crate::mls::key_retriever::KeyRetriever,
+    Verifier: crate::Verifier,
+{
     pub async fn new(
         credential: Credential,
         storage_provider: SqliteStorageProvider<PostcardCodec>,
+        key_retriever: KeyRetriever,
+        verifier: Verifier,
     ) -> Result<Self, MlsAgentCreateError> {
+        let me = credential.certificate().clone();
         if credential.certificate().certificate_type() != CertificateType::Agent {
             return Err(MlsAgentCreateError::NotAnAgent(
                 credential.certificate().clone(),
             ));
         }
 
-        let id = credential.certificate().spki_hash().clone();
+        let processor = MlsProcessorHandle::new_processor(credential, storage_provider);
 
-        let mls = MlsProcessorHandle::new_processor(credential, storage_provider);
-
-        Ok(Self { id, mls })
+        Ok(Self {
+            me,
+            processor,
+            key_retriever,
+            verifier,
+        })
     }
 
     pub async fn create_key_package(&self) -> Result<KeyPackage, CreateKeyPackageError> {
-        self.mls.create_key_package().await
+        self.processor.create_key_package().await
+    }
+
+    pub async fn handle_message(
+        &self,
+        message: MessageToMember,
+    ) -> Result<(), HandleMessageError<KeyRetriever::Error>> {
+        match message {
+            MessageToMember::Welcome(welcome) => self
+                .handle_welcome(welcome)
+                .await
+                .map_err(HandleMessageError::Welcome),
+            MessageToMember::GroupMessage(private_message_in) => todo!(),
+        }
+    }
+
+    async fn handle_welcome(
+        &self,
+        welcome: Welcome,
+    ) -> Result<(), HandleWelcomeError<KeyRetriever::Error>> {
+        let staged = self.processor.stage_join(welcome).await?;
+        let id = SvalinGroupId::from_group_id(staged.group_context().group_id())?;
+
+        match &id {
+            SvalinGroupId::DeviceGroup(device) => {
+                if device != self.me.spki_hash() {
+                    return Err(HandleWelcomeError::UnwantedGroup);
+                }
+            }
+        }
+
+        let required_members = self
+            .key_retriever
+            .get_required_group_members(&id)
+            .await
+            .map_err(HandleWelcomeError::RetrieverError)?
+            .into_iter()
+            .collect::<HashSet<_>>();
+
+        let members = staged
+            .members()
+            .map(|m| m.credential.deserialized())
+            .collect::<Result<HashSet<SpkiHash>, tls_codec::Error>>()?;
+
+        if members != required_members {
+            return Err(HandleWelcomeError::IncorrectMembers);
+        }
+
+        Ok(())
+    }
+
+    pub async fn send_report<Report: Serialize>(
+        &self,
+        report: Report,
+    ) -> Result<MessageToServer, SendDeviceMessageError> {
+        let group_id = SvalinGroupId::DeviceGroup(self.me.spki_hash().clone()).to_group_id();
+        let message = DeviceMessage::Report(report);
+        let encoded = postcard::to_stdvec(&message)?;
+        let to_server = self.processor.create_message(group_id, encoded).await?;
+
+        Ok(to_server)
     }
 
     // pub async fn join_my_device_group(
@@ -117,24 +196,42 @@ impl MlsAgent {
 
     //     Ok(())
     // }
-
-    // pub async fn create_new_report<Report: Serialize>(
-    //     &self,
-    //     report: &Report,
-    // ) -> Result<EncodedReport<Report>, CreateSystemreportError> {
-    //     let report = postcard::to_stdvec(report)?;
-
-    //     let message = self.mls.create_message(self.id.to_vec(), report).await?;
-
-    //     Ok(EncodedReport {
-    //         message,
-    //         report: PhantomData,
-    //     })
-    // }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum CreateSystemreportError {
+    #[error("postcard error: {0}")]
+    PostcardError(#[from] postcard::Error),
+    #[error("create message error: {0}")]
+    CreateMessageError(#[from] CreateGroupMessageError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum HandleMessageError<RetrieverError> {
+    #[error("welcome error: {0}")]
+    Welcome(#[from] HandleWelcomeError<RetrieverError>),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum HandleWelcomeError<RetrieverError> {
+    #[error("join group error: {0}")]
+    JoinGroupError(#[from] JoinGroupError),
+    #[error("parse group id error: {0}")]
+    ParseGroupIdError(#[from] ParseGroupIdError),
+    #[error("unwanted group")]
+    UnwantedGroup,
+    #[error("retriever error: {0}")]
+    RetrieverError(#[source] RetrieverError),
+    #[error("tls codec error: {0}")]
+    TlsCodecError(#[from] tls_codec::Error),
+    #[error("incorrect members")]
+    IncorrectMembers,
+    #[error("library error: {0}")]
+    LibraryError(#[from] LibraryError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SendDeviceMessageError {
     #[error("postcard error: {0}")]
     PostcardError(#[from] postcard::Error),
     #[error("create message error: {0}")]

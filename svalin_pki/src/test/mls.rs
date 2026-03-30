@@ -1,3 +1,10 @@
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    fmt::Display,
+    sync::Arc,
+};
+
 use openmls::{
     group::GroupId,
     prelude::{MlsMessageBodyIn, MlsMessageIn, MlsMessageOut, ProtocolMessage, Welcome},
@@ -7,8 +14,12 @@ use sqlx::SqlitePool;
 use tls_codec::DeserializeBytes;
 
 use crate::{
-    Credential, KeyPair,
+    Certificate, Credential, KeyPair, SpkiHash, Verifier, VerifyError,
     mls::{
+        agent::MlsAgent,
+        client::MlsClient,
+        key_package::{KeyPackage, UnverifiedKeyPackage},
+        key_retriever::{self, KeyRetriever},
         processor::{MlsProcessorHandle, ProcessedMessage},
         provider::PostcardCodec,
         public_processor::{self, PublicProcessorHandle},
@@ -151,36 +162,152 @@ async fn test_public_processor() {
     assert_eq!(test_text, received);
 }
 
+#[derive(Clone)]
+struct TestRetriever {
+    key_packages: Arc<RefCell<HashMap<SpkiHash, UnverifiedKeyPackage>>>,
+}
+
+impl TestRetriever {
+    fn new() -> Self {
+        Self {
+            key_packages: Arc::new(RefCell::new(HashMap::new())),
+        }
+    }
+
+    fn add(&self, key_package: KeyPackage) {
+        self.key_packages
+            .borrow_mut()
+            .insert(key_package.spki_hash().clone(), key_package.to_unverified());
+    }
+}
+
+#[derive(Debug)]
+enum Never {}
+
+impl Display for Never {
+    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        unreachable!()
+    }
+}
+
+impl KeyRetriever for TestRetriever {
+    type Error = Never;
+
+    async fn get_required_group_members(
+        &self,
+        _id: &crate::mls::SvalinGroupId,
+    ) -> Result<Vec<crate::SpkiHash>, Self::Error> {
+        Ok(self.key_packages.borrow().keys().cloned().collect())
+    }
+
+    async fn get_key_packages(
+        &self,
+        entities: &[crate::SpkiHash],
+    ) -> Result<Vec<crate::mls::key_package::UnverifiedKeyPackage>, Self::Error> {
+        let key_packages = self.key_packages.borrow();
+        Ok(entities
+            .iter()
+            .map(|hash| key_packages.get(hash).unwrap().clone())
+            .collect())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct TestVerifier {
+    known: HashMap<SpkiHash, Certificate>,
+}
+
+impl TestVerifier {
+    fn new() -> Self {
+        Self {
+            known: HashMap::new(),
+        }
+    }
+
+    fn push(&mut self, cert: Certificate) {
+        self.known.insert(cert.spki_hash().clone(), cert);
+    }
+}
+
+impl Verifier for TestVerifier {
+    async fn verify_spki_hash(
+        &self,
+        spki_hash: &SpkiHash,
+        time: u64,
+    ) -> Result<Certificate, crate::VerifyError> {
+        let cert = self
+            .known
+            .get(spki_hash)
+            .ok_or(VerifyError::UnknownCertificate)?;
+
+        cert.check_validity_at(time)?;
+
+        Ok(cert.clone())
+    }
+}
+
 #[tokio::test]
 async fn test_device_group() {
-    let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    let storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
-    storage.run_migrations().await.unwrap();
-    let user_credential = Credential::generate_root().unwrap();
-    let client_credential = user_credential.create_user_device_credential().unwrap();
-    let client = crate::mls::processor::MlsProcessorHandle::new_processor(
-        client_credential.clone(),
-        storage,
-    );
+    let mut verifier = TestVerifier::new();
+    let retriever = TestRetriever::new();
 
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    let storage = SqliteStorageProvider::<PostcardCodec>::new(pool.clone());
-    storage.run_migrations().await.unwrap();
+    let client_storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
+    client_storage.run_migrations().await.unwrap();
+    let user_credential = Credential::generate_root().unwrap();
+    verifier.push(user_credential.certificate().clone());
+
+    let client_credential = user_credential.create_user_device_credential().unwrap();
+    verifier.push(client_credential.certificate().clone());
+
+    let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+    let agent_storage = SqliteStorageProvider::<PostcardCodec>::new(pool.clone());
+    agent_storage.run_migrations().await.unwrap();
     let keypair = KeyPair::generate();
     let public_key = keypair.export_public_key();
     let cert = user_credential
         .create_agent_certificate_for_key(&public_key)
         .unwrap();
     let agent_credential = keypair.upgrade(cert.to_unverified()).unwrap();
-    let agent =
-        crate::mls::processor::MlsProcessorHandle::new_processor(agent_credential.clone(), storage);
+    verifier.push(agent_credential.certificate().clone());
 
-    let key_package = agent.create_key_package().await.unwrap();
+    let client = MlsClient::new(
+        client_credential.clone(),
+        client_storage,
+        retriever.clone(),
+        verifier.clone(),
+    )
+    .unwrap();
+    retriever.add(client.create_key_package().await.unwrap());
 
-    // let info = client
-    //     .create_device_group(key_package, Vec::new())
-    //     .await
-    //     .unwrap();
+    let agent = MlsAgent::new(
+        agent_credential.clone(),
+        agent_storage,
+        retriever.clone(),
+        verifier,
+    )
+    .await
+    .unwrap();
+
+    retriever.add(agent.create_key_package().await.unwrap());
+
+    let new_group = client
+        .create_device_group(agent_credential.certificate())
+        .await
+        .unwrap();
+
+    let public_processor = create_public_processor().await;
+    let new_group = new_group.unpack().unwrap();
+    let welcome = public_processor.add_group(new_group).await.unwrap();
+
+    let to_member = welcome.message.unpack().unwrap();
+
+    agent.handle_message(to_member).await.unwrap();
+
+    let report = "Test Data".to_string();
+    let to_server = agent.send_report(report).await.unwrap();
+
+    let to_send = public_processor.process_message(to_server).await.unwrap();
 
     // agent.join_my_device_group(info.clone()).await.unwrap();
 

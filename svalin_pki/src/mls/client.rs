@@ -20,6 +20,7 @@ use crate::{
 };
 
 pub struct MlsClient<KeyRetriever, Verifier> {
+    me: SpkiHash,
     processor: MlsProcessorHandle,
     key_retriever: KeyRetriever,
     verifier: Verifier,
@@ -38,6 +39,7 @@ where
         key_retriever: KeyRetriever,
         verifier: Verifier,
     ) -> Result<Self, CreateClientError> {
+        let me = credential.certificate().spki_hash().clone();
         match credential.certificate().certificate_type() {
             crate::CertificateType::Root => (),
             crate::CertificateType::User => (),
@@ -48,6 +50,7 @@ where
         let processor = MlsProcessorHandle::new_processor(credential, storage_provider);
 
         Ok(Self {
+            me,
             processor,
             key_retriever,
             verifier,
@@ -58,7 +61,7 @@ where
 
     pub async fn create_device_group(
         &self,
-        device: Certificate,
+        device: &Certificate,
     ) -> Result<NewGroupTransport, CreateDeviceGroupError<KeyRetriever::Error>> {
         if device.certificate_type() != CertificateType::Agent {
             return Err(CreateDeviceGroupError::WrongCertificateType(
@@ -72,7 +75,10 @@ where
             .key_retriever
             .get_required_group_members(&group_id)
             .await
-            .map_err(CreateDeviceGroupError::KeyRetrieverError)?;
+            .map_err(CreateDeviceGroupError::KeyRetrieverError)?
+            .into_iter()
+            .filter(|spki_hash| spki_hash != &self.me)
+            .collect::<Vec<_>>();
 
         let unverified = self
             .key_retriever

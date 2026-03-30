@@ -1,7 +1,4 @@
-use crate::shared::join_agent::{
-    accept_handler::AcceptJoin,
-    add_agent::{UploadAgent, UploadAgentCommandError},
-};
+use crate::shared::join_agent::accept_handler::AcceptJoin;
 
 use super::Client;
 

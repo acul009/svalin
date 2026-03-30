@@ -6,7 +6,7 @@ use rand::{Rng, RngExt};
 use svalin_pki::{
     CreateCredentialsError, DeriveKeyError, KeyPair, SignatureVerificationError,
     UnverifiedCertificate, UseAsRootError, get_current_timestamp,
-    mls::processor::CreateKeyPackageError,
+    mls::{agent::MlsAgent, client::MlsClient, processor::CreateKeyPackageError},
 };
 use svalin_rpc::{
     rpc::{
@@ -215,7 +215,7 @@ impl TakeableCommandDispatcher for RequestJoin {
             let storage_provider = Agent::create_new_mls_store()
                 .await
                 .map_err(RequestJoinError::MlsStoreError)?;
-            let mls = MlsProcessor::new(my_credentials.clone(), storage_provider);
+            let mls = MlsAgent::new(my_credentials.clone(), storage_provider)
             let key_package = mls
                 .create_key_package()
                 .await
