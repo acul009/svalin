@@ -30,9 +30,9 @@ thiserror = { workspace = true }
 tokio-stream = { version = "0.1.18", features = ["full"] }
 tokio-util = { workspace = true }
 futures = "0.3.32"
-uuid = "1.22.0"
+uuid = "1.23.0"
 rust-i18n = "3.1.5"
 sipper = { workspace = true }
 
 [build-dependencies]
-iced_fontello = "0.14"
+iced_fontello = {git = "https://github.com/hecrj/iced_fontello.git"}
