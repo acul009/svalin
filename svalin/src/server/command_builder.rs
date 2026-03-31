@@ -12,7 +12,7 @@ use crate::{
     permissions::default_permission_handler::DefaultPermissionHandler,
     server::{
         MlsServer, chain_loader::ChainLoader, key_package_store::KeyPackageStore,
-        session_store::SessionStore,
+        message_store::MessageStore, session_store::SessionStore,
     },
     shared::{
         commands::{
@@ -36,6 +36,7 @@ pub struct SvalinCommandBuilder {
     pub user_store: Arc<UserStore>,
     pub session_store: Arc<SessionStore>,
     pub key_package_store: Arc<KeyPackageStore>,
+    pub message_store: Arc<MessageStore>,
     pub mls: Arc<MlsServer>,
 }
 
@@ -72,6 +73,7 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             .add(UploadAgentHandler::new(
                 self.agent_store.clone(),
                 self.user_store.clone(),
+                self.message_store.clone(),
                 self.root_cert.clone(),
                 self.mls.clone(),
             )?)

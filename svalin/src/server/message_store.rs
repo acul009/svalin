@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use svalin_pki::{SpkiHash, get_current_timestamp, mls::transport_types::MessageToSend};
 use uuid::Uuid;
 
@@ -9,8 +11,8 @@ pub struct MessageStore {
 const MESSAGE_LIMIT_PER_FETCH: i64 = 10;
 
 impl MessageStore {
-    pub fn new(pool: sqlx::SqlitePool) -> Self {
-        Self { pool }
+    pub fn open(pool: sqlx::SqlitePool) -> Arc<Self> {
+        Arc::new(Self { pool })
     }
 
     pub async fn add_message(&self, message: MessageToSend) -> Result<(), MessageStoreError> {

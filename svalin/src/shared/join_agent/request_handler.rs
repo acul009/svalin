@@ -210,42 +210,6 @@ impl TakeableCommandDispatcher for RequestJoin {
                 .verify_signature(&root, get_current_timestamp())
                 .map_err(RequestJoinError::VerifyUpstreamCertError)?;
 
-            let storage_provider = Agent::create_new_mls_store()
-                .await
-                .map_err(RequestJoinError::MlsStoreError)?;
-            let mls = MlsAgent::new(my_credentials.clone(), storage_provider)
-            let key_package = mls
-                .create_key_package()
-                .await
-                .map_err(RequestJoinError::CreateKeyPackageError)?
-                .to_unverified();
-
-            session
-                .write_object(&key_package)
-                .await
-                .map_err(RequestJoinError::SessionWriteError)?;
-
-            let group_info: DeviceGroupCreationInfo = session
-                .read_object()
-                .await
-                .map_err(RequestJoinError::SessionReadError)?;
-
-            let join_group_result = mls
-                .join_my_device_group(group_info)
-                .await
-                .map_err(RequestJoinError::JoinDeviceGroupError);
-
-            match join_group_result {
-                Ok(()) => session
-                    .write_object::<Result<(), ()>>(&Ok(()))
-                    .await
-                    .map_err(RequestJoinError::SessionWriteError)?,
-                Err(err) => {
-                    let _ = session.write_object::<Result<(), ()>>(&Err(())).await;
-                    return Err(err.into());
-                }
-            }
-
             let upload_to_server_result: Result<(), ()> = session
                 .read_object()
                 .await

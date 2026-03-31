@@ -26,7 +26,8 @@ use tracing::{debug, error};
 use crate::{
     server::{
         chain_loader::ChainLoader, key_package_store::KeyPackageStore,
-        local_key_retriever::LocalKeyRetriever, session_store::SessionStore,
+        local_key_retriever::LocalKeyRetriever, message_store::MessageStore,
+        session_store::SessionStore,
     },
     shared::commands::{
         init::{InitHandler, ServerInitSuccess},
@@ -216,6 +217,8 @@ impl Server {
 
         let key_package_store = KeyPackageStore::open(pool.clone());
 
+        let message_store = MessageStore::open(pool.clone());
+
         let credentials = base_config
             .key_source
             .decrypt_credentials(base_config.credentials)
@@ -247,6 +250,7 @@ impl Server {
             user_store,
             agent_store,
             session_store,
+            message_store,
             key_package_store,
             mls,
         };

@@ -152,7 +152,7 @@ impl UploadAgentHandler {
 }
 
 #[derive(Serialize, Deserialize)]
-struct UploadAgentData {
+pub struct UploadAgentData {
     certificate: UnverifiedCertificate,
     device_group: NewGroupTransport,
 }

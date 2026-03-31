@@ -118,8 +118,6 @@ pub enum AcceptJoinError {
     AucPaceError(#[from] AucPaceClientError),
     #[error("error creating device group: {0}")]
     CreateDeviceGroupError(CreateDeviceGroupError<anyhow::Error>),
-    #[error("agent encountered error during device group join")]
-    AgentMlsJoinError,
     #[error("error uploading agent data to server: {0}")]
     UploadToServerError(#[from] ConnectionDispatchError<UploadAgentCommandError>),
 }
@@ -235,13 +233,6 @@ async fn handle_agent_enroll(
         .create_device_group(agent_cert.clone(), agent_key_package)
         .await
         .map_err(AcceptJoinError::CreateDeviceGroupError)?;
-
-    let to_member = new_group.extract_welcome();
-
-    session_e2e.write_object(&to_member).await?;
-
-    let join_result: Result<(), ()> = session_e2e.read_object().await?;
-    join_result.map_err(|_| AcceptJoinError::AgentMlsJoinError)?;
 
     let upload_result = client.upload_agent(agent_cert.clone(), new_group).await;
 

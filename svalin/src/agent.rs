@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::migrate::MigrateDatabase;
 use sqlx::{Sqlite, SqlitePool};
 use svalin_pki::mls::agent::MlsAgent;
+use svalin_pki::mls::key_retriever;
 use svalin_pki::mls::provider::PostcardCodec;
 use svalin_pki::{
     Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
@@ -30,6 +31,7 @@ pub mod update;
 
 use crate::client::tunnel_manager::tcp::handler::TcpForwardHandler;
 use crate::permissions::default_permission_handler::DefaultPermissionHandler;
+use crate::remote_key_retriever::RemoteKeyRetriever;
 use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::commands::terminal::RemoteTerminalHandler;
 use crate::shared::join_agent::AgentInitPayload;
@@ -42,7 +44,7 @@ pub struct Agent {
     root_certificate: RootCertificate,
     credentials: Credential,
     cancel: CancellationToken,
-    mls: MlsAgent,
+    mls: MlsAgent<RemoteKeyRetriever, RemoteVerifier>,
 }
 
 impl Agent {
@@ -73,10 +75,6 @@ impl Agent {
 
         let verifier = ExactVerififier::new(upstream_certificate).to_tls_verifier();
 
-        let storage_provider = Self::open_mls_store().await?;
-
-        let mls = MlsAgent::new(credentials.clone(), storage_provider).await?;
-
         debug!("trying to connect to server");
 
         let rpc = RpcClient::connect(
@@ -89,6 +87,21 @@ impl Agent {
         .context("error connecting rpc")?;
 
         debug!("connection to server established");
+
+        let storage_provider = Self::open_mls_store().await?;
+
+        let key_retriever =
+            RemoteKeyRetriever::new(rpc.upstream_connection(), root_certificate.clone());
+
+        let verifier = RemoteVerifier::new(root_certificate.clone(), rpc.upstream_connection());
+
+        let mls = MlsAgent::new(
+            credentials.clone(),
+            storage_provider,
+            key_retriever,
+            verifier,
+        )
+        .await?;
 
         Ok(Agent {
             credentials,
