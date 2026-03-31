@@ -124,8 +124,6 @@ pub enum RequestJoinError {
     SessionReadError(#[source] SessionReadError),
     #[error("error in AucPace transport: {0}")]
     AucPaceError(#[source] AucPaceServerError),
-    #[error("error joining device group: {0}")]
-    JoinDeviceGroupError(#[source] JoinDeviceGroupError),
     #[error("initializing client reported error when adding the agent to the server")]
     UploadToServerError,
 }

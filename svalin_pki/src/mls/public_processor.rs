@@ -66,7 +66,7 @@ impl PublicProcessorHandle {
 
     pub async fn process_message(
         &self,
-        message: MessageToServer,
+        message: Vec<u8>,
     ) -> Result<MessageToSend, ProcessMessageError> {
         let (send, recv) = oneshot::channel();
 
@@ -112,7 +112,7 @@ impl PublicProcessorHandle {
 
 enum PublicProcessorRequest {
     ProcessMessage {
-        message: MessageToServer,
+        message: Vec<u8>,
         response: oneshot::Sender<Result<MessageToSend, ProcessMessageError>>,
     },
     AddGroup {
@@ -154,22 +154,15 @@ impl PublicProcessor {
         Ok(group)
     }
 
-    fn process_message(
-        &mut self,
-        message: MessageToServer,
-    ) -> Result<MessageToSend, ProcessMessageError> {
-        let to_send = match message {
-            MessageToServer::GroupMessage(message) => {
-                let mls_message = MlsMessageIn::tls_deserialize_exact_bytes(&message)?;
-                let protocol_message = mls_message.try_into_protocol_message()?;
+    fn process_message(&mut self, message: Vec<u8>) -> Result<MessageToSend, ProcessMessageError> {
+        let mls_message = MlsMessageIn::tls_deserialize_exact_bytes(&message)?;
+        let protocol_message = mls_message.try_into_protocol_message()?;
 
-                let members = self.get_group_members(protocol_message.group_id().clone())?;
+        let members = self.get_group_members(protocol_message.group_id().clone())?;
 
-                MessageToSend {
-                    receivers: members,
-                    message: MessageToMemberTransport::GroupMessage(message),
-                }
-            }
+        let to_send = MessageToSend {
+            receivers: members,
+            message: MessageToMemberTransport::GroupMessage(message),
         };
 
         Ok(to_send)

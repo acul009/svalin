@@ -4,8 +4,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Certificate, CertificateChainBuilder, RootCertificate, UnverifiedCertificate, VerifyChainError,
-    get_current_timestamp,
+    Certificate, CertificateChainBuilder, RootCertificate, SpkiHash, UnverifiedCertificate,
+    VerifyChainError, get_current_timestamp,
     mls::{server::AddDeviceGroupError, transport_types::NewGroupTransport},
 };
 use svalin_rpc::rpc::{
@@ -22,6 +22,7 @@ use crate::{
     server::{
         MlsServer,
         agent_store::{self, AgentStore},
+        message_store::{MessageStore, MessageStoreError},
         user_store::{CompleteCertChainError, UserStore},
     },
 };
@@ -44,11 +45,14 @@ pub enum InternalAddAgentError {
     AddAgentError(#[from] agent_store::AddAgentError),
     #[error("error adding device group")]
     AddDeviceGroupError(AddDeviceGroupError<anyhow::Error>),
+    #[error("error adding message to store: {0}")]
+    MessageStoreError(#[from] MessageStoreError),
 }
 
 pub struct UploadAgentHandler {
     agent_store: Arc<AgentStore>,
     user_store: Arc<UserStore>,
+    message_store: Arc<MessageStore>,
     root: RootCertificate,
     mls: Arc<MlsServer>,
 }
@@ -63,12 +67,14 @@ impl UploadAgentHandler {
     pub fn new(
         agent_store: Arc<AgentStore>,
         user_store: Arc<UserStore>,
+        message_store: Arc<MessageStore>,
         root: RootCertificate,
         mls: Arc<MlsServer>,
     ) -> Result<Self> {
         Ok(Self {
             agent_store,
             user_store,
+            message_store,
             root,
             mls,
         })
@@ -89,7 +95,11 @@ impl CommandHandler for UploadAgentHandler {
         request: Self::Request,
         _: CancellationToken,
     ) -> Result<()> {
-        if let Err(err) = self.add_agent(request).await {
+        let svalin_rpc::rpc::peer::Peer::Certificate(sender) = session.peer() else {
+            panic!("unexpected peer type: {:?}", session.peer())
+        };
+
+        if let Err(err) = self.add_agent(request, sender.spki_hash()).await {
             session
                 .write_object::<Result<(), AddAgentError>>(&Err(AddAgentError::StoreError))
                 .await?;
@@ -106,7 +116,11 @@ impl CommandHandler for UploadAgentHandler {
 }
 
 impl UploadAgentHandler {
-    async fn add_agent(&self, data: UploadAgentData) -> Result<(), InternalAddAgentError> {
+    async fn add_agent(
+        &self,
+        data: UploadAgentData,
+        sender: &SpkiHash,
+    ) -> Result<(), InternalAddAgentError> {
         let cert_chain = CertificateChainBuilder::new(data.certificate);
         let cert_chain = self
             .user_store
@@ -118,10 +132,20 @@ impl UploadAgentHandler {
 
         self.agent_store.add_agent(agent_cert).await?;
 
-        self.mls
+        let mut to_send = self
+            .mls
             .add_device_group(data.device_group, &spki_hash)
             .await
             .map_err(InternalAddAgentError::AddDeviceGroupError)?;
+
+        // Do not deliver the welcome to the sender or the agent themselves
+        to_send.receivers = to_send
+            .receivers
+            .into_iter()
+            .filter(|receiver| receiver != sender && receiver != &spki_hash)
+            .collect();
+
+        self.message_store.add_message(to_send).await?;
 
         Ok(())
     }

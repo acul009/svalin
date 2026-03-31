@@ -4,8 +4,9 @@ use svalin_pki::{
     Certificate, CreateCertificateError, DeriveKeyError, ExactVerififier, ExportedPublicKey,
     mls::{
         OpenMlsProvider,
+        client::CreateDeviceGroupError,
         key_package::{KeyPackageError, UnverifiedKeyPackage},
-        processor::CreateDeviceGroupError,
+        transport_types::MessageToMemberTransport,
     },
 };
 use svalin_rpc::{
@@ -28,10 +29,7 @@ use tokio::{io::copy_bidirectional, select, sync::oneshot};
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
-use crate::{
-    client::{Client, GetKeyPackagesError},
-    shared::join_agent::add_agent::UploadAgentCommandError,
-};
+use crate::{client::Client, shared::join_agent::upload_agent::UploadAgentCommandError};
 
 use super::ServerJoinManager;
 
@@ -118,10 +116,8 @@ pub enum AcceptJoinError {
     Aborted,
     #[error("error establishing encrypted tunnel: {0}")]
     AucPaceError(#[from] AucPaceClientError),
-    #[error("error getting additional key packages from server: {0}")]
-    GetKeyPackagesError(#[from] GetKeyPackagesError),
     #[error("error creating device group: {0}")]
-    CreateDeviceGroupError(#[from] CreateDeviceGroupError),
+    CreateDeviceGroupError(CreateDeviceGroupError<anyhow::Error>),
     #[error("agent encountered error during device group join")]
     AgentMlsJoinError,
     #[error("error uploading agent data to server: {0}")]
@@ -235,27 +231,19 @@ async fn handle_agent_enroll(
 
     let agent_key_package: UnverifiedKeyPackage = session_e2e.read_object().await?;
 
-    let verifier = ExactVerififier::new(agent_cert.clone());
+    let new_group = mls
+        .create_device_group(agent_cert.clone(), agent_key_package)
+        .await
+        .map_err(AcceptJoinError::CreateDeviceGroupError)?;
 
-    let agent_key_package = agent_key_package
-        .verify(mls.provider().crypto(), mls.protocol_version(), &verifier)
-        .await?;
+    let to_member = new_group.extract_welcome();
 
-    let others = client
-        .get_key_packages(&[
-            client.user_credential().certificate().clone(),
-            client.root_certificate().as_certificate().clone(),
-        ])
-        .await?;
-
-    let group_info = mls.create_device_group(agent_key_package, others).await?;
-
-    session_e2e.write_object(&group_info).await?;
+    session_e2e.write_object(&to_member).await?;
 
     let join_result: Result<(), ()> = session_e2e.read_object().await?;
     join_result.map_err(|_| AcceptJoinError::AgentMlsJoinError)?;
 
-    let upload_result = client.upload_agent(&group_info).await;
+    let upload_result = client.upload_agent(agent_cert.clone(), new_group).await;
 
     match upload_result {
         Ok(_) => session_e2e.write_object::<Result<(), ()>>(&Ok(())).await?,

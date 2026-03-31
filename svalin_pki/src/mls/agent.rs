@@ -122,6 +122,8 @@ where
             return Err(HandleWelcomeError::IncorrectMembers);
         }
 
+        self.processor.join_group(staged).await?;
+
         Ok(())
     }
 

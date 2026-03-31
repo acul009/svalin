@@ -80,6 +80,10 @@ impl NewGroupTransport {
 
         transport.unpack()
     }
+
+    pub fn extract_welcome(&self) -> MessageToMemberTransport {
+        MessageToMemberTransport::Welcome(self.welcome.clone())
+    }
 }
 
 #[derive(Clone)]

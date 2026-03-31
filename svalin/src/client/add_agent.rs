@@ -1,10 +1,16 @@
-use crate::shared::join_agent::accept_handler::AcceptJoin;
+use crate::shared::join_agent::{
+    accept_handler::AcceptJoin,
+    upload_agent::{UploadAgent, UploadAgentCommandError},
+};
 
 use super::Client;
 
 use anyhow::Result;
-use svalin_pki::Certificate;
-use svalin_rpc::rpc::connection::{Connection, ConnectionDispatchError};
+use svalin_pki::{Certificate, mls::transport_types::NewGroupTransport};
+use svalin_rpc::rpc::{
+    command::dispatcher::DispatcherError,
+    connection::{Connection, ConnectionDispatchError},
+};
 use tokio::sync::oneshot;
 
 impl Client {
@@ -24,5 +30,19 @@ impl Client {
             .await?;
 
         Ok(certificate)
+    }
+
+    pub(crate) async fn upload_agent(
+        &self,
+        device: Certificate,
+        device_group: NewGroupTransport,
+    ) -> Result<(), ConnectionDispatchError<UploadAgentCommandError>> {
+        let connection = self.rpc.upstream_connection();
+
+        connection
+            .dispatch(UploadAgent::new(device, device_group))
+            .await?;
+
+        Ok(())
     }
 }

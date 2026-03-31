@@ -10,8 +10,8 @@ use crate::{
         group_id::{ParseGroupIdError, SvalinGroupId},
         key_package::{KeyPackage, KeyPackageError, UnverifiedKeyPackage},
         provider::PostcardCodec,
-        public_processor::{AddGroupError, PublicProcessorHandle},
-        transport_types::{MessageToSend, NewGroup, NewGroupTransport},
+        public_processor::{AddGroupError, ProcessMessageError, PublicProcessorHandle},
+        transport_types::{MessageToSend, MessageToServer, NewGroup, NewGroupTransport},
     },
 };
 
@@ -103,17 +103,26 @@ where
             .key_retriever
             .get_required_group_members(&id)
             .await
-            .map_err(AddDeviceGroupError::KeyRetrieverError)?;
+            .map_err(AddDeviceGroupError::KeyRetrieverError)?
+            .into_iter()
+            .collect::<HashSet<_>>();
 
-        for required in &required_members {
-            if !members.contains(required) {
-                return Err(todo!());
-            }
+        if members != required_members {
+            return Err(todo!());
         }
 
         let to_send = self.processor.add_group(new_group.clone()).await?;
 
         Ok(to_send)
+    }
+
+    pub async fn process_message(
+        &self,
+        message: MessageToServer,
+    ) -> Result<MessageToSend, ProcessMessageError> {
+        match message {
+            MessageToServer::GroupMessage(data) => self.processor.process_message(data).await,
+        }
     }
 }
 

@@ -17,12 +17,14 @@ use crate::{
     Certificate, Credential, KeyPair, SpkiHash, Verifier, VerifyError,
     mls::{
         agent::MlsAgent,
-        client::MlsClient,
+        client::{MessageData, MlsClient},
         key_package::{KeyPackage, UnverifiedKeyPackage},
         key_retriever::{self, KeyRetriever},
         processor::{MlsProcessorHandle, ProcessedMessage},
         provider::PostcardCodec,
         public_processor::{self, PublicProcessorHandle},
+        server::MlsServer,
+        transport_types::{MessageToMember, MessageToServer},
     },
 };
 
@@ -50,7 +52,7 @@ async fn test_key_package_creation() {
 }
 
 #[tokio::test]
-async fn test_group() {
+async fn test_processor() {
     let credential1 = Credential::generate_root().unwrap();
     let member1 = create_processor(credential1).await;
 
@@ -60,19 +62,17 @@ async fn test_group() {
 
     let group_id = GroupId::from_slice(b"test");
 
-    let welcome = member1
+    let MessageToMember::Welcome(welcome) = member1
         .create_group(vec![key_package], group_id.clone())
         .await
         .unwrap()
         .to_member()
-        .unwrap();
-
-    let staged = member2
-        .process_message(welcome)
-        .await
         .unwrap()
-        .welcome()
-        .expect("wrong message type");
+    else {
+        panic!("wrong message type")
+    };
+
+    let staged = member2.stage_join(welcome).await.unwrap();
     member2.join_group(staged).await.unwrap();
 
     let test_text = b"Hello MLS!".to_vec();
@@ -82,16 +82,13 @@ async fn test_group() {
         .await
         .unwrap();
 
-    let message = message.to_member().unwrap();
+    let MessageToMember::GroupMessage(message) = message.to_member().unwrap() else {
+        panic!("wrong message type")
+    };
 
-    let received = member1
-        .process_message(message)
-        .await
-        .unwrap()
-        .data()
-        .expect("wrong message type");
+    let received = member1.process_message(message).await.unwrap();
 
-    assert_eq!(test_text, received);
+    assert_eq!(test_text, received.decrypted);
 }
 
 #[tokio::test]
@@ -122,24 +119,26 @@ async fn test_public_processor() {
         .into_iter()
         .filter(|spki_hash| spki_hash != &spki_hash1)
         .collect::<Vec<_>>();
+    let MessageToMember::Welcome(welcome) = to_send.message.unpack().unwrap() else {
+        panic!("wrong message type")
+    };
 
     assert_eq!(members.len(), 1);
     assert_eq!(members[0], spki_hash2);
 
-    let staged = member2
-        .process_message(to_send.message.unpack().unwrap())
-        .await
-        .unwrap()
-        .welcome()
-        .expect("wrong message type");
+    let staged = member2.stage_join(welcome).await.unwrap();
     member2.join_group(staged).await.unwrap();
 
     let test_text = b"Hello MLS!".to_vec();
 
-    let message = member2
+    #[allow(irrefutable_let_patterns)]
+    let MessageToServer::GroupMessage(message) = member2
         .create_message(group_id, test_text.clone())
         .await
-        .unwrap();
+        .unwrap()
+    else {
+        panic!("wrong message type")
+    };
 
     let to_send = public_processor.process_message(message).await.unwrap();
 
@@ -152,14 +151,13 @@ async fn test_public_processor() {
     assert_eq!(members.len(), 1);
     assert_eq!(members[0], spki_hash1);
 
-    let received = member1
-        .process_message(to_send.message.unpack().unwrap())
-        .await
-        .unwrap()
-        .data()
-        .expect("wrong message type");
+    let MessageToMember::GroupMessage(message) = to_send.message.unpack().unwrap() else {
+        panic!("wrong message type")
+    };
 
-    assert_eq!(test_text, received);
+    let received = member1.process_message(message).await.unwrap();
+
+    assert_eq!(test_text, received.decrypted);
 }
 
 #[derive(Clone)]
@@ -284,67 +282,47 @@ async fn test_device_group() {
         agent_credential.clone(),
         agent_storage,
         retriever.clone(),
-        verifier,
+        verifier.clone(),
     )
     .await
     .unwrap();
 
+    let agent_key_package = agent.create_key_package().await.unwrap().to_unverified();
+    // Not actually used, just needed to the retriever shows the agent as needed
     retriever.add(agent.create_key_package().await.unwrap());
 
     let new_group = client
-        .create_device_group(agent_credential.certificate())
+        .create_device_group(agent_credential.certificate().clone(), agent_key_package)
         .await
         .unwrap();
 
-    let public_processor = create_public_processor().await;
-    let new_group = new_group.unpack().unwrap();
-    let welcome = public_processor.add_group(new_group).await.unwrap();
+    let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+    let storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
+    storage.run_migrations().await.unwrap();
+    let server = MlsServer::new(storage, verifier.clone(), retriever.clone());
+    let welcome = server
+        .add_device_group(new_group, agent_credential.certificate().spki_hash())
+        .await
+        .unwrap();
 
     let to_member = welcome.message.unpack().unwrap();
 
     agent.handle_message(to_member).await.unwrap();
 
     let report = "Test Data".to_string();
-    let to_server = agent.send_report(report).await.unwrap();
+    let to_server = agent.send_report(report.clone()).await.unwrap();
 
-    let to_send = public_processor.process_message(to_server).await.unwrap();
+    let to_send = server.process_message(to_server).await.unwrap();
 
-    // agent.join_my_device_group(info.clone()).await.unwrap();
+    let received: MessageData<String> = client
+        .handle_message(to_send.message.unpack().unwrap())
+        .await
+        .unwrap();
 
-    // drop(agent);
-    // let storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
-    // let agent = crate::mls::agent::MlsAgent::new(agent_credential.clone(), storage)
-    //     .await
-    //     .unwrap();
+    let MessageData::Report(sender, received_report) = received else {
+        panic!("wrong message type")
+    };
 
-    // let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    // let storage = SqliteStorageProvider::<PostcardCodec>::new(pool.clone());
-    // storage.run_migrations().await.unwrap();
-    // let public_processor = PublicProcessor::new(storage);
-
-    // public_processor.new_device_group(info).await.unwrap();
-
-    // let report = "Test Data".to_string();
-    // let encoded = agent.create_new_report(&report).await.unwrap();
-
-    // let receivers = public_processor
-    //     .process_device_group_message(
-    //         agent_credential.get_certificate().spki_hash(),
-    //         encoded.raw().as_slice(),
-    //     )
-    //     .await
-    //     .unwrap()
-    //     .into_iter()
-    //     .filter(|member| member != agent_credential.get_certificate().spki_hash())
-    //     .collect::<Vec<_>>();
-
-    // assert_eq!(receivers.len(), 1);
-    // assert_eq!(
-    //     &receivers[0],
-    //     client_credential.get_certificate().spki_hash()
-    // );
-
-    // client.decode_system_report(agent_credential.get_certificate().spki_hash(), encoded);
-
-    // compile_error!("client now needs to decode this value")
+    assert_eq!(&sender, agent_credential.certificate().spki_hash());
+    assert_eq!(&received_report, &report);
 }

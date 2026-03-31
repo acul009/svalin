@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
-use crate::mls::{
-    key_package::{KeyPackage, KeyPackageError},
-    provider::{PostcardCodec, SvalinProvider},
-    transport_types::{MessageToMember, MessageToServer, NewGroup, NewGroupTransport},
+use crate::{
+    SpkiHash,
+    mls::{
+        key_package::{KeyPackage, KeyPackageError},
+        provider::{PostcardCodec, SvalinProvider},
+        transport_types::{MessageToMember, MessageToServer, NewGroup, NewGroupTransport},
+    },
 };
 use openmls::{
     framing::errors::{MlsMessageError, ProtocolMessageError},
@@ -14,13 +17,13 @@ use openmls::{
         WelcomeError,
     },
     prelude::{
-        CredentialWithKey, KeyPackageNewError, MlsMessageBodyOut, ProtocolMessage,
-        SenderRatchetConfiguration, Welcome,
+        CredentialWithKey, KeyPackageNewError, MlsMessageBodyIn, MlsMessageBodyOut, MlsMessageIn,
+        PrivateMessageIn, ProtocolMessage, Sender, SenderRatchetConfiguration, Welcome,
     },
 };
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
-use tls_codec::Serialize;
+use tls_codec::{DeserializeBytes, Serialize};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::Credential;
@@ -171,7 +174,7 @@ impl MlsProcessorHandle {
 
     pub async fn process_message(
         &self,
-        message: MessageToMember,
+        message: PrivateMessageIn,
     ) -> Result<ProcessedMessage, ProcessMessageError> {
         let (send, recv) = oneshot::channel();
 
@@ -210,31 +213,15 @@ enum MlsProcessorRequest {
         response: oneshot::Sender<Result<(), JoinGroupError>>,
     },
     ProcessMessage {
-        message: MessageToMember,
+        message: PrivateMessageIn,
         response: oneshot::Sender<Result<ProcessedMessage, ProcessMessageError>>,
     },
 }
 
-pub enum ProcessedMessage {
-    Welcome(StagedWelcome),
-    Data(Vec<u8>),
-}
-
-#[cfg(test)]
-impl ProcessedMessage {
-    pub fn welcome(self) -> Option<StagedWelcome> {
-        match self {
-            Self::Welcome(welcome) => Some(welcome),
-            _ => None,
-        }
-    }
-
-    pub fn data(self) -> Option<Vec<u8>> {
-        match self {
-            Self::Data(data) => Some(data),
-            _ => None,
-        }
-    }
+pub(crate) struct ProcessedMessage {
+    pub group_id: GroupId,
+    pub sender: SpkiHash,
+    pub decrypted: Vec<u8>,
 }
 
 struct MlsProcessor {
@@ -381,53 +368,45 @@ impl MlsProcessor {
 
     fn process_message(
         &mut self,
-        message: MessageToMember,
+        message: PrivateMessageIn,
     ) -> Result<ProcessedMessage, ProcessMessageError> {
-        let processed = match message {
-            MessageToMember::Welcome(welcome) => {
-                let staged = self.stage_join(welcome)?;
-                ProcessedMessage::Welcome(staged)
-            }
-            MessageToMember::GroupMessage(message) => self.process_group_message(message.into())?,
-        };
-
-        Ok(processed)
-    }
-
-    fn process_group_message(
-        &mut self,
-        message: ProtocolMessage,
-    ) -> Result<ProcessedMessage, ProcessGroupMessageError> {
+        let message: ProtocolMessage = message.into();
         let group_id = message.group_id().clone();
-        let group = Self::get_group(&mut self.group_cache, self.provider.storage(), group_id)?;
+        let group = Self::get_group(
+            &mut self.group_cache,
+            self.provider.storage(),
+            group_id.clone(),
+        )?;
 
         let processed = group.process_message(&self.provider, message)?;
+        let Sender::Member(sender) = processed.sender() else {
+            return Err(ProcessMessageError::InvalidSender);
+        };
+        let sender: SpkiHash = group
+            .member_at(sender.clone())
+            .expect("sender index should already have been checked")
+            .credential
+            .deserialized()?;
 
         match processed.into_content() {
             openmls::prelude::ProcessedMessageContent::ApplicationMessage(application_message) => {
-                Ok(ProcessedMessage::Data(application_message.into_bytes()))
+                Ok(ProcessedMessage {
+                    group_id,
+                    sender,
+                    decrypted: application_message.into_bytes(),
+                })
             }
             openmls::prelude::ProcessedMessageContent::ProposalMessage(_queued_proposal) => {
-                Err(ProcessGroupMessageError::ForbiddenMessageType)
+                Err(ProcessMessageError::ForbiddenMessageType)
             }
             openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
                 _queued_proposal,
-            ) => Err(ProcessGroupMessageError::ForbiddenMessageType),
+            ) => Err(ProcessMessageError::ForbiddenMessageType),
             openmls::prelude::ProcessedMessageContent::StagedCommitMessage(_staged_commit) => {
-                Err(ProcessGroupMessageError::ForbiddenMessageType)
+                Err(ProcessMessageError::ForbiddenMessageType)
             }
         }
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum ProcessMessageError {
-    #[error("error joining group:  {0}")]
-    JoinGroupError(#[from] JoinGroupError),
-    #[error("error processing group message")]
-    ProcessGroupMessageError(#[from] ProcessGroupMessageError),
-    #[error("error receiving from mlsclient")]
-    RecvError(#[from] oneshot::error::RecvError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -500,7 +479,7 @@ pub enum CreateGroupMessageError {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ProcessGroupMessageError {
+pub enum ProcessMessageError {
     #[error("error loading group: {0}")]
     GetGroupError(#[from] GetGroupError),
     #[error("error decoding message: {0}")]
@@ -516,6 +495,8 @@ pub enum ProcessGroupMessageError {
     ),
     #[error("group message contained forbidden message type")]
     ForbiddenMessageType,
+    #[error("invalid sender")]
+    InvalidSender,
     #[error("error receiving from mlsprocessor")]
     RecvError(#[from] oneshot::error::RecvError),
 }
