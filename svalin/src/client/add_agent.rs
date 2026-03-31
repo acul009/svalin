@@ -34,14 +34,11 @@ impl Client {
 
     pub(crate) async fn upload_agent(
         &self,
-        device: Certificate,
-        device_group: NewGroupTransport,
+        device: &Certificate,
     ) -> Result<(), ConnectionDispatchError<UploadAgentCommandError>> {
         let connection = self.rpc.upstream_connection();
 
-        connection
-            .dispatch(UploadAgent::new(device, device_group))
-            .await?;
+        connection.dispatch(UploadAgent::new(device)).await?;
 
         Ok(())
     }

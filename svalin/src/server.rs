@@ -325,9 +325,6 @@ impl Server {
 
         self.pool.close().await;
 
-        match result1 {
-            Err(e) => Err(e),
-            Ok(()) => result2,
-        }
+        result1.or(result2)
     }
 }

@@ -18,8 +18,11 @@ use svalin_rpc::commands::e2e::E2EHandler;
 use svalin_rpc::commands::ping::PingHandler;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::command::handler::HandlerCollection;
+use svalin_rpc::rpc::connection::Connection;
+use tokio::task::JoinSet;
 use tokio::time::error::Elapsed;
 use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 use tracing::{debug, instrument};
 use update::Updater;
 use update::request_available_version::AvailableVersionHandler;
@@ -34,6 +37,7 @@ use crate::permissions::default_permission_handler::DefaultPermissionHandler;
 use crate::remote_key_retriever::RemoteKeyRetriever;
 use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::commands::terminal::RemoteTerminalHandler;
+use crate::shared::commands::upload_key_packages::UploadKeyPackages;
 use crate::shared::join_agent::AgentInitPayload;
 use crate::util::key_storage::KeySource;
 use crate::util::location::{Location, LocationError};
@@ -45,11 +49,12 @@ pub struct Agent {
     credentials: Credential,
     cancel: CancellationToken,
     mls: MlsAgent<RemoteKeyRetriever, RemoteVerifier>,
+    tasks: TaskTracker,
 }
 
 impl Agent {
     #[instrument]
-    pub async fn open(cancel: CancellationToken) -> Result<Agent> {
+    pub async fn run(cancel: CancellationToken) -> Result<()> {
         debug!("opening agent configuration");
 
         let config = Self::get_config()
@@ -95,33 +100,21 @@ impl Agent {
 
         let verifier = RemoteVerifier::new(root_certificate.clone(), rpc.upstream_connection());
 
-        let mls = MlsAgent::new(
-            credentials.clone(),
-            storage_provider,
-            key_retriever,
-            verifier,
-        )
-        .await?;
+        let mls = Arc::new(
+            MlsAgent::new(
+                credentials.clone(),
+                storage_provider,
+                key_retriever,
+                verifier,
+            )
+            .await?,
+        );
 
-        Ok(Agent {
-            credentials,
-            root_certificate: root_certificate,
-            rpc: Arc::new(rpc),
-            cancel,
-            mls,
-        })
-    }
-
-    pub fn certificate(&self) -> &Certificate {
-        self.credentials.certificate()
-    }
-
-    pub async fn run(&self) -> Result<()> {
-        let permission_handler = DefaultPermissionHandler::new(self.root_certificate.clone());
+        let permission_handler = DefaultPermissionHandler::new(root_certificate.clone());
 
         let e2e_commands = HandlerCollection::new(permission_handler.clone());
 
-        let updater = Updater::new(self.cancel.clone())
+        let updater = Updater::new(cancel.clone())
             .await
             .context("error creating updater")?;
 
@@ -138,14 +131,11 @@ impl Agent {
 
         let public_commands = HandlerCollection::new(permission_handler.clone());
 
-        let verifier = RemoteVerifier::new(
-            self.root_certificate.clone(),
-            self.rpc.upstream_connection(),
-        )
-        .session_only();
+        let verifier =
+            RemoteVerifier::new(root_certificate.clone(), rpc.upstream_connection()).session_only();
 
         public_commands.chain().await.add(E2EHandler::new(
-            self.credentials.clone(),
+            credentials.clone(),
             e2e_commands,
             verifier.to_tls_verifier(),
         ));
@@ -157,12 +147,21 @@ impl Agent {
             .await
             .add(DeauthenticateHandler::new(public_commands));
 
+        debug!("Starting agent background tasks");
+
+        let connection = rpc.upstream_connection();
+        let mls2 = mls.clone();
+        let key_package_task = tokio::spawn(async move {
+            connection.dispatch(UploadKeyPackages())
+        });
+
         debug!("Agent will now start serving requests");
 
-        self.rpc
-            .serve(server_commands)
+        rpc.serve(server_commands)
             .await
             .context("error serving rpc")?;
+
+        key_package_task.await;
 
         Ok(())
     }
@@ -212,37 +211,19 @@ impl Agent {
         Ok(Self::data_dir().await?.push("mls-store.sqlite"))
     }
 
-    pub async fn create_new_mls_store()
-    -> Result<SqliteStorageProvider<PostcardCodec>, CreateMlsStoreError> {
-        let location = Self::mls_db_path().await?;
-        if tokio::fs::try_exists(&location).await? {
-            return Err(CreateMlsStoreError::AlreadyExists);
-        }
-
-        let location = location
-            .as_path()
-            .to_str()
-            .ok_or_else(|| CreateMlsStoreError::LocationBroken)?;
-
-        Sqlite::create_database(location).await?;
-
-        let pool = SqlitePool::connect(location).await?;
-        let provider = SqliteStorageProvider::new(pool);
-        provider.run_migrations().await?;
-
-        Ok(provider)
-    }
-
-    pub async fn open_mls_store() -> Result<SqliteStorageProvider<PostcardCodec>, OpenMlsStoreError>
-    {
+    async fn open_mls_store() -> Result<SqliteStorageProvider<PostcardCodec>, OpenMlsStoreError> {
         let location = Self::mls_db_path().await?;
 
-        let location = location
+        let path = location
             .as_path()
             .to_str()
             .ok_or_else(|| OpenMlsStoreError::LocationBroken)?;
 
-        let pool = SqlitePool::connect(location).await?;
+        if !location.exists().await {
+            Sqlite::create_database(path).await?;
+        }
+
+        let pool = SqlitePool::connect(path).await?;
         let provider = SqliteStorageProvider::new(pool);
         provider.run_migrations().await?;
 
@@ -256,9 +237,10 @@ impl Agent {
         Ok(())
     }
 
-    pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {
+    pub async fn close(&mut self, timeout_duration: Duration) -> Result<(), Elapsed> {
         self.cancel.cancel();
         let result1 = self.rpc.close(timeout_duration).await;
+        self.tasks.wait().await;
 
         result1
     }

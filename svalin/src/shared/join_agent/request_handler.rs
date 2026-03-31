@@ -210,6 +210,25 @@ impl TakeableCommandDispatcher for RequestJoin {
                 .verify_signature(&root, get_current_timestamp())
                 .map_err(RequestJoinError::VerifyUpstreamCertError)?;
 
+            // debug!("received all neccessary data to initialize agent, creating key package");
+
+            // let storage_provider = Agent::create_new_mls_store()
+            //     .await
+            //     .map_err(RequestJoinError::MlsStoreError)?;
+            // let key_package = MlsAgent::<(), ()>::create_key_package_static(
+            //     my_credentials.clone(),
+            //     storage_provider,
+            // )
+            // .await
+            // .map_err(RequestJoinError::CreateKeyPackageError)?
+            // .to_unverified();
+
+            // debug!("sending key package");
+            // session
+            //     .write_object(&key_package)
+            //     .await
+            //     .map_err(RequestJoinError::SessionWriteError)?;
+
             let upload_to_server_result: Result<(), ()> = session
                 .read_object()
                 .await
@@ -217,7 +236,7 @@ impl TakeableCommandDispatcher for RequestJoin {
 
             upload_to_server_result.map_err(|_| RequestJoinError::UploadToServerError)?;
 
-            debug!("received all neccessary data to initialize agent");
+            debug!("confirmation received, initializing agent");
 
             Ok(AgentInitPayload {
                 credentials: my_credentials,

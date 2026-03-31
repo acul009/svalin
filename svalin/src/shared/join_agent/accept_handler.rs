@@ -213,6 +213,8 @@ async fn handle_agent_enroll(
         .user_credential()
         .create_agent_certificate_for_key(&public_key)?;
 
+    debug!("created agent certificate, sending to agent");
+
     // Sending all 3 required certificates to the agent
     session_e2e.write_object(agent_cert.as_unverified()).await?;
     session_e2e
@@ -222,19 +224,23 @@ async fn handle_agent_enroll(
         .write_object(client.upstream_certificate().as_unverified())
         .await?;
 
-    // Now the agent has it's credentials to both connect to the server and work with MLS.
-    // The next step here is to create an MLS group to both distribute system reports from the agent
-    // as well as record who has access to the system.
-    let mls = client.mls();
+    // debug!("creating mls group for agent");
 
-    let agent_key_package: UnverifiedKeyPackage = session_e2e.read_object().await?;
+    // // Now the agent has it's credentials to both connect to the server and work with MLS.
+    // // The next step here is to create an MLS group to both distribute system reports from the agent
+    // // as well as record who has access to the system.
+    // let mls = client.mls();
 
-    let new_group = mls
-        .create_device_group(agent_cert.clone(), agent_key_package)
-        .await
-        .map_err(AcceptJoinError::CreateDeviceGroupError)?;
+    // let agent_key_package: UnverifiedKeyPackage = session_e2e.read_object().await?;
 
-    let upload_result = client.upload_agent(agent_cert.clone(), new_group).await;
+    // let new_group = mls
+    //     .create_device_group(agent_cert.clone(), agent_key_package)
+    //     .await
+    //     .map_err(AcceptJoinError::CreateDeviceGroupError)?;
+
+    let upload_result = client.upload_agent(&agent_cert).await;
+
+    debug!("upload finished, sending confirmation to agent");
 
     match upload_result {
         Ok(_) => session_e2e.write_object::<Result<(), ()>>(&Ok(())).await?,

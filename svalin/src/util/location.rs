@@ -100,11 +100,15 @@ impl Location {
     }
 
     pub async fn ensure_exists(self) -> Result<Self, LocationError> {
-        if !self.path.exists() {
+        if !self.exists().await {
             tokio::fs::create_dir_all(&self.path).await?;
         }
 
         Ok(self)
+    }
+
+    pub async fn exists(&self) -> bool {
+        tokio::fs::try_exists(&self.path).await.unwrap_or(false)
     }
 
     pub fn as_path(&self) -> &Path {

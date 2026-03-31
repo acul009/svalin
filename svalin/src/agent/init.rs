@@ -136,7 +136,7 @@ impl WaitForConfirm {
         &self.confirm_code
     }
 
-    pub async fn wait_for_confirm(self) -> Result<Agent> {
+    pub async fn wait_for_confirm(self, cancel: CancellationToken) -> Result<()> {
         let init_data = self.success_channel.await?;
 
         Agent::init_with(init_data)
@@ -145,10 +145,10 @@ impl WaitForConfirm {
 
         tokio::time::sleep(Duration::from_secs(3)).await;
 
-        let agent = Agent::open(CancellationToken::new())
+        let agent = Agent::run(cancel)
             .await
             .context("error opening agent after init")?;
 
-        Ok(agent)
+        Ok(())
     }
 }

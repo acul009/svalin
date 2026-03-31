@@ -73,9 +73,7 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             .add(UploadAgentHandler::new(
                 self.agent_store.clone(),
                 self.user_store.clone(),
-                self.message_store.clone(),
                 self.root_cert.clone(),
-                self.mls.clone(),
             )?)
             .add(AgentListHandler::new(
                 self.agent_store.clone(),

@@ -45,6 +45,16 @@ pub enum MlsAgentCreateError {
     JoinError(#[from] JoinError),
 }
 
+impl<K, V> MlsAgent<K, V> {
+    pub async fn create_key_package_static(
+        credential: Credential,
+        storage_provider: SqliteStorageProvider<PostcardCodec>,
+    ) -> Result<KeyPackage, CreateKeyPackageError> {
+        let processor = MlsProcessorHandle::new_processor(credential, storage_provider);
+        processor.create_key_package().await
+    }
+}
+
 impl<KeyRetriever, Verifier> MlsAgent<KeyRetriever, Verifier>
 where
     KeyRetriever: crate::mls::key_retriever::KeyRetriever,

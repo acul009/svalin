@@ -52,9 +52,7 @@ pub enum InternalAddAgentError {
 pub struct UploadAgentHandler {
     agent_store: Arc<AgentStore>,
     user_store: Arc<UserStore>,
-    message_store: Arc<MessageStore>,
     root: RootCertificate,
-    mls: Arc<MlsServer>,
 }
 
 impl From<&PermissionPrecursor<UploadAgentHandler>> for Permission {
@@ -67,23 +65,19 @@ impl UploadAgentHandler {
     pub fn new(
         agent_store: Arc<AgentStore>,
         user_store: Arc<UserStore>,
-        message_store: Arc<MessageStore>,
         root: RootCertificate,
-        mls: Arc<MlsServer>,
     ) -> Result<Self> {
         Ok(Self {
             agent_store,
             user_store,
-            message_store,
             root,
-            mls,
         })
     }
 }
 
 #[async_trait]
 impl CommandHandler for UploadAgentHandler {
-    type Request = UploadAgentData;
+    type Request = UnverifiedCertificate;
 
     fn key() -> String {
         "add_agent".to_owned()
@@ -95,11 +89,7 @@ impl CommandHandler for UploadAgentHandler {
         request: Self::Request,
         _: CancellationToken,
     ) -> Result<()> {
-        let svalin_rpc::rpc::peer::Peer::Certificate(sender) = session.peer() else {
-            panic!("unexpected peer type: {:?}", session.peer())
-        };
-
-        if let Err(err) = self.add_agent(request, sender.spki_hash()).await {
+        if let Err(err) = self.add_agent(request).await {
             session
                 .write_object::<Result<(), AddAgentError>>(&Err(AddAgentError::StoreError))
                 .await?;
@@ -118,53 +108,27 @@ impl CommandHandler for UploadAgentHandler {
 impl UploadAgentHandler {
     async fn add_agent(
         &self,
-        data: UploadAgentData,
-        sender: &SpkiHash,
+        certificate: UnverifiedCertificate,
     ) -> Result<(), InternalAddAgentError> {
-        let cert_chain = CertificateChainBuilder::new(data.certificate);
+        let cert_chain = CertificateChainBuilder::new(certificate);
         let cert_chain = self
             .user_store
             .complete_certificate_chain(cert_chain)
             .await?;
         let agent_cert_chain = cert_chain.verify(&self.root, get_current_timestamp())?;
         let agent_cert = agent_cert_chain.take_leaf();
-        let spki_hash = agent_cert.spki_hash().clone();
 
         self.agent_store.add_agent(agent_cert).await?;
-
-        let mut to_send = self
-            .mls
-            .add_device_group(data.device_group, &spki_hash)
-            .await
-            .map_err(InternalAddAgentError::AddDeviceGroupError)?;
-
-        // Do not deliver the welcome to the sender or the agent themselves
-        to_send.receivers = to_send
-            .receivers
-            .into_iter()
-            .filter(|receiver| receiver != sender && receiver != &spki_hash)
-            .collect();
-
-        self.message_store.add_message(to_send).await?;
 
         Ok(())
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct UploadAgentData {
-    certificate: UnverifiedCertificate,
-    device_group: NewGroupTransport,
-}
+pub struct UploadAgent<'a>(&'a UnverifiedCertificate);
 
-pub struct UploadAgent(UploadAgentData);
-
-impl UploadAgent {
-    pub fn new(device: Certificate, device_group: NewGroupTransport) -> Self {
-        Self(UploadAgentData {
-            certificate: device.to_unverified(),
-            device_group,
-        })
+impl<'a> UploadAgent<'a> {
+    pub fn new(device: &'a Certificate) -> Self {
+        Self(device.as_unverified())
     }
 }
 
@@ -178,11 +142,11 @@ pub enum UploadAgentCommandError {
     AddAgentError(#[from] AddAgentError),
 }
 
-impl CommandDispatcher for UploadAgent {
+impl<'a> CommandDispatcher for UploadAgent<'a> {
     type Output = ();
     type Error = UploadAgentCommandError;
 
-    type Request = UploadAgentData;
+    type Request = UnverifiedCertificate;
 
     fn get_request(&self) -> &Self::Request {
         &self.0
