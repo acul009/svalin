@@ -8,15 +8,37 @@ use tls_codec::DeserializeBytes;
 use crate::{SpkiHash, UnverifiedCertificate};
 
 #[derive(Serialize, Deserialize)]
-pub enum MessageToServer {
+pub enum MessageToServerTransport {
     GroupMessage(Vec<u8>),
+    NewDeviceGroup { device_group: NewGroupTransport },
 }
 
-impl MessageToServer {
+impl MessageToServerTransport {
+    pub(crate) fn unpack(self) -> Result<MessageToServer, tls_codec::Error> {
+        let to_server = match self {
+            Self::GroupMessage(message) => MessageToServer::GroupMessage(message),
+            Self::NewDeviceGroup { device_group } => MessageToServer::NewDeviceGroup {
+                device_group: device_group.unpack()?,
+            },
+        };
+
+        Ok(to_server)
+    }
+}
+
+pub(crate) enum MessageToServer {
+    GroupMessage(Vec<u8>),
+    NewDeviceGroup { device_group: NewGroup },
+}
+
+impl MessageToServerTransport {
     #[cfg(test)]
     pub fn to_member(self) -> Result<MessageToMember, tls_codec::Error> {
         let transport = match self {
             Self::GroupMessage(message) => MessageToMemberTransport::GroupMessage(message),
+            Self::NewDeviceGroup { device_group } => {
+                MessageToMemberTransport::Welcome(device_group.welcome)
+            }
         };
 
         transport.unpack()
@@ -55,7 +77,7 @@ impl MessageToMemberTransport {
     }
 }
 
-pub enum MessageToMember {
+pub(crate) enum MessageToMember {
     Welcome(Welcome),
     GroupMessage(PrivateMessageIn),
 }

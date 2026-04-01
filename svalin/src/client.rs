@@ -15,11 +15,12 @@ mod profile;
 use device::Device;
 pub use first_connect::*;
 use svalin_pki::mls::client::MlsClient;
+use svalin_pki::mls::transport_types::MessageToServerTransport;
 use svalin_pki::{Certificate, Credential, RootCertificate, SpkiHash};
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 use tokio::time::error::Elapsed;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
@@ -38,6 +39,7 @@ pub struct Client {
     mls: Arc<MlsClient<RemoteKeyRetriever, RemoteVerifier>>,
     device_list: watch::Sender<BTreeMap<SpkiHash, Device>>,
     tunnel_manager: TunnelManager,
+    mls_to_server: mpsc::Sender<MessageToServerTransport>,
     // TODO: These should not be required here, but should be created and canceled as needed
     background_tasks: TaskTracker,
     cancel: CancellationToken,
@@ -96,6 +98,18 @@ impl Client {
 
     pub(crate) fn background_tasks(&self) -> &TaskTracker {
         &self.background_tasks
+    }
+
+    pub(crate) async fn ensure_device_group_exists(&self, spki_hash: &SpkiHash) -> Result<()> {
+        if let Some(new_group) = self
+            .mls
+            .create_device_group_if_missing(spki_hash)
+            .await
+            .map_err(|err| anyhow!(err))?
+        {
+            self.mls_to_server.send(new_group).await?;
+        }
+        Ok(())
     }
 
     pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {

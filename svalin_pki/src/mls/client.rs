@@ -10,18 +10,20 @@ use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    Certificate, CertificateType, Credential, ExactVerififier, SpkiHash,
+    Certificate, CertificateType, Credential, ExactVerififier, SpkiHash, VerifyError,
+    get_current_timestamp,
     mls::{
         group_id::{ParseGroupIdError, SvalinGroupId},
         key_package::{self, KeyPackage, KeyPackageError, UnverifiedKeyPackage},
         key_retriever::{self, KeyRetriever},
         processor::{
-            self, CreateGroupError, CreateKeyPackageError, JoinGroupError, MlsProcessorHandle,
-            ProcessMessageError,
+            self, CreateGroupError, CreateKeyPackageError, GroupExistsError, JoinGroupError,
+            MlsProcessorHandle, ProcessMessageError,
         },
         provider::PostcardCodec,
         transport_types::{
-            DeviceMessage, MessageToMember, MessageToServer, NewGroup, NewGroupTransport,
+            DeviceMessage, MessageToMember, MessageToMemberTransport, MessageToServerTransport,
+            NewGroup, NewGroupTransport,
         },
     },
 };
@@ -71,16 +73,15 @@ where
         })
     }
 
-    pub async fn create_device_group(
+    pub async fn create_device_group_if_missing(
         &self,
-        device: Certificate,
-        key_package: UnverifiedKeyPackage,
-    ) -> Result<NewGroupTransport, CreateDeviceGroupError<KeyRetriever::Error>> {
-        let verifier = ExactVerififier::new(device);
-        let key_package = key_package
-            .verify(&self.crypto, self.protocol_version, &verifier)
+        spki_hash: &SpkiHash,
+    ) -> Result<Option<MessageToServerTransport>, CreateDeviceGroupError<KeyRetriever::Error>> {
+        let device = self
+            .verifier
+            .verify_spki_hash(spki_hash, get_current_timestamp())
             .await?;
-        let device = key_package.certificate();
+
         if device.certificate_type() != CertificateType::Agent {
             return Err(CreateDeviceGroupError::WrongCertificateType(
                 device.certificate_type(),
@@ -89,13 +90,17 @@ where
 
         let group_id = SvalinGroupId::DeviceGroup(device.spki_hash().clone());
 
+        if self.processor.group_exists(group_id.to_group_id()).await? {
+            return Ok(None);
+        }
+
         let required_members = self
             .key_retriever
             .get_required_group_members(&group_id)
             .await
             .map_err(CreateDeviceGroupError::KeyRetrieverError)?
             .into_iter()
-            .filter(|spki_hash| spki_hash != &self.me && spki_hash != device.spki_hash())
+            .filter(|spki_hash| spki_hash != &self.me)
             .collect::<Vec<_>>();
 
         let unverified = self
@@ -104,8 +109,7 @@ where
             .await
             .map_err(CreateDeviceGroupError::KeyRetrieverError)?;
 
-        let mut members = Vec::with_capacity(unverified.len() + 1);
-        members.push(key_package);
+        let mut members = Vec::with_capacity(unverified.len());
         for member in unverified {
             let member = member
                 .verify(&self.crypto, self.protocol_version, &self.verifier)
@@ -113,19 +117,21 @@ where
             members.push(member);
         }
 
-        let messages = self
+        let new_group = self
             .processor
             .create_group(members, group_id.to_group_id())
             .await?;
 
-        Ok(messages)
+        Ok(Some(MessageToServerTransport::NewDeviceGroup {
+            device_group: new_group,
+        }))
     }
 
     pub async fn handle_message<Report: DeserializeOwned>(
         &self,
-        message: MessageToMember,
+        message: MessageToMemberTransport,
     ) -> Result<MessageData<Report>, HandleMessageError<KeyRetriever::Error>> {
-        match message {
+        match message.unpack()? {
             MessageToMember::Welcome(welcome) => {
                 self.handle_welcome(welcome).await?;
 
@@ -207,10 +213,16 @@ pub enum CreateDeviceGroupError<KeyRetrieverError> {
     KeyRetrieverError(#[source] KeyRetrieverError),
     #[error("error verifying key package: {0}")]
     KeyPackageError(#[from] KeyPackageError),
+    #[error("error verifying spki hash: {0}")]
+    VerifyError(#[from] VerifyError),
+    #[error("error while checking if group exists: {0}")]
+    GroupExistsError(#[from] GroupExistsError),
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum HandleMessageError<RetrieverError> {
+    #[error("tls codec error: {0}")]
+    TlsCodecError(#[from] tls_codec::Error),
     #[error("welcome error: {0}")]
     Welcome(#[from] HandleWelcomeError<RetrieverError>),
     #[error("process message error: {0}")]

@@ -142,10 +142,8 @@ async fn integration_tests() {
             .send(confirm.confirm_code().to_owned())
             .unwrap();
         debug!("agent waiting for confirmation");
-        let agent = confirm.wait_for_confirm().await.unwrap();
-        debug!("agent init complete!");
-        debug!("starting up agent");
-        agent.run().await.unwrap();
+        let cancel = CancellationToken::new();
+        confirm.wait_for_confirm(cancel).await.unwrap();
         debug!("agent has unexpectedly exited");
     });
 
@@ -179,6 +177,12 @@ async fn integration_tests() {
     }
 
     let ping = device.ping().await.unwrap();
+
+    // By this point I'm hoping that the device has uploaded some key packages
+    client
+        .ensure_device_group_exists(device.item().certificate.spki_hash())
+        .await
+        .unwrap();
 
     debug!("ping through forward connection: {}µs", ping.as_micros());
 

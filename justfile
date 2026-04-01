@@ -27,6 +27,9 @@ restart: clean setup
 test $RUST_LOG="svalin=debug":
     cargo test -p svalin_pki -p svalin_rpc -p svalin -- --nocapture
 
+integration $RUST_LOG="svalin=debug":
+    cargo test -p svalin test::integration -- --nocapture
+
 server $RUST_LOG="debug":
     cargo run -p svalin server 0.0.0.0:1234
 

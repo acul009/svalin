@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use svalin_pki::mls::transport_types::MessageToServerTransport;
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
     rpc::{
@@ -7,6 +8,7 @@ use svalin_rpc::{
         server::{RpcServer, config_builder::RpcCommandBuilder},
     },
 };
+use tokio::sync::mpsc;
 
 use crate::{
     permissions::default_permission_handler::DefaultPermissionHandler,
@@ -20,6 +22,7 @@ use crate::{
             get_key_packages::GetKeyPackagesHandler,
             load_certificate_chain::LoadCertificateChainHandler,
             login::LoginHandler,
+            mls::upload_mls::UploadMlsHandler,
             public_server_status::{PublicStatus, PublicStatusHandler},
             upload_key_packages::UploadKeyPackagesHandler,
         },
@@ -36,8 +39,8 @@ pub struct SvalinCommandBuilder {
     pub user_store: Arc<UserStore>,
     pub session_store: Arc<SessionStore>,
     pub key_package_store: Arc<KeyPackageStore>,
-    pub message_store: Arc<MessageStore>,
     pub mls: Arc<MlsServer>,
+    pub to_mls: mpsc::Sender<MessageToServerTransport>,
 }
 
 impl RpcCommandBuilder for SvalinCommandBuilder {
@@ -83,7 +86,8 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 self.key_package_store.clone(),
                 self.mls,
             ))
-            .add(GetKeyPackagesHandler::new(self.key_package_store.clone()));
+            .add(GetKeyPackagesHandler::new(self.key_package_store.clone()))
+            .add(UploadMlsHandler(self.to_mls));
 
         Ok(commands)
     }

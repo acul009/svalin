@@ -17,7 +17,7 @@ use svalin_rpc::{
     verifiers::skip_verify::SkipClientVerification,
 };
 use tokio::{
-    sync::oneshot,
+    sync::{mpsc, oneshot},
     time::{error::Elapsed, timeout},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
@@ -244,18 +244,36 @@ impl Server {
 
         let verifier = TlsOptionalWrapper::new(verifier.to_tls_verifier());
 
+        let (to_mls, from_mls) = mpsc::channel(100);
+
         let command_builder = SvalinCommandBuilder {
             root_cert: root,
             server_cert: credentials.certificate().clone(),
             user_store,
             agent_store,
             session_store,
-            message_store,
             key_package_store,
-            mls,
+            mls: mls.clone(),
+            to_mls,
         };
 
         let tasks = TaskTracker::new();
+
+        tasks.spawn(async move {
+            let mut recv = from_mls;
+            while let Some(message) = recv.recv().await {
+                match mls.process_message(message).await {
+                    Ok(message) => {
+                        if let Err(err) = message_store.add_message(message).await {
+                            tracing::error!("failed to add message to store: {:#}", err);
+                        }
+                    }
+                    Err(err) => {
+                        tracing::error!("failed to process message: {:#}", err);
+                    }
+                }
+            }
+        });
 
         let rpc = RpcServer::build()
             .credentials(credentials.clone())

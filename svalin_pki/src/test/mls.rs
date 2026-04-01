@@ -24,7 +24,7 @@ use crate::{
         provider::PostcardCodec,
         public_processor::{self, PublicProcessorHandle},
         server::MlsServer,
-        transport_types::{MessageToMember, MessageToServer},
+        transport_types::{MessageToMember, MessageToServerTransport},
     },
 };
 
@@ -132,7 +132,7 @@ async fn test_public_processor() {
     let test_text = b"Hello MLS!".to_vec();
 
     #[allow(irrefutable_let_patterns)]
-    let MessageToServer::GroupMessage(message) = member2
+    let MessageToServerTransport::GroupMessage(message) = member2
         .create_message(group_id, test_text.clone())
         .await
         .unwrap()
@@ -287,23 +287,19 @@ async fn test_device_group() {
     .await
     .unwrap();
 
-    let agent_key_package = agent.create_key_package().await.unwrap().to_unverified();
-    // Not actually used, just needed to the retriever shows the agent as needed
     retriever.add(agent.create_key_package().await.unwrap());
 
     let new_group = client
-        .create_device_group(agent_credential.certificate().clone(), agent_key_package)
+        .create_device_group_if_missing(agent_credential.certificate().spki_hash())
         .await
+        .unwrap()
         .unwrap();
 
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
     let storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
     storage.run_migrations().await.unwrap();
     let server = MlsServer::new(storage, verifier.clone(), retriever.clone());
-    let welcome = server
-        .add_device_group(new_group, agent_credential.certificate().spki_hash())
-        .await
-        .unwrap();
+    let welcome = server.process_message(new_group).await.unwrap();
 
     let to_member = welcome.message.unpack().unwrap();
 
@@ -314,10 +310,7 @@ async fn test_device_group() {
 
     let to_send = server.process_message(to_server).await.unwrap();
 
-    let received: MessageData<String> = client
-        .handle_message(to_send.message.unpack().unwrap())
-        .await
-        .unwrap();
+    let received: MessageData<String> = client.handle_message(to_send.message).await.unwrap();
 
     let MessageData::Report(sender, received_report) = received else {
         panic!("wrong message type")

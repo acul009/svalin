@@ -10,8 +10,10 @@ use crate::{
         group_id::{ParseGroupIdError, SvalinGroupId},
         key_package::{KeyPackage, KeyPackageError, UnverifiedKeyPackage},
         provider::PostcardCodec,
-        public_processor::{AddGroupError, ProcessMessageError, PublicProcessorHandle},
-        transport_types::{MessageToSend, MessageToServer, NewGroup, NewGroupTransport},
+        public_processor::{self, AddGroupError, ProcessMessageError, PublicProcessorHandle},
+        transport_types::{
+            MessageToSend, MessageToServer, MessageToServerTransport, NewGroup, NewGroupTransport,
+        },
     },
 };
 
@@ -57,28 +59,6 @@ where
             .await
     }
 
-    pub async fn add_device_group(
-        &self,
-        new_group: NewGroupTransport,
-        device: &SpkiHash,
-    ) -> Result<MessageToSend, AddDeviceGroupError<KeyRetriever::Error>> {
-        let new_group = new_group.unpack()?;
-        let svalin_id = SvalinGroupId::from_group_id(new_group.group_info.group_id())?;
-        match &svalin_id {
-            SvalinGroupId::DeviceGroup(spki_hash) => {
-                if spki_hash != device {
-                    return Err(AddDeviceGroupError::UnexpectedGroup);
-                }
-            }
-            #[allow(unreachable_patterns)]
-            _ => {
-                return Err(AddDeviceGroupError::UnexpectedGroup);
-            }
-        }
-
-        self.add_svalin_group(new_group).await
-    }
-
     async fn add_svalin_group(
         &self,
         new_group: NewGroup,
@@ -118,12 +98,49 @@ where
 
     pub async fn process_message(
         &self,
-        message: MessageToServer,
-    ) -> Result<MessageToSend, ProcessMessageError> {
+        message: MessageToServerTransport,
+    ) -> Result<MessageToSend, ProcessError<KeyRetriever::Error>> {
+        let message = message.unpack()?;
         match message {
-            MessageToServer::GroupMessage(data) => self.processor.process_message(data).await,
+            MessageToServer::GroupMessage(data) => self
+                .processor
+                .process_message(data)
+                .await
+                .map_err(Into::into),
+            MessageToServer::NewDeviceGroup { device_group } => self
+                .add_device_group(device_group)
+                .await
+                .map_err(Into::into),
         }
     }
+
+    async fn add_device_group(
+        &self,
+        new_group: NewGroup,
+    ) -> Result<MessageToSend, AddDeviceGroupError<KeyRetriever::Error>> {
+        let svalin_id = SvalinGroupId::from_group_id(new_group.group_info.group_id())?;
+        match &svalin_id {
+            SvalinGroupId::DeviceGroup(_spki_hash) => {
+                // no additional things to do here
+            }
+            #[allow(unreachable_patterns)]
+            _ => {
+                return Err(AddDeviceGroupError::UnexpectedGroup);
+            }
+        }
+
+        self.add_svalin_group(new_group).await
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ProcessError<KeyRetrieverError> {
+    #[error("tls codec error: {0}")]
+    TlsCodecError(#[from] tls_codec::Error),
+    #[error("message error: {0}")]
+    MessageError(#[from] public_processor::ProcessMessageError),
+    #[error("add device group error: {0}")]
+    AddDeviceGroupError(#[from] AddDeviceGroupError<KeyRetrieverError>),
 }
 
 #[derive(Debug, thiserror::Error)]

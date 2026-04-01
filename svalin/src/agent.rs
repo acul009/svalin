@@ -151,8 +151,14 @@ impl Agent {
 
         let connection = rpc.upstream_connection();
         let mls2 = mls.clone();
+        let cancel2 = cancel.clone();
         let key_package_task = tokio::spawn(async move {
-            connection.dispatch(UploadKeyPackages())
+            if let Err(err) = connection
+                .dispatch(UploadKeyPackages::new(mls2, cancel2))
+                .await
+            {
+                tracing::error!("Failed to upload key packages: {err}");
+            }
         });
 
         debug!("Agent will now start serving requests");
@@ -161,7 +167,7 @@ impl Agent {
             .await
             .context("error serving rpc")?;
 
-        key_package_task.await;
+        let _ = key_package_task.await;
 
         Ok(())
     }

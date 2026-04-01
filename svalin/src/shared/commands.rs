@@ -6,6 +6,7 @@ pub mod init;
 pub mod list_user_sessions;
 pub mod load_certificate_chain;
 pub mod login;
+pub mod mls;
 pub mod public_server_status;
 pub mod realtime_status;
 pub mod terminal;

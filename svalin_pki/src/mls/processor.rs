@@ -5,7 +5,7 @@ use crate::{
     mls::{
         key_package::{KeyPackage, KeyPackageError},
         provider::{PostcardCodec, SvalinProvider},
-        transport_types::{MessageToMember, MessageToServer, NewGroup, NewGroupTransport},
+        transport_types::{MessageToMember, MessageToServerTransport, NewGroup, NewGroupTransport},
     },
 };
 use openmls::{
@@ -88,6 +88,10 @@ impl MlsProcessorHandle {
                         let result = client.process_message(message);
                         let _ = response.send(result);
                     }
+                    MlsProcessorRequest::GroupExists { group_id, response } => {
+                        let result = client.group_exists(group_id);
+                        let _ = response.send(result);
+                    }
                 }
             }
         });
@@ -157,7 +161,7 @@ impl MlsProcessorHandle {
         &self,
         group_id: GroupId,
         message: Vec<u8>,
-    ) -> Result<MessageToServer, CreateGroupMessageError> {
+    ) -> Result<MessageToServerTransport, CreateGroupMessageError> {
         let (send, recv) = oneshot::channel();
 
         let _ = self
@@ -188,6 +192,20 @@ impl MlsProcessorHandle {
 
         recv.await?
     }
+
+    pub(crate) async fn group_exists(&self, group_id: GroupId) -> Result<bool, GroupExistsError> {
+        let (send, recv) = oneshot::channel();
+
+        let _ = self
+            .channel
+            .send(MlsProcessorRequest::GroupExists {
+                group_id,
+                response: send,
+            })
+            .await;
+
+        recv.await?
+    }
 }
 
 enum MlsProcessorRequest {
@@ -202,7 +220,7 @@ enum MlsProcessorRequest {
     CreateMessage {
         group_id: GroupId,
         message: Vec<u8>,
-        response: oneshot::Sender<Result<MessageToServer, CreateGroupMessageError>>,
+        response: oneshot::Sender<Result<MessageToServerTransport, CreateGroupMessageError>>,
     },
     StageJoin {
         welcome: Welcome,
@@ -215,6 +233,10 @@ enum MlsProcessorRequest {
     ProcessMessage {
         message: PrivateMessageIn,
         response: oneshot::Sender<Result<ProcessedMessage, ProcessMessageError>>,
+    },
+    GroupExists {
+        group_id: GroupId,
+        response: oneshot::Sender<Result<bool, GroupExistsError>>,
     },
 }
 
@@ -352,7 +374,7 @@ impl MlsProcessor {
         &mut self,
         group_id: GroupId,
         message: &[u8],
-    ) -> Result<MessageToServer, CreateGroupMessageError> {
+    ) -> Result<MessageToServerTransport, CreateGroupMessageError> {
         let group = Self::get_group(&mut self.group_cache, self.provider.storage(), group_id)?;
 
         let message = group.create_message(&self.provider, &self.svalin_credential, message)?;
@@ -361,7 +383,7 @@ impl MlsProcessor {
             panic!("expected private message");
         };
 
-        Ok(MessageToServer::GroupMessage(
+        Ok(MessageToServerTransport::GroupMessage(
             message.tls_serialize_detached()?,
         ))
     }
@@ -405,6 +427,14 @@ impl MlsProcessor {
             openmls::prelude::ProcessedMessageContent::StagedCommitMessage(_staged_commit) => {
                 Err(ProcessMessageError::ForbiddenMessageType)
             }
+        }
+    }
+
+    fn group_exists(&mut self, group_id: GroupId) -> Result<bool, GroupExistsError> {
+        match Self::get_group(&mut self.group_cache, &self.provider.storage(), group_id) {
+            Ok(_) => Ok(true),
+            Err(GetGroupError::UnknownGroup) => Ok(false),
+            Err(GetGroupError::StorageError(e)) => Err(GroupExistsError::StorageError(e)),
         }
     }
 }
@@ -511,6 +541,14 @@ pub enum JoinGroupError {
     LibraryError(#[from] openmls::error::LibraryError),
     #[error("error in tls codec: {0}")]
     TlsCodecError(#[from] tls_codec::Error),
+    #[error("error receiving from mlsprocessor")]
+    RecvError(#[from] oneshot::error::RecvError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum GroupExistsError {
+    #[error("storage error: {0}")]
+    StorageError(#[source] <SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError),
     #[error("error receiving from mlsprocessor")]
     RecvError(#[from] oneshot::error::RecvError),
 }

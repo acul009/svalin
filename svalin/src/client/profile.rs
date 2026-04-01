@@ -10,14 +10,17 @@ use svalin_pki::{
     mls::{client::MlsClient, key_retriever},
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
     client::tunnel_manager::TunnelManager,
     remote_key_retriever::RemoteKeyRetriever,
-    shared::commands::{agent_list::UpdateAgentList, upload_key_packages::UploadKeyPackages},
+    shared::commands::{
+        agent_list::UpdateAgentList, mls::upload_mls::UploadMls,
+        upload_key_packages::UploadKeyPackages,
+    },
     util::location::{Location, LocationError},
     verifier::{
         remote_agent_verifier::RemoteAgentVerifier, remote_session_verifier::RemoteSessionVerifier,
@@ -205,14 +208,16 @@ impl Client {
             let key_retriever =
                 RemoteKeyRetriever::new(rpc.upstream_connection(), root_certificate.clone());
 
-            let mls = MlsClient::new(
+            let mls = Arc::new(MlsClient::new(
                 device_credential.clone(),
                 storage_provider,
                 key_retriever,
                 remote_verifier.clone(),
-            )?;
+            )?);
 
             let tunnel_manager = TunnelManager::new();
+
+            let (send, recv) = mpsc::channel(100);
 
             let client = Arc::new(Self {
                 rpc,
@@ -223,15 +228,30 @@ impl Client {
                 device_list: watch::channel(BTreeMap::new()).0,
                 tunnel_manager,
                 mls,
+                mls_to_server: send,
                 background_tasks: TaskTracker::new(),
                 cancel: CancellationToken::new(),
             });
 
-            client
-                .rpc
-                .upstream_connection()
-                .dispatch(UploadKeyPackages(&client.mls))
-                .await?;
+            let connection = client.rpc.upstream_connection();
+            let mls = client.mls.clone();
+            let cancel = client.cancel.clone();
+            client.background_tasks.spawn(async move {
+                if let Err(err) = connection
+                    .dispatch(UploadKeyPackages::new(mls, cancel))
+                    .await
+                {
+                    error!("failed to upload key packages: {:#}", err);
+                }
+            });
+
+            let connection = client.rpc.upstream_connection();
+            let cancel = client.cancel.clone();
+            client.background_tasks.spawn(async move {
+                if let Err(err) = connection.dispatch(UploadMls(recv, cancel)).await {
+                    error!("failed to upload mls: {:#}", err);
+                }
+            });
 
             let list_clone = client.device_list.clone();
             let sync_connection = client.rpc.upstream_connection();

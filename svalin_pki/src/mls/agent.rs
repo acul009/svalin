@@ -22,7 +22,7 @@ use crate::{
             CreateGroupMessageError, CreateKeyPackageError, JoinGroupError, MlsProcessorHandle,
         },
         provider::{PostcardCodec, SvalinProvider},
-        transport_types::{DeviceMessage, MessageToMember, MessageToServer},
+        transport_types::{DeviceMessage, MessageToMember, MessageToServerTransport},
     },
 };
 
@@ -140,7 +140,7 @@ where
     pub async fn send_report<Report: Serialize>(
         &self,
         report: Report,
-    ) -> Result<MessageToServer, SendDeviceMessageError> {
+    ) -> Result<MessageToServerTransport, SendDeviceMessageError> {
         let group_id = SvalinGroupId::DeviceGroup(self.me.spki_hash().clone()).to_group_id();
         let message = DeviceMessage::Report(report);
         let encoded = postcard::to_stdvec(&message)?;

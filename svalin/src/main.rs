@@ -98,24 +98,18 @@ async fn run() {
 
                 let waiting_for_init = Agent::init(address).await.unwrap();
 
+                let cancel = CancellationToken::new();
+
                 println!("Successfully requested to join server.");
                 println!("Join-Code: {}", waiting_for_init.join_code());
                 let waiting_for_confirm = waiting_for_init.wait_for_init().await.unwrap();
                 println!("Confirm-Code: {}", waiting_for_confirm.confirm_code());
-                let agent = waiting_for_confirm.wait_for_confirm().await.unwrap();
+                waiting_for_confirm.wait_for_confirm(cancel).await.unwrap();
                 println!("initialisation complete!");
-                agent.close(Duration::from_secs(1)).await.unwrap();
             }
             None => {
                 let cancel = CancellationToken::new();
                 let cancel2 = cancel.clone();
-                let agent = Arc::new(Agent::open(cancel.clone()).await.unwrap());
-                let agent2 = agent.clone();
-
-                tokio::spawn(async move {
-                    agent2.run().await.unwrap();
-                });
-
                 tokio::spawn(async move {
                     // Wait for shutdown signal
                     tokio::signal::ctrl_c().await.unwrap();
@@ -123,10 +117,9 @@ async fn run() {
                     cancel2.cancel();
                 });
 
-                cancel.cancelled().await;
-                println!("Shutting down agent");
-
-                agent.close(Duration::from_secs(1)).await.unwrap();
+                if let Err(err) = Agent::run(cancel).await {
+                    tracing::error!("Failed to run agent: {err:#}");
+                }
             }
         },
     }
