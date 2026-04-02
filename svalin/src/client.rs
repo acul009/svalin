@@ -7,7 +7,6 @@ use anyhow::{Result, anyhow};
 
 pub mod device;
 mod first_connect;
-pub mod persistent;
 pub mod tunnel_manager;
 
 pub mod add_agent;

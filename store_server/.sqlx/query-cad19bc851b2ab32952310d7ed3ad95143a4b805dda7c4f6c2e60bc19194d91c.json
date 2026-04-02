@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO mls_messages (id, data, received_at) VALUES (?,?,?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "cad19bc851b2ab32952310d7ed3ad95143a4b805dda7c4f6c2e60bc19194d91c"
+}

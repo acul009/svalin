@@ -7,27 +7,12 @@ list:
     @just --list
 
 sqlx:
-    cd sqlx_storage && cargo sqlx database reset -y && cargo sqlx prepare
-    cd store_server && cargo sqlx database reset -y && cargo sqlx prepare && cargo sqlx database drop -y
-    cd store_client && cargo sqlx database reset -y && cargo sqlx prepare && cargo sqlx database drop -y
-
-# Setup the database
-setup: create-db migrate
-
-# Create the database
-create-db:
-    cargo sqlx database create
-
-# Run database migrations
-migrate:
-    cargo sqlx migrate run --source store_server/migrations
-
-# remove database
-clean:
-    cargo sqlx database drop -y
-
-# Restart the database by recreating it
-restart: clean setup
+    cd sqlx_storage && cargo sqlx database reset -y &&  cargo sqlx prepare -D sqlite://$PWD/sqlx.sqlite -- -p openmls_sqlx_storage && cargo sqlx database drop -y
+    cargo check -p openmls_sqlx_storage
+    cargo check -p svalin_client_store || true
+    cd store_client && cargo sqlx database reset -y && cargo sqlx prepare -D sqlite://$PWD/sqlx.sqlite -- -p svalin_client_store && cargo sqlx database drop -y
+    cargo check -p svalin_server_store || true
+    cd store_server && cargo sqlx database reset -y && cargo sqlx prepare -D sqlite://$PWD/sqlx.sqlite -- -p svalin_server_store && cargo sqlx database drop -y
 
 test $RUST_LOG="svalin=debug":
     cargo test -p svalin_pki -p svalin_rpc -p svalin -- --nocapture

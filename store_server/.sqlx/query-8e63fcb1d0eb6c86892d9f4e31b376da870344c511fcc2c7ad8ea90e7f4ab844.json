@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO agents (spki_hash, certificate) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "8e63fcb1d0eb6c86892d9f4e31b376da870344c511fcc2c7ad8ea90e7f4ab844"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT spki_hash as \"spki_hash!\", report FROM system_reports",
+  "describe": {
+    "columns": [
+      {
+        "name": "spki_hash!",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "report",
+        "ordinal": 1,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "bec13cb5ee13a5f211145cf1d9c6a5fc9d7f6fbd12459f197317b697ed744cbf"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT certificate FROM sessions WHERE issuer = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "certificate",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "dc22ffac676784523f06bb0c9195e95f9512ec87f6c9013303d090cdd07f27df"
+}

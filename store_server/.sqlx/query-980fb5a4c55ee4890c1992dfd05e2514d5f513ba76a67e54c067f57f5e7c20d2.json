@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO sessions (spki_hash, issuer, certificate) VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "980fb5a4c55ee4890c1992dfd05e2514d5f513ba76a67e54c067f57f5e7c20d2"
+}

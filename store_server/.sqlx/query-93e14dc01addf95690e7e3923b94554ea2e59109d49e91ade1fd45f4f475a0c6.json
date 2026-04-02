@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO mls_message_receivers (message_id, spki_hash) VALUES (?,?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "93e14dc01addf95690e7e3923b94554ea2e59109d49e91ade1fd45f4f475a0c6"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT certificate FROM sessions WHERE spki_hash = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "certificate",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "550da691eb26ec553428d74ea6aff58f074eef18b6f93f323d4038ebd828bad1"
+}

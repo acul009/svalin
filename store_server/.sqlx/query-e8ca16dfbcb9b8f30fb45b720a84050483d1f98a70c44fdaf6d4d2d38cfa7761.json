@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM key_packages WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "e8ca16dfbcb9b8f30fb45b720a84050483d1f98a70c44fdaf6d4d2d38cfa7761"
+}
