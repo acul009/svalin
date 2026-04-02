@@ -1,7 +1,8 @@
+use std::sync::Arc;
+
 use anyhow::{Result, anyhow};
 use aucpace::{AuCPaceClient, ClientMessage};
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
 use svalin_pki::argon2::password_hash::rand_core::OsRng;
 use svalin_pki::{
     ArgonCost, Certificate, CreateCertificateError, CreateCredentialsError, Credential,
@@ -19,12 +20,11 @@ use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::{Session, SessionReadError, SessionWriteError},
 };
+use svalin_server_store::UserStore;
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use totp_rs::TOTP;
 use tracing::debug;
-
-use crate::server::user_store::UserStore;
 
 pub struct ServerInitSuccess {
     pub credential: Credential,
@@ -51,14 +51,14 @@ pub struct InitRequest {
 }
 
 pub(crate) struct InitHandler {
-    pool: SqlitePool,
+    user_store: Arc<UserStore>,
     channel: tokio::sync::Mutex<Option<oneshot::Sender<ServerInitSuccess>>>,
 }
 
 impl InitHandler {
-    pub fn new(channel: oneshot::Sender<ServerInitSuccess>, pool: SqlitePool) -> Self {
+    pub fn new(channel: oneshot::Sender<ServerInitSuccess>, user_store: Arc<UserStore>) -> Self {
         Self {
-            pool,
+            user_store,
             channel: tokio::sync::Mutex::new(Some(channel)),
         }
     }
@@ -94,7 +94,7 @@ impl CommandHandler for InitHandler {
         let my_credential = keypair.upgrade(init_request.server_cert)?;
 
         UserStore::add_root_user(
-            &self.pool,
+            &self.user_store,
             init_request.username,
             init_request.encrypted_credential,
             init_request.totp_secret,

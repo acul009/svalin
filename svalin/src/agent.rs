@@ -1,33 +1,24 @@
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context, Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
-use sqlx::migrate::MigrateDatabase;
-use sqlx::{Sqlite, SqlitePool};
-use svalin_pki::mls::agent::MlsAgent;
-use svalin_pki::mls::key_retriever;
-use svalin_pki::mls::provider::PostcardCodec;
 use svalin_pki::{
-    Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
-    RootCertificate, UnverifiedCertificate, get_current_timestamp,
+    Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier, RootCertificate,
+    UnverifiedCertificate, get_current_timestamp,
+    mls::{agent::MlsAgent, provider::PostcardCodec},
 };
-use svalin_rpc::commands::deauthenticate::DeauthenticateHandler;
-use svalin_rpc::commands::e2e::E2EHandler;
-use svalin_rpc::commands::ping::PingHandler;
-use svalin_rpc::rpc::client::RpcClient;
-use svalin_rpc::rpc::command::handler::HandlerCollection;
-use svalin_rpc::rpc::connection::Connection;
-use tokio::task::JoinSet;
+use svalin_rpc::{
+    commands::{deauthenticate::DeauthenticateHandler, e2e::E2EHandler, ping::PingHandler},
+    rpc::{client::RpcClient, command::handler::HandlerCollection, connection::Connection},
+};
 use tokio::time::error::Elapsed;
-use tokio_util::sync::CancellationToken;
-use tokio_util::task::TaskTracker;
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, instrument};
-use update::Updater;
-use update::request_available_version::AvailableVersionHandler;
-use update::request_installation_info::InstallationInfoHandler;
-use update::start_agent_update::StartUpdateHandler;
+use update::{
+    Updater, request_available_version::AvailableVersionHandler,
+    request_installation_info::InstallationInfoHandler, start_agent_update::StartUpdateHandler,
+};
 
 mod init;
 pub mod update;
@@ -225,15 +216,7 @@ impl Agent {
             .to_str()
             .ok_or_else(|| OpenMlsStoreError::LocationBroken)?;
 
-        if !location.exists().await {
-            Sqlite::create_database(path).await?;
-        }
-
-        let pool = SqlitePool::connect(path).await?;
-        let provider = SqliteStorageProvider::new(pool);
-        provider.run_migrations().await?;
-
-        Ok(provider)
+        Ok(SqliteStorageProvider::open(path).await?)
     }
 
     async fn save_config(config: &AgentConfig) -> Result<()> {
@@ -271,10 +254,6 @@ pub enum CreateMlsStoreError {
     IoError(#[from] std::io::Error),
     #[error("location did not give valid UTF-8 string")]
     LocationBroken,
-    #[error("sqlx error: {0}")]
-    SqlxError(#[from] sqlx::Error),
-    #[error("sqlx migration error: {0}")]
-    MigrateError(#[from] sqlx::migrate::MigrateError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -286,7 +265,5 @@ pub enum OpenMlsStoreError {
     #[error("location did not give valid UTF-8 string")]
     LocationBroken,
     #[error("sqlx error: {0}")]
-    SqlxError(#[from] sqlx::Error),
-    #[error("sqlx migration error: {0}")]
-    MigrateError(#[from] sqlx::migrate::MigrateError),
+    StoreError(#[from] openmls_sqlx_storage::Error),
 }

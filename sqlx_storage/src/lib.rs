@@ -15,14 +15,15 @@
 //! with the name `_openmls_sqlx_migrations`. All tables created by this crate
 //! are prefixed with `openmls_` to avoid name clashes.
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, path::Path};
 
 use openmls_traits::storage::{CURRENT_VERSION, Entity, Key};
 use serde::Serialize;
-use sqlx::SqlitePool;
+use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 
 pub use crate::codec::Codec;
 use crate::migrator::MigratorWrapper;
+pub use sqlx::Error;
 
 mod codec;
 mod group_data;
@@ -43,6 +44,23 @@ pub struct SqliteStorageProvider<C> {
 }
 
 impl<C: Codec> SqliteStorageProvider<C> {
+    /// Open a [`SqliteStorageProvider`] from the given URL.
+    ///
+    /// This will create the database if it does not exist and run the
+    /// migrations.
+    pub async fn open(filename: impl AsRef<Path>) -> Result<Self, sqlx::Error> {
+        let options = SqliteConnectOptions::new()
+            .create_if_missing(true)
+            .filename(filename)
+            .optimize_on_close(true, None);
+
+        let pool = SqlitePool::connect_with(options).await?;
+        let me = Self::new(pool);
+        me.run_migrations().await?;
+
+        Ok(me)
+    }
+
     /// Create a new [`SqliteStorageProvider`] based on the given
     /// [`SqliteConnection`].
     pub fn new(connection: SqlitePool) -> Self {

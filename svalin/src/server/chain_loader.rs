@@ -1,8 +1,7 @@
 use std::{fmt::Debug, sync::Arc};
 
 use svalin_pki::{CertificateChainBuilder, SpkiHash, UnverifiedCertificateChain};
-
-use crate::server::{agent_store::AgentStore, session_store::SessionStore, user_store::UserStore};
+use svalin_server_store::{AgentStore, SessionStore, UserStore};
 
 #[derive(Debug, Clone)]
 pub struct ChainLoader {

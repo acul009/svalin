@@ -4,31 +4,27 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.102"
-argon2 = { version = "0.5.3", features = ["simple", "std"] }
+anyhow = { workspace = true }
+argon2 = { workspace = true, features = ["simple", "std"] }
 postcard = { workspace = true }
 rand = { workspace = true }
-rcgen = { version = "0.14.7", features = ["x509-parser", "zeroize"] }
-ring = "0.17.14"
-rustls = { version = "0.23.37", default-features = false, features = ["std"] }
+rcgen = { workspace = true, features = ["x509-parser", "zeroize"] }
+ring = { workspace = true }
+rustls = { workspace = true, features = ["std"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
 time = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-x509-parser = { version = "0.18.1", features = ["ring", "validate", "verify"] }
-zeroize = { version = "1.8.2", features = ["aarch64", "derive", "std"] }
-openmls = { version = "0.8.1", features = ["openmls_rust_crypto"] }
-openmls_traits = "0.5.0"
-tls_codec = { version = "0.4.2" }
-sha2 = "0.10.9"
-openmls_rust_crypto = "0.5.1"
-openmls_sqlx_storage = { path = "../sqlx_storage" }
-curve25519-dalek = { version = "4.1.3", features = [
-    "serde",
-    "digest",
-    "rand_core",
-] }
+x509-parser = { workspace = true, features = ["ring", "validate", "verify"] }
+zeroize = { workspace = true, features = ["aarch64", "derive", "std"] }
+openmls = { workspace = true, features = ["openmls_rust_crypto"] }
+openmls_traits = { workspace = true }
+tls_codec = { workspace = true }
+sha2 = { workspace = true }
+openmls_rust_crypto = { workspace = true }
+openmls_sqlx_storage = { workspace = true }
+curve25519-dalek = { workspace = true, features = ["serde", "digest", "rand_core"] }
 
 [dev-dependencies]
-sqlx = { version = "0.8.6", features = ["sqlite", "migrate", "runtime-tokio"] }
+sqlx = { workspace = true, features = ["sqlite", "migrate", "runtime-tokio"] }

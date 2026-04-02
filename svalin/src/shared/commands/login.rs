@@ -30,14 +30,12 @@ use svalin_rpc::{
     },
     verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
 };
+use svalin_server_store::{SessionStore, UserStore};
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
-use crate::{
-    permissions::Permission,
-    server::{session_store::SessionStore, user_store::UserStore},
-};
+use crate::permissions::Permission;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginApproval {

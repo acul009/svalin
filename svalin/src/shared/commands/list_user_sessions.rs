@@ -6,9 +6,8 @@ use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::Session,
 };
+use svalin_server_store::SessionStore;
 use tokio_util::sync::CancellationToken;
-
-use crate::server::session_store::SessionStore;
 
 pub struct ListUserSessionsHandler {
     session_store: Arc<SessionStore>,

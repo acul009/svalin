@@ -21,34 +21,25 @@ tracing = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 time.workspace = true
+uuid = { workspace = true }
 
-async_pty = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git" }
-clap = { version = "4.6.0", features = ["derive", "unstable-doc"] }
-svalin_rpc = { path = "../svalin_rpc" }
-svalin_sysctl = { path = "../svalin_sysctl" }
-svalin_macros = { path = "../svalin_macros" }
-svalin_pki = { path = "../svalin_pki" }
-totp-rs = { version = "5.7.1", features = [
-    "qr",
-    "serde_support",
-    "gen_secret",
-    "zeroize"
-] }
-tracing-subscriber = "0.3.23"
-test-log = { version = "0.2.19", features = ["trace"] }
-futures = "0.3.32"
-pin-project = "1.1.11"
-uuid = { version = "1.23.0", features = ["v4"] }
-aucpace = { version = "0.1.1", features = ["alloc", "serde", "strong_aucpace"] }
-reqwest = { version = "0.13.2", features = [
-    "json",
-    "rustls",
-    "stream",
-], default-features = false }
-sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite", "uuid"] }
-zeroize = { version = "1.8.2", features = ["derive"] }
-dashmap = "6.1.0"
-openmls_sqlx_storage = { path = "../sqlx_storage" }
+async_pty = { workspace = true }
+clap = { workspace = true, features = ["derive", "unstable-doc"] }
+svalin_rpc = { workspace = true }
+svalin_sysctl = { workspace = true }
+svalin_macros = { workspace = true }
+svalin_pki = { workspace = true }
+totp-rs = { workspace = true, features = ["qr", "serde_support", "gen_secret", "zeroize"] }
+tracing-subscriber = { workspace = true }
+test-log = { workspace = true, features = ["trace"] }
+futures = { workspace = true }
+pin-project = { workspace = true }
+aucpace = { workspace = true, features = ["alloc", "serde", "strong_aucpace"] }
+reqwest = { workspace = true, features = ["json", "rustls", "stream"] }
+zeroize = { workspace = true, features = ["derive"] }
+dashmap = { workspace = true }
+openmls_sqlx_storage = { workspace = true }
+svalin_server_store = { workspace = true }
 
 [package.metadata.deb]
 depends = "libc6 (>= 2.31)"

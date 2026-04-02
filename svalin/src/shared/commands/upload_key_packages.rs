@@ -13,14 +13,12 @@ use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::{Session, SessionReadError, SessionWriteError},
 };
+use svalin_server_store::KeyPackageStore;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    remote_key_retriever::RemoteKeyRetriever,
-    server::{
-        MlsServer, key_package_store::KeyPackageStore, local_key_retriever::LocalKeyRetriever,
-    },
-    verifier::{local_verifier::LocalVerifier, remote_verifier::RemoteVerifier},
+    remote_key_retriever::RemoteKeyRetriever, server::MlsServer,
+    verifier::remote_verifier::RemoteVerifier,
 };
 
 enum Uploader {

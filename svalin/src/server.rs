@@ -1,13 +1,11 @@
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
-use agent_store::AgentStore;
 use anyhow::{Context, Result, anyhow};
 use command_builder::SvalinCommandBuilder;
 use config_builder::ServerConfigBuilder;
 use openmls_sqlx_storage::SqliteStorageProvider;
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
-use sqlx::{SqlitePool, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
 use svalin_pki::{
     Credential, EncryptedCredential, KnownCertificateVerifier, UnverifiedCertificate,
 };
@@ -16,6 +14,7 @@ use svalin_rpc::{
     rpc::{command::handler::HandlerCollection, server::Socket},
     verifiers::skip_verify::SkipClientVerification,
 };
+use svalin_server_store::{ServerStore, UserStore};
 use tokio::{
     sync::{mpsc, oneshot},
     time::{error::Elapsed, timeout},
@@ -24,11 +23,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
-    server::{
-        chain_loader::ChainLoader, key_package_store::KeyPackageStore,
-        local_key_retriever::LocalKeyRetriever, message_store::MessageStore,
-        session_store::SessionStore,
-    },
+    server::{chain_loader::ChainLoader, local_key_retriever::LocalKeyRetriever},
     shared::commands::{
         init::{InitHandler, ServerInitSuccess},
         public_server_status::{PublicStatus, PublicStatusHandler},
@@ -42,17 +37,10 @@ use crate::{
 
 use svalin_rpc::rpc::server::RpcServer;
 
-use self::user_store::UserStore;
-
-pub mod agent_store;
 pub mod chain_loader;
 pub mod command_builder;
 pub mod config_builder;
-pub mod key_package_store;
 pub mod local_key_retriever;
-pub mod message_store;
-pub mod session_store;
-pub mod user_store;
 
 pub type MlsServer = svalin_pki::mls::server::MlsServer<LocalVerifier, LocalKeyRetriever>;
 
@@ -68,7 +56,7 @@ pub const INIT_SERVER_SHUTDOWN_COUNTDOWN: Duration = Duration::from_secs(1);
 pub struct Server {
     rpc: Arc<RpcServer>,
     config: ServerConfig,
-    pool: SqlitePool,
+    store_close_handle: svalin_server_store::CloseHandle,
     tasks: TaskTracker,
 }
 
@@ -113,39 +101,12 @@ impl Server {
         Ok(())
     }
 
-    async fn open_db() -> Result<SqlitePool> {
-        let location = Self::data_dir().await?.push("db.sqlite");
-        let url = format!("{}", &location);
-
-        debug!("database_url: {}", &url);
-
-        if !tokio::fs::try_exists(location.as_path()).await? {
-            sqlx::Sqlite::create_database(&url).await?;
-        }
-
-        let pool = SqlitePoolOptions::new().connect(&url).await?;
-
-        sqlx::migrate!("migrations/server").run(&pool).await?;
-
-        Ok(pool)
-    }
-
     async fn open_mls_server(
         verifier: LocalVerifier,
         key_retriever: LocalKeyRetriever,
     ) -> Result<Arc<MlsServer>> {
         let location = Self::data_dir().await?.push("mls-store.sqlite");
-        let url = format!("{}", &location);
-
-        debug!("database_url: {}", &url);
-
-        if !tokio::fs::try_exists(location.as_path()).await? {
-            sqlx::Sqlite::create_database(&url).await?;
-        }
-
-        let pool = SqlitePoolOptions::new().connect(&url).await?;
-        let storage_provider = SqliteStorageProvider::new(pool);
-        storage_provider.run_migrations().await?;
+        let storage_provider = SqliteStorageProvider::open(location.as_path()).await?;
 
         let mls = MlsServer::new(storage_provider, verifier, key_retriever);
 
@@ -158,8 +119,8 @@ impl Server {
             .context("error opening config")?;
 
         debug!("opening DB");
-
-        let pool = Self::open_db().await.context("error opening db")?;
+        let db_path = Self::base_config_path().await?.push("db.sqlite");
+        let store = ServerStore::open(&db_path).await?;
 
         debug!("creating socket");
 
@@ -175,7 +136,7 @@ impl Server {
                 let init_success = Self::init_server(
                     socket.clone(),
                     config.cancelation_token.child_token(),
-                    pool.clone(),
+                    store.users.clone(),
                 )
                 .await
                 .context("failed to initialize server")?;
@@ -209,35 +170,25 @@ impl Server {
 
         let root = base_config.root_cert.use_as_root()?;
 
-        let user_store = UserStore::open(pool.clone());
-
-        let session_store = SessionStore::open(pool.clone());
-
-        let agent_store = AgentStore::open(pool.clone());
-
-        let key_package_store = KeyPackageStore::open(pool.clone());
-
-        let message_store = MessageStore::open(pool.clone());
-
         let credentials = base_config
             .key_source
             .decrypt_credentials(base_config.credentials)
             .await?;
 
         let loader = ChainLoader::new(
-            user_store.clone(),
-            agent_store.clone(),
-            session_store.clone(),
+            store.users.clone(),
+            store.agents.clone(),
+            store.sessions.clone(),
         );
 
         let verifier = LocalVerifier::new(root.clone(), loader.clone());
 
         let key_retriever = LocalKeyRetriever::new(
             root.clone(),
-            agent_store.clone(),
-            user_store.clone(),
-            session_store.clone(),
-            key_package_store.clone(),
+            store.agents.clone(),
+            store.users.clone(),
+            store.sessions.clone(),
+            store.key_packages.clone(),
         );
 
         let mls = Self::open_mls_server(verifier.clone(), key_retriever).await?;
@@ -249,16 +200,14 @@ impl Server {
         let command_builder = SvalinCommandBuilder {
             root_cert: root,
             server_cert: credentials.certificate().clone(),
-            user_store,
-            agent_store,
-            session_store,
-            key_package_store,
+            store,
             mls: mls.clone(),
             to_mls,
         };
 
         let tasks = TaskTracker::new();
 
+        let message_store = command_builder.store.messages.clone();
         tasks.spawn(async move {
             let mut recv = from_mls;
             while let Some(message) = recv.recv().await {
@@ -275,6 +224,8 @@ impl Server {
             }
         });
 
+        let store_close_handle = command_builder.store.close_handle();
+
         let rpc = RpcServer::build()
             .credentials(credentials.clone())
             .client_cert_verifier(verifier)
@@ -288,14 +239,14 @@ impl Server {
             config,
             rpc,
             tasks,
-            pool,
+            store_close_handle,
         })
     }
 
     async fn init_server(
         socket: Socket,
         cancel: CancellationToken,
-        pool: SqlitePool,
+        user_store: Arc<UserStore>,
     ) -> Result<ServerInitSuccess> {
         let permission_handler = AnonymousPermissionHandler::<DummyPermission>::default();
 
@@ -305,7 +256,7 @@ impl Server {
         commands
             .chain()
             .await
-            .add(InitHandler::new(send, pool))
+            .add(InitHandler::new(send, user_store))
             .add(PublicStatusHandler::new(PublicStatus::WaitingForInit));
 
         let temp_credentials = Credential::generate_root()?;
@@ -341,7 +292,7 @@ impl Server {
 
         let result2 = timeout(timeout_duration, self.tasks.wait()).await;
 
-        self.pool.close().await;
+        self.store_close_handle.close().await;
 
         result1.or(result2)
     }

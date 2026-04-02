@@ -1,0 +1,18 @@
+[package]
+name = "svalin_server_store"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+postcard.workspace = true
+serde.workspace = true
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "uuid"] }
+svalin_pki = { workspace = true }
+thiserror.workspace = true
+uuid.workspace = true
+
+totp-rs = { workspace = true, features = ["serde_support", "zeroize"] }
+aucpace = { workspace = true, features = ["alloc", "serde", "strong_aucpace"] }
+tracing.workspace = true
+tokio.workspace = true

@@ -6,6 +6,11 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 list:
     @just --list
 
+sqlx:
+    cd sqlx_storage && cargo sqlx database reset -y && cargo sqlx prepare
+    cd store_server && cargo sqlx database reset -y && cargo sqlx prepare && cargo sqlx database drop -y
+    cd store_client && cargo sqlx database reset -y && cargo sqlx prepare && cargo sqlx database drop -y
+
 # Setup the database
 setup: create-db migrate
 
@@ -15,7 +20,7 @@ create-db:
 
 # Run database migrations
 migrate:
-    cargo sqlx migrate run --source svalin/migrations/server
+    cargo sqlx migrate run --source store_server/migrations
 
 # remove database
 clean:

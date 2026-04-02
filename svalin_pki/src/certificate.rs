@@ -218,6 +218,16 @@ impl SpkiHash {
     pub(crate) fn to_vec(&self) -> Vec<u8> {
         self.0.to_vec()
     }
+
+    pub fn from_slice(slice: &[u8]) -> Result<Self, ()> {
+        if slice.len() != 32 {
+            return Err(());
+        }
+
+        let mut bytes = [0u8; 32];
+        bytes.copy_from_slice(slice);
+        Ok(Self(bytes))
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

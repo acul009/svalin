@@ -19,6 +19,7 @@ use svalin_rpc::{
         session::{Session, SessionReadError},
     },
 };
+use svalin_server_store::{AgentStore, AgentUpdate};
 use tokio::{select, sync::watch};
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
@@ -26,7 +27,6 @@ use tracing::debug;
 use crate::{
     client::{Client, device::Device},
     permissions::Permission,
-    server::agent_store::{AgentStore, AgentUpdate},
     verifier::remote_agent_verifier::RemoteAgentVerifier,
 };
 

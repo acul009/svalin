@@ -37,7 +37,7 @@ pub struct UserStore {
 
 impl UserStore {
     pub async fn add_root_user(
-        pool: &SqlitePool,
+        &self,
         username: Vec<u8>,
         encrypted_credential: EncryptedCredential,
         totp_secret: TOTP,
@@ -46,7 +46,7 @@ impl UserStore {
         verifier: RistrettoPoint,
     ) -> Result<()> {
         let count: u64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
-            .fetch_one(pool)
+            .fetch_one(&self.pool)
             .await?;
 
         if count > 0 {
@@ -78,7 +78,7 @@ impl UserStore {
             username,
             data
         )
-        .execute(pool)
+        .execute(&self.pool)
         .await?;
 
         Ok(())

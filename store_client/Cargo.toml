@@ -1,0 +1,13 @@
+[package]
+name = "svalin_client_store"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "uuid"] }
+svalin_pki = { workspace = true }
+thiserror.workspace = true
+svalin_sysctl = { workspace = true }
+postcard.workspace = true
+futures.workspace = true

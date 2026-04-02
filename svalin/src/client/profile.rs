@@ -3,11 +3,9 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::{Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
-use sqlx::{SqlitePool, migrate::MigrateDatabase};
 use svalin_pki::{
     Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
-    RootCertificate, UnverifiedCertificate, get_current_timestamp,
-    mls::{client::MlsClient, key_retriever},
+    RootCertificate, UnverifiedCertificate, get_current_timestamp, mls::client::MlsClient,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::sync::{mpsc, watch};
@@ -22,10 +20,7 @@ use crate::{
         upload_key_packages::UploadKeyPackages,
     },
     util::location::{Location, LocationError},
-    verifier::{
-        remote_agent_verifier::RemoteAgentVerifier, remote_session_verifier::RemoteSessionVerifier,
-        remote_verifier::RemoteVerifier,
-    },
+    verifier::remote_verifier::RemoteVerifier,
 };
 
 use super::Client;
@@ -199,12 +194,7 @@ impl Client {
                 .as_path()
                 .to_str()
                 .ok_or_else(|| anyhow!("db_path was not valid UTF-8"))?;
-            if !tokio::fs::try_exists(db_path.as_path()).await? {
-                sqlx::Sqlite::create_database(&url).await?;
-            }
-            let pool = SqlitePool::connect(url).await?;
-            let storage_provider = SqliteStorageProvider::new(pool);
-            storage_provider.run_migrations().await?;
+            let storage_provider = SqliteStorageProvider::open(&url).await?;
             let key_retriever =
                 RemoteKeyRetriever::new(rpc.upstream_connection(), root_certificate.clone());
 

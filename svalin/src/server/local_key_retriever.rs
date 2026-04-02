@@ -5,11 +5,7 @@ use svalin_pki::{
     CertificateChainBuilder, RootCertificate, get_current_timestamp,
     mls::{SvalinGroupId, key_retriever::KeyRetriever},
 };
-
-use crate::server::{
-    agent_store::AgentStore, key_package_store::KeyPackageStore, session_store::SessionStore,
-    user_store::UserStore,
-};
+use svalin_server_store::{AgentStore, KeyPackageStore, SessionStore, UserStore};
 
 pub struct LocalKeyRetriever {
     root: RootCertificate,

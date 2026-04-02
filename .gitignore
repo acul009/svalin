@@ -2,6 +2,7 @@ target/
 *.jammdb
 *.sled
 *.sqlite
+*.db
 *.sqlite-shm
 *.sqlite-wal
 flamegraph.svg

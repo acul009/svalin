@@ -4,9 +4,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Certificate, CertificateChainBuilder, RootCertificate, SpkiHash, UnverifiedCertificate,
-    VerifyChainError, get_current_timestamp,
-    mls::{server::AddDeviceGroupError, transport_types::NewGroupTransport},
+    Certificate, CertificateChainBuilder, RootCertificate, UnverifiedCertificate, VerifyChainError,
+    get_current_timestamp, mls::server::AddDeviceGroupError,
 };
 use svalin_rpc::rpc::{
     command::{
@@ -15,17 +14,10 @@ use svalin_rpc::rpc::{
     },
     session::{Session, SessionReadError, SessionWriteError},
 };
+use svalin_server_store::{AgentStore, CompleteCertChainError, MessageStoreError, UserStore};
 use tokio_util::sync::CancellationToken;
 
-use crate::{
-    permissions::Permission,
-    server::{
-        MlsServer,
-        agent_store::{self, AgentStore},
-        message_store::{MessageStore, MessageStoreError},
-        user_store::{CompleteCertChainError, UserStore},
-    },
-};
+use crate::permissions::Permission;
 
 #[derive(Serialize, Deserialize, Debug, thiserror::Error)]
 pub enum AddAgentError {
@@ -42,7 +34,7 @@ pub enum InternalAddAgentError {
     #[error("error verifying loaded chain: {0}")]
     VerifyChainError(#[from] VerifyChainError),
     #[error("error saving agent to database: {0}")]
-    AddAgentError(#[from] agent_store::AddAgentError),
+    AddAgentError(#[from] svalin_server_store::AddAgentError),
     #[error("error adding device group")]
     AddDeviceGroupError(AddDeviceGroupError<anyhow::Error>),
     #[error("error adding message to store: {0}")]

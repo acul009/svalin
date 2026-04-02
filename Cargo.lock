@@ -3801,10 +3801,10 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "sqlx",
  "svalin_macros",
  "svalin_pki",
  "svalin_rpc",
+ "svalin_server_store",
  "svalin_sysctl",
  "test-log",
  "thiserror 2.0.18",
@@ -3816,6 +3816,19 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "svalin_client_store"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "postcard",
+ "sqlx",
+ "svalin_pki",
+ "svalin_sysctl",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3873,6 +3886,23 @@ dependencies = [
  "tokio-rustls",
  "tokio-util",
  "tracing",
+]
+
+[[package]]
+name = "svalin_server_store"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aucpace",
+ "postcard",
+ "serde",
+ "sqlx",
+ "svalin_pki",
+ "thiserror 2.0.18",
+ "tokio",
+ "totp-rs",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -4630,7 +4660,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
