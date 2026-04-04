@@ -119,8 +119,11 @@ impl Server {
             .context("error opening config")?;
 
         debug!("opening DB");
-        let db_path = Self::base_config_path().await?.push("db.sqlite");
-        let store = ServerStore::open(&db_path).await?;
+        let db_path = Self::data_dir().await?.push("db.sqlite");
+        tracing::debug!("opening server store at: {}", &db_path);
+        let store = ServerStore::open(&db_path)
+            .await
+            .context("error opending server store")?;
 
         debug!("creating socket");
 
