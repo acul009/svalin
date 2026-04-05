@@ -6,11 +6,8 @@ use crate::shared::join_agent::{
 use super::Client;
 
 use anyhow::Result;
-use svalin_pki::{Certificate, mls::transport_types::NewGroupTransport};
-use svalin_rpc::rpc::{
-    command::dispatcher::DispatcherError,
-    connection::{Connection, ConnectionDispatchError},
-};
+use svalin_pki::Certificate;
+use svalin_rpc::rpc::connection::{Connection, ConnectionDispatchError};
 use tokio::sync::oneshot;
 
 impl Client {

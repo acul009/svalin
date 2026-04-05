@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use svalin_pki::{Certificate, SpkiHash};
+use svalin_pki::SpkiHash;
 use svalin_sysctl::sytem_report::SystemReport;
 
 /// This contains the persistent state of the clients available information.

@@ -1,12 +1,10 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use svalin_pki::{
-    Certificate, CreateCertificateError, DeriveKeyError, ExactVerififier, ExportedPublicKey,
+    Certificate, CreateCertificateError, DeriveKeyError, ExportedPublicKey,
     mls::{
-        OpenMlsProvider,
         client::CreateDeviceGroupError,
-        key_package::{KeyPackageError, UnverifiedKeyPackage},
-        transport_types::MessageToMemberTransport,
+        key_package::KeyPackageError,
     },
 };
 use svalin_rpc::{

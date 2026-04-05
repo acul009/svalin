@@ -8,7 +8,7 @@ use tokio::{
     sync::watch,
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error};
+use tracing::debug;
 
 pub mod request_available_version;
 pub mod request_installation_info;

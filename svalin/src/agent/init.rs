@@ -145,7 +145,7 @@ impl WaitForConfirm {
 
         tokio::time::sleep(Duration::from_secs(3)).await;
 
-        let agent = Agent::run(cancel)
+        let _agent = Agent::run(cancel)
             .await
             .context("error opening agent after init")?;
 

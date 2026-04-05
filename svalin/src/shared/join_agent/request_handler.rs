@@ -2,11 +2,11 @@ use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use rand::{Rng, RngExt};
+use rand::RngExt;
 use svalin_pki::{
     CreateCredentialsError, DeriveKeyError, KeyPair, SignatureVerificationError,
     UnverifiedCertificate, UseAsRootError, get_current_timestamp,
-    mls::{agent::MlsAgent, client::MlsClient, processor::CreateKeyPackageError},
+    mls::processor::CreateKeyPackageError,
 };
 use svalin_rpc::{
     rpc::{
@@ -26,7 +26,7 @@ use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
-use crate::agent::{Agent, CreateMlsStoreError};
+use crate::agent::CreateMlsStoreError;
 
 use super::{AgentInitPayload, ServerJoinManager};
 
