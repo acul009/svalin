@@ -10,4 +10,5 @@ pub mod mls;
 pub mod public_server_status;
 pub mod realtime_status;
 pub mod terminal;
+pub mod update_user_mls;
 pub mod upload_key_packages;
