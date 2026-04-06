@@ -4,26 +4,26 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = { workspace = true }
+anyhow.workspace = true
 argon2 = { workspace = true, features = ["simple", "std"] }
-postcard = { workspace = true }
-rand = { workspace = true }
+postcard.workspace = true
+rand.workspace = true
 rcgen = { workspace = true, features = ["x509-parser", "zeroize"] }
-ring = { workspace = true }
+ring.workspace = true
 rustls = { workspace = true, features = ["std"] }
-serde = { workspace = true }
-thiserror = { workspace = true }
-time = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
+serde.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 x509-parser = { workspace = true, features = ["ring", "validate", "verify"] }
 zeroize = { workspace = true, features = ["aarch64", "derive", "std"] }
 openmls = { workspace = true, features = ["openmls_rust_crypto"] }
-openmls_traits = { workspace = true }
-tls_codec = { workspace = true }
-sha2 = { workspace = true }
-openmls_rust_crypto = { workspace = true }
-openmls_sqlx_storage = { workspace = true }
+openmls_traits.workspace = true
+tls_codec.workspace = true
+sha2.workspace = true
+openmls_rust_crypto.workspace = true
+openmls_sqlx_storage.workspace = true
 curve25519-dalek = { workspace = true, features = ["serde", "digest", "rand_core"] }
 
 [dev-dependencies]

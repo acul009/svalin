@@ -4,11 +4,14 @@ use anyhow::{Result, anyhow};
 use aucpace::StrongDatabase;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
+use svalin_client_store::persistent;
 use svalin_pki::argon2::password_hash::ParamsString;
 use svalin_pki::curve25519_dalek::{self, RistrettoPoint, Scalar};
+use svalin_pki::mls::provider::ExportedMlsStore;
 use svalin_pki::{
-    AddCertificateError, CertificateChainBuilder, CertificateType, EncryptedCredential, SpkiHash,
-    UnverifiedCertificate, UnverifiedCertificateChain, serde_paramsstring,
+    AddCertificateError, CertificateChainBuilder, CertificateType, EncryptedCredential,
+    EncryptedObject, SpkiHash, UnverifiedCertificate, UnverifiedCertificateChain,
+    serde_paramsstring,
 };
 use totp_rs::TOTP;
 
@@ -28,6 +31,9 @@ pub struct StoredUser {
 
     /// The verifier computer from the user's password
     pub verifier: RistrettoPoint,
+
+    pub mls_store: ExportedMlsStore,
+    persistent_data: EncryptedObject<persistent::ClientState>,
 }
 
 #[derive(Debug)]
@@ -44,6 +50,8 @@ impl UserStore {
         secret_exponent: Scalar,
         params: ParamsString,
         verifier: RistrettoPoint,
+        mls_store: ExportedMlsStore,
+        persistent_data: EncryptedObject<persistent::ClientState>,
     ) -> Result<()> {
         let count: u64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
             .fetch_one(&self.pool)
@@ -64,6 +72,8 @@ impl UserStore {
             secret_exponent,
             params,
             verifier,
+            mls_store,
+            persistent_data,
         };
 
         let cert = user.encrypted_credential.certificate();

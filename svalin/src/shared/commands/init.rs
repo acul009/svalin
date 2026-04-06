@@ -1,14 +1,17 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
 use aucpace::{AuCPaceClient, ClientMessage};
 use serde::{Deserialize, Serialize};
 use svalin_pki::argon2::password_hash::rand_core::OsRng;
+use svalin_pki::mls::provider::{self, ExportedMlsStore, SvalinStorage};
 use svalin_pki::{
     ArgonCost, Certificate, CreateCertificateError, CreateCredentialsError, Credential,
     EncryptError, EncryptedCredential, ExportedPublicKey, KeyPair, RootCertificate, Sha512,
     UnverifiedCertificate, argon2::Argon2, serde_paramsstring,
 };
+use svalin_pki::{EncryptedData, EncryptedObject};
 use svalin_pki::{
     argon2::password_hash::ParamsString,
     curve25519_dalek::{RistrettoPoint, Scalar},
@@ -16,6 +19,7 @@ use svalin_pki::{
 use svalin_rpc::transport::aucpace_transport::NONCE_LENGTH;
 
 use async_trait::async_trait;
+use svalin_client_store::persistent;
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::{Session, SessionReadError, SessionWriteError},
@@ -48,6 +52,9 @@ pub struct InitRequest {
 
     /// The verifier computer from the user's password
     verifier: RistrettoPoint,
+
+    user_mls_store: ExportedMlsStore,
+    persistent_data: EncryptedObject<persistent::ClientState>,
 }
 
 pub(crate) struct InitHandler {
@@ -101,6 +108,8 @@ impl CommandHandler for InitHandler {
             init_request.secret_exponent,
             init_request.params,
             init_request.verifier,
+            init_request.user_mls_store,
+            init_request.persistent_data,
         )
         .await?;
 
@@ -145,6 +154,8 @@ pub enum InitError {
     AucPaceError(aucpace::Error),
     #[error("error encrypting root credential: {0}")]
     EncryptRootError(#[from] EncryptError),
+    #[error("error exporting mls store: {0}")]
+    ExportMlsError(#[from] provider::ExportError),
     #[error("server sent error status back")]
     ServerError,
 }
@@ -232,6 +243,13 @@ impl CommandDispatcher for Init {
         };
 
         // send init request
+        let empty_client_state = persistent::ClientState::empty();
+        let persistent_data =
+            EncryptedObject::encrypt_with_password(&empty_client_state, self.password.clone())
+                .await?;
+
+        let empty_mls_store = SvalinStorage::new_memory();
+        let user_mls_store = empty_mls_store.export(self.password.clone()).await?;
 
         let encrypted_credential = self.root.export(self.password).await?;
 
@@ -243,6 +261,8 @@ impl CommandDispatcher for Init {
             secret_exponent,
             server_cert: server_cert.clone().to_unverified(),
             verifier,
+            user_mls_store,
+            persistent_data,
         };
 
         session

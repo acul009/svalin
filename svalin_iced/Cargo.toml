@@ -23,16 +23,16 @@ iced = { git = "https://github.com/iced-rs/iced.git", features = [
 ] }
 anyhow = "1.0.102"
 futures-util = "0.3.32"
-tokio = { workspace = true }
+tokio.workspace = true
 totp-rs = { version = "5.7.1", features = ["qr", "gen_secret"] }
 lyon_algorithms = "1.0.19"
-thiserror = { workspace = true }
+thiserror.workspace = true
 tokio-stream = { version = "0.1.18", features = ["full"] }
-tokio-util = { workspace = true }
+tokio-util.workspace = true
 futures = "0.3.32"
 uuid = "1.23.0"
 rust-i18n = "3.1.5"
-sipper = { workspace = true }
+sipper.workspace = true
 
 [build-dependencies]
 iced_fontello = {git = "https://github.com/hecrj/iced_fontello.git"}

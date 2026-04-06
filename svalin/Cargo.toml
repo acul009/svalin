@@ -10,36 +10,37 @@ description = "Headless package of the svalin rmm system"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = { workspace = true }
-async-trait = { workspace = true }
-postcard = { workspace = true }
-rand = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-tracing = { workspace = true }
-tokio = { workspace = true }
-tokio-util = { workspace = true }
+anyhow.workspace = true
+async-trait.workspace = true
+postcard.workspace = true
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
 time.workspace = true
-uuid = { workspace = true }
+uuid.workspace = true
 
-async_pty = { workspace = true }
+async_pty.workspace = true
 clap = { workspace = true, features = ["derive", "unstable-doc"] }
-svalin_rpc = { workspace = true }
-svalin_sysctl = { workspace = true }
-svalin_macros = { workspace = true }
-svalin_pki = { workspace = true }
+svalin_rpc.workspace = true
+svalin_sysctl.workspace = true
+svalin_macros.workspace = true
+svalin_pki.workspace = true
 totp-rs = { workspace = true, features = ["qr", "serde_support", "gen_secret", "zeroize"] }
-tracing-subscriber = { workspace = true }
+tracing-subscriber.workspace = true
 test-log = { workspace = true, features = ["trace"] }
-futures = { workspace = true }
-pin-project = { workspace = true }
+futures.workspace = true
+pin-project.workspace = true
 aucpace = { workspace = true, features = ["alloc", "serde", "strong_aucpace"] }
 reqwest = { workspace = true, features = ["json", "rustls", "stream"] }
 zeroize = { workspace = true, features = ["derive"] }
-dashmap = { workspace = true }
-openmls_sqlx_storage = { workspace = true }
-svalin_server_store = { workspace = true }
+dashmap.workspace = true
+openmls_sqlx_storage.workspace = true
+svalin_server_store.workspace = true
+svalin_client_store.workspace = true
 
 [package.metadata.deb]
 depends = "libc6 (>= 2.31)"

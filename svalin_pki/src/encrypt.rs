@@ -11,16 +11,16 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use crate::ArgonParams;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
-enum EncryptionAlgorythm {
+enum EncryptionAlgorithm {
     Chacha20Poly1305,
     Aes256Gcm,
 }
 
-impl From<EncryptionAlgorythm> for &'static ring::aead::Algorithm {
-    fn from(value: EncryptionAlgorythm) -> Self {
+impl From<EncryptionAlgorithm> for &'static ring::aead::Algorithm {
+    fn from(value: EncryptionAlgorithm) -> Self {
         match value {
-            EncryptionAlgorythm::Chacha20Poly1305 => &CHACHA20_POLY1305,
-            EncryptionAlgorythm::Aes256Gcm => &AES_256_GCM,
+            EncryptionAlgorithm::Chacha20Poly1305 => &CHACHA20_POLY1305,
+            EncryptionAlgorithm::Aes256Gcm => &AES_256_GCM,
         }
     }
 }
@@ -29,7 +29,7 @@ impl From<EncryptionAlgorythm> for &'static ring::aead::Algorithm {
 pub struct EncryptedData {
     parameters: Option<ArgonParams>,
     ciphertext: Vec<u8>,
-    alg: EncryptionAlgorythm,
+    alg: EncryptionAlgorithm,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -118,7 +118,7 @@ impl NonceSequence for NonceCounter {
     }
 }
 
-static DEFAULT_ALG: EncryptionAlgorythm = EncryptionAlgorythm::Chacha20Poly1305;
+static DEFAULT_ALG: EncryptionAlgorithm = EncryptionAlgorithm::Chacha20Poly1305;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DecryptError {
@@ -166,7 +166,7 @@ impl EncryptedData {
     fn encrypt_with_alg(
         data: &[u8],
         encryption_key: [u8; 32],
-        alg: EncryptionAlgorythm,
+        alg: EncryptionAlgorithm,
         parameters: Option<ArgonParams>,
     ) -> Result<Self, EncryptError> {
         let ring_alg = alg.into();

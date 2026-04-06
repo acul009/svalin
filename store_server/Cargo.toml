@@ -7,8 +7,8 @@ edition = "2024"
 anyhow.workspace = true
 postcard.workspace = true
 serde.workspace = true
-sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "uuid"] }
-svalin_pki = { workspace = true }
+sqlx.workspace = true
+svalin_pki.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 
@@ -16,3 +16,4 @@ totp-rs = { workspace = true, features = ["serde_support", "zeroize"] }
 aucpace = { workspace = true, features = ["alloc", "serde", "strong_aucpace"] }
 tracing.workspace = true
 tokio.workspace = true
+svalin_client_store.workspace = true

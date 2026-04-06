@@ -6,18 +6,18 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = { workspace = true }
-async-trait = { workspace = true }
+anyhow.workspace = true
+async-trait.workspace = true
 # futures = "0.3.31"
-postcard = { workspace = true }
-serde = { workspace = true }
-tokio = { workspace = true }
-svalin_macros = { workspace = true }
-svalin_pki = { workspace = true }
+postcard.workspace = true
+serde.workspace = true
+tokio.workspace = true
+svalin_macros.workspace = true
+svalin_pki.workspace = true
 quinn = { workspace = true, features = ["ring"] }
-tracing = { workspace = true }
+tracing.workspace = true
 test-log = { workspace = true, features = ["trace"] }
 tokio-rustls = { workspace = true, features = ["ring"] }
-tokio-util = { workspace = true }
-thiserror = { workspace = true }
+tokio-util.workspace = true
+thiserror.workspace = true
 aucpace = { workspace = true, features = ["alloc", "serde"] }

@@ -20,7 +20,7 @@ pub enum Message {
 }
 
 impl ClientState {
-    pub(crate) fn empty() -> Self {
+    pub fn empty() -> Self {
         Self {
             devices: HashMap::new(),
         }

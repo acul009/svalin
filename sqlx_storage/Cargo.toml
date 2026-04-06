@@ -10,15 +10,15 @@ repository = "https://github.com/openmls/openmls/tree/main/sqlx_storage"
 readme = "README.md"
 
 [dependencies]
-thiserror = { workspace = true }
+thiserror.workspace = true
 serde = { workspace = true, features = ["derive"] }
 sqlx = { workspace = true, features = ["sqlite", "migrate", "runtime-tokio"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
-futures-core = { workspace = true }
-openmls_traits = { workspace = true }
+futures-core.workspace = true
+openmls_traits.workspace = true
 
 [dev-dependencies]
-serde_json = { workspace = true }
+serde_json.workspace = true
 
 [features]
 extensions-draft-08 = ["openmls_traits/extensions-draft-08"]

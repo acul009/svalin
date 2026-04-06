@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-serde = { workspace = true }
-anyhow = { workspace = true }
-portable-pty = { workspace = true }
+serde.workspace = true
+anyhow.workspace = true
+portable-pty.workspace = true
 sysinfo = { workspace = true, features = ["windows", "serde"] }
-tokio = { workspace = true }
-tokio-util = { workspace = true }
+tokio.workspace = true
+tokio-util.workspace = true
 tracing.workspace = true

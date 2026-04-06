@@ -5,7 +5,7 @@ use svalin_pki::SpkiHash;
 
 use crate::persistent::Message;
 
-mod persistent;
+pub mod persistent;
 
 pub struct ClientStore {
     pool: SqlitePool,
