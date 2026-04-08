@@ -12,7 +12,6 @@ async-trait.workspace = true
 postcard.workspace = true
 serde.workspace = true
 tokio.workspace = true
-svalin_macros.workspace = true
 svalin_pki.workspace = true
 quinn = { workspace = true, features = ["ring"] }
 tracing.workspace = true

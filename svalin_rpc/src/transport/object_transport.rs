@@ -24,12 +24,29 @@ impl ObjectTransport {
     ) -> Result<(), ObjectWriterError> {
         let encoded = postcard::to_extend(object, Vec::new())?;
 
+        #[cfg(test)]
+        {
+            // sending the type if for easier test debugging
+            let type_name = std::any::type_name::<U>();
+            self.transport.write_chunk(type_name.as_bytes()).await?;
+        }
         self.transport.write_chunk(&encoded).await?;
 
         Ok(())
     }
 
     pub async fn read_object<U: DeserializeOwned>(&mut self) -> Result<U, ObjectReaderError> {
+        #[cfg(test)]
+        {
+            // reading and comparing the type if for easier test debugging
+            let chunk = self.transport.read_chunk().await?;
+            let sent_type = String::from_utf8_lossy(&chunk);
+            let type_name = std::any::type_name::<U>();
+            if sent_type != type_name {
+                panic!("expected type: {}, got: {}", type_name, sent_type);
+            }
+        }
+
         let chunk = self.transport.read_chunk().await?;
 
         let object: U = postcard::from_bytes(&chunk)?;

@@ -3802,7 +3802,6 @@ dependencies = [
  "serde",
  "serde_json",
  "svalin_client_store",
- "svalin_macros",
  "svalin_pki",
  "svalin_rpc",
  "svalin_server_store",
@@ -3831,15 +3830,6 @@ dependencies = [
  "svalin_pki",
  "svalin_sysctl",
  "thiserror 2.0.18",
-]
-
-[[package]]
-name = "svalin_macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -3880,7 +3870,6 @@ dependencies = [
  "postcard",
  "quinn",
  "serde",
- "svalin_macros",
  "svalin_pki",
  "test-log",
  "thiserror 2.0.18",
