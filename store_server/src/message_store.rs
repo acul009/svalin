@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
-use svalin_pki::{get_current_timestamp, mls::transport_types::MessageToSend};
+use futures::{StreamExt, TryStreamExt};
+use svalin_pki::{
+    SpkiHash, get_current_timestamp,
+    mls::transport_types::{MessageToMemberTransport, MessageToSend},
+};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -43,6 +47,25 @@ impl MessageStore {
         tx.commit().await?;
 
         Ok(())
+    }
+
+    pub async fn load_all_for(
+        &self,
+        receiver: &SpkiHash,
+    ) -> Result<Vec<(Uuid, MessageToMemberTransport)>, MessageStoreError> {
+        let receiver = receiver.as_slice();
+        let messages = sqlx::query!(
+            r#"SELECT m.id as "id: uuid::Uuid", m.data, m.received_at FROM mls_messages m JOIN mls_message_receivers r ON m.id = r.message_id WHERE r.spki_hash = ? ORDER BY m.received_at ASC"#,
+            receiver
+        )
+        .fetch(&self.pool)
+        .map(|row| -> Result<_, MessageStoreError> {
+            let row = row?;
+            let message: MessageToMemberTransport = postcard::from_bytes(&row.data)?;
+            Ok((row.id, message))
+        }).try_collect().await?;
+
+        Ok(messages)
     }
 
     // pub async fn aknowledge_messages(

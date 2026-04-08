@@ -17,3 +17,4 @@ aucpace = { workspace = true, features = ["alloc", "serde", "strong_aucpace"] }
 tracing.workspace = true
 tokio.workspace = true
 svalin_client_store.workspace = true
+futures.workspace = true

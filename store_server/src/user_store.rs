@@ -33,7 +33,7 @@ pub struct StoredUser {
     pub verifier: RistrettoPoint,
 
     pub mls_store: ExportedMlsStore,
-    persistent_data: EncryptedObject<persistent::ClientState>,
+    pub persistent_data: EncryptedObject<persistent::ClientState>,
 }
 
 #[derive(Debug)]

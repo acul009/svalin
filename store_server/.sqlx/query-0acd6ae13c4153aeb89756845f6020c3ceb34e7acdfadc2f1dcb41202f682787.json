@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT m.id as \"id: uuid::Uuid\", m.data, m.received_at FROM mls_messages m JOIN mls_message_receivers r ON m.id = r.message_id WHERE r.spki_hash = ? ORDER BY m.received_at ASC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "data",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "received_at",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0acd6ae13c4153aeb89756845f6020c3ceb34e7acdfadc2f1dcb41202f682787"
+}
