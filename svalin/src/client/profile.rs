@@ -200,7 +200,7 @@ impl Client {
 
             let mls = Arc::new(MlsClient::new(
                 device_credential.clone(),
-                storage_provider,
+                storage_provider.into(),
                 key_retriever,
                 remote_verifier.clone(),
             )?);

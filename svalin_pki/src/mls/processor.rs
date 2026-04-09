@@ -4,7 +4,7 @@ use crate::{
     SpkiHash,
     mls::{
         key_package::{KeyPackage, KeyPackageError},
-        provider::{PostcardCodec, SvalinProvider},
+        provider::{PostcardCodec, SvalinProvider, SvalinStorage},
         transport_types::{MessageToMember, MessageToServerTransport, NewGroup, NewGroupTransport},
     },
 };
@@ -34,10 +34,7 @@ pub(crate) struct MlsProcessorHandle {
 }
 
 impl MlsProcessorHandle {
-    pub fn new_processor(
-        credential: Credential,
-        storage_provider: SqliteStorageProvider<PostcardCodec>,
-    ) -> Self {
+    pub fn new_processor(credential: Credential, storage_provider: SvalinStorage) -> Self {
         let public_info = CredentialWithKey {
             credential: credential.certificate().spki_hash().into(),
             signature_key: credential.certificate().public_key().into(),

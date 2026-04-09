@@ -20,7 +20,7 @@ use crate::{
             self, CreateGroupError, CreateKeyPackageError, GroupExistsError, JoinGroupError,
             MlsProcessorHandle, ProcessMessageError,
         },
-        provider::PostcardCodec,
+        provider::{PostcardCodec, SvalinStorage},
         transport_types::{
             DeviceMessage, MessageToMember, MessageToMemberTransport, MessageToServerTransport,
             NewGroup, NewGroupTransport,
@@ -49,7 +49,7 @@ where
 {
     pub fn new(
         credential: Credential,
-        storage_provider: SqliteStorageProvider<PostcardCodec>,
+        storage_provider: SvalinStorage,
         key_retriever: KeyRetriever,
         verifier: Verifier,
     ) -> Result<Self, CreateClientError> {

@@ -7,15 +7,19 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use svalin_client_store::persistent;
 use svalin_pki::{
-    CertificateType, EncryptedObject, SpkiHash,
+    CertificateType, Credential, EncryptedObject, SpkiHash,
     mls::{
-        client::MlsClient, provider::{ExportedMlsStore, SvalinStorage}, transport_types::MessageToMemberTransport
+        client::MlsClient,
+        provider::{ExportedMlsStore, SvalinStorage},
+        transport_types::MessageToMemberTransport,
     },
 };
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
 use svalin_server_store::{MessageStore, UserStore};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+
+use crate::{remote_key_retriever::RemoteKeyRetriever, verifier::remote_verifier::RemoteVerifier};
 
 pub struct UpdateUserMlsHandler {
     user_store: Arc<UserStore>,
@@ -69,7 +73,7 @@ impl CommandHandler for UpdateUserMlsHandler {
         // I might want to somehow verify that new MlsState too. Maybe with a SignedObject?
         // Either way, the dispatcher should send both the updated MlsState, but also the ids of all messages which were processed.
 
-        let messages = self.message_store.load_all_for(user_hash).await?;
+        let messages = self.message_store.load_all_for(&user_hash).await?;
 
         for message in messages {
             session.write_object(&Some(message)).await?;
@@ -88,6 +92,9 @@ impl CommandHandler for UpdateUserMlsHandler {
 
 pub struct UpdateUserMls {
     password: Vec<u8>,
+    user_credential: Credential,
+    key_retriever: RemoteKeyRetriever,
+    verifier: RemoteVerifier,
 }
 
 impl CommandDispatcher for UpdateUserMls {
@@ -114,12 +121,24 @@ impl CommandDispatcher for UpdateUserMls {
             .await?;
         let mls_store = SvalinStorage::import(mls_store, self.password.clone()).await?;
         let persistent_data = persistent_data.decrypt_with_password(self.password).await?;
-        let client = MlsClient::new(credential, storage_provider, key_retriever, verifier)
+        let client = MlsClient::new(
+            self.user_credential,
+            mls_store,
+            self.key_retriever,
+            self.verifier,
+        )?;
+
+        let mut handled = Vec::new();
 
         while let Some((uuid, message)) = session
             .read_object::<Option<(Uuid, MessageToMemberTransport)>>()
             .await?
         {
+            client
+                .handle_message(message)
+                .await
+                .map_err(|err| anyhow!(err))?;
+            handled.push(uuid);
             todo!()
         }
 

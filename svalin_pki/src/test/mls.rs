@@ -32,7 +32,8 @@ async fn create_processor(credential: Credential) -> MlsProcessorHandle {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
     let storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
     storage.run_migrations().await.unwrap();
-    let handle = crate::mls::processor::MlsProcessorHandle::new_processor(credential, storage);
+    let handle =
+        crate::mls::processor::MlsProcessorHandle::new_processor(credential, storage.into());
     handle
 }
 
@@ -271,7 +272,7 @@ async fn test_device_group() {
 
     let client = MlsClient::new(
         client_credential.clone(),
-        client_storage,
+        client_storage.into(),
         retriever.clone(),
         verifier.clone(),
     )
