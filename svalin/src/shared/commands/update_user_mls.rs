@@ -9,13 +9,14 @@ use svalin_client_store::persistent;
 use svalin_pki::{
     CertificateType, Credential, EncryptedObject, SpkiHash,
     mls::{
-        client::MlsClient,
+        client::{MessageData, MlsClient},
         provider::{ExportedMlsStore, SvalinStorage},
         transport_types::MessageToMemberTransport,
     },
 };
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
 use svalin_server_store::{MessageStore, UserStore};
+use svalin_sysctl::sytem_report::SystemReport;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -38,8 +39,8 @@ impl CommandHandler for UpdateUserMlsHandler {
     async fn handle(
         &self,
         session: &mut svalin_rpc::rpc::session::Session,
-        request: Self::Request,
-        cancel: CancellationToken,
+        _request: Self::Request,
+        _cancel: CancellationToken,
     ) -> anyhow::Result<()> {
         let peer = session.peer().certificate()?;
         if peer.certificate_type() != CertificateType::UserDevice {
@@ -82,7 +83,21 @@ impl CommandHandler for UpdateUserMlsHandler {
             .write_object(&Option::<(Uuid, MessageToMemberTransport)>::None)
             .await?;
 
-        todo!("aknowledge messages and save new states");
+        let (mls_store, persistent_data) = session
+            .read_object::<(ExportedMlsStore, EncryptedObject<persistent::ClientState>)>()
+            .await?;
+
+        self.user_store
+            .update_mls_data(&user_hash, mls_store, persistent_data)
+            .await?;
+
+        let handled = session.read_object::<Vec<Uuid>>().await?;
+
+        self.message_store
+            .aknowledge_messages(&user_hash, &handled)
+            .await?;
+
+        session.write_object(&()).await?;
 
         // explicit drop, so I don't accidentally drop it beforehand
         drop(_user_lock);
@@ -119,8 +134,11 @@ impl CommandDispatcher for UpdateUserMls {
         let (mls_store, persistent_data) = session
             .read_object::<(ExportedMlsStore, EncryptedObject<persistent::ClientState>)>()
             .await?;
-        let mls_store = SvalinStorage::import(mls_store, self.password.clone()).await?;
-        let persistent_data = persistent_data.decrypt_with_password(self.password).await?;
+        let (mls_store, export_handle) =
+            SvalinStorage::import(mls_store, self.password.clone()).await?;
+        let mut persistent_data = persistent_data
+            .decrypt_with_password(self.password.clone())
+            .await?;
         let client = MlsClient::new(
             self.user_credential,
             mls_store,
@@ -134,14 +152,34 @@ impl CommandDispatcher for UpdateUserMls {
             .read_object::<Option<(Uuid, MessageToMemberTransport)>>()
             .await?
         {
-            client
-                .handle_message(message)
+            let processed = client
+                .handle_message::<SystemReport>(message)
                 .await
                 .map_err(|err| anyhow!(err))?;
             handled.push(uuid);
-            todo!()
+            match processed {
+                MessageData::Report(spki_hash, report) => {
+                    persistent_data
+                        .update(persistent::Message::UpdateSystemReport(spki_hash, report));
+                }
+                MessageData::Internal => (),
+            }
         }
 
-        todo!()
+        let encrypted_data =
+            EncryptedObject::encrypt_with_password(&persistent_data, self.password.clone()).await?;
+        let exported_mls_store = export_handle.export(self.password.clone()).await?;
+
+        session
+            .write_object(&(exported_mls_store, encrypted_data))
+            .await?;
+
+        session.write_object(&handled).await?;
+
+        session.read_object::<()>().await?;
+
+        compile_error!("Just finished this, time to use it.");
+
+        Ok(persistent_data)
     }
 }

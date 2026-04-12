@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE users SET data = ? WHERE spki_hash = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "c494affb1338ec0926c49ca5424da2b9ee9c4b05c579e7e2acdb2e8e616bdcb0"
+}

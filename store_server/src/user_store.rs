@@ -156,6 +156,35 @@ impl UserStore {
             }
         }
     }
+
+    pub async fn update_mls_data(
+        &self,
+        spki_hash: &SpkiHash,
+        mls_store: ExportedMlsStore,
+        persistent_data: EncryptedObject<persistent::ClientState>,
+    ) -> anyhow::Result<(), UpdateMlsDataError> {
+        let mut tx = self.pool.begin().await?;
+
+        let spki = spki_hash.as_slice();
+        let user_data = sqlx::query!("SELECT data FROM users WHERE spki_hash = ?", spki)
+            .fetch_optional(&mut *tx)
+            .await?;
+
+        let mut user: StoredUser = match user_data {
+            None => return Err(UpdateMlsDataError::UnknownUser(spki_hash.clone())),
+            Some(user_data) => postcard::from_bytes(&user_data.data)?,
+        };
+
+        user.mls_store = mls_store;
+        user.persistent_data = persistent_data;
+
+        let data = postcard::to_stdvec(&user)?;
+        sqlx::query!("UPDATE users SET data = ? WHERE spki_hash = ?", data, spki)
+            .execute(&mut *tx)
+            .await?;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -166,6 +195,16 @@ pub enum CompleteCertChainError {
     NotFound(SpkiHash),
     #[error("error adding cert to chain: {0}")]
     AddCertificateError(#[from] AddCertificateError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum UpdateMlsDataError {
+    #[error("sqlx error: {0}")]
+    SqlxError(#[from] sqlx::Error),
+    #[error("user with spki hash {0} not found")]
+    UnknownUser(SpkiHash),
+    #[error("postcard decode error: {0}")]
+    PostcardError(#[from] postcard::Error),
 }
 
 #[derive(Debug, thiserror::Error)]

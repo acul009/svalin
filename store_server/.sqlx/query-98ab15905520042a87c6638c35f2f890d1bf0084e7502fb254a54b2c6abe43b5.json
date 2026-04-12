@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM mls_message_receivers WHERE message_id = ? AND spki_hash = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "98ab15905520042a87c6638c35f2f890d1bf0084e7502fb254a54b2c6abe43b5"
+}

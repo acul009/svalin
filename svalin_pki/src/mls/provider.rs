@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::RwLock};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use openmls::prelude::{Ciphersuite, ProtocolVersion};
 use openmls_rust_crypto::{MemoryStorage, RustCrypto};
@@ -70,7 +73,7 @@ impl OpenMlsProvider for SvalinProvider {
 
 pub enum SvalinStorage {
     Sqlite(SqliteStorageProvider<PostcardCodec>),
-    Memory(MemoryStorage),
+    Memory(Arc<MemoryStorage>),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -79,40 +82,38 @@ pub struct ExportedMlsStore {
 }
 
 impl SvalinStorage {
-    pub fn new_memory() -> Self {
-        Self::Memory(MemoryStorage {
+    pub fn new_memory() -> (Self, ExportHandle) {
+        let memory = Arc::new(MemoryStorage {
             values: RwLock::new(HashMap::new()),
-        })
+        });
+
+        (Self::Memory(memory.clone()), ExportHandle { memory })
     }
 
-    pub async fn export(&self, password: Vec<u8>) -> Result<ExportedMlsStore, ExportError> {
-        match self {
-            SvalinStorage::Memory(memory) => {
-                let store_data = memory.values.read().unwrap().clone();
-                let encrypted =
-                    EncryptedObject::encrypt_with_password(&store_data, password).await?;
-
-                Ok(ExportedMlsStore { data: encrypted })
-            }
-            _ => Err(ExportError::WrongStorageType),
-        }
-    }
-
-    pub async fn import(map: ExportedMlsStore, password: Vec<u8>) -> Result<Self, DecryptError> {
+    pub async fn import(
+        map: ExportedMlsStore,
+        password: Vec<u8>,
+    ) -> Result<(Self, ExportHandle), DecryptError> {
         let decrypted = map.data.decrypt_with_password(password).await?;
-
-        Ok(Self::Memory(MemoryStorage {
+        let memory = Arc::new(MemoryStorage {
             values: RwLock::new(decrypted),
-        }))
+        });
+
+        Ok((Self::Memory(memory.clone()), ExportHandle { memory }))
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum ExportError {
-    #[error(transparent)]
-    EncryptError(#[from] EncryptError),
-    #[error("wrong storage type")]
-    WrongStorageType,
+pub struct ExportHandle {
+    memory: Arc<MemoryStorage>,
+}
+
+impl ExportHandle {
+    pub async fn export(&self, password: Vec<u8>) -> Result<ExportedMlsStore, EncryptError> {
+        let store_data = self.memory.values.read().unwrap().clone();
+        let encrypted = EncryptedObject::encrypt_with_password(&store_data, password).await?;
+
+        Ok(ExportedMlsStore { data: encrypted })
+    }
 }
 
 impl From<SqliteStorageProvider<PostcardCodec>> for SvalinStorage {
@@ -123,7 +124,7 @@ impl From<SqliteStorageProvider<PostcardCodec>> for SvalinStorage {
 
 impl From<MemoryStorage> for SvalinStorage {
     fn from(memory: MemoryStorage) -> Self {
-        Self::Memory(memory)
+        Self::Memory(Arc::new(memory))
     }
 }
 

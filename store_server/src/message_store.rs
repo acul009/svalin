@@ -68,28 +68,28 @@ impl MessageStore {
         Ok(messages)
     }
 
-    // pub async fn aknowledge_messages(
-    //     &self,
-    //     receiver: &SpkiHash,
-    //     messages: &[Uuid],
-    // ) -> Result<(), MessageStoreError> {
-    //     let mut tx = self.pool.begin().await?;
-    //     let receiver = receiver.as_slice();
+    pub async fn aknowledge_messages(
+        &self,
+        receiver: &SpkiHash,
+        messages: &[Uuid],
+    ) -> Result<(), sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+        let receiver = receiver.as_slice();
 
-    //     for message in messages {
-    //         sqlx::query!(
-    //             "DELETE FROM mls_message_receivers WHERE message_id = ? AND spki_hash = ?",
-    //             message,
-    //             receiver
-    //         )
-    //         .execute(&mut *tx)
-    //         .await?;
+        for message in messages {
+            sqlx::query!(
+                "DELETE FROM mls_message_receivers WHERE message_id = ? AND spki_hash = ?",
+                message,
+                receiver
+            )
+            .execute(&mut *tx)
+            .await?;
 
-    //         sqlx::query!("DELETE FROM mls_messages WHERE id = ? AND NOT EXISTS ( SELECT 1 FROM mls_message_receivers WHERE message_id = ? ) ", message, message).execute(&mut *tx).await?;
-    //     }
+            sqlx::query!("DELETE FROM mls_messages WHERE id = ? AND NOT EXISTS ( SELECT 1 FROM mls_message_receivers WHERE message_id = ? ) ", message, message).execute(&mut *tx).await?;
+        }
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

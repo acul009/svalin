@@ -1,17 +1,16 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
 use aucpace::{AuCPaceClient, ClientMessage};
 use serde::{Deserialize, Serialize};
+use svalin_pki::EncryptedObject;
 use svalin_pki::argon2::password_hash::rand_core::OsRng;
-use svalin_pki::mls::provider::{self, ExportedMlsStore, SvalinStorage};
+use svalin_pki::mls::provider::{ExportedMlsStore, SvalinStorage};
 use svalin_pki::{
     ArgonCost, Certificate, CreateCertificateError, CreateCredentialsError, Credential,
     EncryptError, EncryptedCredential, ExportedPublicKey, KeyPair, RootCertificate, Sha512,
     UnverifiedCertificate, argon2::Argon2, serde_paramsstring,
 };
-use svalin_pki::{EncryptedData, EncryptedObject};
 use svalin_pki::{
     argon2::password_hash::ParamsString,
     curve25519_dalek::{RistrettoPoint, Scalar},
@@ -153,9 +152,7 @@ pub enum InitError {
     #[error("error with aucpace: {0}")]
     AucPaceError(aucpace::Error),
     #[error("error encrypting root credential: {0}")]
-    EncryptRootError(#[from] EncryptError),
-    #[error("error exporting mls store: {0}")]
-    ExportMlsError(#[from] provider::ExportError),
+    EncryptError(#[from] EncryptError),
     #[error("server sent error status back")]
     ServerError,
 }
@@ -248,8 +245,8 @@ impl CommandDispatcher for Init {
             EncryptedObject::encrypt_with_password(&empty_client_state, self.password.clone())
                 .await?;
 
-        let empty_mls_store = SvalinStorage::new_memory();
-        let user_mls_store = empty_mls_store.export(self.password.clone()).await?;
+        let (_, export_handle) = SvalinStorage::new_memory();
+        let user_mls_store = export_handle.export(self.password.clone()).await?;
 
         let encrypted_credential = self.root.export(self.password).await?;
 
