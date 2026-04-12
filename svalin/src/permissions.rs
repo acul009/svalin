@@ -11,7 +11,7 @@ use svalin_rpc::{
 use crate::shared::commands::{
     get_key_packages::GetKeyPackagesHandler, load_certificate_chain::LoadCertificateChainHandler,
     mls::upload_mls::UploadMlsHandler, public_server_status::PublicStatusHandler,
-    upload_key_packages::UploadKeyPackagesHandler,
+    update_user_mls::UpdateUserMlsHandler, upload_key_packages::UploadKeyPackagesHandler,
 };
 
 pub mod default_permission_handler;
@@ -70,7 +70,7 @@ impl<Nested: PermissionHandler> From<&PermissionPrecursor<DeauthenticateHandler<
 
 impl From<&PermissionPrecursor<UploadKeyPackagesHandler>> for Permission {
     fn from(_value: &PermissionPrecursor<UploadKeyPackagesHandler>) -> Self {
-        Permission::UserOrSession
+        Permission::AuthenticatedOnly
     }
 }
 
@@ -83,5 +83,11 @@ impl From<&PermissionPrecursor<GetKeyPackagesHandler>> for Permission {
 impl From<&PermissionPrecursor<UploadMlsHandler>> for Permission {
     fn from(_value: &PermissionPrecursor<UploadMlsHandler>) -> Self {
         Permission::AuthenticatedOnly
+    }
+}
+
+impl From<&PermissionPrecursor<UpdateUserMlsHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<UpdateUserMlsHandler>) -> Self {
+        Permission::UserOrSession
     }
 }

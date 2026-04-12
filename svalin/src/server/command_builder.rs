@@ -22,6 +22,7 @@ use crate::{
             login::LoginHandler,
             mls::upload_mls::UploadMlsHandler,
             public_server_status::{PublicStatus, PublicStatusHandler},
+            update_user_mls::UpdateUserMlsHandler,
             upload_key_packages::UploadKeyPackagesHandler,
         },
         join_agent::upload_agent::UploadAgentHandler,
@@ -80,7 +81,11 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 self.mls,
             ))
             .add(GetKeyPackagesHandler::new(self.store.key_packages.clone()))
-            .add(UploadMlsHandler(self.to_mls));
+            .add(UploadMlsHandler(self.to_mls))
+            .add(UpdateUserMlsHandler::new(
+                self.store.users.clone(),
+                self.store.messages.clone(),
+            ));
 
         Ok(commands)
     }

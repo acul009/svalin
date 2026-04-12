@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use anyhow::{Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
@@ -16,7 +16,7 @@ use crate::{
     client::tunnel_manager::TunnelManager,
     remote_key_retriever::RemoteKeyRetriever,
     shared::commands::{
-        agent_list::UpdateAgentList, mls::upload_mls::UploadMls,
+        agent_list::UpdateAgentList, mls::upload_mls::UploadMls, update_user_mls::UpdateUserMls,
         upload_key_packages::UploadKeyPackages,
     },
     util::location::{Location, LocationError},
@@ -166,7 +166,7 @@ impl Client {
             let db_path = profile.profile_dir().await?.push("mls-store.sqlite");
             debug!("unlocking profile");
             let user_credential = profile.user_credential.decrypt(password.clone()).await?;
-            let device_credential = profile.device_credential.decrypt(password).await?;
+            let device_credential = profile.device_credential.decrypt(password.clone()).await?;
             let root_certificate = profile.root_certificate.use_as_root()?;
             let upstream_certificate = profile
                 .upstream_certificate
@@ -201,7 +201,7 @@ impl Client {
             let mls = Arc::new(MlsClient::new(
                 device_credential.clone(),
                 storage_provider.into(),
-                key_retriever,
+                key_retriever.clone(),
                 remote_verifier.clone(),
             )?);
 
@@ -247,6 +247,7 @@ impl Client {
             let sync_connection = client.rpc.upstream_connection();
             let cancel = client.cancel.clone();
             let client2 = client.clone();
+            let verifier = remote_verifier.clone().agent_only();
 
             client.background_tasks.spawn(async move {
                 debug!("subscribing to upstream agent list");
@@ -256,13 +257,44 @@ impl Client {
                         base_connection: sync_connection.clone(),
                         credentials: device_credential,
                         list: list_clone,
-                        verifier: remote_verifier.agent_only(),
+                        verifier: verifier,
                         cancel,
                     })
                     .await
                 {
                     error!("error while keeping agent list in sync: {}", err);
                 }
+            });
+
+            let connection = client.rpc.upstream_connection();
+            let cancel = client.cancel.clone();
+            let password = password.clone();
+            let user_credential = client.user_credential.clone();
+
+            client.background_tasks.spawn(async move {
+                let cancel = cancel;
+                cancel
+                    .run_until_cancelled(async move {
+                        let password = password;
+                        let key_retriever = key_retriever;
+                        let user_credential = user_credential;
+                        let verifier = remote_verifier;
+                        loop {
+                            if let Err(err) = connection
+                                .dispatch(UpdateUserMls {
+                                    password: password.clone(),
+                                    key_retriever: key_retriever.clone(),
+                                    user_credential: user_credential.clone(),
+                                    verifier: verifier.clone(),
+                                })
+                                .await
+                            {
+                                tracing::error!("error while updating user mls: {}", err);
+                            }
+                            tokio::time::sleep(Duration::from_secs(30)).await
+                        }
+                    })
+                    .await;
             });
 
             Ok(client)

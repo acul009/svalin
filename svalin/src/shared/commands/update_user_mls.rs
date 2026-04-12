@@ -28,6 +28,16 @@ pub struct UpdateUserMlsHandler {
     user_lock: Mutex<HashMap<SpkiHash, Arc<tokio::sync::Mutex<()>>>>,
 }
 
+impl UpdateUserMlsHandler {
+    pub fn new(user_store: Arc<UserStore>, message_store: Arc<MessageStore>) -> Self {
+        Self {
+            user_store,
+            message_store,
+            user_lock: Mutex::new(HashMap::new()),
+        }
+    }
+}
+
 #[async_trait]
 impl CommandHandler for UpdateUserMlsHandler {
     type Request = ();
@@ -106,10 +116,10 @@ impl CommandHandler for UpdateUserMlsHandler {
 }
 
 pub struct UpdateUserMls {
-    password: Vec<u8>,
-    user_credential: Credential,
-    key_retriever: RemoteKeyRetriever,
-    verifier: RemoteVerifier,
+    pub password: Vec<u8>,
+    pub user_credential: Credential,
+    pub key_retriever: RemoteKeyRetriever,
+    pub verifier: RemoteVerifier,
 }
 
 impl CommandDispatcher for UpdateUserMls {
@@ -124,7 +134,7 @@ impl CommandDispatcher for UpdateUserMls {
     }
 
     fn get_request(&self) -> &Self::Request {
-        todo!()
+        &()
     }
 
     async fn dispatch(
@@ -165,6 +175,7 @@ impl CommandDispatcher for UpdateUserMls {
                 MessageData::Internal => (),
             }
         }
+        compile_error!("Also handle key packages here!");
 
         let encrypted_data =
             EncryptedObject::encrypt_with_password(&persistent_data, self.password.clone()).await?;
@@ -177,8 +188,6 @@ impl CommandDispatcher for UpdateUserMls {
         session.write_object(&handled).await?;
 
         session.read_object::<()>().await?;
-
-        compile_error!("Just finished this, time to use it.");
 
         Ok(persistent_data)
     }

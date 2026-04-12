@@ -10,6 +10,7 @@ use crate::shared::commands::{
     load_certificate_chain::ChainRequest,
 };
 
+#[derive(Clone)]
 pub struct RemoteKeyRetriever {
     connection: DirectConnection,
     root: RootCertificate,
