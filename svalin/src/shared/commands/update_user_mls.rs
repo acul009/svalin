@@ -7,32 +7,45 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use svalin_client_store::persistent;
 use svalin_pki::{
-    CertificateType, Credential, EncryptedObject, SpkiHash,
+    CertificateType, Credential, EncryptedObject, ExactVerififier, SpkiHash,
     mls::{
         client::{MessageData, MlsClient},
+        key_package::UnverifiedKeyPackage,
         provider::{ExportedMlsStore, SvalinStorage},
         transport_types::MessageToMemberTransport,
     },
 };
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
-use svalin_server_store::{MessageStore, UserStore};
+use svalin_server_store::{KeyPackageStore, MessageStore, UserStore};
 use svalin_sysctl::sytem_report::SystemReport;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::{remote_key_retriever::RemoteKeyRetriever, verifier::remote_verifier::RemoteVerifier};
+use crate::{
+    remote_key_retriever::RemoteKeyRetriever, server::MlsServer,
+    verifier::remote_verifier::RemoteVerifier,
+};
 
 pub struct UpdateUserMlsHandler {
     user_store: Arc<UserStore>,
     message_store: Arc<MessageStore>,
+    key_package_store: Arc<KeyPackageStore>,
+    mls: Arc<MlsServer>,
     user_lock: Mutex<HashMap<SpkiHash, Arc<tokio::sync::Mutex<()>>>>,
 }
 
 impl UpdateUserMlsHandler {
-    pub fn new(user_store: Arc<UserStore>, message_store: Arc<MessageStore>) -> Self {
+    pub fn new(
+        user_store: Arc<UserStore>,
+        message_store: Arc<MessageStore>,
+        key_package_store: Arc<KeyPackageStore>,
+        mls: Arc<MlsServer>,
+    ) -> Self {
         Self {
             user_store,
             message_store,
+            key_package_store,
+            mls,
             user_lock: Mutex::new(HashMap::new()),
         }
     }
@@ -52,7 +65,7 @@ impl CommandHandler for UpdateUserMlsHandler {
         _request: Self::Request,
         _cancel: CancellationToken,
     ) -> anyhow::Result<()> {
-        let peer = session.peer().certificate()?;
+        let peer = session.peer().certificate()?.clone();
         if peer.certificate_type() != CertificateType::UserDevice {
             return Err(anyhow::anyhow!("wrong certificate type, expected session"));
         }
@@ -90,8 +103,23 @@ impl CommandHandler for UpdateUserMlsHandler {
             session.write_object(&Some(message)).await?;
         }
         session
-            .write_object(&Option::<(Uuid, MessageToMemberTransport)>::None)
+            .write_object(&None::<(Uuid, MessageToMemberTransport)>)
             .await?;
+
+        let verifier = ExactVerififier::new(peer.clone());
+        while let Some(key_package) = session
+            .read_object::<Option<UnverifiedKeyPackage>>()
+            .await?
+        {
+            let key_package = self.mls.verify_key_package(key_package, &verifier).await?;
+            self.key_package_store.add_key_package(key_package).await?;
+        }
+
+        let current_packages = self
+            .key_package_store
+            .count_key_packages(&user_hash)
+            .await?;
+        session.write_object(&current_packages).await?;
 
         let (mls_store, persistent_data) = session
             .read_object::<(ExportedMlsStore, EncryptedObject<persistent::ClientState>)>()
@@ -175,7 +203,14 @@ impl CommandDispatcher for UpdateUserMls {
                 MessageData::Internal => (),
             }
         }
-        compile_error!("Also handle key packages here!");
+
+        let mut current_packages = session.read_object::<u64>().await?;
+        while current_packages < 100 {
+            let key_package = Some(client.create_key_package().await?.to_unverified());
+            session.write_object(&key_package).await?;
+            current_packages += 1;
+        }
+        session.write_object(&None::<UnverifiedKeyPackage>).await?;
 
         let encrypted_data =
             EncryptedObject::encrypt_with_password(&persistent_data, self.password.clone()).await?;

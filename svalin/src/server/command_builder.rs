@@ -78,13 +78,15 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             ))
             .add(UploadKeyPackagesHandler::new(
                 self.store.key_packages.clone(),
-                self.mls,
+                self.mls.clone(),
             ))
             .add(GetKeyPackagesHandler::new(self.store.key_packages.clone()))
             .add(UploadMlsHandler(self.to_mls))
             .add(UpdateUserMlsHandler::new(
                 self.store.users.clone(),
                 self.store.messages.clone(),
+                self.store.key_packages.clone(),
+                self.mls.clone(),
             ));
 
         Ok(commands)
