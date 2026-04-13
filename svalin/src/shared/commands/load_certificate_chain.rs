@@ -62,6 +62,8 @@ pub enum LoadSessionChainError {
     SessionReadError(#[from] SessionReadError),
     #[error("session write error: {0}")]
     SessionWriteError(#[from] SessionWriteError),
+    #[error("Server returned incorrect certificate chain - possibly an attack")]
+    IncorrectChain,
     #[error("Server was unable to load certificate chain")]
     ServerError,
 }
@@ -88,6 +90,11 @@ impl CommandDispatcher for ChainRequest {
 
         let _ = session.write_object(&()).await;
 
-        chain_result
+        let chain = chain_result?;
+        if chain.leaf().map(|cert| cert.spki_hash()) != Some(&self.0) {
+            return Err(LoadSessionChainError::IncorrectChain);
+        }
+
+        Ok(chain)
     }
 }

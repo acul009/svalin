@@ -118,14 +118,14 @@ impl Server {
             .await
             .context("error opening config")?;
 
-        debug!("opening DB");
+        // debug!("opening DB");
         let db_path = Self::data_dir().await?.push("db.sqlite");
-        tracing::debug!("opening server store at: {}", &db_path);
+        // tracing::debug!("opening server store at: {}", &db_path);
         let store = ServerStore::open(&db_path)
             .await
             .context("error opending server store")?;
 
-        debug!("creating socket");
+        // debug!("creating socket");
 
         let socket = RpcServer::create_socket(config.addr).context("failed to create socket")?;
 
@@ -196,11 +196,12 @@ impl Server {
 
         let mls = Self::open_mls_server(verifier.clone(), key_retriever).await?;
 
-        let verifier = TlsOptionalWrapper::new(verifier.to_tls_verifier());
+        let tls_verifier = TlsOptionalWrapper::new(verifier.clone().to_tls_verifier());
 
         let (to_mls, from_mls) = mpsc::channel(100);
 
         let command_builder = SvalinCommandBuilder {
+            verifier: verifier.clone(),
             root_cert: root,
             server_cert: credentials.certificate().clone(),
             store,
@@ -231,7 +232,7 @@ impl Server {
 
         let rpc = RpcServer::build()
             .credentials(credentials.clone())
-            .client_cert_verifier(verifier)
+            .client_cert_verifier(tls_verifier)
             .cancellation_token(config.cancelation_token.clone())
             .commands(command_builder)
             .task_tracker(tasks.clone())

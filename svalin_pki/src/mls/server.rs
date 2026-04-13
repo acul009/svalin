@@ -83,12 +83,12 @@ where
             .key_retriever
             .get_required_group_members(&id)
             .await
-            .map_err(AddDeviceGroupError::KeyRetrieverError)?
-            .into_iter()
-            .collect::<HashSet<_>>();
+            .map_err(AddDeviceGroupError::KeyRetrieverError)?;
 
-        if members != required_members {
-            return Err(todo!());
+        for required in required_members.iter() {
+            if !members.contains(required) {
+                return Err(AddDeviceGroupError::MissingMember(required.clone()));
+            }
         }
 
         let to_send = self.processor.add_group(new_group.clone()).await?;
@@ -155,4 +155,6 @@ pub enum AddDeviceGroupError<KeyRetrieverError> {
     KeyRetrieverError(#[source] KeyRetrieverError),
     #[error("expected a different group")]
     UnexpectedGroup,
+    #[error("missing member: {0}")]
+    MissingMember(SpkiHash),
 }

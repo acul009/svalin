@@ -10,7 +10,7 @@ use svalin_server_store::SessionStore;
 use tokio_util::sync::CancellationToken;
 
 pub struct ListUserSessionsHandler {
-    session_store: Arc<SessionStore>,
+    pub session_store: Arc<SessionStore>,
 }
 
 #[async_trait]

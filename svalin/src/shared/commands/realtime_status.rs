@@ -39,7 +39,7 @@ impl CommandHandler for RealtimeStatusHandler {
         _: Self::Request,
         cancel: CancellationToken,
     ) -> Result<()> {
-        debug!("realtime status requested");
+        // debug!("realtime status requested");
         loop {
             let status = RealtimeStatus::get().await;
             // debug!("sending realtime status");

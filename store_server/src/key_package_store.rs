@@ -16,19 +16,20 @@ impl KeyPackageStore {
     }
 
     pub async fn add_key_package(&self, key_package: KeyPackage) -> anyhow::Result<()> {
-        let owner_spki_hash = key_package.spki_hash().clone();
-        let owner_spki_hash = owner_spki_hash.as_slice();
-        let user_spki_hash = key_package.user_spki_hash().clone();
-        let user_spki_hash = user_spki_hash.as_slice();
+        let spki_hash = key_package.spki_hash().clone();
+        let spki_hash_slice = spki_hash.as_slice();
         let member = key_package.to_unverified();
+        if member.spki_hash()? != spki_hash {
+            anyhow::bail!("Key package hash mismatch");
+        }
+
         let data = postcard::to_stdvec(&member)?;
         let id = uuid::Uuid::new_v4().as_hyphenated().to_string();
 
         sqlx::query!(
-            "INSERT INTO key_packages (id, owner_spki_hash, user_spki_hash, data) VALUES (?, ?, ?, ?)",
+            "INSERT INTO key_packages (id, spki_hash, data) VALUES (?, ?, ?)",
             id,
-            owner_spki_hash,
-            user_spki_hash,
+            spki_hash_slice,
             data
         )
         .execute(&self.pool)
@@ -40,7 +41,7 @@ impl KeyPackageStore {
     pub async fn count_key_packages(&self, owner: &SpkiHash) -> anyhow::Result<u64> {
         let spki_hash = owner.as_slice();
         let count = sqlx::query_scalar!(
-            "SELECT COUNT(*) as count FROM key_packages WHERE owner_spki_hash = ?",
+            "SELECT COUNT(*) as count FROM key_packages WHERE spki_hash = ?",
             spki_hash
         )
         .fetch_one(&self.pool)
@@ -58,10 +59,11 @@ impl KeyPackageStore {
         let mut key_packages = Vec::with_capacity(entities.len());
 
         for spki_hash in entities {
-            let spki_hash = spki_hash.as_slice();
+            // tracing::debug!("Loading key package for {spki_hash}");
+            let spki_hash_slice = spki_hash.as_slice();
             let key_package = sqlx::query!(
-                "SELECT id, data FROM key_packages WHERE owner_spki_hash != ?",
-                spki_hash,
+                "SELECT id, data FROM key_packages WHERE spki_hash == ? LIMIT 1",
+                spki_hash_slice,
             )
             .fetch_one(&mut *transaction)
             .await?;
@@ -69,7 +71,10 @@ impl KeyPackageStore {
             sqlx::query!("DELETE FROM key_packages WHERE id = ?", key_package.id)
                 .execute(&mut *transaction)
                 .await?;
-            let key_package = postcard::from_bytes(&key_package.data)?;
+            let key_package: UnverifiedKeyPackage = postcard::from_bytes(&key_package.data)?;
+            if &key_package.spki_hash()? != spki_hash {
+                anyhow::bail!("Key package in store does not match the expected owner");
+            }
             key_packages.push(key_package);
         }
 

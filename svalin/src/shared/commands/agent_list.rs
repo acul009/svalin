@@ -125,7 +125,7 @@ impl CommandHandler for AgentListHandler {
                                 online_status,
                             };
 
-                            debug!("sending update to client: {:?}", item);
+                            // debug!("sending update to client: {:?}", item);
 
                             session.write_object(&item).await?;
                         },
@@ -178,7 +178,7 @@ impl CommandDispatcher for UpdateAgentList {
                         .await
                         .map_err(UpdateAgentListError::ReceiveItemError)?;
 
-                    debug!("verifying new agent certificate");
+                    // debug!("verifying new agent certificate");
                     let certificate = self
                         .verifier
                         .verify_known_certificate(
@@ -192,7 +192,7 @@ impl CommandDispatcher for UpdateAgentList {
                         certificate,
                     };
 
-                    debug!("updating agent list");
+                    // debug!("updating agent list");
                     self.list.send_modify(|list| {
                         if let Some(device) = list.get(&item.certificate.spki_hash()) {
                             device.update(item);
@@ -209,7 +209,7 @@ impl CommandDispatcher for UpdateAgentList {
                             list.insert(spki_hash, device);
                         }
                     });
-                    debug!("agent list updated");
+                    // debug!("agent list updated");
                 }
             })
             .await;

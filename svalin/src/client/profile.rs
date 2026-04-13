@@ -160,11 +160,11 @@ impl Client {
     pub async fn open_profile(profile_key: &str, password: Vec<u8>) -> Result<Arc<Self>> {
         let profile = Self::get_profile(&profile_key).await?;
 
-        debug!("Data from profile ready");
+        // debug!("Data from profile ready");
 
         if let Some(profile) = profile {
             let db_path = profile.profile_dir().await?.push("mls-store.sqlite");
-            debug!("unlocking profile");
+            // debug!("unlocking profile");
             let user_credential = profile.user_credential.decrypt(password.clone()).await?;
             let device_credential = profile.device_credential.decrypt(password.clone()).await?;
             let root_certificate = profile.root_certificate.use_as_root()?;
@@ -172,10 +172,10 @@ impl Client {
                 .upstream_certificate
                 .verify_signature(&root_certificate, get_current_timestamp())?;
 
-            debug!("creating verifier");
+            // debug!("creating verifier");
             let verifier = ExactVerififier::new(upstream_certificate.clone()).to_tls_verifier();
 
-            debug!("connecting to server");
+            // debug!("connecting to server");
             let rpc = RpcClient::connect(
                 &profile.upstream_address,
                 Some(&device_credential),
@@ -187,9 +187,9 @@ impl Client {
             let remote_verifier =
                 RemoteVerifier::new(root_certificate.clone(), rpc.upstream_connection());
 
-            debug!("connected to server");
+            // debug!("connected to server");
 
-            debug!("opening sqlite database: {}", db_path.display());
+            // debug!("opening sqlite database: {}", db_path.display());
             let url = db_path
                 .as_path()
                 .to_str()
@@ -250,7 +250,7 @@ impl Client {
             let verifier = remote_verifier.clone().agent_only();
 
             client.background_tasks.spawn(async move {
-                debug!("subscribing to upstream agent list");
+                // debug!("subscribing to upstream agent list");
                 if let Err(err) = sync_connection
                     .dispatch(UpdateAgentList {
                         client: client2,
@@ -272,29 +272,32 @@ impl Client {
             let user_credential = client.user_credential.clone();
 
             client.background_tasks.spawn(async move {
+                debug!("starting user mls update task");
                 let cancel = cancel;
-                cancel
-                    .run_until_cancelled(async move {
-                        let password = password;
-                        let key_retriever = key_retriever;
-                        let user_credential = user_credential;
-                        let verifier = remote_verifier;
-                        loop {
-                            if let Err(err) = connection
-                                .dispatch(UpdateUserMls {
-                                    password: password.clone(),
-                                    key_retriever: key_retriever.clone(),
-                                    user_credential: user_credential.clone(),
-                                    verifier: verifier.clone(),
-                                })
-                                .await
-                            {
-                                tracing::error!("error while updating user mls: {}", err);
-                            }
-                            tokio::time::sleep(Duration::from_secs(30)).await
-                        }
-                    })
-                    .await;
+                let password = password;
+                let key_retriever = key_retriever;
+                let user_credential = user_credential;
+                let verifier = remote_verifier;
+                loop {
+                    if let Err(err) = connection
+                        .dispatch(UpdateUserMls {
+                            password: password.clone(),
+                            key_retriever: key_retriever.clone(),
+                            user_credential: user_credential.clone(),
+                            verifier: verifier.clone(),
+                        })
+                        .await
+                    {
+                        tracing::error!("error while updating user mls: {}", err);
+                    }
+                    if cancel
+                        .run_until_cancelled(tokio::time::sleep(Duration::from_secs(30)))
+                        .await
+                        .is_none()
+                    {
+                        break;
+                    }
+                }
             });
 
             Ok(client)

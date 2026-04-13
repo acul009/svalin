@@ -43,11 +43,11 @@ pub struct EncryptedCredential {
 
 impl EncryptedCredential {
     pub async fn decrypt(self, password: Vec<u8>) -> Result<Credential, DecodeCredentialsError> {
-        debug!("decrypting credentials with password");
+        // debug!("decrypting credentials with password");
 
         let decrypted_keypair = KeyPair::decrypt(self.encrypted_keypair, password).await?;
 
-        debug!("credentials decrypted");
+        // debug!("credentials decrypted");
 
         Credential::new(decrypted_keypair, self.certificate)
             .map_err(DecodeCredentialsError::CreateCredentialsError)

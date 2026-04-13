@@ -178,6 +178,8 @@ async fn integration_tests() {
 
     let ping = device.ping().await.unwrap();
 
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
     // By this point I'm hoping that the device has uploaded some key packages
     client
         .ensure_device_group_exists(device.item().certificate.spki_hash())

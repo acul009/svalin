@@ -33,11 +33,11 @@ impl Agent {
 
         let conn = client.upstream_connection();
 
-        debug!("requesting public status");
+        // debug!("requesting public status");
 
         let server_status = conn.dispatch(GetPutblicStatus).await?;
 
-        debug!("public status: {server_status:?}");
+        // debug!("public status: {server_status:?}");
 
         match server_status {
             crate::shared::commands::public_server_status::PublicStatus::WaitingForInit => {

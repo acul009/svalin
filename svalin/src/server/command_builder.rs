@@ -18,6 +18,7 @@ use crate::{
         commands::{
             agent_list::AgentListHandler,
             get_key_packages::GetKeyPackagesHandler,
+            list_user_sessions::ListUserSessionsHandler,
             load_certificate_chain::LoadCertificateChainHandler,
             login::LoginHandler,
             mls::upload_mls::UploadMlsHandler,
@@ -27,6 +28,7 @@ use crate::{
         },
         join_agent::upload_agent::UploadAgentHandler,
     },
+    verifier::local_verifier::LocalVerifier,
 };
 
 pub struct SvalinCommandBuilder {
@@ -35,6 +37,7 @@ pub struct SvalinCommandBuilder {
     pub store: ServerStore,
     pub mls: Arc<MlsServer>,
     pub to_mls: mpsc::Sender<MessageToServerTransport>,
+    pub verifier: LocalVerifier,
 }
 
 impl RpcCommandBuilder for SvalinCommandBuilder {
@@ -76,18 +79,24 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 self.store.agents.clone(),
                 server.clone(),
             ))
-            .add(UploadKeyPackagesHandler::new(
-                self.store.key_packages.clone(),
-                self.mls.clone(),
-            ))
-            .add(GetKeyPackagesHandler::new(self.store.key_packages.clone()))
+            .add(UploadKeyPackagesHandler {
+                key_package_store: self.store.key_packages.clone(),
+                mls_server: self.mls.clone(),
+            })
+            .add(GetKeyPackagesHandler {
+                key_package_store: self.store.key_packages.clone(),
+            })
             .add(UploadMlsHandler(self.to_mls))
             .add(UpdateUserMlsHandler::new(
+                self.verifier.clone(),
                 self.store.users.clone(),
                 self.store.messages.clone(),
                 self.store.key_packages.clone(),
                 self.mls.clone(),
-            ));
+            ))
+            .add(GetKeyPackagesHandler {
+                key_package_store: self.store.key_packages.clone(),
+            });
 
         Ok(commands)
     }

@@ -159,17 +159,17 @@ impl TakeableCommandDispatcher for RequestJoin {
                 .await
                 .map_err(RequestJoinError::JoinCodeReadError)?;
 
-            debug!("received join code from server: {join_code}");
+            // debug!("received join code from server: {join_code}");
 
             self.join_code_channel
                 .send(join_code.clone())
                 .map_err(|_| RequestJoinError::ChannelSendError)?;
 
-            debug!("waiting for client to confirm join code");
+            // debug!("waiting for client to confirm join code");
 
             let confirm_code = svalin_pki::generate_short_code();
 
-            debug!("generated confirm code: {confirm_code}");
+            // debug!("generated confirm code: {confirm_code}");
 
             self.confirm_code_channel
                 .send(confirm_code.clone())
@@ -183,7 +183,7 @@ impl TakeableCommandDispatcher for RequestJoin {
 
             let keypair = KeyPair::generate();
             let public_key = keypair.export_public_key();
-            debug!("sending request: {:?}", public_key);
+            // debug!("sending request: {:?}", public_key);
             session
                 .write_object(&public_key)
                 .await

@@ -74,7 +74,7 @@ impl DirectConnection {
             }
         };
 
-        debug!("connection with peer: {peer:?}");
+        // debug!("connection with peer: {peer:?}");
 
         Ok(DirectConnection { conn, peer })
     }

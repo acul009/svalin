@@ -21,7 +21,7 @@ pub enum VerifyError {
     CertificateInvalid,
     #[error("The certificate corresponding to the given fingerprint is unknown")]
     UnknownCertificate,
-    #[error("The issuer of the certificate could not be found")]
+    #[error("Expected a differenct certificate")]
     CertificateMismatch,
     #[error("The certificate is not valid: {0}")]
     TimerangeError(#[from] ValidityError),

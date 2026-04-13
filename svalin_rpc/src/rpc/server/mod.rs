@@ -165,22 +165,22 @@ impl RpcServer {
     }
 
     async fn serve(self: Arc<Self>, commands: HandlerCollection<impl PermissionHandler>) {
-        debug!("starting server");
+        // debug!("starting server");
 
         loop {
-            debug!("Waiting for next connection");
+            // debug!("Waiting for next connection");
             select! {
                 _ = self.config.cancellation_token.cancelled() => {
-                    debug!("canceling RPC main serve loop");
+                    // debug!("canceling RPC main serve loop");
                     break;
                 }
                 conn_option = self.endpoint.accept() => {
                     match conn_option {
                         None => {
-                            debug!("no more connections");
+                            // debug!("no more connections");
                         },
                         Some(conn) => {
-                            debug!("connection incoming");
+                            // debug!("connection incoming");
                             let serve_connection_future = self.clone().serve_connection(conn, commands.clone());
                             self.tasks.spawn(serve_connection_future);
                         }
@@ -208,21 +208,21 @@ impl RpcServer {
         conn: quinn::Incoming,
         commands: HandlerCollection<impl PermissionHandler>,
     ) -> Result<()> {
-        debug!("spawned new task for incoming connection");
-        debug!("waiting for connection to get ready...");
+        // debug!("spawned new task for incoming connection");
+        // debug!("waiting for connection to get ready...");
 
         let conn = conn
             .await
             .context("Error when awaiting connection establishment")?;
 
-        debug!("connection established");
+        // debug!("connection established");
 
         let conn = DirectConnection::new(conn)?;
 
         // certificate has already been verified by quinn using a custom verifier
 
         if let Peer::Certificate(cert) = conn.peer() {
-            debug!("noting down connection for peer");
+            // debug!("noting down connection for peer");
             let mut lock = self.connection_data.lock().await;
             lock.latest_connections
                 .insert(cert.spki_hash().clone(), conn.clone());
@@ -242,16 +242,16 @@ impl RpcServer {
         )
         .await?;
 
-        debug!("connection handled");
+        // debug!("connection handled");
 
         Ok(())
     }
 
     async fn update_connection_data_on_close(self: Arc<Self>, conn: DirectConnection) {
-        debug!("spawned task to update connection data on close");
+        // debug!("spawned task to update connection data on close");
         conn.closed().await;
         if let Peer::Certificate(cert) = conn.peer() {
-            debug!("removing connection data for peer after close");
+            // debug!("removing connection data for peer after close");
             let mut lock = self.connection_data.lock().await;
             if let Some(latest_peer_conn) = lock.latest_connections.get(cert.spki_hash()) {
                 if latest_peer_conn.eq(&conn) {

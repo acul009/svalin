@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use svalin_pki::{Certificate, RootCertificate, SpkiHash, Verifier, VerifyError};
 
 use crate::server::chain_loader::ChainLoader;
@@ -31,7 +32,14 @@ impl Verifier for LocalVerifier {
         let cert_chain = cert_chain.verify(&self.root, time)?;
 
         let cert = cert_chain.take_leaf();
-        tracing::debug!("exiting incoming connection verifier");
+
+        if cert.spki_hash() != spki_hash {
+            return Err(VerifyError::InternalError(anyhow!(
+                "got wrong certificate from chain loader"
+            )));
+        }
+
+        // tracing::debug!("exiting incoming connection verifier");
         Ok(cert)
     }
 }

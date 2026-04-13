@@ -118,7 +118,7 @@ impl<'b> TakeableCommandDispatcher for E2EDispatcher<'b> {
         session: &mut Option<Session>,
     ) -> Result<Self::Output, DispatcherError<Self::InnerError>> {
         if let Some(session_ready) = session.take() {
-            debug!("encrypting session");
+            // debug!("encrypting session");
 
             let (transport, _) = session_ready.destructure();
             let tls_transport = TlsTransport::client(

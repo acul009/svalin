@@ -54,25 +54,7 @@ impl KeyRetriever for LocalKeyRetriever {
                 let chain = self.user_store.complete_certificate_chain(chain).await?;
                 let chain = chain.verify(&self.root, timestamp)?;
 
-                let mut required_members = vec![spki_hash.clone()];
-
-                for user_certificate in chain.iter().rev().skip(1) {
-                    required_members.push(user_certificate.spki_hash().clone());
-                    let sessions = self
-                        .session_store
-                        .list_user_sessions(user_certificate.spki_hash())
-                        .await?;
-
-                    for session in sessions.into_iter() {
-                        match session.verify_signature(user_certificate, timestamp) {
-                            Ok(certificate) => {
-                                required_members.push(certificate.spki_hash().clone());
-                            }
-                            // TODO: report this error somewhere
-                            Err(_) => {}
-                        }
-                    }
-                }
+                let required_members = chain.iter().map(|cert| cert.spki_hash().clone()).collect();
 
                 Ok(required_members)
             }

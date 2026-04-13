@@ -45,12 +45,12 @@ impl CommandHandler for TcpForwardHandler {
         request: Self::Request,
         cancel: CancellationToken,
     ) -> Result<()> {
-        debug!("incoming tcp_forward request: {request}");
+        // debug!("incoming tcp_forward request: {request}");
         let stream = TcpStream::connect(request).await;
 
         match stream {
             Err(err) => {
-                debug!("failed to connect: {err}");
+                tracing::error!("failed to connect: {err}");
                 session
                     .write_object::<Result<(), TcpForwardError>>(&Err(TcpForwardError::Generic))
                     .await?;
@@ -58,14 +58,14 @@ impl CommandHandler for TcpForwardHandler {
                 return Err(err.into());
             }
             Ok(mut stream) => {
-                debug!("connected!");
+                // debug!("connected!");
                 session
                     .write_object::<Result<(), TcpForwardError>>(&Ok(()))
                     .await?;
 
                 let mut transport = session.borrow_transport();
 
-                debug!("copying!");
+                // debug!("copying!");
 
                 select! {
                     _ = cancel.cancelled() => {

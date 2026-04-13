@@ -53,7 +53,7 @@ impl Agent {
             .context("error loading config")?
             .ok_or_else(|| anyhow!("agent is not yet initialized"))?;
 
-        debug!("decrypting agent credentials");
+        // debug!("decrypting agent credentials");
 
         let credentials = config
             .key_source
@@ -61,7 +61,7 @@ impl Agent {
             .await
             .context("error decrypting credentials")?;
 
-        debug!("building upstream verifier");
+        // debug!("building upstream verifier");
         let root_certificate = config.root_certificate.use_as_root()?;
 
         let upstream_certificate = config

@@ -137,13 +137,13 @@ impl TakeableCommandHandler for LoginHandler {
 
             let mut session = Session::new(Box::new(tls_transport), Peer::Anonymous);
 
-            debug!("server session recreated");
+            // debug!("server session recreated");
 
             // ===== SSID Establishment =====
             let mut pake_server: AuCPaceServer<_, _, NONCE_LENGTH> =
                 aucpace::Server::new(Default::default());
 
-            debug!("sending server nonce");
+            // debug!("sending server nonce");
 
             let (pake_server, server_nonce) = pake_server.begin();
 
@@ -152,7 +152,7 @@ impl TakeableCommandHandler for LoginHandler {
                 .await
                 .context("Failed to write server nonce")?;
 
-            debug!("reading for client nonce");
+            // debug!("reading for client nonce");
 
             // ===== Augmentation Layer =====
             let client_nonce: Nonce = session
@@ -162,7 +162,7 @@ impl TakeableCommandHandler for LoginHandler {
 
             let pake_server = pake_server.agree_ssid(client_nonce.to_array());
 
-            debug!("reading for strong username");
+            // debug!("reading for strong username");
 
             let strong_username: StrongUsername = session
                 .read_object()
@@ -189,7 +189,7 @@ impl TakeableCommandHandler for LoginHandler {
             if client_info.hash_params.is_empty() {
                 client_info.hash_params = ArgonCost::strong().get_params().try_into()?;
             }
-            debug!("hash params: {}", &client_info.hash_params);
+            // debug!("hash params: {}", &client_info.hash_params);
 
             session
                 .write_object(&client_info)
@@ -465,7 +465,7 @@ impl TakeableCommandDispatcher for Login {
                     .await
                     .map_err(LoginDispatcherError::TlsClientError)?;
 
-            debug!("tls transport created");
+            // debug!("tls transport created");
 
             let mut key_material = [0u8; 32];
             let key_material = tls_transport
@@ -474,12 +474,12 @@ impl TakeableCommandDispatcher for Login {
 
             let mut session = Session::new(Box::new(tls_transport), Peer::Anonymous);
 
-            debug!("session recreated");
+            // debug!("session recreated");
 
             // ===== SSID Establishment =====
             let mut client = AuCPaceClient::<Sha512, Argon2, _, NONCE_LENGTH>::new(OsRng);
 
-            debug!("sending client nonce");
+            // debug!("sending client nonce");
 
             let (client, client_nonce) = client.begin();
             session
@@ -490,7 +490,7 @@ impl TakeableCommandDispatcher for Login {
                 .await
                 .map_err(LoginDispatcherError::WriteClientNonceError)?;
 
-            debug!("receiving server nonce");
+            // debug!("receiving server nonce");
 
             // Receive server nonce
             let server_nonce: Nonce = session
@@ -502,7 +502,7 @@ impl TakeableCommandDispatcher for Login {
             let (username_send, username_recv) = oneshot::channel();
             let (client_info_send, client_info_recv) = oneshot::channel();
 
-            debug!("starting augmentation task");
+            // debug!("starting augmentation task");
 
             // ===== Augmentation Layer =====
             // Running is a blocking task, so the hashing doesn't cause issues
@@ -539,7 +539,7 @@ impl TakeableCommandDispatcher for Login {
                     .map_err(LoginDispatcherError::AucPaceError)
             });
 
-            debug!("sending strong username");
+            // debug!("sending strong username");
 
             session
                 .write_object(
@@ -550,7 +550,7 @@ impl TakeableCommandDispatcher for Login {
                 .await
                 .map_err(LoginDispatcherError::WriteUsernameError)?;
 
-            debug!("receiving client info");
+            // debug!("receiving client info");
 
             let client_info: StrongClientInfo = session
                 .read_object()
@@ -565,7 +565,7 @@ impl TakeableCommandDispatcher for Login {
                 .await
                 .map_err(LoginDispatcherError::JoinError)??;
 
-            debug!("sending client public key");
+            // debug!("sending client public key");
 
             let (client, client_key) = client.generate_public_key(key_material, &mut OsRng);
 
@@ -577,7 +577,7 @@ impl TakeableCommandDispatcher for Login {
                 .await
                 .map_err(LoginDispatcherError::ClientPublicKeyWriteError)?;
 
-            debug!("receiving server public key");
+            // debug!("receiving server public key");
 
             let server_key: PublicKey = session
                 .read_object()
@@ -586,7 +586,7 @@ impl TakeableCommandDispatcher for Login {
 
             // ===== Explicit Mutual Authentication =====
 
-            debug!("sending client authenticator");
+            // debug!("sending client authenticator");
 
             let (client, client_authenticator) = client
                 .receive_server_pubkey(server_key.0)
@@ -600,7 +600,7 @@ impl TakeableCommandDispatcher for Login {
                 .await
                 .map_err(LoginDispatcherError::ClientAuthenticatorWriteError)?;
 
-            debug!("receiving server authenticator");
+            // debug!("receiving server authenticator");
 
             let server_authenticator = session
                 .read_object::<Result<Authenticator, ()>>()

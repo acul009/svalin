@@ -17,13 +17,18 @@ pub struct UnverifiedCertificateChain {
 }
 
 pub struct CertificateChain {
-    _root: RootCertificate,
     certificates: Vec<Certificate>,
 }
 
 impl CertificateChain {
     pub fn iter(&self) -> std::slice::Iter<'_, Certificate> {
         self.certificates.iter()
+    }
+
+    pub fn leaf(&self) -> &Certificate {
+        self.certificates
+            .last()
+            .expect("A verified certificate chain cannot be empty")
     }
 
     pub fn take_leaf(mut self) -> Certificate {
@@ -151,11 +156,11 @@ impl UnverifiedCertificateChain {
         }
 
         let mut verified_chain = Vec::with_capacity(self.certificates.len());
+        verified_chain.push(root.clone().to_certificate());
 
         if self.certificates.len() == 1 {
             return Ok(CertificateChain {
-                _root: root.clone(),
-                certificates: vec![],
+                certificates: verified_chain,
             });
         }
 
@@ -170,8 +175,11 @@ impl UnverifiedCertificateChain {
         }
 
         Ok(CertificateChain {
-            _root: root.clone(),
             certificates: verified_chain,
         })
+    }
+
+    pub fn leaf(&self) -> Option<&UnverifiedCertificate> {
+        self.certificates.last()
     }
 }

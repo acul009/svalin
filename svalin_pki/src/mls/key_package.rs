@@ -1,12 +1,23 @@
+use std::fmt::Debug;
+
 use openmls::prelude::{KeyPackageIn, KeyPackageVerifyError, OpenMlsCrypto, ProtocolVersion};
 use serde::{Deserialize, Serialize};
 
 use crate::{Certificate, CertificateType, SpkiHash, Verifier, VerifyError, get_current_timestamp};
 
 #[cfg_attr(test, derive(Clone))]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct UnverifiedKeyPackage {
     key_package: KeyPackageIn,
+}
+
+impl Debug for UnverifiedKeyPackage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let spki_hash = self.spki_hash().map_err(|_| std::fmt::Error)?;
+        f.debug_struct("UnverifiedKeyPackage")
+            .field("spki_hash", &spki_hash)
+            .finish()
+    }
 }
 
 pub struct KeyPackage {
@@ -95,14 +106,6 @@ impl KeyPackage {
 
     pub fn spki_hash(&self) -> &SpkiHash {
         self.certificate.spki_hash()
-    }
-
-    pub fn user_spki_hash(&self) -> &SpkiHash {
-        if self.certificate.certificate_type() == CertificateType::UserDevice {
-            self.certificate.issuer()
-        } else {
-            self.certificate.spki_hash()
-        }
     }
 
     pub fn certificate(&self) -> &Certificate {

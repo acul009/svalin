@@ -1,11 +1,10 @@
 use openmls::prelude::{
-    MlsMessageBodyIn, MlsMessageIn, PrivateMessageIn, ProtocolMessage, Welcome,
-    group_info::VerifiableGroupInfo,
+    MlsMessageBodyIn, MlsMessageIn, PrivateMessageIn, Welcome, group_info::VerifiableGroupInfo,
 };
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize};
 use tls_codec::DeserializeBytes;
 
-use crate::{SpkiHash, UnverifiedCertificate};
+use crate::SpkiHash;
 
 #[derive(Serialize, Deserialize)]
 pub enum MessageToServerTransport {

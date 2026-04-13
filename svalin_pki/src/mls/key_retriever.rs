@@ -1,14 +1,8 @@
-use std::{
-    fmt::{Debug, Display},
-    pin::Pin,
-};
+use std::fmt::{Debug, Display};
 
 use crate::{
     SpkiHash,
-    mls::{
-        group_id::SvalinGroupId,
-        key_package::{KeyPackage, UnverifiedKeyPackage},
-    },
+    mls::{group_id::SvalinGroupId, key_package::UnverifiedKeyPackage},
 };
 
 pub trait KeyRetriever {

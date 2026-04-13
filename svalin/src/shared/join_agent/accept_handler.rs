@@ -2,10 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use svalin_pki::{
     Certificate, CreateCertificateError, DeriveKeyError, ExportedPublicKey,
-    mls::{
-        client::CreateDeviceGroupError,
-        key_package::KeyPackageError,
-    },
+    mls::{client::CreateDeviceGroupError, key_package::KeyPackageError},
 };
 use svalin_rpc::{
     rpc::{
@@ -64,7 +61,7 @@ impl CommandHandler for JoinAcceptHandler {
                 let answer: Result<(), ()> = Ok(());
                 session.write_object(&answer).await?;
 
-                debug!("forwarding session to agent");
+                // debug!("forwarding session to agent");
 
                 let transport1 = session.borrow_transport();
                 let transport2 = agent_session.borrow_transport();
@@ -74,7 +71,7 @@ impl CommandHandler for JoinAcceptHandler {
                         result = copy_bidirectional(transport1,transport2) => {result?;}
                 }
 
-                debug!("finished forwarding join accept session");
+                // debug!("finished forwarding join accept session");
 
                 Ok(())
             }
@@ -204,14 +201,14 @@ async fn handle_agent_enroll(
     // and providing the agent with the root and upstream certificates.
 
     let public_key: ExportedPublicKey = session_e2e.read_object().await?;
-    debug!("received public key: {:?}", public_key);
+    // debug!("received public key: {:?}", public_key);
 
     // Creating certificate for agent
     let agent_cert = client
         .user_credential()
         .create_agent_certificate_for_key(&public_key)?;
 
-    debug!("created agent certificate, sending to agent");
+    // debug!("created agent certificate, sending to agent");
 
     // Sending all 3 required certificates to the agent
     session_e2e.write_object(agent_cert.as_unverified()).await?;
@@ -238,7 +235,7 @@ async fn handle_agent_enroll(
 
     let upload_result = client.upload_agent(&agent_cert).await;
 
-    debug!("upload finished, sending confirmation to agent");
+    // debug!("upload finished, sending confirmation to agent");
 
     match upload_result {
         Ok(_) => session_e2e.write_object::<Result<(), ()>>(&Ok(())).await?,

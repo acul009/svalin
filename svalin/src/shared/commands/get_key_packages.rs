@@ -20,10 +20,12 @@ pub enum GetKeyPackagesDispatcherError {
     SessionRead(#[from] SessionReadError),
     #[error("Server error")]
     ServerError,
-    #[error("server did not return all requested key packages")]
-    MissingKeyPackages,
+    #[error("server did not return all requested key packages, missing: {0}")]
+    MissingKeyPackage(SpkiHash),
     #[error("Key package verify error: {0}")]
     VerifyError(#[from] KeyPackageError),
+    #[error("Too many key packages returned")]
+    ToManyKeyPackages,
 }
 
 impl CommandDispatcher for GetKeyPackages {
@@ -52,9 +54,13 @@ impl CommandDispatcher for GetKeyPackages {
                 .iter()
                 .map(|key_package| key_package.spki_hash())
                 .collect::<Result<HashSet<SpkiHash>, _>>()?;
+            // tracing::debug!("received key packages: {:?}", received_packages);
+            if received_packages.len() > packages.len() {
+                return Err(GetKeyPackagesDispatcherError::ToManyKeyPackages);
+            }
             for requested in self.0 {
                 if !received_packages.contains(&requested) {
-                    return Err(GetKeyPackagesDispatcherError::MissingKeyPackages);
+                    return Err(GetKeyPackagesDispatcherError::MissingKeyPackage(requested));
                 }
             }
         }
@@ -63,18 +69,12 @@ impl CommandDispatcher for GetKeyPackages {
 }
 
 pub struct GetKeyPackagesHandler {
-    key_package_store: Arc<KeyPackageStore>,
-}
-
-impl GetKeyPackagesHandler {
-    pub fn new(key_package_store: Arc<KeyPackageStore>) -> Self {
-        Self { key_package_store }
-    }
+    pub key_package_store: Arc<KeyPackageStore>,
 }
 
 #[async_trait]
 impl CommandHandler for GetKeyPackagesHandler {
-    type Request = HashSet<SpkiHash>;
+    type Request = Vec<SpkiHash>;
 
     fn key() -> String {
         "get_key_packages".into()
@@ -92,12 +92,13 @@ impl CommandHandler for GetKeyPackagesHandler {
             .await
         {
             Ok(key_packages) => {
+                // tracing::debug!("sending key packages: {:?}", key_packages);
                 session.write_object(&Some(key_packages)).await?;
                 Ok(())
             }
             Err(err) => {
                 let _ = session
-                    .write_object(&Option::<Vec<UnverifiedKeyPackage>>::None)
+                    .write_object(&None::<Vec<UnverifiedKeyPackage>>)
                     .await?;
                 Err(err.into())
             }

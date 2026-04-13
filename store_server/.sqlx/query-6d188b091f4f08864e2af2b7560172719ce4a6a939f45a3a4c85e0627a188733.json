@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COUNT(*) as count FROM key_packages WHERE owner_spki_hash = ?",
+  "query": "SELECT COUNT(*) as count FROM key_packages WHERE spki_hash = ?",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "f8787d222f5ea003d173526bc1cedeca407208d3794329e812d59d30e15bf6e1"
+  "hash": "6d188b091f4f08864e2af2b7560172719ce4a6a939f45a3a4c85e0627a188733"
 }

@@ -21,7 +21,7 @@ use crate::{
     verifier::remote_verifier::RemoteVerifier,
 };
 
-enum Uploader {
+pub enum Uploader {
     Client(Arc<MlsClient<RemoteKeyRetriever, RemoteVerifier>>),
     Agent(Arc<MlsAgent<RemoteKeyRetriever, RemoteVerifier>>),
 }
@@ -130,17 +130,8 @@ impl CommandDispatcher for UploadKeyPackages {
 }
 
 pub struct UploadKeyPackagesHandler {
-    key_package_store: Arc<KeyPackageStore>,
-    mls_server: Arc<MlsServer>,
-}
-
-impl UploadKeyPackagesHandler {
-    pub fn new(key_package_store: Arc<KeyPackageStore>, mls_server: Arc<MlsServer>) -> Self {
-        Self {
-            key_package_store,
-            mls_server,
-        }
-    }
+    pub key_package_store: Arc<KeyPackageStore>,
+    pub mls_server: Arc<MlsServer>,
 }
 
 #[async_trait::async_trait]

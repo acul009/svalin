@@ -71,7 +71,7 @@ impl TunnelManager {
 
         self.join_set.lock().unwrap().spawn(async move {
             let result = tunnel_result.await_result().await;
-            debug!("tunnel result: {result:?}");
+            // debug!("tunnel result: {result:?}");
             if let Err(err) = result {
                 tracing::error!("{err}");
             }

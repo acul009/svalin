@@ -97,7 +97,7 @@ impl Session {
 
         let key = header.command_key.clone();
 
-        debug!("requested command: {key}");
+        // debug!("requested command: {key}");
 
         commands
             .handle_session(self, header, cancel)
@@ -135,7 +135,7 @@ impl Session {
                 return Err(SessionDispatchError::SessionDeclined { code, message });
             }
             SessionResponseHeader::Accept => {
-                debug!("Peer accepted command: {}", D::key());
+                // debug!("Peer accepted command: {}", D::key());
             }
         };
 
@@ -169,7 +169,7 @@ impl Session {
     }
 
     pub(crate) async fn shutdown(mut self) {
-        debug!("Shutting down session");
+        // debug!("Shutting down session");
         if let Err(err) = self.transport.shutdown().await {
             error!("error shuting down session: {err}");
         }
