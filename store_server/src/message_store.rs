@@ -68,6 +68,26 @@ impl MessageStore {
         Ok(messages)
     }
 
+    pub async fn aknowledge_single_message(
+        &self,
+        receiver: &SpkiHash,
+        message: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        let receiver = receiver.as_slice();
+
+        sqlx::query!(
+            "DELETE FROM mls_message_receivers WHERE message_id = ? AND spki_hash = ?",
+            message,
+            receiver
+        )
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query!("DELETE FROM mls_messages WHERE id = ? AND NOT EXISTS ( SELECT 1 FROM mls_message_receivers WHERE message_id = ? ) ", message, message).execute(&self.pool).await?;
+
+        Ok(())
+    }
+
     pub async fn aknowledge_messages(
         &self,
         receiver: &SpkiHash,

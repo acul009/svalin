@@ -7,6 +7,7 @@ pub mod agent;
 // pub mod async_com;
 pub mod client;
 pub mod device;
+pub mod message_streaming;
 pub mod mls;
 pub mod permissions;
 pub mod remote_key_retriever;
