@@ -33,7 +33,6 @@ use svalin_rpc::{
 use svalin_server_store::{SessionStore, UserStore};
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
 
 use crate::permissions::Permission;
 

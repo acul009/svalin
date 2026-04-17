@@ -42,12 +42,12 @@ impl ClientStore {
         Ok(())
     }
 
-    pub async fn load_persistent(&self) -> Result<persistent::ClientState, Error> {
+    pub async fn load_persistent(&self) -> Result<persistent::State, Error> {
         let mut reports =
             sqlx::query!(r#"SELECT spki_hash as "spki_hash!", report FROM system_reports"#)
                 .fetch(&self.pool);
 
-        let mut state = persistent::ClientState::empty();
+        let mut state = persistent::State::empty();
 
         while let Some(row) = reports.next().await {
             let row = row?;
@@ -57,7 +57,7 @@ impl ClientStore {
             state.update(Message::UpdateSystemReport(spki_hash, report));
         }
 
-        todo!()
+        Ok(state)
     }
 
     pub fn close_handle(&self) -> CloseHandle {

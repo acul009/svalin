@@ -12,7 +12,7 @@ use tokio::{
     select,
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::permissions::Permission;
 

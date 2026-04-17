@@ -12,9 +12,8 @@ use svalin_rpc::rpc::{
 use svalin_sysctl::realtime::RealtimeStatus;
 use tokio::{select, sync::watch};
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
 
-use crate::{client::device::RemoteData, permissions::Permission};
+use crate::{client::RemoteData, permissions::Permission};
 
 #[derive(Default)]
 pub struct RealtimeStatusHandler;

@@ -17,10 +17,7 @@ use crate::{
         request_installation_info::InstallationInfoDispatcher,
         start_agent_update::StartUpdateDispatcher,
     },
-    shared::commands::{
-        agent_list::AgentListItem, realtime_status::SubscribeRealtimeStatus,
-        terminal::RemoteTerminalDispatcher,
-    },
+    shared::commands::terminal::RemoteTerminalDispatcher,
     util::smart_subscriber::{SmartSubscriber, SubscriberStarter},
 };
 

@@ -52,7 +52,7 @@ where
         match credential.certificate().certificate_type() {
             crate::CertificateType::Root => (),
             crate::CertificateType::User => (),
-            crate::CertificateType::UserDevice => (),
+            crate::CertificateType::UserSession => (),
             cert_type => return Err(CreateClientError::WrongCertificateType(cert_type)),
         }
 

@@ -31,7 +31,7 @@ impl PermissionHandler for DefaultPermissionHandler {
                         Permission::UserOrSession => true,
                         _ => false,
                     },
-                    CertificateType::UserDevice => match permission {
+                    CertificateType::UserSession => match permission {
                         Permission::RootOnlyPlaceholder => {
                             certificate.issuer() == self.root.spki_hash()
                         }

@@ -1,9 +1,16 @@
+use std::sync::Arc;
+
+use anyhow::anyhow;
 use svalin_pki::mls::agent::MlsAgent;
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
 use tokio::sync::{mpsc, oneshot};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
-    message_streaming::{MessageFromAgent, MessageToAgent, server::AgentMessageHandler},
+    message_streaming::{
+        MessageFromAgent, MessageToAgent,
+        with_agent::{MessageHandler, MessageSender},
+    },
     remote_key_retriever::RemoteKeyRetriever,
     verifier::remote_verifier::RemoteVerifier,
 };
@@ -44,7 +51,7 @@ impl CommandDispatcher for AgentMessageDispatcher {
     type Request = ();
 
     fn key() -> String {
-        AgentMessageHandler::key()
+        MessageHandler::key()
     }
 
     fn get_request(&self) -> &Self::Request {
@@ -69,15 +76,60 @@ impl CommandDispatcher for AgentMessageDispatcher {
 }
 
 pub struct AgentMessageReceiver {
-    sender: AgentMessageDispatcherHandle,
-    mls: MlsAgent<RemoteKeyRetriever, RemoteVerifier>,
+    pub sender: AgentMessageDispatcherHandle,
+    pub mls: Arc<MlsAgent<RemoteKeyRetriever, RemoteVerifier>>,
+    pub cancel: CancellationToken,
+}
+
+impl CommandDispatcher for AgentMessageReceiver {
+    type Output = ();
+
+    type Error = anyhow::Error;
+
+    type Request = ();
+
+    fn key() -> String {
+        MessageSender::key()
+    }
+
+    fn get_request(&self) -> &Self::Request {
+        &()
+    }
+
+    async fn dispatch(
+        self,
+        session: &mut svalin_rpc::rpc::session::Session,
+    ) -> Result<Self::Output, Self::Error> {
+        while let Some(message_result) = self
+            .cancel
+            .run_until_cancelled(session.read_object::<MessageToAgent>())
+            .await
+        {
+            let message = message_result?;
+
+            let handle_result = self.handle(message).await;
+            let response = handle_result.as_ref().map(|_| ()).map_err(|_| ());
+            session.write_object(&response).await?;
+
+            if let Err(err) = handle_result {
+                tracing::error!("Failed to handle message: {err}");
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl AgentMessageReceiver {
-    fn handle(message: MessageToAgent) -> Result<(), anyhow::Error> {
+    async fn handle(&self, message: MessageToAgent) -> Result<(), anyhow::Error> {
         match message {
-            MessageToAgent::Mls(message_to_member_transport) => todo!(),
-            MessageToAgent::KeyPackageCount(_) => todo!(),
+            MessageToAgent::Mls(message) => {
+                self.mls
+                    .handle_message(message)
+                    .await
+                    .map_err(|err| anyhow!(err))?;
+                todo!();
+            }
         }
     }
 }

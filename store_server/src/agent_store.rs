@@ -3,12 +3,10 @@ use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use sqlx::SqlitePool;
 use svalin_pki::{Certificate, SpkiHash, UnverifiedCertificate};
-use tokio::sync::broadcast;
 
 #[derive(Debug)]
 pub struct AgentStore {
     pool: SqlitePool,
-    broadcast: broadcast::Sender<AgentUpdate>,
 }
 
 #[derive(Clone, Debug)]
@@ -18,8 +16,7 @@ pub enum AgentUpdate {
 
 impl AgentStore {
     pub fn open(pool: SqlitePool) -> Arc<Self> {
-        let (broadcast, _) = broadcast::channel(10);
-        Arc::new(Self { pool, broadcast })
+        Arc::new(Self { pool })
     }
 
     pub async fn get_agent(&self, spki_hash: &SpkiHash) -> Result<Option<UnverifiedCertificate>> {
@@ -50,8 +47,6 @@ impl AgentStore {
         .execute(&self.pool)
         .await?;
 
-        let _ = self.broadcast.send(AgentUpdate::Add(agent));
-
         Ok(())
     }
 
@@ -68,10 +63,6 @@ impl AgentStore {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(certificates)
-    }
-
-    pub fn subscribe(&self) -> broadcast::Receiver<AgentUpdate> {
-        self.broadcast.subscribe()
     }
 }
 

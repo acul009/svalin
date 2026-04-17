@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use svalin_pki::mls::transport_types::MessageToServerTransport;
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
     rpc::{
@@ -9,22 +8,22 @@ use svalin_rpc::{
     },
 };
 use svalin_server_store::ServerStore;
-use tokio::sync::mpsc;
 
 use crate::{
+    message_streaming::{
+        server::MlsMessageHandler,
+        with_agent::{self},
+        with_client,
+    },
     permissions::default_permission_handler::DefaultPermissionHandler,
     server::{MlsServer, chain_loader::ChainLoader},
     shared::{
         commands::{
-            agent_list::AgentListHandler,
             get_key_packages::GetKeyPackagesHandler,
-            list_user_sessions::ListUserSessionsHandler,
             load_certificate_chain::LoadCertificateChainHandler,
             login::LoginHandler,
-            mls::upload_mls::UploadMlsHandler,
             public_server_status::{PublicStatus, PublicStatusHandler},
             update_user_mls::UpdateUserMlsHandler,
-            upload_key_packages::UploadKeyPackagesHandler,
         },
         join_agent::upload_agent::UploadAgentHandler,
     },
@@ -36,7 +35,6 @@ pub struct SvalinCommandBuilder {
     pub server_cert: svalin_pki::Certificate,
     pub store: ServerStore,
     pub mls: Arc<MlsServer>,
-    pub to_mls: mpsc::Sender<MessageToServerTransport>,
     pub verifier: LocalVerifier,
 }
 
@@ -50,6 +48,21 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
         let commands = HandlerCollection::new(permission_handler);
 
         let join_manager = crate::shared::join_agent::ServerJoinManager::new();
+
+        let agent_sender = with_agent::MessageSender::new();
+        let client_sender = with_client::MessageSender::new(server.clone());
+
+        let mls_handler = Arc::new(MlsMessageHandler {
+            key_package_store: self.store.key_packages.clone(),
+            message_store: self.store.messages.clone(),
+            mls_server: self.mls.clone(),
+            verifier: self.verifier.clone(),
+        });
+
+        let agent_message_handler = with_agent::MessageHandler {
+            mls_handler: mls_handler.clone(),
+        };
+        let client_message_handler = with_client::MessageHandler { mls_handler };
 
         commands
             .chain()
@@ -75,18 +88,17 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 self.store.users.clone(),
                 self.root_cert.clone(),
             )?)
-            .add(AgentListHandler::new(
-                self.store.agents.clone(),
-                server.clone(),
-            ))
-            .add(UploadKeyPackagesHandler {
-                key_package_store: self.store.key_packages.clone(),
-                mls_server: self.mls.clone(),
-            })
+            // .add(AgentListHandler::new(
+            //     self.store.agents.clone(),
+            //     server.clone(),
+            // ))
+            // .add(UploadKeyPackagesHandler {
+            //     key_package_store: self.store.key_packages.clone(),
+            //     mls_server: self.mls.clone(),
+            // })
             .add(GetKeyPackagesHandler {
                 key_package_store: self.store.key_packages.clone(),
             })
-            .add(UploadMlsHandler(self.to_mls))
             .add(UpdateUserMlsHandler::new(
                 self.verifier.clone(),
                 self.store.users.clone(),
@@ -96,7 +108,11 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             ))
             .add(GetKeyPackagesHandler {
                 key_package_store: self.store.key_packages.clone(),
-            });
+            })
+            .add(agent_message_handler)
+            .add(client_message_handler)
+            .add(agent_sender)
+            .add(client_sender);
 
         Ok(commands)
     }

@@ -24,7 +24,7 @@ impl SessionStore {
         &self,
         certificate: Certificate,
     ) -> anyhow::Result<(), AddSessionError> {
-        if certificate.certificate_type() != CertificateType::UserDevice {
+        if certificate.certificate_type() != CertificateType::UserSession {
             return Err(AddSessionError::InvalidCertificateType(
                 certificate.certificate_type(),
             ));

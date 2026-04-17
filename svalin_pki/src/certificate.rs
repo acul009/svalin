@@ -22,7 +22,7 @@ pub enum CertificateType {
     Root,
     Temporary,
     User,
-    UserDevice,
+    UserSession,
     Agent,
     Server,
 }
@@ -569,7 +569,7 @@ impl CertificateType {
         match self {
             CertificateType::Root => true,
             CertificateType::User => true,
-            CertificateType::UserDevice => false,
+            CertificateType::UserSession => false,
             CertificateType::Agent => false,
             CertificateType::Server => false,
             CertificateType::Temporary => false,
@@ -580,7 +580,7 @@ impl CertificateType {
         match self {
             CertificateType::Root => Duration::days(365 * 10),
             CertificateType::User => Duration::days(365 * 1),
-            CertificateType::UserDevice => Duration::days(30),
+            CertificateType::UserSession => Duration::days(30),
             CertificateType::Agent => Duration::days(365 * 1),
             CertificateType::Server => Duration::days(365 * 10),
             CertificateType::Temporary => Duration::minutes(1),
@@ -594,7 +594,7 @@ impl CertificateType {
                 CertificateType::Server => true,
                 CertificateType::User => true,
                 CertificateType::Agent => true,
-                CertificateType::UserDevice => true,
+                CertificateType::UserSession => true,
                 CertificateType::Temporary => false,
             },
             CertificateType::User => match child_type {
@@ -602,10 +602,10 @@ impl CertificateType {
                 CertificateType::Server => false,
                 CertificateType::User => true,
                 CertificateType::Agent => true,
-                CertificateType::UserDevice => true,
+                CertificateType::UserSession => true,
                 CertificateType::Temporary => false,
             },
-            CertificateType::UserDevice => false,
+            CertificateType::UserSession => false,
             CertificateType::Agent => false,
             CertificateType::Server => false,
             CertificateType::Temporary => false,
@@ -618,7 +618,7 @@ impl std::fmt::Display for CertificateType {
         match self {
             CertificateType::Root => write!(f, "root"),
             CertificateType::User => write!(f, "user"),
-            CertificateType::UserDevice => write!(f, "user_device"),
+            CertificateType::UserSession => write!(f, "user_device"),
             CertificateType::Agent => write!(f, "agent"),
             CertificateType::Server => write!(f, "server"),
             CertificateType::Temporary => write!(f, "temporary"),
@@ -639,7 +639,7 @@ impl FromStr for CertificateType {
         match s {
             "root" => Ok(CertificateType::Root),
             "user" => Ok(CertificateType::User),
-            "user_device" => Ok(CertificateType::UserDevice),
+            "user_device" => Ok(CertificateType::UserSession),
             "agent" => Ok(CertificateType::Agent),
             "server" => Ok(CertificateType::Server),
             "temporary" => Ok(CertificateType::Temporary),

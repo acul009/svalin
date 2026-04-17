@@ -8,10 +8,14 @@ use svalin_rpc::{
     rustls::server::danger::ClientCertVerifier,
 };
 
-use crate::shared::commands::{
-    get_key_packages::GetKeyPackagesHandler, load_certificate_chain::LoadCertificateChainHandler,
-    mls::upload_mls::UploadMlsHandler, public_server_status::PublicStatusHandler,
-    update_user_mls::UpdateUserMlsHandler, upload_key_packages::UploadKeyPackagesHandler,
+use crate::{
+    message_streaming::{with_agent, with_client},
+    shared::commands::{
+        get_key_packages::GetKeyPackagesHandler,
+        load_certificate_chain::LoadCertificateChainHandler,
+        public_server_status::PublicStatusHandler, update_user_mls::UpdateUserMlsHandler,
+        upload_key_packages::UploadKeyPackagesHandler,
+    },
 };
 
 pub mod default_permission_handler;
@@ -80,14 +84,32 @@ impl From<&PermissionPrecursor<GetKeyPackagesHandler>> for Permission {
     }
 }
 
-impl From<&PermissionPrecursor<UploadMlsHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<UploadMlsHandler>) -> Self {
-        Permission::AuthenticatedOnly
+impl From<&PermissionPrecursor<UpdateUserMlsHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<UpdateUserMlsHandler>) -> Self {
+        Permission::UserOrSession
     }
 }
 
-impl From<&PermissionPrecursor<UpdateUserMlsHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<UpdateUserMlsHandler>) -> Self {
+impl From<&PermissionPrecursor<with_agent::MessageHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<with_agent::MessageHandler>) -> Self {
+        Permission::AgentOnlyPlaceholder
+    }
+}
+
+impl From<&PermissionPrecursor<with_agent::MessageSender>> for Permission {
+    fn from(_value: &PermissionPrecursor<with_agent::MessageSender>) -> Self {
+        Permission::AgentOnlyPlaceholder
+    }
+}
+
+impl From<&PermissionPrecursor<with_client::MessageHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<with_client::MessageHandler>) -> Self {
+        Permission::UserOrSession
+    }
+}
+
+impl From<&PermissionPrecursor<with_client::MessageSender>> for Permission {
+    fn from(_value: &PermissionPrecursor<with_client::MessageSender>) -> Self {
         Permission::UserOrSession
     }
 }

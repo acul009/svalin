@@ -16,13 +16,14 @@ use svalin_rpc::{
 };
 use svalin_server_store::{ServerStore, UserStore};
 use tokio::{
-    sync::{mpsc, oneshot},
+    sync::oneshot,
     time::{error::Elapsed, timeout},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
+    message_streaming::{with_agent, with_client},
     server::{chain_loader::ChainLoader, local_key_retriever::LocalKeyRetriever},
     shared::commands::{
         init::{InitHandler, ServerInitSuccess},
@@ -198,35 +199,15 @@ impl Server {
 
         let tls_verifier = TlsOptionalWrapper::new(verifier.clone().to_tls_verifier());
 
-        let (to_mls, from_mls) = mpsc::channel(100);
-
         let command_builder = SvalinCommandBuilder {
             verifier: verifier.clone(),
             root_cert: root,
             server_cert: credentials.certificate().clone(),
             store,
             mls: mls.clone(),
-            to_mls,
         };
 
         let tasks = TaskTracker::new();
-
-        let message_store = command_builder.store.messages.clone();
-        tasks.spawn(async move {
-            let mut recv = from_mls;
-            while let Some(message) = recv.recv().await {
-                match mls.process_message(message).await {
-                    Ok(message) => {
-                        if let Err(err) = message_store.add_message(message).await {
-                            tracing::error!("failed to add message to store: {:#}", err);
-                        }
-                    }
-                    Err(err) => {
-                        tracing::error!("failed to process message: {:#}", err);
-                    }
-                }
-            }
-        });
 
         let store_close_handle = command_builder.store.close_handle();
 

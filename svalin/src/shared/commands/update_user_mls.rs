@@ -61,7 +61,7 @@ impl UpdateUserMlsHandler {
 #[derive(Serialize, Deserialize)]
 struct UpdateData {
     mls_store: ExportedMlsStore,
-    persistent_data: EncryptedObject<persistent::ClientState>,
+    persistent_data: EncryptedObject<persistent::State>,
     messages: Vec<(Uuid, MessageToMemberTransport)>,
     key_package_count: u64,
 }
@@ -69,7 +69,7 @@ struct UpdateData {
 #[derive(Serialize, Deserialize)]
 struct UpdateResponse {
     mls_store: ExportedMlsStore,
-    persistent_data: EncryptedObject<persistent::ClientState>,
+    persistent_data: EncryptedObject<persistent::State>,
     handled: Vec<Uuid>,
     key_packages: Vec<UnverifiedKeyPackage>,
 }
@@ -89,7 +89,7 @@ impl CommandHandler for UpdateUserMlsHandler {
         _cancel: CancellationToken,
     ) -> anyhow::Result<()> {
         let peer = session.peer().certificate()?;
-        if peer.certificate_type() != CertificateType::UserDevice {
+        if peer.certificate_type() != CertificateType::UserSession {
             return Err(anyhow::anyhow!("wrong certificate type, expected session"));
         }
         let user_hash = peer.issuer().clone();
@@ -176,7 +176,7 @@ pub struct UpdateUserMls {
 }
 
 impl CommandDispatcher for UpdateUserMls {
-    type Output = persistent::ClientState;
+    type Output = persistent::State;
 
     type Error = anyhow::Error;
 

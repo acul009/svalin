@@ -15,7 +15,9 @@ use crate::{
             CreateGroupMessageError, CreateKeyPackageError, JoinGroupError, MlsProcessorHandle,
         },
         provider::{PostcardCodec, SvalinProvider},
-        transport_types::{DeviceMessage, MessageToMember, MessageToServerTransport},
+        transport_types::{
+            DeviceMessage, MessageToMember, MessageToMemberTransport, MessageToServerTransport,
+        },
     },
 };
 
@@ -72,8 +74,10 @@ where
 
     pub async fn handle_message(
         &self,
-        message: MessageToMember,
+        message: MessageToMemberTransport,
     ) -> Result<(), HandleMessageError<KeyRetriever::Error>> {
+        let message = message.unpack()?;
+
         match message {
             MessageToMember::Welcome(welcome) => self
                 .handle_welcome(welcome)
@@ -205,6 +209,8 @@ pub enum CreateSystemreportError {
 pub enum HandleMessageError<RetrieverError> {
     #[error("welcome error: {0}")]
     Welcome(#[from] HandleWelcomeError<RetrieverError>),
+    #[error("tls codec error: {0}")]
+    TlsCodex(#[from] tls_codec::Error),
 }
 
 #[derive(Debug, thiserror::Error)]

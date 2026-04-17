@@ -5,28 +5,29 @@ use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 
-pub mod device;
+// pub mod device;
 mod first_connect;
 pub mod tunnel_manager;
 
 pub mod add_agent;
 mod profile;
+pub mod state;
 
-use device::Device;
 pub use first_connect::*;
 use svalin_pki::mls::client::MlsClient;
-use svalin_pki::mls::transport_types::MessageToServerTransport;
 use svalin_pki::{Certificate, Credential, RootCertificate, SpkiHash};
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
-use tokio::sync::{mpsc, watch};
+use tokio::sync::{broadcast, watch};
 use tokio::time::error::Elapsed;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tunnel_manager::TunnelManager;
 
+use crate::client::state::{ClientState, ClientStateUpdate};
+use crate::message_streaming::client::{ClientMessageDispatcherHandle, ClientStateHandle};
 use crate::remote_key_retriever::RemoteKeyRetriever;
 use crate::verifier::remote_verifier::RemoteVerifier;
 
@@ -37,10 +38,9 @@ pub struct Client {
     root_certificate: RootCertificate,
     user_credential: Credential,
     mls: Arc<MlsClient<RemoteKeyRetriever, RemoteVerifier>>,
-    device_list: watch::Sender<BTreeMap<SpkiHash, Device>>,
     tunnel_manager: TunnelManager,
-    mls_to_server: mpsc::Sender<MessageToServerTransport>,
-    // TODO: These should not be required here, but should be created and canceled as needed
+    message_sender: ClientMessageDispatcherHandle,
+    state_handle: ClientStateHandle,
     background_tasks: TaskTracker,
     cancel: CancellationToken,
 }
@@ -64,12 +64,10 @@ impl Client {
         &self.upstream_certificate
     }
 
-    pub(crate) fn mls(&self) -> &MlsClient<RemoteKeyRetriever, RemoteVerifier> {
-        &self.mls
-    }
-
-    pub fn device(&self, spki_hash: &SpkiHash) -> Option<Device> {
-        self.device_list.borrow().get(spki_hash).cloned()
+    pub async fn subscribe_state(
+        &self,
+    ) -> Result<(ClientState, broadcast::Receiver<ClientStateUpdate>), anyhow::Error> {
+        self.state_handle.subscribe().await
     }
 
     pub async fn ping_upstream(&self) -> anyhow::Result<Duration> {
@@ -78,14 +76,6 @@ impl Client {
             .dispatch(Ping)
             .await
             .map_err(|err| anyhow!(err))
-    }
-
-    pub fn device_list<'a>(&'a self) -> watch::Ref<'a, BTreeMap<SpkiHash, Device>> {
-        self.device_list.borrow()
-    }
-
-    pub fn watch_device_list(&self) -> watch::Receiver<BTreeMap<SpkiHash, Device>> {
-        self.device_list.subscribe()
     }
 
     pub fn tunnel_manager(&self) -> &TunnelManager {
@@ -98,18 +88,6 @@ impl Client {
 
     pub(crate) fn background_tasks(&self) -> &TaskTracker {
         &self.background_tasks
-    }
-
-    pub(crate) async fn ensure_device_group_exists(&self, spki_hash: &SpkiHash) -> Result<()> {
-        if let Some(new_group) = self
-            .mls
-            .create_device_group_if_missing(spki_hash)
-            .await
-            .map_err(|err| anyhow!(err))?
-        {
-            self.mls_to_server.send(new_group).await?;
-        }
-        Ok(())
     }
 
     pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {
@@ -125,4 +103,11 @@ impl Client {
             Ok(()) => result2,
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub enum RemoteData<T> {
+    Unavailable,
+    Pending,
+    Ready(T),
 }

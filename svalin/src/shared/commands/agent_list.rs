@@ -22,7 +22,6 @@ use svalin_rpc::{
 use svalin_server_store::{AgentStore, AgentUpdate};
 use tokio::{select, sync::watch};
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
 
 use crate::{
     client::{Client, device::Device},

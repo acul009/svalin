@@ -10,16 +10,17 @@ use svalin_sysctl::sytem_report::SystemReport;
 ///
 /// That also entails that this state should be updated whether the user looks at it or not.
 /// Live data, in contrast, should only be updated when the user actively interacts with it - it's ephemeral.
-#[derive(Serialize, Deserialize)]
-pub struct ClientState {
+#[derive(Serialize, Deserialize, Clone)]
+pub struct State {
     pub(crate) devices: HashMap<SpkiHash, DeviceState>,
 }
 
+#[derive(Clone)]
 pub enum Message {
     UpdateSystemReport(SpkiHash, SystemReport),
 }
 
-impl ClientState {
+impl State {
     pub fn empty() -> Self {
         Self {
             devices: HashMap::new(),
@@ -39,7 +40,7 @@ impl ClientState {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DeviceState {
     system_report: Option<SystemReport>,
 }

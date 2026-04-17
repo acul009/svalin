@@ -53,7 +53,7 @@ pub struct InitRequest {
     verifier: RistrettoPoint,
 
     user_mls_store: ExportedMlsStore,
-    persistent_data: EncryptedObject<persistent::ClientState>,
+    persistent_data: EncryptedObject<persistent::State>,
 }
 
 pub(crate) struct InitHandler {
@@ -240,7 +240,7 @@ impl CommandDispatcher for Init {
         };
 
         // send init request
-        let empty_client_state = persistent::ClientState::empty();
+        let empty_client_state = persistent::State::empty();
         let persistent_data =
             EncryptedObject::encrypt_with_password(&empty_client_state, self.password.clone())
                 .await?;

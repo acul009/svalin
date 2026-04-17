@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use svalin_pki::{
     RootCertificate, get_current_timestamp,
     mls::{SvalinGroupId, key_retriever::KeyRetriever},
@@ -6,8 +5,7 @@ use svalin_pki::{
 use svalin_rpc::rpc::connection::{Connection, direct_connection::DirectConnection};
 
 use crate::shared::commands::{
-    get_key_packages::GetKeyPackages, list_user_sessions::ListUserSessions,
-    load_certificate_chain::ChainRequest,
+    get_key_packages::GetKeyPackages, load_certificate_chain::ChainRequest,
 };
 
 #[derive(Clone)]

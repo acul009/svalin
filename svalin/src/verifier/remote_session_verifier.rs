@@ -28,7 +28,7 @@ impl Verifier for RemoteSessionVerifier {
     ) -> Result<svalin_pki::Certificate, svalin_pki::VerifyError> {
         let certificate = self.inner.verify_spki_hash(spki_hash, time).await?;
 
-        if certificate.certificate_type() == CertificateType::UserDevice {
+        if certificate.certificate_type() == CertificateType::UserSession {
             Ok(certificate)
         } else {
             Err(VerifyError::IncorrectCertificateType)

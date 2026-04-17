@@ -34,7 +34,7 @@ pub struct RpcServer {
     config: RpcServerConfig,
     endpoint: quinn::Endpoint,
     connection_data: Mutex<ServerConnectionData>,
-    client_status_broadcast: broadcast::Sender<ClientConnectionStatus>,
+    client_status_broadcast: broadcast::Sender<(SpkiHash, bool)>,
     tasks: TaskTracker,
 }
 
@@ -43,12 +43,6 @@ struct RpcServerConfig {
     credentials: Credential,
     client_cert_verifier: Arc<dyn ClientCertVerifier>,
     cancellation_token: CancellationToken,
-}
-
-#[derive(Debug, Clone)]
-pub struct ClientConnectionStatus {
-    pub client: Certificate,
-    pub online: bool,
 }
 
 #[derive(Debug)]
@@ -115,7 +109,7 @@ impl RpcServer {
         let endpoint =
             RpcServer::create_endpoint(socket, &config).context("failed to create rpc endpoint")?;
 
-        let (br_send, _) = broadcast::channel::<ClientConnectionStatus>(10);
+        let (br_send, _) = broadcast::channel(10);
 
         let tasks = TaskTracker::new();
         let tasks2 = tasks.clone();
@@ -226,10 +220,8 @@ impl RpcServer {
             let mut lock = self.connection_data.lock().await;
             lock.latest_connections
                 .insert(cert.spki_hash().clone(), conn.clone());
-            let _ = self.client_status_broadcast.send(ClientConnectionStatus {
-                client: cert.clone(),
-                online: true,
-            });
+            self.client_status_broadcast
+                .send((cert.spki_hash().clone(), true));
 
             let on_close_future = self.clone().update_connection_data_on_close(conn.clone());
 
@@ -256,10 +248,9 @@ impl RpcServer {
             if let Some(latest_peer_conn) = lock.latest_connections.get(cert.spki_hash()) {
                 if latest_peer_conn.eq(&conn) {
                     lock.latest_connections.remove(cert.spki_hash());
-                    let _ = self.client_status_broadcast.send(ClientConnectionStatus {
-                        client: cert.clone(),
-                        online: false,
-                    });
+                    let _ = self
+                        .client_status_broadcast
+                        .send((cert.spki_hash().clone(), false));
                 }
             }
         }
@@ -292,7 +283,7 @@ impl RpcServer {
         Ok(session)
     }
 
-    pub fn subscribe_to_connection_status(&self) -> broadcast::Receiver<ClientConnectionStatus> {
+    pub fn subscribe_to_connection_status(&self) -> broadcast::Receiver<(SpkiHash, bool)> {
         self.client_status_broadcast.subscribe()
     }
 

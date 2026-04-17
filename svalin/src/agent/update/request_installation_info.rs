@@ -11,7 +11,7 @@ use svalin_rpc::rpc::{
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 
-use crate::{client::device::RemoteData, permissions::Permission};
+use crate::{client::RemoteData, permissions::Permission};
 
 use super::{InstallationInfo, Updater};
 

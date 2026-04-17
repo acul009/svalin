@@ -23,16 +23,21 @@ use update::{
 mod init;
 pub mod update;
 
-use crate::client::tunnel_manager::tcp::handler::TcpForwardHandler;
-use crate::permissions::default_permission_handler::DefaultPermissionHandler;
 use crate::remote_key_retriever::RemoteKeyRetriever;
 use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::commands::terminal::RemoteTerminalHandler;
-use crate::shared::commands::upload_key_packages::UploadKeyPackages;
 use crate::shared::join_agent::AgentInitPayload;
 use crate::util::key_storage::KeySource;
 use crate::util::location::{Location, LocationError};
 use crate::verifier::remote_verifier::RemoteVerifier;
+use crate::{
+    client::tunnel_manager::tcp::handler::TcpForwardHandler,
+    message_streaming::agent::AgentMessageDispatcher,
+};
+use crate::{
+    message_streaming::agent::AgentMessageReceiver,
+    permissions::default_permission_handler::DefaultPermissionHandler,
+};
 
 pub struct Agent {
     rpc: Arc<RpcClient>,
@@ -139,26 +144,41 @@ impl Agent {
             .add(DeauthenticateHandler::new(public_commands));
 
         debug!("Starting agent background tasks");
+        let tasks = TaskTracker::new();
+
+        let (messager_handle, message_dispatcher) = AgentMessageDispatcher::new();
 
         let connection = rpc.upstream_connection();
-        let mls2 = mls.clone();
-        let cancel2 = cancel.clone();
-        let key_package_task = tokio::spawn(async move {
-            if let Err(err) = connection
-                .dispatch(UploadKeyPackages::new(mls2, cancel2))
-                .await
-            {
-                tracing::error!("Failed to upload key packages: {err}");
+        tasks.spawn(async move {
+            if let Err(err) = connection.dispatch(message_dispatcher).await {
+                tracing::error!("Failed to dispatch messages: {err}");
             }
         });
 
-        debug!("Agent will now start serving requests");
+        let receiver = AgentMessageReceiver {
+            cancel: cancel.clone(),
+            mls,
+            sender: messager_handle,
+        };
 
-        rpc.serve(server_commands)
-            .await
-            .context("error serving rpc")?;
+        let connection = rpc.upstream_connection();
+        tasks.spawn(async move {
+            if let Err(err) = connection.dispatch(receiver).await {
+                tracing::error!("Failed to receive messages: {err}");
+            }
+        });
 
-        let _ = key_package_task.await;
+        tasks.spawn(async move {
+            debug!("Agent will now start serving requests");
+            if let Err(err) = rpc.serve(server_commands).await {
+                tracing::error!("Failed to serve requests: {err}");
+            }
+        });
+
+        cancel.cancelled().await;
+        tasks.close();
+        // TODO: add timeout with error message
+        tasks.wait().await;
 
         Ok(())
     }

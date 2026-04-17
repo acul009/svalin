@@ -33,7 +33,7 @@ pub struct StoredUser {
     pub verifier: RistrettoPoint,
 
     pub mls_store: ExportedMlsStore,
-    pub persistent_data: EncryptedObject<persistent::ClientState>,
+    pub persistent_data: EncryptedObject<persistent::State>,
 }
 
 #[derive(Debug)]
@@ -51,7 +51,7 @@ impl UserStore {
         params: ParamsString,
         verifier: RistrettoPoint,
         mls_store: ExportedMlsStore,
-        persistent_data: EncryptedObject<persistent::ClientState>,
+        persistent_data: EncryptedObject<persistent::State>,
     ) -> Result<()> {
         let count: u64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
             .fetch_one(&self.pool)
@@ -161,7 +161,7 @@ impl UserStore {
         &self,
         spki_hash: &SpkiHash,
         mls_store: ExportedMlsStore,
-        persistent_data: EncryptedObject<persistent::ClientState>,
+        persistent_data: EncryptedObject<persistent::State>,
     ) -> anyhow::Result<(), UpdateMlsDataError> {
         let mut tx = self.pool.begin().await?;
 

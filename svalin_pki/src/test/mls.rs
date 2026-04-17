@@ -302,9 +302,7 @@ async fn test_device_group() {
     let server = MlsServer::new(storage, verifier.clone(), retriever.clone());
     let welcome = server.process_message(new_group).await.unwrap();
 
-    let to_member = welcome.message.unpack().unwrap();
-
-    agent.handle_message(to_member).await.unwrap();
+    agent.handle_message(welcome.message).await.unwrap();
 
     let report = "Test Data".to_string();
     let to_server = agent.send_report(report.clone()).await.unwrap();

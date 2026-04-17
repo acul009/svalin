@@ -18,7 +18,6 @@ use tokio::{
     sync::{oneshot, watch},
     task::JoinSet,
 };
-use tracing::debug;
 use uuid::Uuid;
 
 pub mod tcp;

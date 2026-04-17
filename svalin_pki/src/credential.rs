@@ -268,7 +268,7 @@ impl Credential {
 
         let certificate = self.create_certificate_for_key(
             &keypair.export_public_key(),
-            CertificateType::UserDevice,
+            CertificateType::UserSession,
         )?;
 
         keypair.upgrade(certificate)

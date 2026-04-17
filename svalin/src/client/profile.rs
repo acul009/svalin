@@ -1,24 +1,22 @@
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use anyhow::{Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
+use svalin_client_store::ClientStore;
 use svalin_pki::{
     Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
     RootCertificate, UnverifiedCertificate, get_current_timestamp, mls::client::MlsClient,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
-use tokio::sync::{mpsc, watch};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
     client::tunnel_manager::TunnelManager,
+    message_streaming::client::{ClientMessageDispatcher, ClientMessageReceiver},
     remote_key_retriever::RemoteKeyRetriever,
-    shared::commands::{
-        agent_list::UpdateAgentList, mls::upload_mls::UploadMls, update_user_mls::UpdateUserMls,
-        upload_key_packages::UploadKeyPackages,
-    },
+    shared::commands::update_user_mls::UpdateUserMls,
     util::location::{Location, LocationError},
     verifier::remote_verifier::RemoteVerifier,
 };
@@ -163,7 +161,8 @@ impl Client {
         // debug!("Data from profile ready");
 
         if let Some(profile) = profile {
-            let db_path = profile.profile_dir().await?.push("mls-store.sqlite");
+            let mls_db_path = profile.profile_dir().await?.push("mls-store.sqlite");
+            let client_db_path = profile.profile_dir().await?.push("client-store.sqlite");
             // debug!("unlocking profile");
             let user_credential = profile.user_credential.decrypt(password.clone()).await?;
             let device_credential = profile.device_credential.decrypt(password.clone()).await?;
@@ -190,7 +189,7 @@ impl Client {
             // debug!("connected to server");
 
             // debug!("opening sqlite database: {}", db_path.display());
-            let url = db_path
+            let url = mls_db_path
                 .as_path()
                 .to_str()
                 .ok_or_else(|| anyhow!("db_path was not valid UTF-8"))?;
@@ -207,7 +206,35 @@ impl Client {
 
             let tunnel_manager = TunnelManager::new();
 
-            let (send, recv) = mpsc::channel(100);
+            let (dispatcher_handle, message_dispatcher) = ClientMessageDispatcher::new();
+
+            // Starting Background Tasks
+            let background_tasks = TaskTracker::new();
+            let cancel = CancellationToken::new();
+
+            let connection = rpc.upstream_connection();
+            background_tasks.spawn(async move {
+                if let Err(err) = connection.dispatch(message_dispatcher).await {
+                    error!("failed to send messages to server: {:#}", err);
+                }
+            });
+
+            let client_store = Arc::new(ClientStore::open(client_db_path).await?);
+
+            let (message_receiver, client_state_handle) = ClientMessageReceiver::initialize(
+                dispatcher_handle.clone(),
+                mls.clone(),
+                cancel.clone(),
+                client_store,
+            )
+            .await?;
+
+            let connection = rpc.upstream_connection();
+            background_tasks.spawn(async move {
+                if let Err(err) = connection.dispatch(message_receiver).await {
+                    error!("failed to send messages to server: {:#}", err);
+                }
+            });
 
             let client = Arc::new(Self {
                 rpc,
@@ -215,62 +242,18 @@ impl Client {
                 upstream_certificate,
                 root_certificate: root_certificate.clone(),
                 user_credential: user_credential,
-                device_list: watch::channel(BTreeMap::new()).0,
                 tunnel_manager,
                 mls,
-                mls_to_server: send,
-                background_tasks: TaskTracker::new(),
-                cancel: CancellationToken::new(),
-            });
-
-            let connection = client.rpc.upstream_connection();
-            let mls = client.mls.clone();
-            let cancel = client.cancel.clone();
-            client.background_tasks.spawn(async move {
-                if let Err(err) = connection
-                    .dispatch(UploadKeyPackages::new(mls, cancel))
-                    .await
-                {
-                    error!("failed to upload key packages: {:#}", err);
-                }
-            });
-
-            let connection = client.rpc.upstream_connection();
-            let cancel = client.cancel.clone();
-            client.background_tasks.spawn(async move {
-                if let Err(err) = connection.dispatch(UploadMls(recv, cancel)).await {
-                    error!("failed to upload mls: {:#}", err);
-                }
-            });
-
-            let list_clone = client.device_list.clone();
-            let sync_connection = client.rpc.upstream_connection();
-            let cancel = client.cancel.clone();
-            let client2 = client.clone();
-            let verifier = remote_verifier.clone().agent_only();
-
-            client.background_tasks.spawn(async move {
-                // debug!("subscribing to upstream agent list");
-                if let Err(err) = sync_connection
-                    .dispatch(UpdateAgentList {
-                        client: client2,
-                        base_connection: sync_connection.clone(),
-                        credentials: device_credential,
-                        list: list_clone,
-                        verifier: verifier,
-                        cancel,
-                    })
-                    .await
-                {
-                    error!("error while keeping agent list in sync: {}", err);
-                }
+                message_sender: dispatcher_handle.clone(),
+                state_handle: client_state_handle,
+                background_tasks,
+                cancel,
             });
 
             let connection = client.rpc.upstream_connection();
             let cancel = client.cancel.clone();
             let password = password.clone();
             let user_credential = client.user_credential.clone();
-
             client.background_tasks.spawn(async move {
                 debug!("starting user mls update task");
                 let cancel = cancel;
