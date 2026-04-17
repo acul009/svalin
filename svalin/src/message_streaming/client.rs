@@ -65,6 +65,7 @@ impl CommandDispatcher for ClientMessageDispatcher {
         mut self,
         session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
+        tracing::debug!("Message Dispatcher connected!");
         while let Some((message, feedback)) = self.0.recv().await {
             session.write_object(&message).await?;
 
@@ -124,6 +125,7 @@ impl CommandDispatcher for ClientMessageReceiver {
         self,
         session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
+        tracing::debug!("client message receiver connected!");
         while let Some(message_result) = self
             .cancel
             .run_until_cancelled(session.read_object::<MessageToClient>())
@@ -156,14 +158,16 @@ impl ClientMessageReceiver {
                 todo!();
             }
             MessageToClient::AgentOnlineStatus(spki_hash, online) => {
-                self.update_client_state(ClientStateUpdate::AgentOnlineStatus(spki_hash, online));
+                self.update_client_state(ClientStateUpdate::AgentOnlineStatus(spki_hash, online))
+                    .await;
                 Ok(())
             }
         }
     }
 
     async fn update_client_state(&self, update: ClientStateUpdate) {
-        self.update_sender
+        let _ = self
+            .update_sender
             .send(ClientStateRequest::Update(update))
             .await;
     }

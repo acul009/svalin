@@ -1,14 +1,9 @@
-// pub mod add_user;
-// pub mod agent_list;
 pub mod get_key_packages;
-// pub mod get_user_certs;
 pub mod init;
 pub mod list_user_sessions;
 pub mod load_certificate_chain;
 pub mod login;
-// pub mod mls;
 pub mod public_server_status;
 pub mod realtime_status;
 pub mod terminal;
 pub mod update_user_mls;
-pub mod upload_key_packages;

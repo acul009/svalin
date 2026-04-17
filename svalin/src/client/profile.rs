@@ -156,136 +156,132 @@ impl Client {
     }
 
     pub async fn open_profile(profile_key: &str, password: Vec<u8>) -> Result<Arc<Self>> {
-        let profile = Self::get_profile(&profile_key).await?;
+        let Some(profile) = Self::get_profile(&profile_key).await? else {
+            return Err(anyhow!("Profile is empty"));
+        };
 
-        // debug!("Data from profile ready");
+        let mls_db_path = profile.profile_dir().await?.push("mls-store.sqlite");
+        let client_db_path = profile.profile_dir().await?.push("client-store.sqlite");
+        // debug!("unlocking profile");
+        let user_credential = profile.user_credential.decrypt(password.clone()).await?;
+        let device_credential = profile.device_credential.decrypt(password.clone()).await?;
+        let root_certificate = profile.root_certificate.use_as_root()?;
+        let upstream_certificate = profile
+            .upstream_certificate
+            .verify_signature(&root_certificate, get_current_timestamp())?;
 
-        if let Some(profile) = profile {
-            let mls_db_path = profile.profile_dir().await?.push("mls-store.sqlite");
-            let client_db_path = profile.profile_dir().await?.push("client-store.sqlite");
-            // debug!("unlocking profile");
-            let user_credential = profile.user_credential.decrypt(password.clone()).await?;
-            let device_credential = profile.device_credential.decrypt(password.clone()).await?;
-            let root_certificate = profile.root_certificate.use_as_root()?;
-            let upstream_certificate = profile
-                .upstream_certificate
-                .verify_signature(&root_certificate, get_current_timestamp())?;
+        // debug!("creating verifier");
+        let verifier = ExactVerififier::new(upstream_certificate.clone()).to_tls_verifier();
 
-            // debug!("creating verifier");
-            let verifier = ExactVerififier::new(upstream_certificate.clone()).to_tls_verifier();
+        // debug!("connecting to server");
+        let rpc = RpcClient::connect(
+            &profile.upstream_address,
+            Some(&device_credential),
+            verifier,
+            CancellationToken::new(),
+        )
+        .await?;
 
-            // debug!("connecting to server");
-            let rpc = RpcClient::connect(
-                &profile.upstream_address,
-                Some(&device_credential),
-                verifier,
-                CancellationToken::new(),
-            )
-            .await?;
+        let remote_verifier =
+            RemoteVerifier::new(root_certificate.clone(), rpc.upstream_connection());
 
-            let remote_verifier =
-                RemoteVerifier::new(root_certificate.clone(), rpc.upstream_connection());
+        // debug!("connected to server");
 
-            // debug!("connected to server");
+        // debug!("opening sqlite database: {}", db_path.display());
+        let url = mls_db_path
+            .as_path()
+            .to_str()
+            .ok_or_else(|| anyhow!("db_path was not valid UTF-8"))?;
+        let storage_provider = SqliteStorageProvider::open(&url).await?;
+        let key_retriever =
+            RemoteKeyRetriever::new(rpc.upstream_connection(), root_certificate.clone());
 
-            // debug!("opening sqlite database: {}", db_path.display());
-            let url = mls_db_path
-                .as_path()
-                .to_str()
-                .ok_or_else(|| anyhow!("db_path was not valid UTF-8"))?;
-            let storage_provider = SqliteStorageProvider::open(&url).await?;
-            let key_retriever =
-                RemoteKeyRetriever::new(rpc.upstream_connection(), root_certificate.clone());
+        let mls = Arc::new(MlsClient::new(
+            device_credential.clone(),
+            storage_provider.into(),
+            key_retriever.clone(),
+            remote_verifier.clone(),
+        )?);
 
-            let mls = Arc::new(MlsClient::new(
-                device_credential.clone(),
-                storage_provider.into(),
-                key_retriever.clone(),
-                remote_verifier.clone(),
-            )?);
+        let tunnel_manager = TunnelManager::new();
 
-            let tunnel_manager = TunnelManager::new();
+        let (dispatcher_handle, message_dispatcher) = ClientMessageDispatcher::new();
 
-            let (dispatcher_handle, message_dispatcher) = ClientMessageDispatcher::new();
+        // Starting Background Tasks
+        let background_tasks = TaskTracker::new();
+        let cancel = CancellationToken::new();
 
-            // Starting Background Tasks
-            let background_tasks = TaskTracker::new();
-            let cancel = CancellationToken::new();
+        let connection = rpc.upstream_connection();
+        background_tasks.spawn(async move {
+            if let Err(err) = connection.dispatch(message_dispatcher).await {
+                error!("failed to send messages to server: {:#}", err);
+            }
+        });
 
-            let connection = rpc.upstream_connection();
-            background_tasks.spawn(async move {
-                if let Err(err) = connection.dispatch(message_dispatcher).await {
-                    error!("failed to send messages to server: {:#}", err);
+        let client_store = Arc::new(ClientStore::open(client_db_path).await?);
+
+        let (message_receiver, client_state_handle) = ClientMessageReceiver::initialize(
+            dispatcher_handle.clone(),
+            mls.clone(),
+            cancel.clone(),
+            client_store,
+        )
+        .await?;
+
+        let connection = rpc.upstream_connection();
+        background_tasks.spawn(async move {
+            if let Err(err) = connection.dispatch(message_receiver).await {
+                error!("failed to send messages to server: {:#}", err);
+            }
+        });
+
+        let client = Arc::new(Self {
+            rpc,
+            _upstream_address: profile.upstream_address,
+            upstream_certificate,
+            root_certificate: root_certificate.clone(),
+            user_credential: user_credential,
+            tunnel_manager,
+            mls,
+            message_sender: dispatcher_handle.clone(),
+            state_handle: client_state_handle,
+            background_tasks,
+            cancel,
+        });
+
+        let connection = client.rpc.upstream_connection();
+        let cancel = client.cancel.clone();
+        let password = password.clone();
+        let user_credential = client.user_credential.clone();
+        client.background_tasks.spawn(async move {
+            debug!("starting user mls update task");
+            let cancel = cancel;
+            let password = password;
+            let key_retriever = key_retriever;
+            let user_credential = user_credential;
+            let verifier = remote_verifier;
+            loop {
+                if let Err(err) = connection
+                    .dispatch(UpdateUserMls {
+                        password: password.clone(),
+                        key_retriever: key_retriever.clone(),
+                        user_credential: user_credential.clone(),
+                        verifier: verifier.clone(),
+                    })
+                    .await
+                {
+                    tracing::error!("error while updating user mls: {}", err);
                 }
-            });
-
-            let client_store = Arc::new(ClientStore::open(client_db_path).await?);
-
-            let (message_receiver, client_state_handle) = ClientMessageReceiver::initialize(
-                dispatcher_handle.clone(),
-                mls.clone(),
-                cancel.clone(),
-                client_store,
-            )
-            .await?;
-
-            let connection = rpc.upstream_connection();
-            background_tasks.spawn(async move {
-                if let Err(err) = connection.dispatch(message_receiver).await {
-                    error!("failed to send messages to server: {:#}", err);
+                if cancel
+                    .run_until_cancelled(tokio::time::sleep(Duration::from_secs(30)))
+                    .await
+                    .is_none()
+                {
+                    break;
                 }
-            });
+            }
+        });
 
-            let client = Arc::new(Self {
-                rpc,
-                _upstream_address: profile.upstream_address,
-                upstream_certificate,
-                root_certificate: root_certificate.clone(),
-                user_credential: user_credential,
-                tunnel_manager,
-                mls,
-                message_sender: dispatcher_handle.clone(),
-                state_handle: client_state_handle,
-                background_tasks,
-                cancel,
-            });
-
-            let connection = client.rpc.upstream_connection();
-            let cancel = client.cancel.clone();
-            let password = password.clone();
-            let user_credential = client.user_credential.clone();
-            client.background_tasks.spawn(async move {
-                debug!("starting user mls update task");
-                let cancel = cancel;
-                let password = password;
-                let key_retriever = key_retriever;
-                let user_credential = user_credential;
-                let verifier = remote_verifier;
-                loop {
-                    if let Err(err) = connection
-                        .dispatch(UpdateUserMls {
-                            password: password.clone(),
-                            key_retriever: key_retriever.clone(),
-                            user_credential: user_credential.clone(),
-                            verifier: verifier.clone(),
-                        })
-                        .await
-                    {
-                        tracing::error!("error while updating user mls: {}", err);
-                    }
-                    if cancel
-                        .run_until_cancelled(tokio::time::sleep(Duration::from_secs(30)))
-                        .await
-                        .is_none()
-                    {
-                        break;
-                    }
-                }
-            });
-
-            Ok(client)
-        } else {
-            Err(anyhow!("Profile is empty"))
-        }
+        Ok(client)
     }
 }

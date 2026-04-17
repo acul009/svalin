@@ -98,6 +98,8 @@ impl CommandHandler for MessageSender {
             return Err(anyhow!("Expected peer to be a session"));
         };
 
+        tracing::debug!("client {peer:?} now receiving messages");
+
         let (sender, receiver) = mpsc::channel(10);
 
         // stream agent online status
@@ -108,10 +110,15 @@ impl CommandHandler for MessageSender {
             let sender = sender2;
             let mut recv = server.subscribe_to_connection_status();
             for connected in server.get_current_connected_clients().await {
-                sender.send((MessageToClient::AgentOnlineStatus(connected, true), None));
+                let _ = sender
+                    .send((MessageToClient::AgentOnlineStatus(connected, true), None))
+                    .await;
             }
             while let Ok((spki_hash, online)) = recv.recv().await {
-                sender.send((MessageToClient::AgentOnlineStatus(spki_hash, online), None));
+                tracing::debug!("peer online status: {spki_hash:?} {online}");
+                let _ = sender
+                    .send((MessageToClient::AgentOnlineStatus(spki_hash, online), None))
+                    .await;
             }
         });
 

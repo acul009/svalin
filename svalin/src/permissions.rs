@@ -14,7 +14,6 @@ use crate::{
         get_key_packages::GetKeyPackagesHandler,
         load_certificate_chain::LoadCertificateChainHandler,
         public_server_status::PublicStatusHandler, update_user_mls::UpdateUserMlsHandler,
-        upload_key_packages::UploadKeyPackagesHandler,
     },
 };
 
@@ -68,12 +67,6 @@ impl<Nested: PermissionHandler> From<&PermissionPrecursor<DeauthenticateHandler<
     for Permission
 {
     fn from(_value: &PermissionPrecursor<DeauthenticateHandler<Nested>>) -> Self {
-        Permission::AuthenticatedOnly
-    }
-}
-
-impl From<&PermissionPrecursor<UploadKeyPackagesHandler>> for Permission {
-    fn from(_value: &PermissionPrecursor<UploadKeyPackagesHandler>) -> Self {
         Permission::AuthenticatedOnly
     }
 }
