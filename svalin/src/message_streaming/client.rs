@@ -80,7 +80,7 @@ impl CommandDispatcher for ClientMessageDispatcher {
 }
 
 pub struct ClientMessageReceiver {
-    sender: ClientMessageDispatcherHandle,
+    _to_server: ClientMessageDispatcherHandle,
     mls: Arc<MlsClient<RemoteKeyRetriever, RemoteVerifier>>,
     cancel: CancellationToken,
     update_sender: mpsc::Sender<ClientStateRequest>,
@@ -96,7 +96,7 @@ impl ClientMessageReceiver {
         let state_handle = ClientStateHandle::initialize(store).await?;
 
         let me = Self {
-            sender,
+            _to_server: sender,
             mls,
             cancel,
             update_sender: state_handle.channel.clone(),

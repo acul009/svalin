@@ -22,7 +22,6 @@ use svalin_rpc::{
 };
 use tokio::{io::copy_bidirectional, select, sync::oneshot};
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
 
 use crate::{client::Client, shared::join_agent::upload_agent::UploadAgentCommandError};
 

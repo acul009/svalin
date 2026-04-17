@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,11 +14,11 @@ pub mod state;
 
 pub use first_connect::*;
 use svalin_pki::mls::client::MlsClient;
-use svalin_pki::{Certificate, Credential, RootCertificate, SpkiHash};
+use svalin_pki::{Certificate, Credential, RootCertificate};
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
-use tokio::sync::{broadcast, watch};
+use tokio::sync::broadcast;
 use tokio::time::error::Elapsed;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
@@ -80,14 +79,6 @@ impl Client {
 
     pub fn tunnel_manager(&self) -> &TunnelManager {
         &self.tunnel_manager
-    }
-
-    pub(crate) fn cancellation_token(&self) -> &CancellationToken {
-        &self.cancel
-    }
-
-    pub(crate) fn background_tasks(&self) -> &TaskTracker {
-        &self.background_tasks
     }
 
     pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {

@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::permissions::PermissionHandler;
 use crate::rpc::{command::handler::HandlerCollection, session::Session};

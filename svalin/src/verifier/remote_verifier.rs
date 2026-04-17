@@ -5,7 +5,6 @@ use svalin_pki::{
     Certificate, RootCertificate, SpkiHash, Verifier, VerifyError, get_current_timestamp,
 };
 use svalin_rpc::rpc::connection::{Connection, direct_connection::DirectConnection};
-use tracing::debug;
 
 use crate::{
     shared::commands::load_certificate_chain::ChainRequest,

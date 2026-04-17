@@ -2,7 +2,6 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use quinn::{VarInt, rustls::pki_types::CertificateDer};
 use svalin_pki::Certificate;
-use tracing::debug;
 
 use crate::{
     rpc::peer::Peer,

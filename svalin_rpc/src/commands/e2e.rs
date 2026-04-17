@@ -5,7 +5,6 @@ use async_trait::async_trait;
 use quinn::rustls::server::danger::ClientCertVerifier;
 use svalin_pki::{Certificate, Credential, ExactVerififier, KnownCertificateVerifier};
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
 
 use crate::{
     permissions::PermissionHandler,

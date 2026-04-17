@@ -14,7 +14,7 @@ use tokio::time::error::Elapsed;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::permissions::PermissionHandler;
 use crate::rpc::connection::{Connection, ServeableConnection};
@@ -220,7 +220,8 @@ impl RpcServer {
             let mut lock = self.connection_data.lock().await;
             lock.latest_connections
                 .insert(cert.spki_hash().clone(), conn.clone());
-            self.client_status_broadcast
+            let _ = self
+                .client_status_broadcast
                 .send((cert.spki_hash().clone(), true));
 
             let on_close_future = self.clone().update_connection_data_on_close(conn.clone());

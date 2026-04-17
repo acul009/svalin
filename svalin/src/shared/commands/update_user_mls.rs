@@ -8,8 +8,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_client_store::persistent;
 use svalin_pki::{
-    CertificateChainBuilder, CertificateType, Credential, EncryptedObject, ExactVerififier,
-    RootCertificate, SpkiHash, Verifier, get_current_timestamp,
+    CertificateType, Credential, EncryptedObject, ExactVerififier, SpkiHash, Verifier, get_current_timestamp,
     mls::{
         client::{MessageData, MlsClient},
         key_package::UnverifiedKeyPackage,

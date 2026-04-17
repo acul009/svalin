@@ -9,10 +9,7 @@ use crate::{
         peer::Peer,
         session::{SessionReadError, SessionWriteError},
     },
-    transport::{
-        aucpace_transport::{AucPaceClientError, AucPaceTransport},
-        combined_transport::CombinedTransport,
-    },
+    transport::aucpace_transport::{AucPaceClientError, AucPaceTransport},
 };
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;

@@ -23,7 +23,6 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
-    message_streaming::{with_agent, with_client},
     server::{chain_loader::ChainLoader, local_key_retriever::LocalKeyRetriever},
     shared::commands::{
         init::{InitHandler, ServerInitSuccess},
@@ -191,7 +190,6 @@ impl Server {
             root.clone(),
             store.agents.clone(),
             store.users.clone(),
-            store.sessions.clone(),
             store.key_packages.clone(),
         );
 

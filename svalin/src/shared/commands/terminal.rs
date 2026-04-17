@@ -12,7 +12,6 @@ use svalin_rpc::rpc::{
 
 use tokio::{select, sync::mpsc};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::debug;
 
 use crate::permissions::Permission;
 

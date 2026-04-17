@@ -2,8 +2,6 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::transport::session_transport::SessionTransport;
 
-use super::session_transport::{SessionTransportReader, SessionTransportWriter};
-
 pub struct ChunkTransport {
     transport: Box<dyn SessionTransport>,
 }
@@ -75,10 +73,6 @@ impl ChunkTransport {
     }
 }
 
-pub(crate) struct ChunkReader {
-    read: Box<dyn SessionTransportReader>,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum ChunkReaderError {
     #[error("Failed to read chunk length: {0}")]
@@ -87,57 +81,6 @@ pub enum ChunkReaderError {
     ExtendedLengthReadError(std::io::Error),
     #[error("Failed to read chunk body: {0}")]
     BodyReadError(std::io::Error),
-}
-
-impl ChunkReader {
-    pub(crate) fn new(read: Box<dyn SessionTransportReader>) -> Self {
-        Self { read }
-    }
-
-    pub async fn read_chunk(&mut self) -> Result<Vec<u8>, ChunkReaderError> {
-        let short_len = self
-            .read
-            .read_u8()
-            .await
-            .map_err(|err| ChunkReaderError::LengthReadError(err))?;
-
-        // println!("read short len: {}", short_len);
-
-        let len = match ChunkLength::try_from_byte(short_len) {
-            Some(len) => len,
-            None => {
-                let mut size = [short_len, 0, 0, 0];
-                self.read
-                    .read_exact(&mut size[1..])
-                    .await
-                    .map_err(|err| ChunkReaderError::LengthReadError(err))?;
-                ChunkLength::from_4bytes(size)
-            }
-        };
-
-        let mut chunk = vec![0; len.to_usize()];
-
-        self.read
-            .read_exact(&mut chunk)
-            .await
-            .map_err(|err| ChunkReaderError::BodyReadError(err))?;
-
-        // debug!("read chunk: {:x?}", &chunk);
-
-        Ok(chunk)
-    }
-
-    pub fn get_reader(self) -> Box<dyn SessionTransportReader> {
-        self.read
-    }
-
-    pub fn borrow_reader(&mut self) -> &mut dyn SessionTransportReader {
-        &mut self.read
-    }
-}
-
-pub(crate) struct ChunkWriter {
-    write: Box<dyn SessionTransportWriter>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -150,40 +93,6 @@ pub enum ChunkWriterError {
     ExtendedLengthWriteError(std::io::Error),
     #[error("Failed to write chunk body: {0}")]
     BodyWriteError(std::io::Error),
-}
-
-impl ChunkWriter {
-    pub(crate) fn new(write: Box<dyn SessionTransportWriter>) -> Self {
-        Self { write }
-    }
-
-    pub async fn write_chunk(&mut self, chunk: &[u8]) -> Result<(), ChunkWriterError> {
-        let len = ChunkLength::from_usize(chunk.len());
-
-        self.write
-            .write_all(len.as_bytes())
-            .await
-            .map_err(|err| ChunkWriterError::ExtendedLengthWriteError(err))?;
-
-        self.write
-            .write_all(chunk)
-            .await
-            .map_err(|err| ChunkWriterError::BodyWriteError(err))?;
-
-        Ok(())
-    }
-
-    pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
-        self.write.shutdown().await
-    }
-
-    pub fn get_writer(self) -> Box<dyn SessionTransportWriter> {
-        self.write
-    }
-
-    pub fn borrow_writer(&mut self) -> &mut dyn SessionTransportWriter {
-        &mut self.write
-    }
 }
 
 pub enum ChunkLength {

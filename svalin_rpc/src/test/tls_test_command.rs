@@ -9,10 +9,7 @@ use crate::{
         peer::Peer,
         session::{SessionReadError, SessionWriteError},
     },
-    transport::{
-        combined_transport::CombinedTransport,
-        tls_transport::{TlsClientError, TlsTransport},
-    },
+    transport::tls_transport::{TlsClientError, TlsTransport},
 };
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;

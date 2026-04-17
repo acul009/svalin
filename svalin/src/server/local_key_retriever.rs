@@ -5,13 +5,12 @@ use svalin_pki::{
     CertificateChainBuilder, RootCertificate, get_current_timestamp,
     mls::{SvalinGroupId, key_retriever::KeyRetriever},
 };
-use svalin_server_store::{AgentStore, KeyPackageStore, SessionStore, UserStore};
+use svalin_server_store::{AgentStore, KeyPackageStore, UserStore};
 
 pub struct LocalKeyRetriever {
     root: RootCertificate,
     agent_store: Arc<AgentStore>,
     user_store: Arc<UserStore>,
-    session_store: Arc<SessionStore>,
     key_package_store: Arc<KeyPackageStore>,
 }
 
@@ -20,14 +19,12 @@ impl LocalKeyRetriever {
         root: RootCertificate,
         agent_store: Arc<AgentStore>,
         user_store: Arc<UserStore>,
-        session_store: Arc<SessionStore>,
         key_package_store: Arc<KeyPackageStore>,
     ) -> Self {
         Self {
             root,
             agent_store,
             user_store,
-            session_store,
             key_package_store,
         }
     }

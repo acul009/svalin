@@ -7,7 +7,7 @@ use svalin_pki::{Certificate, CertificateType, SpkiHash};
 use svalin_rpc::rpc::{
     command::handler::CommandHandler, peer::Peer, server::RpcServer, session::Session,
 };
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 use crate::message_streaming::{MessageFromClient, MessageToClient, server::MlsMessageHandler};

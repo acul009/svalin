@@ -1,7 +1,6 @@
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
 
 use crate::{
     permissions::PermissionHandler,

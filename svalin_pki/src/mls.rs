@@ -1,7 +1,7 @@
 use openmls::prelude::CredentialType;
 use openmls_traits::signatures::SignerError;
 
-use crate::{Certificate, Credential, SpkiHash, signed_message::CanSign};
+use crate::{Credential, SpkiHash, signed_message::CanSign};
 
 pub mod agent;
 pub mod client;

@@ -2,10 +2,7 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use crate::transport::{chunked_transport::ChunkTransport, session_transport::SessionTransport};
 
-use super::{
-    chunked_transport::{ChunkReader, ChunkReaderError, ChunkWriter, ChunkWriterError},
-    session_transport::{SessionTransportReader, SessionTransportWriter},
-};
+use super::chunked_transport::{ChunkReaderError, ChunkWriterError};
 
 pub struct ObjectTransport {
     transport: ChunkTransport,
@@ -67,10 +64,6 @@ impl ObjectTransport {
     }
 }
 
-pub struct ObjectReader {
-    read: ChunkReader,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum ObjectReaderError {
     #[error("Failed to read chunk: {0}")]
@@ -79,71 +72,12 @@ pub enum ObjectReaderError {
     DeserializeError(#[from] postcard::Error),
 }
 
-impl ObjectReader {
-    pub(crate) fn new(read: Box<dyn SessionTransportReader>) -> Self {
-        Self {
-            read: ChunkReader::new(read),
-        }
-    }
-
-    pub async fn read_object<U: DeserializeOwned>(&mut self) -> Result<U, ObjectReaderError> {
-        let chunk = self.read.read_chunk().await?;
-
-        let object: U = postcard::from_bytes(&chunk)?;
-
-        Ok(object)
-    }
-
-    pub fn get_reader(self) -> Box<dyn SessionTransportReader> {
-        self.read.get_reader()
-    }
-
-    pub fn borrow_reader(&mut self) -> &mut dyn SessionTransportReader {
-        self.read.borrow_reader()
-    }
-}
-
-pub struct ObjectWriter {
-    write: ChunkWriter,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum ObjectWriterError {
     #[error("Failed to write chunk: {0}")]
     ChunkWriteError(#[from] ChunkWriterError),
     #[error("Failed to serialize object: {0}")]
     SerializeError(#[from] postcard::Error),
-}
-
-impl ObjectWriter {
-    pub(crate) fn new(write: Box<dyn SessionTransportWriter>) -> Self {
-        Self {
-            write: ChunkWriter::new(write),
-        }
-    }
-
-    pub async fn write_object<U: Serialize>(
-        &mut self,
-        object: &U,
-    ) -> Result<(), ObjectWriterError> {
-        let encoded = postcard::to_extend(object, Vec::new())?;
-
-        self.write.write_chunk(&encoded).await?;
-
-        Ok(())
-    }
-
-    pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
-        self.write.shutdown().await
-    }
-
-    pub fn get_writer(self) -> Box<dyn SessionTransportWriter> {
-        self.write.get_writer()
-    }
-
-    pub fn borrow_writer(&mut self) -> &mut dyn SessionTransportWriter {
-        self.write.borrow_writer()
-    }
 }
 
 #[cfg(test)]

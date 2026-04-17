@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use svalin_pki::{Certificate, Credential, SpkiHash};
 use tokio::io::AsyncWriteExt;
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
 
 fn forward_key() -> String {
     "forward".to_owned()

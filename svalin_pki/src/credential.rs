@@ -6,7 +6,6 @@ use rcgen::{Issuer, PublicKeyData};
 use ring::signature::Ed25519KeyPair;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use tracing::debug;
 
 use crate::{
     Certificate, CertificateParseError, EncryptError, KeyPair,

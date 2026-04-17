@@ -3,16 +3,14 @@ use std::fmt::Debug;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::{
     permissions::PermissionHandler,
     rpc::command::handler::HandlerCollection,
     transport::{
-        object_transport::{
-            ObjectReader, ObjectReaderError, ObjectTransport, ObjectWriter, ObjectWriterError,
-        },
-        session_transport::{SessionTransport, SessionTransportReader, SessionTransportWriter},
+        object_transport::{ObjectReaderError, ObjectTransport, ObjectWriterError},
+        session_transport::SessionTransport,
     },
 };
 
@@ -179,7 +177,7 @@ impl Session {
         (self.transport.into_transport(), self.peer)
     }
 
-    pub fn borrow_transport(&mut self) -> (&mut dyn SessionTransport) {
+    pub fn borrow_transport(&mut self) -> &mut dyn SessionTransport {
         self.transport.borrow_transport()
     }
 }
