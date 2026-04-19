@@ -152,7 +152,7 @@ impl ClientMessageReceiver {
             MessageToClient::Mls(message) => {
                 let _message = self
                     .mls
-                    .handle_message::<SystemReport>(message)
+                    .handle_message::<SystemReport>(&message)
                     .await
                     .map_err(|err| anyhow!(err))?;
                 todo!();
@@ -173,6 +173,7 @@ impl ClientMessageReceiver {
     }
 }
 
+#[derive(Clone)]
 pub struct ClientStateHandle {
     channel: mpsc::Sender<ClientStateRequest>,
 }
@@ -225,5 +226,13 @@ impl ClientStateHandle {
             .send(ClientStateRequest::Subscribe(sender))
             .await?;
         Ok(receiver.await?)
+    }
+
+    pub async fn update(&self, update: ClientStateUpdate) -> Result<(), anyhow::Error> {
+        self.channel
+            .send(ClientStateRequest::Update(update))
+            .await?;
+
+        Ok(())
     }
 }

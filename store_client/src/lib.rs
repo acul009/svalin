@@ -28,14 +28,26 @@ impl ClientStore {
     }
 
     pub async fn update(&self, message: &persistent::Message) -> Result<(), Error> {
-        match message {
+        match &message {
             persistent::Message::UpdateSystemReport(spki_hash, system_report) => {
                 let report = postcard::to_stdvec(system_report)?;
                 let spki_hash = spki_hash.as_slice();
+                let generated_at = system_report.generated_at as i64;
 
-                sqlx::query!("INSERT INTO system_reports (spki_hash, report) VALUES (?, ?) ON CONFLICT(spki_hash) DO UPDATE SET report = ?", spki_hash, report, report)
+                sqlx::query!("INSERT INTO system_reports (spki_hash, report) VALUES (?, ?) ON CONFLICT(spki_hash) DO UPDATE SET report = ? where generated_at < ?", spki_hash, report, report, generated_at)
                     .execute(&self.pool)
                     .await?;
+            }
+            &persistent::Message::UpdateFromMainState(state) => {
+                for (spki_hash, device) in &state.devices {
+                    let report = postcard::to_stdvec(&device.system_report)?;
+                    let spki_hash = spki_hash.as_slice();
+                    let generated_at = device.system_report.generated_at as i64;
+
+                    sqlx::query!("INSERT INTO system_reports (spki_hash, report) VALUES (?, ?) ON CONFLICT(spki_hash) DO UPDATE SET report = ? where generated_at < ?", spki_hash, report, report, generated_at)
+                        .execute(&self.pool)
+                        .await?;
+                }
             }
         }
 

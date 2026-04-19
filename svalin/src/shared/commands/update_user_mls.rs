@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 
@@ -8,9 +8,10 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_client_store::persistent;
 use svalin_pki::{
-    CertificateType, Credential, EncryptedObject, ExactVerififier, SpkiHash, Verifier, get_current_timestamp,
+    CertificateType, Credential, EncryptedObject, ExactVerififier, SpkiHash, Verifier,
+    get_current_timestamp,
     mls::{
-        client::{MessageData, MlsClient},
+        client::{MessageDataContent, MlsClient},
         key_package::UnverifiedKeyPackage,
         provider::{ExportedMlsStore, SvalinStorage},
         transport_types::MessageToMemberTransport,
@@ -24,6 +25,7 @@ use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
+    message_streaming::client,
     remote_key_retriever::RemoteKeyRetriever,
     server::MlsServer,
     verifier::{local_verifier::LocalVerifier, remote_verifier::RemoteVerifier},
@@ -172,6 +174,8 @@ pub struct UpdateUserMls {
     pub user_credential: Credential,
     pub key_retriever: RemoteKeyRetriever,
     pub verifier: RemoteVerifier,
+    pub session_mls: Arc<MlsClient<RemoteKeyRetriever, RemoteVerifier>>,
+    pub message_sender: client::ClientMessageDispatcherHandle,
 }
 
 impl CommandDispatcher for UpdateUserMls {
@@ -211,19 +215,31 @@ impl CommandDispatcher for UpdateUserMls {
         debug!("Temporary MLS client created, processing messages");
 
         let mut handled = Vec::new();
+        let mut groups = HashSet::new();
 
         for (uuid, message) in data.messages {
             let processed = client
-                .handle_message::<SystemReport>(message)
+                .handle_message::<SystemReport>(&message)
                 .await
                 .map_err(|err| anyhow!(err))?;
+
             handled.push(uuid);
-            match processed {
-                MessageData::Report(spki_hash, report) => {
+            groups.insert(processed.group);
+
+            match processed.content {
+                MessageDataContent::Report(spki_hash, report) => {
                     persistent_data
                         .update(persistent::Message::UpdateSystemReport(spki_hash, report));
                 }
-                MessageData::Internal => (),
+                MessageDataContent::Internal => (),
+            }
+        }
+
+        for group in groups {
+            if !client.is_member(&group, self.session_mls.me()).await? {
+                // TODO
+                // let key_package = self.session_mls.create_key_package().await?;
+                // client.add_member(&group, key_package).await?;
             }
         }
 

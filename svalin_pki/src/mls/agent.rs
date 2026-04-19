@@ -1,18 +1,18 @@
-use std::collections::HashSet;
-
-use openmls::{error::LibraryError, prelude::Welcome};
+use openmls::{error::LibraryError, prelude::ProtocolVersion};
+use openmls_rust_crypto::RustCrypto;
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::Serialize;
 use tokio::task::JoinError;
 
 use crate::{
-    Certificate, CertificateType, Credential, SpkiHash,
+    Certificate, CertificateType, Credential, VerifyError,
     mls::{
         SvalinGroupId,
         group_id::ParseGroupIdError,
-        key_package::KeyPackage,
+        key_package::{KeyPackage, KeyPackageError},
         processor::{
-            CreateGroupMessageError, CreateKeyPackageError, JoinGroupError, MlsProcessorHandle,
+            CreateGroupError, CreateGroupMessageError, CreateKeyPackageError, GroupExistsError,
+            JoinGroupError, MlsProcessorHandle,
         },
         provider::{PostcardCodec, SvalinProvider},
         transport_types::{
@@ -26,6 +26,8 @@ pub struct MlsAgent<KeyRetriever, Verifier> {
     key_retriever: KeyRetriever,
     verifier: Verifier,
     me: Certificate,
+    crypto: RustCrypto,
+    protocol_version: ProtocolVersion,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -65,6 +67,8 @@ where
             processor,
             key_retriever,
             verifier,
+            crypto: RustCrypto::default(),
+            protocol_version: ProtocolVersion::default(),
         })
     }
 
@@ -79,50 +83,51 @@ where
         let message = message.unpack()?;
 
         match message {
-            MessageToMember::Welcome(welcome) => self
-                .handle_welcome(welcome)
-                .await
-                .map_err(HandleMessageError::Welcome),
-            MessageToMember::GroupMessage(private_message_in) => todo!(),
-        }
-    }
-
-    async fn handle_welcome(
-        &self,
-        welcome: Welcome,
-    ) -> Result<(), HandleWelcomeError<KeyRetriever::Error>> {
-        let staged = self.processor.stage_join(welcome).await?;
-        let id = SvalinGroupId::from_group_id(staged.group_context().group_id())?;
-
-        match &id {
-            SvalinGroupId::DeviceGroup(device) => {
-                if device != self.me.spki_hash() {
-                    return Err(HandleWelcomeError::UnwantedGroup);
-                }
+            MessageToMember::Welcome(_welcome) => {
+                todo!("Don't have a use case for an agent joining another group yet")
+            }
+            MessageToMember::GroupMessage(_private_message_in) => {
+                todo!("There aren't any reasons for an agent to receive a message yet")
             }
         }
-
-        let required_members = self
-            .key_retriever
-            .get_required_group_members(&id)
-            .await
-            .map_err(HandleWelcomeError::RetrieverError)?
-            .into_iter()
-            .collect::<HashSet<_>>();
-
-        let members = staged
-            .members()
-            .map(|m| m.credential.deserialized())
-            .collect::<Result<HashSet<SpkiHash>, tls_codec::Error>>()?;
-
-        if members != required_members {
-            return Err(HandleWelcomeError::IncorrectMembers);
-        }
-
-        self.processor.join_group(staged).await?;
-
-        Ok(())
     }
+
+    // async fn handle_welcome(
+    //     &self,
+    //     welcome: Welcome,
+    // ) -> Result<(), HandleWelcomeError<KeyRetriever::Error>> {
+    //     let staged = self.processor.stage_join(welcome).await?;
+    //     let id = SvalinGroupId::from_group_id(staged.group_context().group_id())?;
+
+    //     match &id {
+    //         SvalinGroupId::DeviceGroup(device) => {
+    //             if device != self.me.spki_hash() {
+    //                 return Err(HandleWelcomeError::UnwantedGroup);
+    //             }
+    //         }
+    //     }
+
+    //     let required_members = self
+    //         .key_retriever
+    //         .get_required_group_members(&id)
+    //         .await
+    //         .map_err(HandleWelcomeError::RetrieverError)?
+    //         .into_iter()
+    //         .collect::<HashSet<_>>();
+
+    //     let members = staged
+    //         .members()
+    //         .map(|m| m.credential.deserialized())
+    //         .collect::<Result<HashSet<SpkiHash>, tls_codec::Error>>()?;
+
+    //     if members != required_members {
+    //         return Err(HandleWelcomeError::IncorrectMembers);
+    //     }
+
+    //     self.processor.join_group(staged).await?;
+
+    //     Ok(())
+    // }
 
     pub async fn send_report<Report: Serialize>(
         &self,
@@ -136,65 +141,47 @@ where
         Ok(to_server)
     }
 
-    // pub async fn join_my_device_group(
-    //     &self,
-    //     group_info: DeviceGroupCreationInfo,
-    // ) -> Result<(), JoinDeviceGroupError> {
-    //     let provider = self.provider.clone();
-    //     let me = self.svalin_credential.get_certificate().spki_hash().clone();
-    //     let my_parent = self.svalin_credential.get_certificate().issuer().clone();
+    pub async fn create_device_group_if_missing(
+        &self,
+    ) -> Result<Option<MessageToServerTransport>, CreateDeviceGroupError<KeyRetriever::Error>> {
+        let group_id = SvalinGroupId::DeviceGroup(self.me.spki_hash().clone());
 
-    //     let welcome = group_info.welcome()?;
+        if self.processor.group_exists(group_id.to_group_id()).await? {
+            return Ok(None);
+        }
 
-    //     let ratchet_tree = group_info.ratchet_tree()?;
+        let required_members = self
+            .key_retriever
+            .get_required_group_members(&group_id)
+            .await
+            .map_err(CreateDeviceGroupError::KeyRetrieverError)?
+            .into_iter()
+            .filter(|spki_hash| spki_hash != self.me.spki_hash())
+            .collect::<Vec<_>>();
 
-    //     let join_config = MlsGroupJoinConfig::builder()
-    //         .max_past_epochs(0)
-    //         .use_ratchet_tree_extension(false)
-    //         .wire_format_policy(PURE_PLAINTEXT_WIRE_FORMAT_POLICY)
-    //         .sender_ratchet_configuration(SenderRatchetConfiguration::new(0, 0))
-    //         .build();
+        let unverified = self
+            .key_retriever
+            .get_key_packages(&required_members)
+            .await
+            .map_err(CreateDeviceGroupError::KeyRetrieverError)?;
 
-    //     let welcome = StagedWelcome::new_from_welcome(
-    //         provider.as_ref(),
-    //         &join_config,
-    //         welcome,
-    //         Some(ratchet_tree),
-    //     )?;
+        let mut members = Vec::with_capacity(unverified.len());
+        for member in unverified {
+            let member = member
+                .verify(&self.crypto, self.protocol_version, &self.verifier)
+                .await?;
+            members.push(member);
+        }
 
-    //     if welcome.group_context().group_id().as_slice() != me.as_slice() {
-    //         return Err(JoinDeviceGroupError::WrongGroupId);
-    //     }
+        let new_group = self
+            .processor
+            .create_group(members, group_id.to_group_id())
+            .await?;
 
-    //     let creator: UnverifiedCertificate =
-    //         welcome.welcome_sender()?.credential().deserialized()?;
-
-    //     // Ensure there are only sessions and myself in the group
-    //     welcome
-    //         .members()
-    //         .map(|member| -> Result<(), JoinDeviceGroupError> {
-    //             let certificate: UnverifiedCertificate = member.credential.deserialized()?;
-    //             if certificate.spki_hash() == &me {
-    //                 return Ok(());
-    //             }
-
-    //             if certificate.certificate_type() != CertificateType::UserDevice {
-    //                 return Err(JoinDeviceGroupError::WrongMemberType);
-    //             }
-
-    //             Ok(())
-    //         })
-    //         .collect::<Result<(), JoinDeviceGroupError>>()?;
-
-    //     // TODO: check that members contains root
-    //     if creator.issuer() != &my_parent {
-    //         return Err(JoinDeviceGroupError::WrongGroupCreator);
-    //     }
-
-    //     let _group = welcome.into_group(provider.as_ref())?;
-
-    //     Ok(())
-    // }
+        Ok(Some(MessageToServerTransport::NewDeviceGroup {
+            device_group: new_group,
+        }))
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -237,4 +224,20 @@ pub enum SendDeviceMessageError {
     PostcardError(#[from] postcard::Error),
     #[error("create message error: {0}")]
     CreateMessageError(#[from] CreateGroupMessageError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CreateDeviceGroupError<KeyRetrieverError> {
+    #[error("wrong certificate type: {0}, expected agent")]
+    WrongCertificateType(CertificateType),
+    #[error("error creating mls group: {0}")]
+    CreateGroupError(#[from] CreateGroupError),
+    #[error("error during key retrieval: {0}")]
+    KeyRetrieverError(#[source] KeyRetrieverError),
+    #[error("error verifying key package: {0}")]
+    KeyPackageError(#[from] KeyPackageError),
+    #[error("error verifying spki hash: {0}")]
+    VerifyError(#[from] VerifyError),
+    #[error("error while checking if group exists: {0}")]
+    GroupExistsError(#[from] GroupExistsError),
 }

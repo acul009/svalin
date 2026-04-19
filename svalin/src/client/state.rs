@@ -9,7 +9,7 @@ pub struct ClientState {
     agents_online: HashSet<SpkiHash>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ClientStateUpdate {
     Persistent(persistent::Message),
     AgentOnlineStatus(SpkiHash, bool),

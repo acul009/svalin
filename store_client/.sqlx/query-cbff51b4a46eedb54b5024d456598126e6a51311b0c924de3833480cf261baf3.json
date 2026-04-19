@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO system_reports (spki_hash, report) VALUES (?, ?) ON CONFLICT(spki_hash) DO UPDATE SET report = ? where generated_at < ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "cbff51b4a46eedb54b5024d456598126e6a51311b0c924de3833480cf261baf3"
+}

@@ -2,6 +2,7 @@ use openmls::group::GroupId;
 
 use crate::SpkiHash;
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SvalinGroupId {
     DeviceGroup(SpkiHash),
 }

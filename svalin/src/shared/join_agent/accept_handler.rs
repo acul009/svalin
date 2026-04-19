@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use svalin_pki::{
     Certificate, CreateCertificateError, DeriveKeyError, ExportedPublicKey,
-    mls::{client::CreateDeviceGroupError, key_package::KeyPackageError},
+    mls::{agent::CreateDeviceGroupError, key_package::KeyPackageError},
 };
 use svalin_rpc::{
     rpc::{

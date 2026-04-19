@@ -14,6 +14,13 @@ pub struct ArgonCost {
 
 impl ArgonCost {
     pub fn strong() -> Self {
+        #[cfg(test)]
+        return Self {
+            m_cost: 64,
+            t_cost: 1,
+            p_cost: 2,
+        };
+        #[cfg(not(test))]
         Self {
             m_cost: 128 * 1024,
             t_cost: 2,
@@ -22,6 +29,13 @@ impl ArgonCost {
     }
 
     pub fn basic() -> Self {
+        #[cfg(test)]
+        return Self {
+            m_cost: 64,
+            t_cost: 1,
+            p_cost: 2,
+        };
+        #[cfg(not(test))]
         Self {
             m_cost: 32 * 1024,
             t_cost: 2,

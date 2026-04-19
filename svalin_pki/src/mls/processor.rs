@@ -4,8 +4,8 @@ use crate::{
     SpkiHash,
     mls::{
         key_package::{KeyPackage, KeyPackageError},
-        provider::{PostcardCodec, SvalinProvider, SvalinStorage},
-        transport_types::{MessageToMember, MessageToServerTransport, NewGroup, NewGroupTransport},
+        provider::{SvalinProvider, SvalinStorage},
+        transport_types::{MessageToServerTransport, NewGroupTransport},
     },
 };
 use openmls::{
@@ -17,13 +17,12 @@ use openmls::{
         WelcomeError,
     },
     prelude::{
-        CredentialWithKey, KeyPackageNewError, MlsMessageBodyIn, MlsMessageBodyOut, MlsMessageIn,
-        PrivateMessageIn, ProtocolMessage, Sender, SenderRatchetConfiguration, Welcome,
+        CredentialWithKey, KeyPackageNewError, MlsMessageBodyOut, PrivateMessageIn,
+        ProtocolMessage, Sender, SenderRatchetConfiguration, Welcome,
     },
 };
-use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
-use tls_codec::{DeserializeBytes, Serialize};
+use tls_codec::Serialize;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::Credential;
@@ -87,6 +86,10 @@ impl MlsProcessorHandle {
                     }
                     MlsProcessorRequest::GroupExists { group_id, response } => {
                         let result = client.group_exists(group_id);
+                        let _ = response.send(result);
+                    }
+                    MlsProcessorRequest::ListMembers { group_id, response } => {
+                        let result = client.list_members(group_id);
                         let _ = response.send(result);
                     }
                 }
@@ -203,6 +206,23 @@ impl MlsProcessorHandle {
 
         recv.await?
     }
+
+    pub(crate) async fn list_members(
+        &self,
+        group_id: GroupId,
+    ) -> Result<Vec<SpkiHash>, anyhow::Error> {
+        let (send, recv) = oneshot::channel();
+
+        let _ = self
+            .channel
+            .send(MlsProcessorRequest::ListMembers {
+                group_id,
+                response: send,
+            })
+            .await;
+
+        Ok(recv.await??)
+    }
 }
 
 enum MlsProcessorRequest {
@@ -234,6 +254,10 @@ enum MlsProcessorRequest {
     GroupExists {
         group_id: GroupId,
         response: oneshot::Sender<Result<bool, GroupExistsError>>,
+    },
+    ListMembers {
+        group_id: GroupId,
+        response: oneshot::Sender<Result<Vec<SpkiHash>, anyhow::Error>>,
     },
 }
 
@@ -433,6 +457,17 @@ impl MlsProcessor {
             Err(GetGroupError::UnknownGroup) => Ok(false),
             Err(GetGroupError::StorageError(e)) => Err(GroupExistsError::StorageError(e)),
         }
+    }
+
+    fn list_members(&mut self, group_id: GroupId) -> Result<Vec<SpkiHash>, anyhow::Error> {
+        let group = Self::get_group(&mut self.group_cache, &self.provider.storage(), group_id)?;
+
+        let members = group
+            .members()
+            .map(|member| member.credential.deserialized())
+            .collect::<Result<_, _>>()?;
+
+        Ok(members)
     }
 }
 

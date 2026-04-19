@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
     SpkiHash,
@@ -15,15 +17,16 @@ pub enum MessageToAgent {
     Mls(MessageToMemberTransport),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum MessageFromAgent {
     Mls(MessageToServerTransport),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum MessageToClient {
     AgentOnlineStatus(SpkiHash, bool),
-    Mls(MessageToMemberTransport),
+    // The arc is unfortunately needed currently, so the server doesn't have to copy as much data
+    Mls(Arc<MessageToMemberTransport>),
 }
 
 #[derive(Serialize, Deserialize)]

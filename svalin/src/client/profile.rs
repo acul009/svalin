@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use anyhow::{Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
-use svalin_client_store::ClientStore;
+use svalin_client_store::{ClientStore, persistent};
 use svalin_pki::{
     Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
     RootCertificate, UnverifiedCertificate, get_current_timestamp, mls::client::MlsClient,
@@ -13,7 +13,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
-    client::tunnel_manager::TunnelManager,
+    client::{state::ClientStateUpdate, tunnel_manager::TunnelManager},
     message_streaming::client::{ClientMessageDispatcher, ClientMessageReceiver},
     remote_key_retriever::RemoteKeyRetriever,
     shared::commands::update_user_mls::UpdateUserMls,
@@ -242,7 +242,7 @@ impl Client {
             root_certificate: root_certificate.clone(),
             user_credential: user_credential,
             tunnel_manager,
-            mls,
+            mls: mls.clone(),
             message_sender: dispatcher_handle.clone(),
             state_handle: client_state_handle,
             background_tasks,
@@ -253,6 +253,9 @@ impl Client {
         let cancel = client.cancel.clone();
         let password = password.clone();
         let user_credential = client.user_credential.clone();
+        let session_mls = mls.clone();
+        let message_sender = dispatcher_handle.clone();
+        let state_handle = client.state_handle.clone();
         client.background_tasks.spawn(async move {
             debug!("starting user mls update task");
             let cancel = cancel;
@@ -260,17 +263,31 @@ impl Client {
             let key_retriever = key_retriever;
             let user_credential = user_credential;
             let verifier = remote_verifier;
+            let session_mls = session_mls;
+            let message_sender = message_sender;
             loop {
-                if let Err(err) = connection
+                match connection
                     .dispatch(UpdateUserMls {
                         password: password.clone(),
                         key_retriever: key_retriever.clone(),
                         user_credential: user_credential.clone(),
                         verifier: verifier.clone(),
+                        session_mls: session_mls.clone(),
+                        message_sender: message_sender.clone(),
                     })
                     .await
                 {
-                    tracing::error!("error while updating user mls: {}", err);
+                    Ok(main_state) => {
+                        if let Err(err) = state_handle
+                            .update(ClientStateUpdate::Persistent(
+                                persistent::Message::UpdateFromMainState(main_state),
+                            ))
+                            .await
+                        {
+                            tracing::error!("error while sending main state update: {}", err);
+                        }
+                    }
+                    Err(err) => tracing::error!("error while updating user mls: {}", err),
                 }
                 if cancel
                     .run_until_cancelled(tokio::time::sleep(Duration::from_secs(30)))

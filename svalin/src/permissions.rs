@@ -73,7 +73,7 @@ impl<Nested: PermissionHandler> From<&PermissionPrecursor<DeauthenticateHandler<
 
 impl From<&PermissionPrecursor<GetKeyPackagesHandler>> for Permission {
     fn from(_value: &PermissionPrecursor<GetKeyPackagesHandler>) -> Self {
-        Permission::UserOrSession
+        Permission::AuthenticatedOnly
     }
 }
 

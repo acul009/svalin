@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use openmls::prelude::{
     MlsMessageBodyIn, MlsMessageIn, PrivateMessageIn, Welcome, group_info::VerifiableGroupInfo,
 };
@@ -10,6 +12,15 @@ use crate::SpkiHash;
 pub enum MessageToServerTransport {
     GroupMessage(Vec<u8>),
     NewDeviceGroup { device_group: NewGroupTransport },
+}
+
+impl Debug for MessageToServerTransport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::GroupMessage(_) => f.debug_tuple("GroupMessage").finish(),
+            Self::NewDeviceGroup { .. } => f.debug_tuple("NewDeviceGroup").finish(),
+        }
+    }
 }
 
 impl MessageToServerTransport {
@@ -44,6 +55,7 @@ impl MessageToServerTransport {
     }
 }
 
+#[derive(Debug)]
 pub struct MessageToSend {
     pub receivers: Vec<SpkiHash>,
     pub message: MessageToMemberTransport,
@@ -55,8 +67,17 @@ pub enum MessageToMemberTransport {
     GroupMessage(Vec<u8>),
 }
 
+impl Debug for MessageToMemberTransport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MessageToMemberTransport::Welcome(_) => f.debug_tuple("Welcome").finish(),
+            MessageToMemberTransport::GroupMessage(_) => f.debug_tuple("GroupMessage").finish(),
+        }
+    }
+}
+
 impl MessageToMemberTransport {
-    pub(crate) fn unpack(self) -> Result<MessageToMember, tls_codec::Error> {
+    pub(crate) fn unpack(&self) -> Result<MessageToMember, tls_codec::Error> {
         let unpacked = match self {
             MessageToMemberTransport::Welcome(welcome) => {
                 MessageToMember::Welcome(Welcome::tls_deserialize_exact_bytes(&welcome)?)

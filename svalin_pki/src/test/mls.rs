@@ -1,28 +1,19 @@
-use std::{
-    cell::{Cell, RefCell},
-    collections::HashMap,
-    fmt::Display,
-    sync::Arc,
-};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, sync::Arc};
 
-use openmls::{
-    group::GroupId,
-    prelude::{MlsMessageBodyIn, MlsMessageIn, MlsMessageOut, ProtocolMessage, Welcome},
-};
+use openmls::group::GroupId;
 use openmls_sqlx_storage::SqliteStorageProvider;
 use sqlx::SqlitePool;
-use tls_codec::DeserializeBytes;
 
 use crate::{
     Certificate, Credential, KeyPair, SpkiHash, Verifier, VerifyError,
     mls::{
         agent::MlsAgent,
-        client::{MessageData, MlsClient},
+        client::{MessageData, MessageDataContent, MlsClient},
         key_package::{KeyPackage, UnverifiedKeyPackage},
-        key_retriever::{self, KeyRetriever},
-        processor::{MlsProcessorHandle, ProcessedMessage},
+        key_retriever::KeyRetriever,
+        processor::MlsProcessorHandle,
         provider::PostcardCodec,
-        public_processor::{self, PublicProcessorHandle},
+        public_processor::PublicProcessorHandle,
         server::MlsServer,
         transport_types::{MessageToMember, MessageToServerTransport},
     },
@@ -290,8 +281,8 @@ async fn test_device_group() {
 
     retriever.add(agent.create_key_package().await.unwrap());
 
-    let new_group = client
-        .create_device_group_if_missing(agent_credential.certificate().spki_hash())
+    let new_group = agent
+        .create_device_group_if_missing()
         .await
         .unwrap()
         .unwrap();
@@ -302,16 +293,19 @@ async fn test_device_group() {
     let server = MlsServer::new(storage, verifier.clone(), retriever.clone());
     let welcome = server.process_message(new_group).await.unwrap();
 
-    agent.handle_message(welcome.message).await.unwrap();
+    client
+        .handle_message::<String>(&welcome.message)
+        .await
+        .unwrap();
 
     let report = "Test Data".to_string();
     let to_server = agent.send_report(report.clone()).await.unwrap();
 
     let to_send = server.process_message(to_server).await.unwrap();
 
-    let received: MessageData<String> = client.handle_message(to_send.message).await.unwrap();
+    let received: MessageData<String> = client.handle_message(&to_send.message).await.unwrap();
 
-    let MessageData::Report(sender, received_report) = received else {
+    let MessageDataContent::Report(sender, received_report) = received.content else {
         panic!("wrong message type")
     };
 

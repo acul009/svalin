@@ -7,6 +7,7 @@ use svalin_pki::{Certificate, CertificateType, SpkiHash};
 use svalin_rpc::rpc::{
     command::handler::CommandHandler, peer::Peer, server::RpcServer, session::Session,
 };
+use svalin_server_store::MessageStore;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
@@ -75,6 +76,7 @@ pub struct MessageSender {
         DashMap<SpkiHash, mpsc::Sender<(MessageToClient, Option<oneshot::Sender<Result<(), ()>>>)>>,
     >,
     server: Arc<RpcServer>,
+    message_store: Arc<MessageStore>,
 }
 
 #[async_trait]
@@ -102,25 +104,16 @@ impl CommandHandler for MessageSender {
 
         let (sender, receiver) = mpsc::channel(10);
 
-        // stream agent online status
-        let server = self.server.clone();
-        let sender2 = sender.clone();
-        tokio::spawn(async move {
-            // TODO: access permissions
-            let sender = sender2;
-            let mut recv = server.subscribe_to_connection_status();
-            for connected in server.get_current_connected_clients().await {
-                let _ = sender
-                    .send((MessageToClient::AgentOnlineStatus(connected, true), None))
-                    .await;
-            }
-            while let Ok((spki_hash, online)) = recv.recv().await {
-                tracing::debug!("peer online status: {spki_hash:?} {online}");
-                let _ = sender
-                    .send((MessageToClient::AgentOnlineStatus(spki_hash, online), None))
-                    .await;
-            }
-        });
+        tokio::spawn(stream_agent_online_status(
+            sender.clone(),
+            self.server.clone(),
+        ));
+
+        tokio::spawn(stream_mls_messages(
+            peer.spki_hash().clone(),
+            sender.clone(),
+            self.message_store.clone(),
+        ));
 
         let spki_hash = peer.spki_hash().clone();
         self.channels.insert(spki_hash.clone(), sender);
@@ -134,10 +127,11 @@ impl CommandHandler for MessageSender {
 }
 
 impl MessageSender {
-    pub fn new(server: Arc<RpcServer>) -> Self {
+    pub fn new(server: Arc<RpcServer>, message_store: Arc<MessageStore>) -> Self {
         Self {
             channels: Arc::new(DashMap::new()),
             server,
+            message_store,
         }
     }
 
@@ -147,6 +141,7 @@ impl MessageSender {
         mut receiver: mpsc::Receiver<(MessageToClient, Option<oneshot::Sender<Result<(), ()>>>)>,
     ) -> Result<(), anyhow::Error> {
         while let Some((message, feedback)) = receiver.recv().await {
+            tracing::debug!("Sending message to client: {:?}", message);
             session.write_object(&message).await?;
 
             let response = session.read_object::<Result<(), ()>>().await?;
@@ -197,4 +192,85 @@ impl MessageSender {
     ) -> Option<mpsc::Sender<(MessageToClient, Option<oneshot::Sender<Result<(), ()>>>)>> {
         self.channels.get(spki_hash).map(|sender| sender.clone())
     }
+}
+
+async fn stream_agent_online_status(
+    sender: mpsc::Sender<(MessageToClient, Option<oneshot::Sender<Result<(), ()>>>)>,
+    server: Arc<RpcServer>,
+) {
+    // TODO: access permissions
+    let mut recv = server.subscribe_to_connection_status();
+    for connected in server.get_current_connected_clients().await {
+        if connected.certificate_type() != CertificateType::Agent {
+            continue;
+        }
+        let _ = sender
+            .send((
+                MessageToClient::AgentOnlineStatus(connected.spki_hash().clone(), true),
+                None,
+            ))
+            .await;
+    }
+    while let Ok((cert, online)) = recv.recv().await {
+        if cert.certificate_type() != CertificateType::Agent {
+            continue;
+        }
+        let _ = sender
+            .send((
+                MessageToClient::AgentOnlineStatus(cert.spki_hash().clone(), online),
+                None,
+            ))
+            .await;
+    }
+}
+
+async fn stream_mls_messages(
+    receiver: SpkiHash,
+    sender: mpsc::Sender<(MessageToClient, Option<oneshot::Sender<Result<(), ()>>>)>,
+    message_store: Arc<MessageStore>,
+) {
+    if let Err(e) = stream_mls_messages_inner(receiver, sender, message_store).await {
+        tracing::error!("Error streaming mls messages: {}", e);
+    }
+}
+
+async fn stream_mls_messages_inner(
+    receiver: SpkiHash,
+    sender: mpsc::Sender<(MessageToClient, Option<oneshot::Sender<Result<(), ()>>>)>,
+    message_store: Arc<MessageStore>,
+) -> Result<(), anyhow::Error> {
+    let current = message_store.load_all_for(&receiver).await?;
+    let mut subscription = message_store.subscribe(receiver.clone()).await;
+    for message in current {
+        let (send, recv) = oneshot::channel();
+
+        let _ = sender
+            .send((MessageToClient::Mls(Arc::new(message.1)), Some(send)))
+            .await;
+
+        recv.await?
+            .map_err(|_| anyhow!("client encountered error with message"))?;
+
+        message_store
+            .aknowledge_single_message(&receiver, message.0)
+            .await?;
+    }
+
+    while let Some(message) = subscription.recv().await {
+        tracing::debug!("received message from subscription: {:?}", message);
+        let (send, recv) = oneshot::channel();
+
+        let _ = sender
+            .send((MessageToClient::Mls(message.1), Some(send)))
+            .await;
+
+        recv.await?
+            .map_err(|_| anyhow!("client encountered error with message"))?;
+
+        message_store
+            .aknowledge_single_message(&receiver, message.0)
+            .await?;
+    }
+
+    Ok(())
 }

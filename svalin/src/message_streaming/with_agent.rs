@@ -20,6 +20,7 @@ impl MessageHandler {
         agent: &Certificate,
         message: MessageFromAgent,
     ) -> Result<(), anyhow::Error> {
+        tracing::debug!("handling agent message: {:?}", message);
         match message {
             MessageFromAgent::Mls(mls) => self.mls_handler.handle(agent, mls).await,
         }

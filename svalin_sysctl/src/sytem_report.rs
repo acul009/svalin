@@ -1,8 +1,11 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SystemReport {
-    os: OS,
+    pub generated_at: u64,
+    pub os: OS,
 }
 
 impl SystemReport {
@@ -16,11 +19,16 @@ impl SystemReport {
         #[cfg(all(not(unix), not(windows)))]
         let os = OS::Unknown;
 
-        Ok(Self { os })
+        let generated_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_secs();
+
+        Ok(Self { os, generated_at })
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum OS {
     Windows,
     Linux,

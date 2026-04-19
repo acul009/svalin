@@ -21,6 +21,7 @@ use update::{
 };
 
 mod init;
+mod mls;
 pub mod update;
 
 use crate::remote_key_retriever::RemoteKeyRetriever;
@@ -157,8 +158,8 @@ impl Agent {
 
         let receiver = AgentMessageReceiver {
             cancel: cancel.clone(),
-            mls,
-            sender: messager_handle,
+            mls: mls.clone(),
+            sender: messager_handle.clone(),
         };
 
         let connection = rpc.upstream_connection();
@@ -174,6 +175,14 @@ impl Agent {
                 tracing::error!("Failed to serve requests: {err}");
             }
         });
+
+        mls::ensure_group_exists(&mls, &messager_handle).await?;
+
+        tasks.spawn(mls::schedule_system_reports(
+            mls,
+            messager_handle,
+            cancel.clone(),
+        ));
 
         cancel.cancelled().await;
         tasks.close();

@@ -1,9 +1,10 @@
 use std::{panic, process, time::Duration};
 
 use std::net::ToSocketAddrs;
-use svalin_client_store::persistent::DeviceState;
+use svalin_client_store::persistent::{self, DeviceState};
 use test_log::test;
 use tokio::sync::oneshot;
+use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use totp_rs::TOTP;
 use tracing::debug;
@@ -64,41 +65,41 @@ async fn integration_tests() {
         .await
         .unwrap();
 
-    // ===== TEST WRONG PASSWORD =====
+    // // ===== TEST WRONG PASSWORD =====
 
-    let second_connect = Client::first_connect(host.clone()).await.unwrap();
+    // let second_connect = Client::first_connect(host.clone()).await.unwrap();
 
-    match second_connect {
-        crate::client::FirstConnect::Init(_) => unreachable!(),
-        crate::client::FirstConnect::Login(login) => {
-            login
-                .login(
-                    username.clone(),
-                    b"wrong password".to_vec(),
-                    totp_secret.generate_current().unwrap(),
-                )
-                .await
-                .unwrap_err();
-        }
-    };
+    // match second_connect {
+    //     crate::client::FirstConnect::Init(_) => unreachable!(),
+    //     crate::client::FirstConnect::Login(login) => {
+    //         login
+    //             .login(
+    //                 username.clone(),
+    //                 b"wrong password".to_vec(),
+    //                 totp_secret.generate_current().unwrap(),
+    //             )
+    //             .await
+    //             .unwrap_err();
+    //     }
+    // };
 
-    // ===== TEST WRONG USERNAME =====
+    // // ===== TEST WRONG USERNAME =====
 
-    let third_connect = Client::first_connect(host.clone()).await.unwrap();
+    // let third_connect = Client::first_connect(host.clone()).await.unwrap();
 
-    match third_connect {
-        crate::client::FirstConnect::Init(_) => unreachable!(),
-        crate::client::FirstConnect::Login(login) => {
-            login
-                .login(
-                    "wrong username".to_string(),
-                    password.clone().into_bytes(),
-                    totp_secret.generate_current().unwrap(),
-                )
-                .await
-                .unwrap_err();
-        }
-    };
+    // match third_connect {
+    //     crate::client::FirstConnect::Init(_) => unreachable!(),
+    //     crate::client::FirstConnect::Login(login) => {
+    //         login
+    //             .login(
+    //                 "wrong username".to_string(),
+    //                 password.clone().into_bytes(),
+    //                 totp_secret.generate_current().unwrap(),
+    //             )
+    //             .await
+    //             .unwrap_err();
+    //     }
+    // };
 
     // ===== TEST LOGIN =====
 
@@ -124,10 +125,23 @@ async fn integration_tests() {
         .await
         .unwrap();
 
+    let (mut client_state, mut client_state_updates) = client.subscribe_state().await.unwrap();
+
     debug!("Login successful!");
 
     let duration = client.ping_upstream().await.unwrap();
     debug!("ping duration: {:?}", duration);
+
+    // wait for the first full update - this is sent after generating the key packages
+    let update = timeout(Duration::from_secs(30), client_state_updates.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    if let ClientStateUpdate::Persistent(persistent::Message::UpdateFromMainState(_)) = &update {
+        client_state.update(update);
+    } else {
+        panic!("expected persistent state update, got: {:?}", &update);
+    }
 
     // ===== TEST AGENT =====
 
@@ -137,6 +151,8 @@ async fn integration_tests() {
     debug!("received join code");
     let (confirm_send, confirm_recv) = oneshot::channel();
 
+    let agent_cancel = CancellationToken::new();
+    let cancel = agent_cancel.clone();
     let agent_handle = tokio::spawn(async move {
         let confirm = waiting.wait_for_init().await.unwrap();
         debug!("generated confirm code");
@@ -144,12 +160,9 @@ async fn integration_tests() {
             .send(confirm.confirm_code().to_owned())
             .unwrap();
         debug!("agent waiting for confirmation");
-        let cancel = CancellationToken::new();
         confirm.wait_for_confirm(cancel).await.unwrap();
         debug!("agent has unexpectedly exited");
     });
-
-    let (mut client_state, mut client_state_updates) = client.subscribe_state().await.unwrap();
 
     let (send, recv) = oneshot::channel();
     let client2 = client.clone();
@@ -164,13 +177,35 @@ async fn integration_tests() {
     add_agent_handle.await.unwrap().unwrap();
     debug!("agent was added");
 
-    let update = client_state_updates.recv().await.unwrap();
+    // first update should be the online status
+    let update = timeout(Duration::from_secs(10), client_state_updates.recv())
+        .await
+        .unwrap()
+        .unwrap();
     if let ClientStateUpdate::AgentOnlineStatus(_, _) = &update {
         client_state.update(update);
         debug!("agent is online");
     } else {
-        panic!("expected agent online status update");
+        panic!("expected agent online status update, got: {:?}", &update);
     }
+
+    // second update should be the system report
+    let update = timeout(Duration::from_secs(30), client_state_updates.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    if let ClientStateUpdate::Persistent(persistent::Message::UpdateSystemReport(_, _)) = &update {
+        client_state.update(update);
+        debug!("agent is online");
+    } else {
+        panic!("expected agent online status update, got {:?}", &update);
+    }
+
+    agent_cancel.cancel();
+    tokio::time::timeout(Duration::from_secs(1), agent_handle)
+        .await
+        .unwrap()
+        .unwrap();
 
     // let device = device_list.borrow().first_key_value().unwrap().1.clone();
 

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
@@ -34,7 +34,7 @@ pub struct RpcServer {
     config: RpcServerConfig,
     endpoint: quinn::Endpoint,
     connection_data: Mutex<ServerConnectionData>,
-    client_status_broadcast: broadcast::Sender<(SpkiHash, bool)>,
+    client_status_broadcast: broadcast::Sender<(Certificate, bool)>,
     tasks: TaskTracker,
 }
 
@@ -220,9 +220,7 @@ impl RpcServer {
             let mut lock = self.connection_data.lock().await;
             lock.latest_connections
                 .insert(cert.spki_hash().clone(), conn.clone());
-            let _ = self
-                .client_status_broadcast
-                .send((cert.spki_hash().clone(), true));
+            let _ = self.client_status_broadcast.send((cert.clone(), true));
 
             let on_close_future = self.clone().update_connection_data_on_close(conn.clone());
 
@@ -249,9 +247,7 @@ impl RpcServer {
             if let Some(latest_peer_conn) = lock.latest_connections.get(cert.spki_hash()) {
                 if latest_peer_conn.eq(&conn) {
                     lock.latest_connections.remove(cert.spki_hash());
-                    let _ = self
-                        .client_status_broadcast
-                        .send((cert.spki_hash().clone(), false));
+                    let _ = self.client_status_broadcast.send((cert.clone(), false));
                 }
             }
         }
@@ -284,17 +280,23 @@ impl RpcServer {
         Ok(session)
     }
 
-    pub fn subscribe_to_connection_status(&self) -> broadcast::Receiver<(SpkiHash, bool)> {
+    pub fn subscribe_to_connection_status(&self) -> broadcast::Receiver<(Certificate, bool)> {
         self.client_status_broadcast.subscribe()
     }
 
-    pub async fn get_current_connected_clients(&self) -> HashSet<SpkiHash> {
+    pub async fn get_current_connected_clients(&self) -> Vec<Certificate> {
         self.connection_data
             .lock()
             .await
             .latest_connections
-            .keys()
-            .cloned()
+            .values()
+            .filter_map(|connection| {
+                if let Peer::Certificate(cert) = connection.peer() {
+                    Some(cert.clone())
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
