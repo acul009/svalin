@@ -216,7 +216,7 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::AgentOnlineStatus(_, true) = &update {
+    if let ClientStateUpdate::AgentOnlineStatus(_, false) = &update {
         client_state.update(update);
         debug!("agent is offline");
     } else {
