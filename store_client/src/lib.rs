@@ -44,7 +44,7 @@ impl ClientStore {
                     let spki_hash = spki_hash.as_slice();
                     let generated_at = device.system_report.generated_at as i64;
 
-                    sqlx::query!("INSERT INTO system_reports (spki_hash, report) VALUES (?, ?) ON CONFLICT(spki_hash) DO UPDATE SET report = ? where generated_at < ?", spki_hash, report, report, generated_at)
+                    sqlx::query!("INSERT INTO system_reports (spki_hash, report, generated_at) VALUES (?, ?, ?) ON CONFLICT(spki_hash) DO UPDATE SET report = ? where generated_at < ?", spki_hash, report, generated_at, report, generated_at)
                         .execute(&self.pool)
                         .await?;
                 }

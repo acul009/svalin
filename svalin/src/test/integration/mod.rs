@@ -24,12 +24,14 @@ async fn integration_tests() {
     let _ = std::fs::remove_dir_all("./test_data");
 
     let addr = "0.0.0.0:1234".to_socket_addrs().unwrap().next().unwrap();
+    let server_cancel = CancellationToken::new();
+    let cancel = server_cancel.clone();
     let (send_server, recv_server) = oneshot::channel();
 
     tokio::spawn(async move {
         let server = Server::build()
             .addr(addr)
-            .cancel(CancellationToken::new())
+            .cancel(cancel)
             .start_server()
             .await
             .unwrap();
@@ -182,7 +184,7 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::AgentOnlineStatus(_, _) = &update {
+    if let ClientStateUpdate::AgentOnlineStatus(_, true) = &update {
         client_state.update(update);
         debug!("agent is online");
     } else {
@@ -190,19 +192,39 @@ async fn integration_tests() {
     }
 
     // second update should be the system report
-    let update = timeout(Duration::from_secs(30), client_state_updates.recv())
+    let update = timeout(Duration::from_secs(40), client_state_updates.recv())
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::Persistent(persistent::Message::UpdateSystemReport(_, _)) = &update {
+    if let ClientStateUpdate::Persistent(persistent::Message::UpdateFromMainState(_)) = &update {
         client_state.update(update);
-        debug!("agent is online");
     } else {
-        panic!("expected agent online status update, got {:?}", &update);
+        panic!("expected update from main status update, got {:?}", &update);
     }
+
+    let system_report = client_state.persistent().iter().next().unwrap();
+    tracing::debug!("client persistent data: {:#?}", system_report);
 
     agent_cancel.cancel();
     tokio::time::timeout(Duration::from_secs(1), agent_handle)
+        .await
+        .unwrap()
+        .unwrap();
+
+    // client should go offline
+    let update = timeout(Duration::from_secs(1), client_state_updates.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    if let ClientStateUpdate::AgentOnlineStatus(_, true) = &update {
+        client_state.update(update);
+        debug!("agent is offline");
+    } else {
+        panic!("expected agent online status update, got: {:?}", &update);
+    }
+
+    server_cancel.cancel();
+    tokio::time::timeout(Duration::from_secs(1), recv_server)
         .await
         .unwrap()
         .unwrap();

@@ -183,6 +183,8 @@ impl UserStore {
             .execute(&mut *tx)
             .await?;
 
+        tx.commit().await?;
+
         Ok(())
     }
 }

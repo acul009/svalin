@@ -52,9 +52,19 @@ impl State {
             }
         }
     }
+
+    pub fn devices(&self) -> &HashMap<SpkiHash, DeviceState> {
+        &self.devices
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DeviceState {
     pub(crate) system_report: SystemReport,
+}
+
+impl DeviceState {
+    pub fn system_report(&self) -> &SystemReport {
+        &self.system_report
+    }
 }
