@@ -19,10 +19,11 @@ impl MessageHandler {
         &self,
         agent: &Certificate,
         message: MessageFromAgent,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<bool, anyhow::Error> {
         tracing::debug!("handling agent message: {:?}", message);
         match message {
-            MessageFromAgent::Mls(mls) => self.mls_handler.handle(agent, mls).await,
+            MessageFromAgent::Mls(mls) => self.mls_handler.handle(agent, mls).await.map(|_| false),
+            MessageFromAgent::Goodbye => Ok(true),
         }
     }
 }
@@ -56,8 +57,12 @@ impl CommandHandler for MessageHandler {
             let message = message_result?;
 
             let handle_result = self.handle(&peer, message).await;
+            let shutdown = handle_result.as_ref().cloned().unwrap_or(false);
             let response = handle_result.as_ref().map(|_| ()).map_err(|_| ());
             session.write_object(&response).await?;
+            if shutdown {
+                break;
+            }
 
             if let Err(err) = handle_result {
                 tracing::error!("Failed to handle message: {err}");

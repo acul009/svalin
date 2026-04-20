@@ -16,14 +16,19 @@ pub struct MlsMessageHandler {
 impl MlsMessageHandler {
     pub async fn handle(
         &self,
-        _sender: &Certificate,
+        sender: &Certificate,
         message: MessageToServerTransport,
     ) -> Result<(), anyhow::Error> {
-        let to_send = self
+        let mut to_send = self
             .mls_server
             .process_message(message)
             .await
             .map_err(|err| anyhow!(err))?;
+        to_send.receivers = to_send
+            .receivers
+            .into_iter()
+            .filter(|target| target != sender.spki_hash())
+            .collect();
         self.message_store.add_message(to_send).await?;
 
         Ok(())

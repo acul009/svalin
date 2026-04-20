@@ -134,8 +134,13 @@ impl CommandDispatcher for ClientMessageReceiver {
             let message = message_result?;
 
             let handle_result = self.handle(message).await;
+            let shutdown = handle_result.as_ref().cloned().unwrap_or(false);
             let response = handle_result.as_ref().map(|_| ()).map_err(|_| ());
             session.write_object(&response).await?;
+
+            if shutdown {
+                break;
+            }
 
             if let Err(err) = handle_result {
                 tracing::error!("Failed to handle message: {err}");
@@ -147,7 +152,7 @@ impl CommandDispatcher for ClientMessageReceiver {
 }
 
 impl ClientMessageReceiver {
-    async fn handle(&self, message: MessageToClient) -> Result<(), anyhow::Error> {
+    async fn handle(&self, message: MessageToClient) -> Result<bool, anyhow::Error> {
         match message {
             MessageToClient::Mls(message) => {
                 let _message = self
@@ -160,8 +165,9 @@ impl ClientMessageReceiver {
             MessageToClient::AgentOnlineStatus(spki_hash, online) => {
                 self.update_client_state(ClientStateUpdate::AgentOnlineStatus(spki_hash, online))
                     .await;
-                Ok(())
+                Ok(false)
             }
+            MessageToClient::Goodbye => Ok(true),
         }
     }
 

@@ -18,7 +18,9 @@ use crate::{
     CertificateParseError, SpkiHash,
     mls::{
         provider::{PostcardCodec, SvalinProvider},
-        transport_types::{MessageToMemberTransport, MessageToSend, MessageToServerTransport, NewGroup},
+        transport_types::{
+            MessageToMemberTransport, MessageToSend, MessageToServerTransport, NewGroup,
+        },
     },
 };
 

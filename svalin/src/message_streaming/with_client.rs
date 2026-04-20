@@ -22,9 +22,12 @@ impl MessageHandler {
         &self,
         session: &Certificate,
         message: MessageFromClient,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<bool, anyhow::Error> {
         match message {
-            MessageFromClient::Mls(mls) => self.mls_handler.handle(session, mls).await,
+            MessageFromClient::Mls(mls) => {
+                self.mls_handler.handle(session, mls).await.map(|_| false)
+            }
+            MessageFromClient::Goodbye => Ok(true),
         }
     }
 }
@@ -58,8 +61,13 @@ impl CommandHandler for MessageHandler {
             let message = message_result?;
 
             let handle_result = self.handle(&peer, message).await;
+            let shutdown = handle_result.as_ref().cloned().unwrap_or(false);
             let response = handle_result.as_ref().map(|_| ()).map_err(|_| ());
             session.write_object(&response).await?;
+
+            if shutdown {
+                break;
+            }
 
             if let Err(err) = handle_result {
                 tracing::error!("Failed to handle message: {err}");

@@ -71,6 +71,9 @@ impl CommandDispatcher for AgentMessageDispatcher {
             }
         }
 
+        session.write_object(&MessageFromAgent::Goodbye).await?;
+        let _result = session.read_object::<Result<(), ()>>().await?;
+
         Ok(())
     }
 }
@@ -108,8 +111,12 @@ impl CommandDispatcher for AgentMessageReceiver {
             let message = message_result?;
 
             let handle_result = self.handle(message).await;
+            let shutdown = handle_result.as_ref().cloned().unwrap_or(false);
             let response = handle_result.as_ref().map(|_| ()).map_err(|_| ());
             session.write_object(&response).await?;
+            if shutdown {
+                break;
+            }
 
             if let Err(err) = handle_result {
                 tracing::error!("Failed to handle message: {err}");
@@ -121,7 +128,7 @@ impl CommandDispatcher for AgentMessageReceiver {
 }
 
 impl AgentMessageReceiver {
-    async fn handle(&self, message: MessageToAgent) -> Result<(), anyhow::Error> {
+    async fn handle(&self, message: MessageToAgent) -> Result<bool, anyhow::Error> {
         match message {
             MessageToAgent::Mls(message) => {
                 self.mls
@@ -130,6 +137,7 @@ impl AgentMessageReceiver {
                     .map_err(|err| anyhow!(err))?;
                 todo!();
             }
+            MessageToAgent::Goodbye => Ok(true),
         }
     }
 }
