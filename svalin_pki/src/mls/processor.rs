@@ -92,6 +92,14 @@ impl MlsProcessorHandle {
                         let result = client.list_members(group_id);
                         let _ = response.send(result);
                     }
+                    MlsProcessorRequest::AddMember {
+                        group_id,
+                        key_package,
+                        response,
+                    } => {
+                        let result = client.add_member(group_id, key_package);
+                        let _ = response.send(result);
+                    }
                 }
             }
         });
@@ -223,6 +231,21 @@ impl MlsProcessorHandle {
 
         Ok(recv.await??)
     }
+
+    pub(crate) async fn add_member(&self, group_id: GroupId, key_package: KeyPackage) -> _ {
+        let (send, recv) = oneshot::channel();
+
+        let _ = self
+            .channel
+            .send(MlsProcessorRequest::AddMember {
+                group_id,
+                key_package,
+                response: send,
+            })
+            .await;
+
+        Ok(recv.await??)
+    }
 }
 
 enum MlsProcessorRequest {
@@ -258,6 +281,11 @@ enum MlsProcessorRequest {
     ListMembers {
         group_id: GroupId,
         response: oneshot::Sender<Result<Vec<SpkiHash>, anyhow::Error>>,
+    },
+    AddMember {
+        group_id: GroupId,
+        key_package: KeyPackage,
+        response: oneshot::Sender<()>,
     },
 }
 
@@ -468,6 +496,19 @@ impl MlsProcessor {
             .collect::<Result<_, _>>()?;
 
         Ok(members)
+    }
+
+    fn add_member(
+        &mut self,
+        group_id: GroupId,
+        key_package: KeyPackage,
+    ) -> Result<MessageToServerTransport, anyhow::Error> {
+        let group = Self::get_group(&mut self.group_cache, &self.provider.storage(), group_id)?;
+        let key_packages = [key_package.unpack()];
+
+        let (commit, welcome, _) =
+            group.add_members(&self.provider, &self.svalin_credential, &key_packages)?;
+        todo!()
     }
 }
 

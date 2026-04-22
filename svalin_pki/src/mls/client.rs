@@ -164,6 +164,17 @@ where
             .await
             .map(|members| members.contains(spki_hash))
     }
+
+    pub async fn add_member(
+        &self,
+        group: &SvalinGroupId,
+        key_package: KeyPackage,
+    ) -> Result<(), anyhow::Error> {
+        self.processor
+            .add_member(group.to_group_id(), key_package)
+            .await;
+        todo!()
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

@@ -11,6 +11,7 @@ use svalin_pki::{
     CertificateType, Credential, EncryptedObject, ExactVerififier, SpkiHash, Verifier,
     get_current_timestamp,
     mls::{
+        SvalinGroupId,
         client::{MessageDataContent, MlsClient},
         key_package::UnverifiedKeyPackage,
         provider::{ExportedMlsStore, SvalinStorage},
@@ -215,7 +216,6 @@ impl CommandDispatcher for UpdateUserMls {
         debug!("Temporary MLS client created, processing messages");
 
         let mut handled = Vec::new();
-        let mut groups = HashSet::new();
 
         for (uuid, message) in data.messages {
             let processed = client
@@ -224,7 +224,6 @@ impl CommandDispatcher for UpdateUserMls {
                 .map_err(|err| anyhow!(err))?;
 
             handled.push(uuid);
-            groups.insert(processed.group);
 
             match processed.content {
                 MessageDataContent::Report(spki_hash, report) => {
@@ -235,11 +234,12 @@ impl CommandDispatcher for UpdateUserMls {
             }
         }
 
-        for group in groups {
+        for (device, _) in persistent_data.devices() {
+            let group = SvalinGroupId::DeviceGroup(device.clone());
             if !client.is_member(&group, self.session_mls.me()).await? {
                 // TODO
-                // let key_package = self.session_mls.create_key_package().await?;
-                // client.add_member(&group, key_package).await?;
+                let key_package = self.session_mls.create_key_package().await?;
+                client.add_member(&group, key_package).await?;
             }
         }
 

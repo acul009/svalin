@@ -1,7 +1,8 @@
 use std::fmt::Debug;
 
 use openmls::prelude::{
-    MlsMessageBodyIn, MlsMessageIn, PrivateMessageIn, Welcome, group_info::VerifiableGroupInfo,
+    MlsMessageBodyIn, MlsMessageIn, PrivateMessageIn, PublicMessageIn, Welcome,
+    group_info::VerifiableGroupInfo,
 };
 use serde::{Deserialize, Serialize};
 use tls_codec::DeserializeBytes;
@@ -12,6 +13,7 @@ use crate::SpkiHash;
 pub enum MessageToServerTransport {
     GroupMessage(Vec<u8>),
     NewDeviceGroup { device_group: NewGroupTransport },
+    AddToGroup(AddToGroupTransport),
 }
 
 impl Debug for MessageToServerTransport {
@@ -19,6 +21,7 @@ impl Debug for MessageToServerTransport {
         match self {
             Self::GroupMessage(_) => f.debug_tuple("GroupMessage").finish(),
             Self::NewDeviceGroup { .. } => f.debug_tuple("NewDeviceGroup").finish(),
+            Self::AddToGroup(_) => f.debug_tuple("AddToGroup").finish(),
         }
     }
 }
@@ -30,6 +33,7 @@ impl MessageToServerTransport {
             Self::NewDeviceGroup { device_group } => MessageToServer::NewDeviceGroup {
                 device_group: device_group.unpack()?,
             },
+            Self::AddToGroup(add_to_group) => MessageToServer::AddToGroup(add_to_group.unpack()?),
         };
 
         Ok(to_server)
@@ -39,6 +43,7 @@ impl MessageToServerTransport {
 pub(crate) enum MessageToServer {
     GroupMessage(Vec<u8>),
     NewDeviceGroup { device_group: NewGroup },
+    AddToGroup(AddToGroup),
 }
 
 impl MessageToServerTransport {
@@ -48,6 +53,9 @@ impl MessageToServerTransport {
             Self::GroupMessage(message) => MessageToMemberTransport::GroupMessage(message),
             Self::NewDeviceGroup { device_group } => {
                 MessageToMemberTransport::Welcome(device_group.welcome)
+            }
+            Self::AddToGroup(add_to_group) => {
+                MessageToMemberTransport::AddToGroup(add_to_group.commit)
             }
         };
 
@@ -65,6 +73,7 @@ pub struct MessageToSend {
 pub enum MessageToMemberTransport {
     Welcome(Vec<u8>),
     GroupMessage(Vec<u8>),
+    AddToGroup(Vec<u8>),
 }
 
 impl Debug for MessageToMemberTransport {
@@ -72,6 +81,7 @@ impl Debug for MessageToMemberTransport {
         match self {
             MessageToMemberTransport::Welcome(_) => f.debug_tuple("Welcome").finish(),
             MessageToMemberTransport::GroupMessage(_) => f.debug_tuple("GroupMessage").finish(),
+            MessageToMemberTransport::AddToGroup(_) => f.debug_tuple("AddToGroup").finish(),
         }
     }
 }
@@ -91,6 +101,15 @@ impl MessageToMemberTransport {
                 };
                 MessageToMember::GroupMessage(private_message)
             }
+            MessageToMemberTransport::AddToGroup(commit) => {
+                let commit = MlsMessageIn::tls_deserialize_exact_bytes(&commit)?;
+                let MlsMessageBodyIn::PublicMessage(commit) = commit.extract() else {
+                    return Err(tls_codec::Error::DecodingError(
+                        "Expected a Private MLS message, but got something else".into(),
+                    ));
+                };
+                MessageToMember::AddToGroup(commit)
+            }
         };
 
         Ok(unpacked)
@@ -100,6 +119,7 @@ impl MessageToMemberTransport {
 pub(crate) enum MessageToMember {
     Welcome(Welcome),
     GroupMessage(PrivateMessageIn),
+    AddToGroup(PublicMessageIn),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -133,4 +153,33 @@ pub struct NewGroup {
 #[derive(Serialize, Deserialize)]
 pub enum DeviceMessage<Report> {
     Report(Report),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AddToGroupTransport {
+    pub(crate) commit: Vec<u8>,
+    pub(crate) welcome: Vec<u8>,
+}
+
+impl AddToGroupTransport {
+    fn unpack(&self) -> Result<AddToGroup, tls_codec::Error> {
+        let commit = MlsMessageIn::tls_deserialize_exact_bytes(&self.commit)?;
+        let MlsMessageBodyIn::PublicMessage(commit) = commit.extract() else {
+            return Err(tls_codec::Error::DecodingError(
+                "Expected a Private MLS message, but got something else".into(),
+            ));
+        };
+
+        Ok(AddToGroup {
+            commit,
+            commit_bytes: self.commit.clone(),
+            welcome: self.welcome.clone(),
+        })
+    }
+}
+
+pub struct AddToGroup {
+    pub(crate) commit: PublicMessageIn,
+    pub(crate) commit_bytes: Vec<u8>,
+    pub(crate) welcome: Vec<u8>,
 }
