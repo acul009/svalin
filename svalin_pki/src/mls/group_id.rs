@@ -23,10 +23,9 @@ impl SvalinGroupId {
             if group_id.as_slice().len() != 39 {
                 return Err(ParseGroupIdError::WrongSliceLength);
             }
-            let raw_spki_hash: [u8; 32] = group_id.as_slice()[7..39]
-                .try_into()
-                .expect("already checked length");
-            Ok(Self::DeviceGroup(SpkiHash(raw_spki_hash)))
+            let spki_hash =
+                SpkiHash::from_slice(&group_id.as_slice()[7..39]).expect("already checked length");
+            Ok(Self::DeviceGroup(spki_hash))
         } else {
             Err(ParseGroupIdError::UnknownGroupType)
         }

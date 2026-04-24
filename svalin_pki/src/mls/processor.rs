@@ -1,13 +1,16 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use crate::{
     SpkiHash,
     mls::{
+        SvalinGroupId,
+        group_id::ParseGroupIdError,
         key_package::{KeyPackage, KeyPackageError},
         provider::{SvalinProvider, SvalinStorage},
-        transport_types::{MessageToServerTransport, NewGroupTransport},
+        transport_types::{AddToGroupTransport, MessageToServerTransport, NewGroupTransport},
     },
 };
+use anyhow::anyhow;
 use openmls::{
     framing::errors::{MlsMessageError, ProtocolMessageError},
     group::{
@@ -17,7 +20,7 @@ use openmls::{
         WelcomeError,
     },
     prelude::{
-        CredentialWithKey, KeyPackageNewError, MlsMessageBodyOut, PrivateMessageIn,
+        CredentialWithKey, KeyPackageNewError, LeafNodeIndex, MlsMessageBodyOut, PrivateMessageIn,
         ProtocolMessage, Sender, SenderRatchetConfiguration, Welcome,
     },
 };
@@ -90,6 +93,14 @@ impl MlsProcessorHandle {
                     }
                     MlsProcessorRequest::ListMembers { group_id, response } => {
                         let result = client.list_members(group_id);
+                        let _ = response.send(result);
+                    }
+                    MlsProcessorRequest::GetMember {
+                        group_id,
+                        index,
+                        response,
+                    } => {
+                        let result = client.get_member(group_id, index);
                         let _ = response.send(result);
                     }
                     MlsProcessorRequest::AddMember {
@@ -186,14 +197,14 @@ impl MlsProcessorHandle {
 
     pub async fn process_message(
         &self,
-        message: PrivateMessageIn,
+        message: impl Into<ProtocolMessage>,
     ) -> Result<ProcessedMessage, ProcessMessageError> {
         let (send, recv) = oneshot::channel();
 
         let _ = self
             .channel
             .send(MlsProcessorRequest::ProcessMessage {
-                message,
+                message: message.into(),
                 response: send,
             })
             .await;
@@ -232,7 +243,11 @@ impl MlsProcessorHandle {
         Ok(recv.await??)
     }
 
-    pub(crate) async fn add_member(&self, group_id: GroupId, key_package: KeyPackage) -> _ {
+    pub(crate) async fn add_member(
+        &self,
+        group_id: GroupId,
+        key_package: KeyPackage,
+    ) -> Result<MessageToServerTransport, anyhow::Error> {
         let (send, recv) = oneshot::channel();
 
         let _ = self
@@ -240,6 +255,25 @@ impl MlsProcessorHandle {
             .send(MlsProcessorRequest::AddMember {
                 group_id,
                 key_package,
+                response: send,
+            })
+            .await;
+
+        Ok(recv.await??)
+    }
+
+    pub(crate) async fn get_member(
+        &self,
+        group_id: GroupId,
+        index: LeafNodeIndex,
+    ) -> Result<SpkiHash, anyhow::Error> {
+        let (send, recv) = oneshot::channel();
+
+        let _ = self
+            .channel
+            .send(MlsProcessorRequest::GetMember {
+                group_id,
+                index,
                 response: send,
             })
             .await;
@@ -271,7 +305,7 @@ enum MlsProcessorRequest {
         response: oneshot::Sender<Result<(), JoinGroupError>>,
     },
     ProcessMessage {
-        message: PrivateMessageIn,
+        message: ProtocolMessage,
         response: oneshot::Sender<Result<ProcessedMessage, ProcessMessageError>>,
     },
     GroupExists {
@@ -285,18 +319,42 @@ enum MlsProcessorRequest {
     AddMember {
         group_id: GroupId,
         key_package: KeyPackage,
-        response: oneshot::Sender<()>,
+        response: oneshot::Sender<Result<MessageToServerTransport, anyhow::Error>>,
+    },
+    GetMember {
+        group_id: GroupId,
+        index: LeafNodeIndex,
+        response: oneshot::Sender<Result<SpkiHash, anyhow::Error>>,
     },
 }
 
 pub(crate) struct ProcessedMessage {
     pub group_id: GroupId,
     pub sender: SpkiHash,
-    pub decrypted: Vec<u8>,
+    pub content: ProcessedContent,
+}
+
+impl ProcessedMessage {
+    pub fn group_id(&self) -> Result<SvalinGroupId, ParseGroupIdError> {
+        Ok(SvalinGroupId::from_group_id(&self.group_id)?)
+    }
+}
+
+pub(crate) enum ProcessedContent {
+    Message(Vec<u8>),
+    Commit(Box<openmls::prelude::StagedCommit>),
+}
+
+impl Debug for ProcessedContent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProcessedContent::Message(_) => f.debug_tuple("Message").finish(),
+            ProcessedContent::Commit(_) => f.debug_tuple("Commit").finish(),
+        }
+    }
 }
 
 struct MlsProcessor {
-    // Needs to be an Arc so `spawn_blocking` works.
     provider: SvalinProvider,
     svalin_credential: Credential,
     mls_credential_with_key: CredentialWithKey,
@@ -439,7 +497,7 @@ impl MlsProcessor {
 
     fn process_message(
         &mut self,
-        message: PrivateMessageIn,
+        message: ProtocolMessage,
     ) -> Result<ProcessedMessage, ProcessMessageError> {
         let message: ProtocolMessage = message.into();
         let group_id = message.group_id().clone();
@@ -464,7 +522,7 @@ impl MlsProcessor {
                 Ok(ProcessedMessage {
                     group_id,
                     sender,
-                    decrypted: application_message.into_bytes(),
+                    content: ProcessedContent::Message(application_message.into_bytes()),
                 })
             }
             openmls::prelude::ProcessedMessageContent::ProposalMessage(_queued_proposal) => {
@@ -473,8 +531,12 @@ impl MlsProcessor {
             openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
                 _queued_proposal,
             ) => Err(ProcessMessageError::ForbiddenMessageType),
-            openmls::prelude::ProcessedMessageContent::StagedCommitMessage(_staged_commit) => {
-                Err(ProcessMessageError::ForbiddenMessageType)
+            openmls::prelude::ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
+                Ok(ProcessedMessage {
+                    group_id,
+                    sender,
+                    content: ProcessedContent::Commit(staged_commit),
+                })
             }
         }
     }
@@ -508,7 +570,25 @@ impl MlsProcessor {
 
         let (commit, welcome, _) =
             group.add_members(&self.provider, &self.svalin_credential, &key_packages)?;
-        todo!()
+        group.merge_pending_commit(&self.provider)?;
+
+        Ok(MessageToServerTransport::AddToGroup(AddToGroupTransport {
+            commit: commit.to_bytes()?,
+            welcome: welcome.to_bytes()?,
+        }))
+    }
+
+    fn get_member(
+        &mut self,
+        group_id: GroupId,
+        index: LeafNodeIndex,
+    ) -> Result<SpkiHash, anyhow::Error> {
+        let group = Self::get_group(&mut self.group_cache, &self.provider.storage(), group_id)?;
+        let member = group
+            .member(index)
+            .ok_or_else(|| anyhow!("group member not found"))?
+            .deserialized()?;
+        Ok(member)
     }
 }
 

@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub trait KeyRetriever {
-    type Error: Display + Debug;
+    type Error: Send + Sync + Display + Debug + 'static;
 
     fn get_required_group_members(
         &self,

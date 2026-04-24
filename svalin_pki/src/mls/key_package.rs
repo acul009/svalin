@@ -40,6 +40,10 @@ pub enum KeyPackageError {
 }
 
 impl UnverifiedKeyPackage {
+    pub(crate) fn new(key_package: KeyPackageIn) -> Self {
+        Self { key_package }
+    }
+
     pub(crate) async fn verify(
         self,
         crypto: &impl OpenMlsCrypto,
@@ -99,9 +103,7 @@ impl KeyPackage {
     }
 
     pub fn to_unverified(self) -> UnverifiedKeyPackage {
-        UnverifiedKeyPackage {
-            key_package: self.key_package.into(),
-        }
+        UnverifiedKeyPackage::new(self.key_package.into())
     }
 
     pub fn spki_hash(&self) -> &SpkiHash {
