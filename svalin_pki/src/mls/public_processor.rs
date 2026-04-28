@@ -1,26 +1,21 @@
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Add,
-};
+use std::collections::HashMap;
 
 use openmls::{
     framing::errors::ProtocolMessageError,
     group::{GroupId, MergeCommitError, ProposalStore, PublicGroup, PublicProcessMessageError},
-    prelude::{CreationFromExternalError, MlsMessageIn, group_info::VerifiableGroupInfo},
+    prelude::{CreationFromExternalError, ProtocolMessage, Sender},
 };
 use openmls_rust_crypto::{MemoryStorage, MemoryStorageError};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
-use tls_codec::DeserializeBytes;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
     CertificateParseError, SpkiHash,
     mls::{
+        harness::AnyMlsProcessor,
         provider::{PostcardCodec, SvalinProvider},
-        transport_types::{
-            MessageToMemberTransport, MessageToSend, MessageToServerTransport, NewGroup,
-        },
+        transport_types::{MessageToMemberTransport, MessageToSend, NewGroup},
     },
 };
 
@@ -59,6 +54,14 @@ impl PublicProcessorHandle {
                         let result = public_processor.add_group(new_group);
                         let _ = response.send(result);
                     }
+                    PublicProcessorRequest::GetMember {
+                        group_id,
+                        index,
+                        response,
+                    } => {
+                        let result = public_processor.get_member(group_id, index);
+                        let _ = response.send(result);
+                    }
                 }
             }
         });
@@ -68,8 +71,8 @@ impl PublicProcessorHandle {
 
     pub async fn process_message(
         &self,
-        message: Vec<u8>,
-    ) -> Result<MessageToSend, ProcessMessageError> {
+        message: ProtocolMessage,
+    ) -> anyhow::Result<ProcessedMessage> {
         let (send, recv) = oneshot::channel();
 
         let _ = self
@@ -112,10 +115,31 @@ impl PublicProcessorHandle {
     }
 }
 
+impl AnyMlsProcessor for PublicProcessorHandle {
+    async fn get_member(
+        &self,
+        group_id: GroupId,
+        index: openmls::prelude::LeafNodeIndex,
+    ) -> anyhow::Result<SpkiHash> {
+        let (send, recv) = oneshot::channel();
+
+        let _ = self
+            .channel
+            .send(PublicProcessorRequest::GetMember {
+                group_id,
+                index,
+                response: send,
+            })
+            .await;
+
+        recv.await?
+    }
+}
+
 enum PublicProcessorRequest {
     ProcessMessage {
-        message: Vec<u8>,
-        response: oneshot::Sender<Result<MessageToSend, ProcessMessageError>>,
+        message: ProtocolMessage,
+        response: oneshot::Sender<anyhow::Result<ProcessedMessage>>,
     },
     AddGroup {
         new_group: NewGroup,
@@ -124,6 +148,25 @@ enum PublicProcessorRequest {
     CheckGroup {
         new_group: NewGroup,
         response: oneshot::Sender<Result<PublicGroup, AddGroupError>>,
+    },
+    GetMember {
+        group_id: GroupId,
+        index: openmls::prelude::LeafNodeIndex,
+        response: oneshot::Sender<Result<SpkiHash, anyhow::Error>>,
+    },
+}
+
+pub(crate) struct ProcessedMessage {
+    pub group_id: GroupId,
+    pub receivers: Vec<SpkiHash>,
+    pub content: ProcessedContent,
+}
+
+pub(crate) enum ProcessedContent {
+    Unknown,
+    Commit {
+        sender: SpkiHash,
+        commit: Box<openmls::prelude::StagedCommit>,
     },
 }
 
@@ -156,18 +199,61 @@ impl PublicProcessor {
         Ok(group)
     }
 
-    fn process_message(&mut self, message: Vec<u8>) -> Result<MessageToSend, ProcessMessageError> {
-        let mls_message = MlsMessageIn::tls_deserialize_exact_bytes(&message)?;
-        let protocol_message = mls_message.try_into_protocol_message()?;
+    fn process_message(&mut self, message: ProtocolMessage) -> anyhow::Result<ProcessedMessage> {
+        let group_id = message.group_id().clone();
+        let group = Self::get_group(
+            &mut self.group_cache,
+            self.provider.storage(),
+            group_id.clone(),
+        )?;
 
-        let members = self.get_group_members(protocol_message.group_id().clone())?;
+        let current_members = group
+            .members()
+            .map(|member| {
+                let spki_hash: SpkiHash = member.credential.deserialized()?;
+                Ok(spki_hash)
+            })
+            .collect::<Result<Vec<_>, tls_codec::Error>>()?;
 
-        let to_send = MessageToSend {
-            receivers: members,
-            message: MessageToMemberTransport::GroupMessage(message),
+        let sender = match &message {
+            ProtocolMessage::PrivateMessage(_) => {
+                return Ok(ProcessedMessage {
+                    group_id: group_id,
+                    receivers: current_members,
+                    content: ProcessedContent::Unknown,
+                });
+            }
+            ProtocolMessage::PublicMessage(public) => {
+                let Sender::Member(index) = public.sender() else {
+                    anyhow::bail!("invalid sender");
+                };
+                let Some(sender) = group.leaf(index.clone()) else {
+                    anyhow::bail!("invalid sender");
+                };
+                sender.credential().deserialized::<SpkiHash>()?
+            }
         };
 
-        Ok(to_send)
+        let processed = group.process_message(self.provider.crypto(), message)?;
+
+        match processed.into_content() {
+            openmls::prelude::ProcessedMessageContent::ApplicationMessage(_application_message) => {
+                unreachable!()
+            }
+            openmls::prelude::ProcessedMessageContent::ProposalMessage(_queued_proposal) => {
+                anyhow::bail!("message type not allowed")
+            }
+            openmls::prelude::ProcessedMessageContent::ExternalJoinProposalMessage(
+                _queued_proposal,
+            ) => anyhow::bail!("message type not allowed"),
+            openmls::prelude::ProcessedMessageContent::StagedCommitMessage(commit) => {
+                return Ok(ProcessedMessage {
+                    group_id: group_id,
+                    receivers: current_members,
+                    content: ProcessedContent::Commit { sender, commit },
+                });
+            }
+        }
     }
 
     fn check_group(&mut self, new_group: NewGroup) -> Result<PublicGroup, AddGroupError> {
@@ -230,18 +316,20 @@ impl PublicProcessor {
 
         Ok(members)
     }
-}
 
-#[derive(Debug, thiserror::Error)]
-pub enum ProcessMessageError {
-    #[error("error during tls decode: {0}")]
-    TlsCodecError(#[from] tls_codec::Error),
-    #[error("message seems to have wrong format: {0}")]
-    ProtocolMessageError(#[from] ProtocolMessageError),
-    #[error("error getting members: {0}")]
-    GetMembersError(#[from] GetMembersError),
-    #[error("error receiving from delivery service")]
-    RecvError(#[from] oneshot::error::RecvError),
+    fn get_member(
+        &mut self,
+        group_id: GroupId,
+        index: openmls::prelude::LeafNodeIndex,
+    ) -> Result<SpkiHash, anyhow::Error> {
+        let group = Self::get_group(&mut self.group_cache, self.provider.storage(), group_id)?;
+
+        let Some(leaf) = group.leaf(index) else {
+            anyhow::bail!("member is not in group");
+        };
+
+        Ok(leaf.credential().deserialized()?)
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

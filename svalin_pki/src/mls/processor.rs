@@ -5,6 +5,7 @@ use crate::{
     mls::{
         SvalinGroupId,
         group_id::ParseGroupIdError,
+        harness::AnyMlsProcessor,
         key_package::{KeyPackage, KeyPackageError},
         provider::{SvalinProvider, SvalinStorage},
         transport_types::{AddToGroupTransport, MessageToServerTransport, NewGroupTransport},
@@ -20,8 +21,8 @@ use openmls::{
         WelcomeError,
     },
     prelude::{
-        CredentialWithKey, KeyPackageNewError, LeafNodeIndex, MlsMessageBodyOut, PrivateMessageIn,
-        ProtocolMessage, Sender, SenderRatchetConfiguration, Welcome,
+        CredentialWithKey, KeyPackageNewError, LeafNodeIndex, MlsMessageBodyOut, ProtocolMessage,
+        Sender, SenderRatchetConfiguration, Welcome,
     },
 };
 use openmls_traits::OpenMlsProvider;
@@ -261,8 +262,10 @@ impl MlsProcessorHandle {
 
         Ok(recv.await??)
     }
+}
 
-    pub(crate) async fn get_member(
+impl AnyMlsProcessor for MlsProcessorHandle {
+    async fn get_member(
         &self,
         group_id: GroupId,
         index: LeafNodeIndex,

@@ -6,6 +6,7 @@ use crate::{Credential, SpkiHash, signed_message::CanSign};
 pub mod agent;
 pub mod client;
 pub(crate) mod group_id;
+pub mod harness;
 pub mod key_package;
 pub mod key_retriever;
 pub mod processor;

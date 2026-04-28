@@ -1,19 +1,21 @@
 use std::collections::HashSet;
 
+use anyhow::anyhow;
 use openmls::{
     error::LibraryError,
-    prelude::{ProtocolVersion, Welcome},
+    prelude::{PublicMessageIn, Welcome},
 };
-use openmls_rust_crypto::RustCrypto;
 use serde::de::DeserializeOwned;
 
 use crate::{
     CertificateType, Credential, SpkiHash, VerifyError, get_current_timestamp,
     mls::{
         group_id::{ParseGroupIdError, SvalinGroupId},
+        harness::MlsHarness,
         key_package::KeyPackage,
         processor::{
             CreateKeyPackageError, JoinGroupError, MlsProcessorHandle, ProcessMessageError,
+            ProcessedContent,
         },
         provider::SvalinStorage,
         transport_types::{DeviceMessage, MessageToMember, MessageToMemberTransport},
@@ -22,11 +24,7 @@ use crate::{
 
 pub struct MlsClient<KeyRetriever, Verifier> {
     me: SpkiHash,
-    processor: MlsProcessorHandle,
-    key_retriever: KeyRetriever,
-    verifier: Verifier,
-    crypto: RustCrypto,
-    protocol_version: ProtocolVersion,
+    harness: MlsHarness<KeyRetriever, Verifier, MlsProcessorHandle>,
 }
 
 pub struct MessageData<Report> {
@@ -62,11 +60,7 @@ where
 
         Ok(Self {
             me,
-            processor,
-            key_retriever,
-            verifier,
-            crypto: RustCrypto::default(),
-            protocol_version: ProtocolVersion::default(),
+            harness: MlsHarness::new(key_retriever, verifier, processor),
         })
     }
 
@@ -77,10 +71,13 @@ where
     pub async fn handle_message<Report: DeserializeOwned>(
         &self,
         message: &MessageToMemberTransport,
-    ) -> Result<MessageData<Report>, HandleMessageError<KeyRetriever::Error>> {
+    ) -> anyhow::Result<MessageData<Report>> {
         match message.unpack()? {
             MessageToMember::Welcome(welcome) => {
-                let group = self.handle_welcome(welcome).await?;
+                let group = self
+                    .handle_welcome(welcome)
+                    .await
+                    .map_err(|err| anyhow!(err))?;
 
                 Ok(MessageData {
                     content: MessageDataContent::Internal,
@@ -88,15 +85,20 @@ where
                 })
             }
             MessageToMember::GroupMessage(message) => {
-                let processed = self.processor.process_message(message).await?;
+                let processed = self.harness.processor().process_message(message).await?;
                 let group_id = SvalinGroupId::from_group_id(&processed.group_id)?;
-                let decoded: DeviceMessage<Report> = postcard::from_bytes(&processed.decrypted)?;
+                let ProcessedContent::Message(decrypted) = processed.content else {
+                    anyhow::bail!("expected data message, got something else instead.")
+                };
+                let decoded: DeviceMessage<Report> = postcard::from_bytes(&decrypted)?;
 
                 match decoded {
                     DeviceMessage::Report(report) => match group_id.clone() {
                         SvalinGroupId::DeviceGroup(device) => {
                             if device != processed.sender {
-                                Err(HandleMessageError::ForbiddenSender)
+                                anyhow::bail!(
+                                    "only the device itself can send reports to its group"
+                                )
                             } else {
                                 Ok(MessageData {
                                     group: group_id,
@@ -105,10 +107,11 @@ where
                             }
                         }
                         #[allow(unreachable_patterns)]
-                        _ => return Err(HandleMessageError::InvalidMessage),
+                        _ => anyhow::bail!("unallowed message type"),
                     },
                 }
             }
+            MessageToMember::AddToGroup(message) => self.handle_add_to_group(message).await,
         }
     }
 
@@ -116,12 +119,13 @@ where
         &self,
         welcome: Welcome,
     ) -> Result<SvalinGroupId, HandleWelcomeError<KeyRetriever::Error>> {
-        let staged = self.processor.stage_join(welcome).await?;
+        let staged = self.harness.processor().stage_join(welcome).await?;
         let id = SvalinGroupId::from_group_id(staged.group_context().group_id())?;
 
         match &id {
             SvalinGroupId::DeviceGroup(device) => {
-                self.verifier
+                self.harness
+                    .verifier()
                     .verify_spki_hash(device, get_current_timestamp())
                     .await?;
                 // No additional verification for now
@@ -129,7 +133,8 @@ where
         }
 
         let required_members = self
-            .key_retriever
+            .harness
+            .key_retriever()
             .get_required_group_members(&id)
             .await
             .map_err(HandleWelcomeError::RetrieverError)?
@@ -145,13 +150,37 @@ where
             return Err(HandleWelcomeError::IncorrectMembers);
         }
 
-        self.processor.join_group(staged).await?;
+        self.harness.processor().join_group(staged).await?;
 
         Ok(id)
     }
 
+    async fn handle_add_to_group<Report>(
+        &self,
+        message: PublicMessageIn,
+    ) -> anyhow::Result<MessageData<Report>> {
+        let processed = self
+            .harness
+            .processor()
+            .process_message(message)
+            .await
+            .map_err(|err| anyhow!(err))?;
+        let group_id = processed.group_id()?;
+
+        let ProcessedContent::Commit(commit) = processed.content else {
+            anyhow::bail!("Expected a commit message, got {:?}", processed.content)
+        };
+
+        self.harness.check_commit(&group_id, &commit).await?;
+
+        Ok(MessageData {
+            group: group_id,
+            content: MessageDataContent::Internal,
+        })
+    }
+
     pub async fn create_key_package(&self) -> Result<KeyPackage, CreateKeyPackageError> {
-        self.processor.create_key_package().await
+        self.harness.processor().create_key_package().await
     }
 
     pub async fn is_member(
@@ -159,7 +188,8 @@ where
         group_id: &SvalinGroupId,
         spki_hash: &SpkiHash,
     ) -> Result<bool, anyhow::Error> {
-        self.processor
+        self.harness
+            .processor()
             .list_members(group_id.to_group_id())
             .await
             .map(|members| members.contains(spki_hash))
@@ -170,7 +200,8 @@ where
         group: &SvalinGroupId,
         key_package: KeyPackage,
     ) -> Result<(), anyhow::Error> {
-        self.processor
+        self.harness
+            .processor()
             .add_member(group.to_group_id(), key_package)
             .await;
         todo!()

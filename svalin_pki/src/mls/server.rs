@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use openmls::prelude::{ProtocolVersion, SignaturePublicKey, Verifiable, group_info};
+use anyhow::anyhow;
+use openmls::prelude::{
+    ProtocolVersion, PublicMessageIn, SignaturePublicKey, Verifiable, group_info,
+};
 use openmls_rust_crypto::RustCrypto;
 use openmls_sqlx_storage::SqliteStorageProvider;
 
@@ -8,24 +11,22 @@ use crate::{
     Certificate, SpkiHash, Verifier, get_current_timestamp,
     mls::{
         group_id::{ParseGroupIdError, SvalinGroupId},
+        harness::MlsHarness,
         key_package::{KeyPackage, KeyPackageError, UnverifiedKeyPackage},
         provider::PostcardCodec,
         public_processor::{self, AddGroupError, ProcessMessageError, PublicProcessorHandle},
         transport_types::{
-            MessageToSend, MessageToServer, MessageToServerTransport, NewGroup, NewGroupTransport,
+            AddToGroup, MessageToSend, MessageToServer, MessageToServerTransport, NewGroup,
+            NewGroupTransport,
         },
     },
 };
 
-pub struct MlsServer<Verifier, KeyRetriever> {
-    processor: PublicProcessorHandle,
-    verifier: Verifier,
-    key_retriever: KeyRetriever,
-    crypto: RustCrypto,
-    protocol_version: ProtocolVersion,
+pub struct MlsServer<KeyRetriever, Verifier> {
+    harness: MlsHarness<KeyRetriever, Verifier, PublicProcessorHandle>,
 }
 
-impl<Verifier, KeyRetriever> MlsServer<Verifier, KeyRetriever>
+impl<KeyRetriever, Verifier> MlsServer<KeyRetriever, Verifier>
 where
     Verifier: crate::Verifier,
     KeyRetriever: crate::mls::key_retriever::KeyRetriever,
@@ -36,15 +37,9 @@ where
         key_retriever: KeyRetriever,
     ) -> Self {
         let processor = PublicProcessorHandle::new(storage_provider);
-        let crypto = RustCrypto::default();
-        let protocol_version = ProtocolVersion::default();
 
         Self {
-            processor,
-            verifier,
-            key_retriever,
-            crypto,
-            protocol_version,
+            harness: MlsHarness::new(key_retriever, verifier, processor),
         }
     }
 
@@ -52,11 +47,13 @@ where
         &self,
         key_package: UnverifiedKeyPackage,
         // This one is here to allow verifying to an exact certificate on upload, so noone uploads keypackages that don't belong to them
-        verifier: &impl crate::Verifier,
+        expected: &SpkiHash,
     ) -> Result<KeyPackage, KeyPackageError> {
-        key_package
-            .verify(&self.crypto, self.protocol_version, verifier)
-            .await
+        let verified = self.harness.verify_key_package(key_package).await?;
+        if verified.spki_hash() != expected {
+            return Err(KeyPackageError::SpkiHashMismatch);
+        }
+        Ok(verified)
     }
 
     async fn add_svalin_group(
@@ -71,7 +68,11 @@ where
         // - Or I just create the group, inspect it and then delete it if it's not up to my expectations.
         //      Update: I did almost that, instead I just create a MemoryStorage and just drop it right after creating the group
 
-        let temp_group = self.processor.check_group(new_group.clone()).await?;
+        let temp_group = self
+            .harness
+            .processor()
+            .check_group(new_group.clone())
+            .await?;
 
         let members = temp_group
             .members()
@@ -80,7 +81,8 @@ where
 
         let id = SvalinGroupId::from_group_id(temp_group.group_id())?;
         let required_members = self
-            .key_retriever
+            .harness
+            .key_retriever()
             .get_required_group_members(&id)
             .await
             .map_err(AddDeviceGroupError::KeyRetrieverError)?;
@@ -91,7 +93,11 @@ where
             }
         }
 
-        let to_send = self.processor.add_group(new_group.clone()).await?;
+        let to_send = self
+            .harness
+            .processor()
+            .add_group(new_group.clone())
+            .await?;
 
         Ok(to_send)
     }
@@ -99,18 +105,22 @@ where
     pub async fn process_message(
         &self,
         message: MessageToServerTransport,
-    ) -> Result<MessageToSend, ProcessError<KeyRetriever::Error>> {
+    ) -> Result<MessageToSend, anyhow::Error> {
         let message = message.unpack()?;
         match message {
             MessageToServer::GroupMessage(data) => self
-                .processor
+                .harness
+                .processor()
                 .process_message(data)
                 .await
                 .map_err(Into::into),
             MessageToServer::NewDeviceGroup { device_group } => self
                 .add_device_group(device_group)
                 .await
-                .map_err(Into::into),
+                .map_err(|err| anyhow!(err)),
+            MessageToServer::AddToGroup(add_to_group) => {
+                self.handle_add_to_group(add_to_group).await
+            }
         }
     }
 
@@ -130,6 +140,29 @@ where
         }
 
         self.add_svalin_group(new_group).await
+    }
+
+    async fn handle_add_to_group(&self, add_to_group: AddToGroup) -> Result<(), anyhow::Error> {
+        let commit = add_to_group.commit;
+        let processed = self
+            .harness
+            .processor()
+            .process_message(commit)
+            .await
+            .map_err(|err| anyhow!(err))?;
+        let group_id = processed.group_id()?;
+
+        let ProcessedContent::Commit(commit) = processed.content else {
+            anyhow::bail!("Expected a commit message, got {:?}", processed.content)
+        };
+
+        if group_id != self.my_device_group {
+            anyhow::bail!("received message for unexpected group: {:?}", group_id)
+        }
+
+        self.harness.check_commit(&group_id, &commit).await?;
+
+        Ok(())
     }
 }
 

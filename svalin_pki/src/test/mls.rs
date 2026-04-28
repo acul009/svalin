@@ -11,7 +11,7 @@ use crate::{
         client::{MessageData, MessageDataContent, MlsClient},
         key_package::{KeyPackage, UnverifiedKeyPackage},
         key_retriever::KeyRetriever,
-        processor::MlsProcessorHandle,
+        processor::{MlsProcessorHandle, ProcessedContent},
         provider::PostcardCodec,
         public_processor::PublicProcessorHandle,
         server::MlsServer,
@@ -78,9 +78,13 @@ async fn test_processor() {
         panic!("wrong message type")
     };
 
-    let received = member1.process_message(message).await.unwrap();
+    let ProcessedContent::Message(received) =
+        member1.process_message(message).await.unwrap().content
+    else {
+        panic!("wrong content type");
+    };
 
-    assert_eq!(test_text, received.decrypted);
+    assert_eq!(test_text, received);
 }
 
 #[tokio::test]
@@ -147,9 +151,13 @@ async fn test_public_processor() {
         panic!("wrong message type")
     };
 
-    let received = member1.process_message(message).await.unwrap();
+    let ProcessedContent::Message(received) =
+        member1.process_message(message).await.unwrap().content
+    else {
+        panic!("wrong content type");
+    };
 
-    assert_eq!(test_text, received.decrypted);
+    assert_eq!(test_text, received);
 }
 
 #[derive(Clone)]

@@ -1,19 +1,16 @@
 use anyhow::anyhow;
-use openmls::{
-    error::LibraryError,
-    prelude::{ProtocolVersion, PublicMessageIn},
-};
-use openmls_rust_crypto::RustCrypto;
+use openmls::{error::LibraryError, prelude::PublicMessageIn};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::Serialize;
 use tokio::task::JoinError;
 
 use crate::{
-    Certificate, CertificateType, Credential, SpkiHash, VerifyError, get_current_timestamp,
+    Certificate, CertificateType, Credential, VerifyError,
     mls::{
         SvalinGroupId,
         group_id::ParseGroupIdError,
-        key_package::{KeyPackage, KeyPackageError, UnverifiedKeyPackage},
+        harness::MlsHarness,
+        key_package::{KeyPackage, KeyPackageError},
         processor::{
             CreateGroupError, CreateGroupMessageError, CreateKeyPackageError, GroupExistsError,
             JoinGroupError, MlsProcessorHandle, ProcessedContent,
@@ -26,13 +23,9 @@ use crate::{
 };
 
 pub struct MlsAgent<KeyRetriever, Verifier> {
-    processor: MlsProcessorHandle,
-    key_retriever: KeyRetriever,
-    verifier: Verifier,
     me: Certificate,
     my_device_group: SvalinGroupId,
-    crypto: RustCrypto,
-    protocol_version: ProtocolVersion,
+    harness: MlsHarness<KeyRetriever, Verifier, MlsProcessorHandle>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -70,16 +63,12 @@ where
         Ok(Self {
             my_device_group: SvalinGroupId::DeviceGroup(me.spki_hash().clone()),
             me,
-            processor,
-            key_retriever,
-            verifier,
-            crypto: RustCrypto::default(),
-            protocol_version: ProtocolVersion::default(),
+            harness: MlsHarness::new(key_retriever, verifier, processor),
         })
     }
 
     pub async fn create_key_package(&self) -> Result<KeyPackage, CreateKeyPackageError> {
-        self.processor.create_key_package().await
+        self.harness.processor().create_key_package().await
     }
 
     pub async fn handle_message(
@@ -101,7 +90,8 @@ where
 
     async fn handle_add_to_group(&self, message: PublicMessageIn) -> Result<(), anyhow::Error> {
         let processed = self
-            .processor
+            .harness
+            .processor()
             .process_message(message)
             .await
             .map_err(|err| anyhow!(err))?;
@@ -115,57 +105,7 @@ where
             anyhow::bail!("received message for unexpected group: {:?}", group_id)
         }
 
-        let required = self
-            .key_retriever
-            .get_required_group_members(&group_id)
-            .await
-            .map_err(|err| anyhow!(err))?;
-        for proposal in commit.remove_proposals() {
-            let index = proposal.remove_proposal().removed();
-            let spki_hash = self
-                .processor
-                .get_member(group_id.to_group_id(), index)
-                .await?;
-            if required.contains(&spki_hash) {
-                anyhow::bail!("Cannot remove required member: {spki_hash:?}")
-            }
-        }
-
-        for proposal in commit.add_proposals() {
-            let raw_key_package = proposal.add_proposal().key_package();
-            let key_package = UnverifiedKeyPackage::new(raw_key_package.clone().into());
-            let key_package = key_package
-                .verify(&self.crypto, self.protocol_version, &self.verifier)
-                .await?;
-            match key_package.certificate().certificate_type() {
-                CertificateType::User => (),
-                CertificateType::UserSession => (),
-                certificate_type => anyhow::bail!(
-                    "Unexpected certificate type in key package: {certificate_type:?}"
-                ),
-            }
-        }
-
-        for mls_credential in commit.credentials_to_verify() {
-            let spki_hash: SpkiHash = mls_credential.deserialized()?;
-            self.verifier
-                .verify_spki_hash(&spki_hash, get_current_timestamp())
-                .await?;
-        }
-
-        let verified = self
-            .verifier
-            .verify_spki_hash(&processed.sender, get_current_timestamp())
-            .await?;
-
-        match verified.certificate_type() {
-            CertificateType::Root => (),
-            CertificateType::User => (),
-            _ => anyhow::bail!(
-                "Sender {:?} is not allowed to add members to the group",
-                processed.sender
-            ),
-        };
+        self.harness.check_commit(&group_id, &commit).await?;
 
         Ok(())
     }
@@ -174,7 +114,7 @@ where
     //     &self,
     //     welcome: Welcome,
     // ) -> Result<(), HandleWelcomeError<KeyRetriever::Error>> {
-    //     let staged = self.processor.stage_join(welcome).await?;
+    //     let staged = self.harness.processor().stage_join(welcome).await?;
     //     let id = SvalinGroupId::from_group_id(staged.group_context().group_id())?;
 
     //     match &id {
@@ -186,8 +126,7 @@ where
     //     }
 
     //     let required_members = self
-    //         .key_retriever
-    //         .get_required_group_members(&id)
+    //         .harness.key_retriever()    //         .get_required_group_members(&id)
     //         .await
     //         .map_err(HandleWelcomeError::RetrieverError)?
     //         .into_iter()
@@ -202,7 +141,7 @@ where
     //         return Err(HandleWelcomeError::IncorrectMembers);
     //     }
 
-    //     self.processor.join_group(staged).await?;
+    //     self.harness.processor().join_group(staged).await?;
 
     //     Ok(())
     // }
@@ -214,7 +153,11 @@ where
         let group_id = SvalinGroupId::DeviceGroup(self.me.spki_hash().clone()).to_group_id();
         let message = DeviceMessage::Report(report);
         let encoded = postcard::to_stdvec(&message)?;
-        let to_server = self.processor.create_message(group_id, encoded).await?;
+        let to_server = self
+            .harness
+            .processor()
+            .create_message(group_id, encoded)
+            .await?;
 
         Ok(to_server)
     }
@@ -224,12 +167,18 @@ where
     ) -> Result<Option<MessageToServerTransport>, CreateDeviceGroupError<KeyRetriever::Error>> {
         let group_id = SvalinGroupId::DeviceGroup(self.me.spki_hash().clone());
 
-        if self.processor.group_exists(group_id.to_group_id()).await? {
+        if self
+            .harness
+            .processor()
+            .group_exists(group_id.to_group_id())
+            .await?
+        {
             return Ok(None);
         }
 
         let required_members = self
-            .key_retriever
+            .harness
+            .key_retriever()
             .get_required_group_members(&group_id)
             .await
             .map_err(CreateDeviceGroupError::KeyRetrieverError)?
@@ -238,21 +187,21 @@ where
             .collect::<Vec<_>>();
 
         let unverified = self
-            .key_retriever
+            .harness
+            .key_retriever()
             .get_key_packages(&required_members)
             .await
             .map_err(CreateDeviceGroupError::KeyRetrieverError)?;
 
         let mut members = Vec::with_capacity(unverified.len());
         for member in unverified {
-            let member = member
-                .verify(&self.crypto, self.protocol_version, &self.verifier)
-                .await?;
+            let member = self.harness.verify_key_package(member).await?;
             members.push(member);
         }
 
         let new_group = self
-            .processor
+            .harness
+            .processor()
             .create_group(members, group_id.to_group_id())
             .await?;
 

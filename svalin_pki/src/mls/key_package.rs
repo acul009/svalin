@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use openmls::prelude::{KeyPackageIn, KeyPackageVerifyError, OpenMlsCrypto, ProtocolVersion};
 use serde::{Deserialize, Serialize};
 
-use crate::{Certificate, CertificateType, SpkiHash, Verifier, VerifyError, get_current_timestamp};
+use crate::{Certificate, SpkiHash, Verifier, VerifyError, get_current_timestamp};
 
 #[cfg_attr(test, derive(Clone))]
 #[derive(Serialize, Deserialize)]
