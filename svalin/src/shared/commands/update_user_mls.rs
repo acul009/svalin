@@ -138,11 +138,10 @@ impl CommandHandler for UpdateUserMlsHandler {
             .verifier
             .verify_spki_hash(&user_hash, get_current_timestamp())
             .await?;
-        let verifier = ExactVerififier::new(user_cert);
         for key_package in response.key_packages {
             let key_package = self
                 .mls
-                .verify_key_package(key_package, &verifier)
+                .verify_key_package(key_package, user_cert.spki_hash())
                 .await
                 .context("error verifying key package")?;
             self.key_package_store.add_key_package(key_package).await?;
@@ -237,7 +236,6 @@ impl CommandDispatcher for UpdateUserMls {
         for (device, _) in persistent_data.devices() {
             let group = SvalinGroupId::DeviceGroup(device.clone());
             if !client.is_member(&group, self.session_mls.me()).await? {
-                // TODO
                 let key_package = self.session_mls.create_key_package().await?;
                 client.add_member(&group, key_package).await?;
             }

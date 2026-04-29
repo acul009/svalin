@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use openmls::{
     framing::errors::ProtocolMessageError,
     group::{GroupId, MergeCommitError, ProposalStore, PublicGroup, PublicProcessMessageError},
-    prelude::{CreationFromExternalError, ProtocolMessage, Sender},
+    prelude::{CreationFromExternalError, ProtocolMessage},
 };
 use openmls_rust_crypto::{MemoryStorage, MemoryStorageError};
 use openmls_sqlx_storage::SqliteStorageProvider;
@@ -13,6 +13,8 @@ use tokio::sync::{mpsc, oneshot};
 use crate::{
     CertificateParseError, SpkiHash,
     mls::{
+        SvalinGroupId,
+        group_id::ParseGroupIdError,
         harness::AnyMlsProcessor,
         provider::{PostcardCodec, SvalinProvider},
         transport_types::{MessageToMemberTransport, MessageToSend, NewGroup},
@@ -60,6 +62,14 @@ impl PublicProcessorHandle {
                         response,
                     } => {
                         let result = public_processor.get_member(group_id, index);
+                        let _ = response.send(result);
+                    }
+                    PublicProcessorRequest::Commit {
+                        group_id,
+                        commit,
+                        response,
+                    } => {
+                        let result = public_processor.commit(group_id, commit);
                         let _ = response.send(result);
                     }
                 }
@@ -113,6 +123,25 @@ impl PublicProcessorHandle {
 
         recv.await?
     }
+
+    pub(crate) async fn commit(
+        &self,
+        group_id: GroupId,
+        commit: Box<openmls::prelude::StagedCommit>,
+    ) -> anyhow::Result<()> {
+        let (send, recv) = oneshot::channel();
+
+        let _ = self
+            .channel
+            .send(PublicProcessorRequest::Commit {
+                group_id,
+                commit,
+                response: send,
+            })
+            .await;
+
+        recv.await?
+    }
 }
 
 impl AnyMlsProcessor for PublicProcessorHandle {
@@ -154,6 +183,11 @@ enum PublicProcessorRequest {
         index: openmls::prelude::LeafNodeIndex,
         response: oneshot::Sender<Result<SpkiHash, anyhow::Error>>,
     },
+    Commit {
+        group_id: GroupId,
+        commit: Box<openmls::prelude::StagedCommit>,
+        response: oneshot::Sender<Result<(), anyhow::Error>>,
+    },
 }
 
 pub(crate) struct ProcessedMessage {
@@ -162,12 +196,16 @@ pub(crate) struct ProcessedMessage {
     pub content: ProcessedContent,
 }
 
+impl ProcessedMessage {
+    pub fn group_id(&self) -> Result<SvalinGroupId, ParseGroupIdError> {
+        SvalinGroupId::from_group_id(&self.group_id)
+    }
+}
+
+#[derive(Debug)]
 pub(crate) enum ProcessedContent {
     Unknown,
-    Commit {
-        sender: SpkiHash,
-        commit: Box<openmls::prelude::StagedCommit>,
-    },
+    Commit(Box<openmls::prelude::StagedCommit>),
 }
 
 struct PublicProcessor {
@@ -215,30 +253,20 @@ impl PublicProcessor {
             })
             .collect::<Result<Vec<_>, tls_codec::Error>>()?;
 
-        let sender = match &message {
-            ProtocolMessage::PrivateMessage(_) => {
-                return Ok(ProcessedMessage {
-                    group_id: group_id,
-                    receivers: current_members,
-                    content: ProcessedContent::Unknown,
-                });
-            }
-            ProtocolMessage::PublicMessage(public) => {
-                let Sender::Member(index) = public.sender() else {
-                    anyhow::bail!("invalid sender");
-                };
-                let Some(sender) = group.leaf(index.clone()) else {
-                    anyhow::bail!("invalid sender");
-                };
-                sender.credential().deserialized::<SpkiHash>()?
-            }
-        };
+        // Need to shortcut here to not cause a wire format error
+        if let ProtocolMessage::PrivateMessage(_) = &message {
+            return Ok(ProcessedMessage {
+                group_id: group_id,
+                receivers: current_members,
+                content: ProcessedContent::Unknown,
+            });
+        }
 
         let processed = group.process_message(self.provider.crypto(), message)?;
 
         match processed.into_content() {
             openmls::prelude::ProcessedMessageContent::ApplicationMessage(_application_message) => {
-                unreachable!()
+                unreachable!("see the private message shortcut above");
             }
             openmls::prelude::ProcessedMessageContent::ProposalMessage(_queued_proposal) => {
                 anyhow::bail!("message type not allowed")
@@ -250,7 +278,7 @@ impl PublicProcessor {
                 return Ok(ProcessedMessage {
                     group_id: group_id,
                     receivers: current_members,
-                    content: ProcessedContent::Commit { sender, commit },
+                    content: ProcessedContent::Commit(commit),
                 });
             }
         }
@@ -329,6 +357,18 @@ impl PublicProcessor {
         };
 
         Ok(leaf.credential().deserialized()?)
+    }
+
+    fn commit(
+        &mut self,
+        group_id: GroupId,
+        commit: Box<openmls::prelude::StagedCommit>,
+    ) -> Result<(), anyhow::Error> {
+        let group = Self::get_group(&mut self.group_cache, self.provider.storage(), group_id)?;
+
+        group.merge_commit(self.provider.storage(), *commit)?;
+
+        Ok(())
     }
 }
 

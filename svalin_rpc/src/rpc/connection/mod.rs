@@ -129,7 +129,6 @@ where
 
         open_sessions.close();
         open_sessions.wait().await;
-        self.close().await;
         Ok(())
     }
 }

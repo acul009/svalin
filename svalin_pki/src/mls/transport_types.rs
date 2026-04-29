@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use openmls::prelude::{
-    MlsMessageBodyIn, MlsMessageIn, PrivateMessageIn, PublicMessageIn, Welcome,
+    MlsMessageBodyIn, MlsMessageIn, PrivateMessageIn, ProtocolMessage, PublicMessageIn, Welcome,
     group_info::VerifiableGroupInfo,
 };
 use serde::{Deserialize, Serialize};
@@ -27,9 +27,13 @@ impl Debug for MessageToServerTransport {
 }
 
 impl MessageToServerTransport {
-    pub(crate) fn unpack(self) -> Result<MessageToServer, tls_codec::Error> {
+    pub(crate) fn unpack(self) -> anyhow::Result<MessageToServer> {
         let to_server = match self {
-            Self::GroupMessage(message) => MessageToServer::GroupMessage(message),
+            Self::GroupMessage(raw) => {
+                let message =
+                    MlsMessageIn::tls_deserialize_exact_bytes(&raw)?.try_into_protocol_message()?;
+                MessageToServer::GroupMessage { raw, message }
+            }
             Self::NewDeviceGroup { device_group } => MessageToServer::NewDeviceGroup {
                 device_group: device_group.unpack()?,
             },
@@ -41,8 +45,13 @@ impl MessageToServerTransport {
 }
 
 pub(crate) enum MessageToServer {
-    GroupMessage(Vec<u8>),
-    NewDeviceGroup { device_group: NewGroup },
+    GroupMessage {
+        raw: Vec<u8>,
+        message: ProtocolMessage,
+    },
+    NewDeviceGroup {
+        device_group: NewGroup,
+    },
     AddToGroup(AddToGroup),
 }
 

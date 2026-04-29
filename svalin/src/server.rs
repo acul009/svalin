@@ -42,7 +42,7 @@ pub mod command_builder;
 pub mod config_builder;
 pub mod local_key_retriever;
 
-pub type MlsServer = svalin_pki::mls::server::MlsServer<LocalVerifier, LocalKeyRetriever>;
+pub type MlsServer = svalin_pki::mls::server::MlsServer<LocalKeyRetriever, LocalVerifier>;
 
 #[derive(Debug)]
 pub struct ServerConfig {

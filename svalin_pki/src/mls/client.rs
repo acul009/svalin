@@ -18,7 +18,9 @@ use crate::{
             ProcessedContent,
         },
         provider::SvalinStorage,
-        transport_types::{DeviceMessage, MessageToMember, MessageToMemberTransport},
+        transport_types::{
+            DeviceMessage, MessageToMember, MessageToMemberTransport, MessageToServerTransport,
+        },
     },
 };
 
@@ -187,7 +189,7 @@ where
         &self,
         group_id: &SvalinGroupId,
         spki_hash: &SpkiHash,
-    ) -> Result<bool, anyhow::Error> {
+    ) -> anyhow::Result<bool> {
         self.harness
             .processor()
             .list_members(group_id.to_group_id())
@@ -199,12 +201,14 @@ where
         &self,
         group: &SvalinGroupId,
         key_package: KeyPackage,
-    ) -> Result<(), anyhow::Error> {
-        self.harness
+    ) -> anyhow::Result<MessageToServerTransport> {
+        let message_to_server = self
+            .harness
             .processor()
             .add_member(group.to_group_id(), key_package)
-            .await;
-        todo!()
+            .await?;
+
+        Ok(message_to_server)
     }
 }
 

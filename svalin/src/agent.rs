@@ -10,7 +10,11 @@ use svalin_pki::{
 };
 use svalin_rpc::{
     commands::{deauthenticate::DeauthenticateHandler, e2e::E2EHandler, ping::PingHandler},
-    rpc::{client::RpcClient, command::handler::HandlerCollection, connection::Connection},
+    rpc::{
+        client::RpcClient,
+        command::handler::HandlerCollection,
+        connection::{Connection, ServeableConnection, ServeableConnectionBase},
+    },
 };
 use tokio::time::error::Elapsed;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
@@ -169,6 +173,7 @@ impl Agent {
             }
         });
 
+        let connection = rpc.upstream_connection();
         tasks.spawn(async move {
             debug!("Agent will now start serving requests");
             if let Err(err) = rpc.serve(server_commands).await {
@@ -187,7 +192,9 @@ impl Agent {
         cancel.cancelled().await;
         tasks.close();
         // TODO: add timeout with error message
-        tasks.wait().await;
+        tokio::time::timeout(Duration::from_secs(3), tasks.wait()).await?;
+
+        ServeableConnectionBase::close(&connection).await;
 
         Ok(())
     }

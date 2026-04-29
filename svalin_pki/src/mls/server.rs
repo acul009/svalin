@@ -1,23 +1,19 @@
 use std::collections::HashSet;
 
 use anyhow::anyhow;
-use openmls::prelude::{
-    ProtocolVersion, PublicMessageIn, SignaturePublicKey, Verifiable, group_info,
-};
-use openmls_rust_crypto::RustCrypto;
 use openmls_sqlx_storage::SqliteStorageProvider;
 
 use crate::{
-    Certificate, SpkiHash, Verifier, get_current_timestamp,
+    SpkiHash,
     mls::{
         group_id::{ParseGroupIdError, SvalinGroupId},
         harness::MlsHarness,
         key_package::{KeyPackage, KeyPackageError, UnverifiedKeyPackage},
         provider::PostcardCodec,
-        public_processor::{self, AddGroupError, ProcessMessageError, PublicProcessorHandle},
+        public_processor::{AddGroupError, ProcessedContent, PublicProcessorHandle},
         transport_types::{
-            AddToGroup, MessageToSend, MessageToServer, MessageToServerTransport, NewGroup,
-            NewGroupTransport,
+            AddToGroup, MessageToMemberTransport, MessageToSend, MessageToServer,
+            MessageToServerTransport, NewGroup,
         },
     },
 };
@@ -105,19 +101,48 @@ where
     pub async fn process_message(
         &self,
         message: MessageToServerTransport,
-    ) -> Result<MessageToSend, anyhow::Error> {
+    ) -> Result<Vec<MessageToSend>, anyhow::Error> {
         let message = message.unpack()?;
         match message {
-            MessageToServer::GroupMessage(data) => self
-                .harness
-                .processor()
-                .process_message(data)
-                .await
-                .map_err(Into::into),
-            MessageToServer::NewDeviceGroup { device_group } => self
-                .add_device_group(device_group)
-                .await
-                .map_err(|err| anyhow!(err)),
+            MessageToServer::GroupMessage { raw, message } => {
+                let processed = self.harness.processor().process_message(message).await?;
+                let group_id = processed.group_id()?;
+
+                // I still need to send this to everyone to ensure the group stays in sync.
+                // Security is just controlled by whether server and members choose to actually commit to staged commits.
+
+                match processed.content {
+                    ProcessedContent::Unknown => (),
+                    ProcessedContent::Commit(commit) => {
+                        // No adds allowed here, so if this commit has adds, it's just ignored with this message type
+                        if commit.add_proposals().count() == 0 {
+                            if let Err(err) = self.harness.check_commit(&group_id, &commit).await {
+                                // message still needs to be distributed to all members, so just logging, no bail here
+                                tracing::error!("invalid commit for group {group_id:?}: {err}");
+                            } else {
+                                // No error while checking, so we can commit here
+                                self.harness
+                                    .processor()
+                                    .commit(group_id.to_group_id(), commit)
+                                    .await?;
+                            }
+                        }
+                    }
+                }
+
+                Ok(vec![MessageToSend {
+                    message: MessageToMemberTransport::GroupMessage(raw),
+                    receivers: processed.receivers,
+                }])
+            }
+            MessageToServer::NewDeviceGroup { device_group } => {
+                let to_send = self
+                    .add_device_group(device_group)
+                    .await
+                    .map_err(|err| anyhow!(err))?;
+
+                Ok(vec![to_send])
+            }
             MessageToServer::AddToGroup(add_to_group) => {
                 self.handle_add_to_group(add_to_group).await
             }
@@ -142,39 +167,73 @@ where
         self.add_svalin_group(new_group).await
     }
 
-    async fn handle_add_to_group(&self, add_to_group: AddToGroup) -> Result<(), anyhow::Error> {
+    async fn handle_add_to_group(
+        &self,
+        add_to_group: AddToGroup,
+    ) -> Result<Vec<MessageToSend>, anyhow::Error> {
         let commit = add_to_group.commit;
         let processed = self
             .harness
             .processor()
-            .process_message(commit)
+            .process_message(commit.into())
             .await
             .map_err(|err| anyhow!(err))?;
         let group_id = processed.group_id()?;
 
         let ProcessedContent::Commit(commit) = processed.content else {
-            anyhow::bail!("Expected a commit message, got {:?}", processed.content)
+            tracing::error!("Expected a commit message, got {:?}", processed.content);
+            return Ok(vec![MessageToSend {
+                message: MessageToMemberTransport::AddToGroup(add_to_group.commit_bytes),
+                receivers: processed.receivers,
+            }]);
         };
 
-        if group_id != self.my_device_group {
-            anyhow::bail!("received message for unexpected group: {:?}", group_id)
+        if let Err(err) = self.harness.check_commit(&group_id, &commit).await {
+            tracing::error!("Failed to check commit: {}", err);
+            return Ok(vec![MessageToSend {
+                message: MessageToMemberTransport::AddToGroup(add_to_group.commit_bytes),
+                receivers: processed.receivers,
+            }]);
         }
 
-        self.harness.check_commit(&group_id, &commit).await?;
+        let new_members = commit
+            .add_proposals()
+            .map(|add| {
+                add.add_proposal()
+                    .key_package()
+                    .leaf_node()
+                    .credential()
+                    .deserialized::<SpkiHash>().expect("the commit has already been checked, which includes deserializing and verifying credentials")
+            })
+            .collect();
 
-        Ok(())
+        self.harness
+            .processor()
+            .commit(group_id.to_group_id(), commit)
+            .await?;
+
+        Ok(vec![
+            MessageToSend {
+                message: MessageToMemberTransport::AddToGroup(add_to_group.commit_bytes),
+                receivers: processed.receivers,
+            },
+            MessageToSend {
+                message: MessageToMemberTransport::Welcome(add_to_group.welcome),
+                receivers: new_members,
+            },
+        ])
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum ProcessError<KeyRetrieverError> {
-    #[error("tls codec error: {0}")]
-    TlsCodecError(#[from] tls_codec::Error),
-    #[error("message error: {0}")]
-    MessageError(#[from] public_processor::ProcessMessageError),
-    #[error("add device group error: {0}")]
-    AddDeviceGroupError(#[from] AddDeviceGroupError<KeyRetrieverError>),
-}
+// #[derive(Debug, thiserror::Error)]
+// pub enum ProcessError<KeyRetrieverError> {
+//     #[error("tls codec error: {0}")]
+//     TlsCodecError(#[from] tls_codec::Error),
+//     #[error("message error: {0}")]
+//     MessageError(#[from] public_processor::ProcessMessageError),
+//     #[error("add device group error: {0}")]
+//     AddDeviceGroupError(#[from] AddDeviceGroupError<KeyRetrieverError>),
+// }
 
 #[derive(Debug, thiserror::Error)]
 pub enum AddDeviceGroupError<KeyRetrieverError> {

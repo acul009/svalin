@@ -15,7 +15,7 @@ use crate::{
         provider::PostcardCodec,
         public_processor::PublicProcessorHandle,
         server::MlsServer,
-        transport_types::{MessageToMember, MessageToServerTransport},
+        transport_types::{MessageToMember, MessageToMemberTransport, MessageToServer},
     },
 };
 
@@ -128,17 +128,26 @@ async fn test_public_processor() {
     let test_text = b"Hello MLS!".to_vec();
 
     #[allow(irrefutable_let_patterns)]
-    let MessageToServerTransport::GroupMessage(message) = member2
+    let MessageToServer::GroupMessage { raw, message } = member2
         .create_message(group_id, test_text.clone())
         .await
+        .unwrap()
+        .unpack()
         .unwrap()
     else {
         panic!("wrong message type")
     };
 
-    let to_send = public_processor.process_message(message).await.unwrap();
+    let MessageToMember::GroupMessage(client_message) = MessageToMemberTransport::GroupMessage(raw)
+        .unpack()
+        .unwrap()
+    else {
+        panic!("wrong message type")
+    };
 
-    let members = to_send
+    let processed = public_processor.process_message(message).await.unwrap();
+
+    let members = processed
         .receivers
         .into_iter()
         .filter(|spki_hash| spki_hash != &spki_hash2)
@@ -147,12 +156,11 @@ async fn test_public_processor() {
     assert_eq!(members.len(), 1);
     assert_eq!(members[0], spki_hash1);
 
-    let MessageToMember::GroupMessage(message) = to_send.message.unpack().unwrap() else {
-        panic!("wrong message type")
-    };
-
-    let ProcessedContent::Message(received) =
-        member1.process_message(message).await.unwrap().content
+    let ProcessedContent::Message(received) = member1
+        .process_message(client_message)
+        .await
+        .unwrap()
+        .content
     else {
         panic!("wrong content type");
     };
@@ -302,7 +310,7 @@ async fn test_device_group() {
     let welcome = server.process_message(new_group).await.unwrap();
 
     client
-        .handle_message::<String>(&welcome.message)
+        .handle_message::<String>(&welcome[0].message)
         .await
         .unwrap();
 
@@ -311,7 +319,7 @@ async fn test_device_group() {
 
     let to_send = server.process_message(to_server).await.unwrap();
 
-    let received: MessageData<String> = client.handle_message(&to_send.message).await.unwrap();
+    let received: MessageData<String> = client.handle_message(&to_send[0].message).await.unwrap();
 
     let MessageDataContent::Report(sender, received_report) = received.content else {
         panic!("wrong message type")

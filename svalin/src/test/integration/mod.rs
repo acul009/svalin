@@ -163,7 +163,6 @@ async fn integration_tests() {
             .unwrap();
         debug!("agent waiting for confirmation");
         confirm.wait_for_confirm(cancel).await.unwrap();
-        debug!("agent has unexpectedly exited");
     });
 
     let (send, recv) = oneshot::channel();
