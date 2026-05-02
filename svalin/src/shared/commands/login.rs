@@ -12,6 +12,7 @@ use svalin_pki::{
     UnverifiedCertificate, UseAsRootError, argon2::Argon2, get_current_timestamp,
     serde_paramsstring,
 };
+use svalin_pki::{ArgonParams, EncryptionKey};
 use svalin_pki::{argon2::password_hash::ParamsString, curve25519_dalek::RistrettoPoint};
 use svalin_rpc::{
     rpc::{
@@ -39,6 +40,7 @@ use crate::permissions::Permission;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginApproval {
     pub encrypted_user_credentials: EncryptedCredential,
+    pub credential_key_params: ArgonParams,
     pub root_cert: UnverifiedCertificate,
     pub server_cert: UnverifiedCertificate,
 }
@@ -239,11 +241,12 @@ impl TakeableCommandHandler for LoginHandler {
                     return Err(anyhow!(err).context("failed to authenticate"));
                 }
             };
+            let key = EncryptionKey::dangerous_from_bytes(key);
 
             // Encrypt & Authenticate session
 
             let (transport, _) = session.destructure();
-            let tls_transport = TlsTransport::server_preshared(transport, key).await?;
+            let tls_transport = TlsTransport::server_preshared(transport, &key).await?;
             let mut session = Session::new(Box::new(tls_transport), Peer::Anonymous);
 
             // ===== TOTP =====
@@ -269,6 +272,7 @@ impl TakeableCommandHandler for LoginHandler {
 
             let success = LoginApproval {
                 encrypted_user_credentials: user.encrypted_credential,
+                credential_key_params: user.credential_key_params,
                 root_cert: self.root_cert.clone().to_unverified(),
                 server_cert: self.server_cert.clone().to_unverified(),
             };
@@ -411,10 +415,11 @@ pub enum LoginDispatcherError {
     RootCert(#[source] UseAsRootError),
     #[error("error verifying upstream certificate: {0}")]
     VerifyUpstreamCertError(#[source] SignatureVerificationError),
+    #[error("error deriving encryption key: {0}")]
+    DeriveEncryptionKeyError(anyhow::Error),
 }
 
 pub struct LoginSuccess {
-    pub user_credential: Credential,
     pub device_credential: Credential,
     pub root_cert: RootCertificate,
     pub server_cert: Certificate,
@@ -612,11 +617,12 @@ impl TakeableCommandDispatcher for Login {
                 .map_err(LoginDispatcherError::AucPaceError)?;
 
             let key = key_to_array(key);
+            let key = EncryptionKey::dangerous_from_bytes(key);
 
             // Encrypt & Authenticate session
 
             let (transport, _) = session.destructure();
-            let tls_transport = TlsTransport::client_preshared(transport, key)
+            let tls_transport = TlsTransport::client_preshared(transport, &key)
                 .await
                 .map_err(LoginDispatcherError::TlsClientError)?;
             let mut session = Session::new(Box::new(tls_transport), Peer::Anonymous);
@@ -642,10 +648,15 @@ impl TakeableCommandDispatcher for Login {
                 .await
                 .map_err(LoginDispatcherError::ReadSuccessError)?;
 
+            let key = success
+                .credential_key_params
+                .derive_encryption_key(self.password)
+                .await
+                .map_err(LoginDispatcherError::DeriveEncryptionKeyError)?;
+
             let user_credential = success
                 .encrypted_user_credentials
-                .decrypt(self.password)
-                .await
+                .decrypt(&key)
                 .map_err(LoginDispatcherError::DecodeCredentialsError)?;
 
             let device_credential = user_credential
@@ -679,7 +690,6 @@ impl TakeableCommandDispatcher for Login {
             Ok(LoginSuccess {
                 root_cert,
                 server_cert,
-                user_credential,
                 device_credential,
             })
         } else {

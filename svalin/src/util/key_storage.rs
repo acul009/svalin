@@ -1,6 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{Credential, EncryptedCredential};
+use svalin_pki::{Credential, EncryptedCredential, EncryptionKey};
 use tracing::debug;
 
 /// The keysource enum is saved in the configuration and specifies how to
@@ -12,15 +12,15 @@ pub enum KeySource {
 }
 
 impl KeySource {
-    async fn to_key(&self) -> Result<Vec<u8>> {
+    async fn to_key(&self) -> Result<EncryptionKey> {
         match self {
-            KeySource::BuiltIn(k) => Ok(k.to_vec()),
+            KeySource::BuiltIn(k) => Ok(EncryptionKey::dangerous_from_bytes(k.clone())),
         }
     }
 
     pub fn generate_builtin() -> Result<Self> {
         let key = svalin_pki::generate_key()?;
-        Ok(Self::BuiltIn(key))
+        Ok(Self::BuiltIn(key.as_ref().clone()))
     }
 
     pub async fn encrypt_credential(
@@ -29,7 +29,7 @@ impl KeySource {
     ) -> Result<EncryptedCredential> {
         let key = self.to_key().await?;
 
-        Ok(credentials.export(key).await?)
+        Ok(credentials.export(&key)?)
     }
 
     pub async fn decrypt_credentials(
@@ -38,6 +38,6 @@ impl KeySource {
     ) -> Result<Credential> {
         let key = self.to_key().await?;
         debug!("headless password loaded, decrypting...");
-        Ok(encrypted_credentials.decrypt(key).await?)
+        Ok(encrypted_credentials.decrypt(&key)?)
     }
 }

@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::{
     CreateCredentialsError, Credential, EncryptError, UnverifiedCertificate,
-    encrypt::EncryptedObject,
+    encrypt::{EncryptedObject, EncryptionKey},
 };
 use anyhow::Result;
 use rcgen::{PublicKeyData, SignatureAlgorithm};
@@ -59,23 +59,23 @@ impl KeyPair {
         Credential::new(self, certificate)
     }
 
-    pub(crate) async fn encrypt(
+    pub(crate) fn encrypt(
         &self,
-        password: Vec<u8>,
+        encryption_key: &EncryptionKey,
     ) -> Result<EncryptedObject<SavedKeypair>, EncryptError> {
         let saved = SavedKeypair {
             der: self.keypair.serialize_der(),
             alg: Algorithm::from_rcgen(self.keypair.algorithm()),
         };
 
-        EncryptedObject::encrypt_with_password(&saved, password).await
+        EncryptedObject::encrypt(&saved, encryption_key)
     }
 
-    pub(crate) async fn decrypt(
+    pub(crate) fn decrypt(
         ciphertext: EncryptedObject<SavedKeypair>,
-        password: Vec<u8>,
+        encryption_key: &EncryptionKey,
     ) -> Result<Self, DecodeKeypairError> {
-        let saved = ciphertext.decrypt_with_password(password).await?;
+        let saved = ciphertext.decrypt(encryption_key)?;
 
         let keypair = rcgen::KeyPair::from_der_and_sign_algo(
             &saved
@@ -162,14 +162,14 @@ impl PublicKeyData for ExportedPublicKey {
 #[cfg(test)]
 mod test {
 
-    use crate::KeyPair;
+    use crate::{KeyPair, generate_key};
 
     #[tokio::test]
     async fn test_encode_decode() {
         let credentials = KeyPair::generate();
-        let password = "testpass".as_bytes().to_owned();
+        let key = generate_key().unwrap();
 
-        let encrypted = credentials.encrypt(password.clone()).await.unwrap();
-        let _credentials2 = KeyPair::decrypt(encrypted, password).await.unwrap();
+        let encrypted = credentials.encrypt(&key).unwrap();
+        let _credentials2 = KeyPair::decrypt(encrypted, &key).unwrap();
     }
 }

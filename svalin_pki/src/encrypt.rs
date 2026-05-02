@@ -8,8 +8,6 @@ use ring::aead::{
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-use crate::ArgonParams;
-
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 enum EncryptionAlgorithm {
     Chacha20Poly1305,
@@ -25,9 +23,22 @@ impl From<EncryptionAlgorithm> for &'static ring::aead::Algorithm {
     }
 }
 
+pub struct EncryptionKey([u8; 32]);
+
+impl EncryptionKey {
+    pub fn dangerous_from_bytes(key: [u8; 32]) -> Self {
+        Self(key)
+    }
+}
+
+impl AsRef<[u8; 32]> for EncryptionKey {
+    fn as_ref(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct EncryptedData {
-    parameters: Option<ArgonParams>,
     ciphertext: Vec<u8>,
     alg: EncryptionAlgorithm,
 }
@@ -59,21 +70,9 @@ impl<T> EncryptedObject<T>
 where
     T: Serialize,
 {
-    pub fn encrypt_with_key(object: &T, encryption_key: [u8; 32]) -> Result<Self, EncryptError> {
+    pub fn encrypt(object: &T, encryption_key: &EncryptionKey) -> Result<Self, EncryptError> {
         let serialized = postcard::to_stdvec(object)?;
-        let ciphertext = EncryptedData::encrypt_with_key(&serialized, encryption_key)?;
-        Ok(Self {
-            ciphertext,
-            phantom: PhantomData,
-        })
-    }
-
-    pub async fn encrypt_with_password(
-        object: &T,
-        password: Vec<u8>,
-    ) -> Result<Self, EncryptError> {
-        let serialized = postcard::to_stdvec(object)?;
-        let ciphertext = EncryptedData::encrypt_with_password(&serialized, password).await?;
+        let ciphertext = EncryptedData::encrypt(&serialized, encryption_key)?;
         Ok(Self {
             ciphertext,
             phantom: PhantomData,
@@ -85,13 +84,8 @@ impl<T> EncryptedObject<T>
 where
     T: DeserializeOwned,
 {
-    pub fn decrypt_with_key(self, encryption_key: [u8; 32]) -> Result<T, DecryptError> {
-        let encoded = self.ciphertext.decrypt_with_key(encryption_key)?;
-        Ok(postcard::from_bytes(&encoded)?)
-    }
-
-    pub async fn decrypt_with_password(self, password: Vec<u8>) -> Result<T, DecryptError> {
-        let encoded = self.ciphertext.decrypt_with_password(password).await?;
+    pub fn decrypt(self, encryption_key: &EncryptionKey) -> Result<T, DecryptError> {
+        let encoded = self.ciphertext.decrypt(encryption_key)?;
         Ok(postcard::from_bytes(&encoded)?)
     }
 }
@@ -130,16 +124,12 @@ pub enum DecryptError {
     CreateUnboundError(ring::error::Unspecified),
     #[error("error decrypting data: {0}")]
     UnsealError(ring::error::Unspecified),
-    #[error("error deriving encryption key: {0}")]
-    DeriveKeyError(#[from] crate::DeriveKeyError),
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum EncryptError {
     #[error("error marshalling data: {0}")]
     MarshalError(#[from] postcard::Error),
-    #[error("error deriving encryption key: {0}")]
-    DeriveKeyError(#[from] crate::DeriveKeyError),
     #[error("error loading key into ring: {0}")]
     CreateUnboundError(ring::error::Unspecified),
     #[error("error sealing data: {0}")]
@@ -147,32 +137,19 @@ pub enum EncryptError {
 }
 
 impl EncryptedData {
-    pub async fn encrypt_with_password(
-        data: &[u8],
-        password: Vec<u8>,
-    ) -> Result<Self, EncryptError> {
-        let parameters = ArgonParams::strong();
-        let encryption_key = parameters
-            .derive_key(password)
-            .await
-            .map_err(EncryptError::DeriveKeyError)?;
-        EncryptedData::encrypt_with_alg(data, encryption_key, DEFAULT_ALG, Some(parameters))
-    }
-
-    pub fn encrypt_with_key(data: &[u8], encryption_key: [u8; 32]) -> Result<Self, EncryptError> {
-        Self::encrypt_with_alg(data, encryption_key, DEFAULT_ALG, None)
+    pub fn encrypt(data: &[u8], encryption_key: &EncryptionKey) -> Result<Self, EncryptError> {
+        Self::encrypt_with_alg(data, encryption_key, DEFAULT_ALG)
     }
 
     fn encrypt_with_alg(
         data: &[u8],
-        encryption_key: [u8; 32],
+        encryption_key: &EncryptionKey,
         alg: EncryptionAlgorithm,
-        parameters: Option<ArgonParams>,
     ) -> Result<Self, EncryptError> {
         let ring_alg = alg.into();
 
-        let unbound =
-            UnboundKey::new(ring_alg, &encryption_key).map_err(EncryptError::CreateUnboundError)?;
+        let unbound = UnboundKey::new(ring_alg, encryption_key.0.as_ref())
+            .map_err(EncryptError::CreateUnboundError)?;
         let mut sealing = SealingKey::new(unbound, NonceCounter::new());
 
         let mut encrypted = data.to_owned();
@@ -183,28 +160,15 @@ impl EncryptedData {
 
         Ok(Self {
             alg,
-            parameters,
             ciphertext: encrypted,
         })
     }
 
-    pub async fn decrypt_with_password(self, password: Vec<u8>) -> Result<Vec<u8>, DecryptError> {
-        let parameters = if let Some(parameters) = &self.parameters {
-            parameters
-        } else {
-            return Err(DecryptError::MissingHashParameters);
-        };
-
-        let encryption_key = parameters.derive_key(password).await?;
-
-        self.decrypt_with_key(encryption_key)
-    }
-
-    pub fn decrypt_with_key(mut self, encryption_key: [u8; 32]) -> Result<Vec<u8>, DecryptError> {
+    pub fn decrypt(mut self, encryption_key: &EncryptionKey) -> Result<Vec<u8>, DecryptError> {
         let ring_alg = self.alg.into();
 
-        let unbound =
-            UnboundKey::new(ring_alg, &encryption_key).map_err(DecryptError::CreateUnboundError)?;
+        let unbound = UnboundKey::new(ring_alg, encryption_key.0.as_ref())
+            .map_err(DecryptError::CreateUnboundError)?;
         let mut opening = OpeningKey::new(unbound, NonceCounter::new());
 
         let cleartext_len = opening
@@ -222,6 +186,8 @@ impl EncryptedData {
 mod test {
     use ring::rand::{SecureRandom, SystemRandom};
 
+    use crate::generate_key;
+
     use super::EncryptedData;
 
     #[tokio::test]
@@ -230,15 +196,10 @@ mod test {
         let mut msg = [0u8; 1024];
         rand.fill(&mut msg).unwrap();
 
-        let password = "testpass".as_bytes();
+        let key = generate_key().unwrap();
 
-        let encrypted = EncryptedData::encrypt_with_password(&msg, password.to_owned())
-            .await
-            .unwrap();
-        let msg2 = encrypted
-            .decrypt_with_password(password.to_owned())
-            .await
-            .unwrap();
+        let encrypted = EncryptedData::encrypt(&msg, &key).unwrap();
+        let msg2 = encrypted.decrypt(&key).unwrap();
 
         assert_eq!(msg.as_ref(), &msg2);
     }

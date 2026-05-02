@@ -10,7 +10,7 @@ use time::OffsetDateTime;
 use crate::{
     Certificate, CertificateParseError, EncryptError, KeyPair,
     certificate::{CertificateType, UnverifiedCertificate},
-    encrypt::EncryptedObject,
+    encrypt::{EncryptedObject, EncryptionKey},
     keypair::{DecodeKeypairError, ExportedPublicKey, SavedKeypair},
     signed_message::CanSign,
 };
@@ -41,10 +41,13 @@ pub struct EncryptedCredential {
 }
 
 impl EncryptedCredential {
-    pub async fn decrypt(self, password: Vec<u8>) -> Result<Credential, DecodeCredentialsError> {
+    pub fn decrypt(
+        self,
+        encryption_key: &EncryptionKey,
+    ) -> Result<Credential, DecodeCredentialsError> {
         // debug!("decrypting credentials with password");
 
-        let decrypted_keypair = KeyPair::decrypt(self.encrypted_keypair, password).await?;
+        let decrypted_keypair = KeyPair::decrypt(self.encrypted_keypair, encryption_key)?;
 
         // debug!("credentials decrypted");
 
@@ -273,8 +276,11 @@ impl Credential {
         keypair.upgrade(certificate)
     }
 
-    pub async fn export(&self, password: Vec<u8>) -> Result<EncryptedCredential, EncryptError> {
-        let encrypted_keypair = self.data.keypair.encrypt(password).await?;
+    pub fn export(
+        &self,
+        encryption_key: &EncryptionKey,
+    ) -> Result<EncryptedCredential, EncryptError> {
+        let encrypted_keypair = self.data.keypair.encrypt(encryption_key)?;
         let on_disk = EncryptedCredential {
             encrypted_keypair,
             certificate: self.data.certificate.clone().to_unverified(),

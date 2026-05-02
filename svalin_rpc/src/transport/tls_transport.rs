@@ -7,7 +7,7 @@ use anyhow::Result;
 use quinn::rustls::pki_types::InvalidDnsNameError;
 use svalin_pki::{
     Certificate, CertificateParseError, CreateCredentialsError, Credential, DecryptError,
-    EncryptError, EncryptedObject, ExactVerififier, KnownCertificateVerifier,
+    EncryptError, EncryptedObject, EncryptionKey, ExactVerififier, KnownCertificateVerifier,
     UnverifiedCertificate,
 };
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -87,7 +87,7 @@ where
 {
     pub async fn client_preshared(
         mut base_transport: T,
-        preshared: [u8; 32],
+        preshared: &EncryptionKey,
     ) -> Result<Self, TlsClientError> {
         let (credentials, certificate) =
             Self::exchange_temp_credentials(&mut base_transport, preshared).await?;
@@ -145,7 +145,7 @@ where
 
     pub async fn server_preshared(
         mut base_transport: T,
-        preshared: [u8; 32],
+        preshared: &EncryptionKey,
     ) -> Result<Self, TlsServerError> {
         let (credentials, certificate) =
             Self::exchange_temp_credentials(&mut base_transport, preshared).await?;
@@ -223,15 +223,13 @@ where
 
     async fn exchange_temp_credentials(
         base_transport: &mut T,
-        preshared: [u8; 32],
+        preshared: &EncryptionKey,
     ) -> Result<(Credential, Certificate), PresharedError> {
         let credentials = Credential::generate_temporary()?;
 
         // Write my cert
-        let encrypted = EncryptedObject::encrypt_with_key(
-            credentials.certificate().as_unverified(),
-            preshared,
-        )?;
+        let encrypted =
+            EncryptedObject::encrypt(credentials.certificate().as_unverified(), &preshared)?;
         let encoded = postcard::to_stdvec(&encrypted)?;
 
         let length_bytes = (encoded.len() as u32).to_be_bytes();
@@ -248,7 +246,7 @@ where
         base_transport.read_exact(&mut encoded).await?;
         let encrypted: EncryptedObject<UnverifiedCertificate> = postcard::from_bytes(&encoded)?;
 
-        let unverified_certificate = encrypted.decrypt_with_key(preshared)?;
+        let unverified_certificate = encrypted.decrypt(&preshared)?;
         let certificate = unverified_certificate
             .use_as_temporary()
             .ok_or(PresharedError::NotTemporaryCertificate)?;

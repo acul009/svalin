@@ -38,6 +38,7 @@ impl PermissionHandler for DefaultPermissionHandler {
                         Permission::AuthenticatedOnly => true,
                         Permission::ViewPublicInformation => true,
                         Permission::UserOrSession => true,
+                        Permission::SessionOnly => true,
                         _ => false,
                     },
                     CertificateType::Agent => match permission {
@@ -74,6 +75,9 @@ impl PermissionHandler for DefaultPermissionHandler {
                         Permission::AnonymousOnly => Err(PermissionCheckError::PermissionDenied(
                             "peer must be unauthenticated for this action! This could be a security critical bug, please report it!".to_string()
                         )),
+                        Permission::SessionOnly => Err(PermissionCheckError::PermissionDenied(
+                            "peer must be a session for this action".to_string()
+                        )),
                     }
                 }
             }
@@ -87,6 +91,9 @@ impl PermissionHandler for DefaultPermissionHandler {
                 Permission::AnonymousOnly => Ok(()),
                 Permission::AuthenticatedOnly => Err(PermissionCheckError::PermissionDenied(
                     "peer must be authenticated for this action!".to_string(),
+                )),
+                Permission::SessionOnly => Err(PermissionCheckError::PermissionDenied(
+                    "peer must be a session for this action".to_string(),
                 )),
             },
         }

@@ -2,7 +2,7 @@ use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage};
 use serde::{Deserialize, Serialize, de};
 use std::pin::Pin;
 use svalin_pki::{
-    ArgonCost, ParamsStringParseError, Sha512,
+    ArgonCost, EncryptionKey, ParamsStringParseError, Sha512,
     argon2::{
         Argon2,
         password_hash::{
@@ -151,12 +151,13 @@ where
             .map_err(|_| AucPaceClientError::WrongPassword)?;
         let key = client.receive_server_authenticator(server_authenticator.0)?;
         let key = key_to_array(key);
+        let key = EncryptionKey::dangerous_from_bytes(key);
 
         // ===== Create TLS Tunnel =====
         let (transport, _) = session.destructure();
         let transport = transport.into_any().downcast::<T>().unwrap();
 
-        let tls_transport = TlsTransport::client_preshared(*transport, key).await?;
+        let tls_transport = TlsTransport::client_preshared(*transport, &key).await?;
 
         Ok(Self { tls_transport })
     }
@@ -248,13 +249,14 @@ where
                 return Err(AucPaceServerError::AuthenticationFailed(err));
             }
         };
+        let key = EncryptionKey::dangerous_from_bytes(key);
 
         // ===== Create TLS Tunnel =====
         debug!("Creating TLS tunnel");
         let (transport, _) = session.destructure();
         let transport = transport.into_any().downcast::<T>().unwrap();
 
-        let tls_transport = TlsTransport::server_preshared(*transport, key).await?;
+        let tls_transport = TlsTransport::server_preshared(*transport, &key).await?;
 
         Ok(Self { tls_transport })
     }

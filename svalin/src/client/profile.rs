@@ -5,8 +5,9 @@ use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
 use svalin_client_store::{ClientStore, persistent};
 use svalin_pki::{
-    Certificate, Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier,
-    RootCertificate, UnverifiedCertificate, get_current_timestamp, mls::client::MlsClient,
+    ArgonParams, Certificate, Credential, EncryptedCredential, ExactVerififier,
+    KnownCertificateVerifier, RootCertificate, UnverifiedCertificate, get_current_timestamp,
+    mls::client::MlsClient,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
@@ -16,7 +17,7 @@ use crate::{
     client::{state::ClientStateUpdate, tunnel_manager::TunnelManager},
     message_streaming::client::{ClientMessageDispatcher, ClientMessageReceiver},
     remote_key_retriever::RemoteKeyRetriever,
-    shared::commands::update_user_mls::UpdateUserMls,
+    shared::commands::{get_user_credentials::GetUserCredential, update_user_mls::UpdateUserMls},
     util::location::{Location, LocationError},
     verifier::remote_verifier::RemoteVerifier,
 };
@@ -29,7 +30,7 @@ pub(crate) struct Profile {
     pub(crate) upstream_address: String,
     pub(crate) upstream_certificate: UnverifiedCertificate,
     pub(crate) root_certificate: UnverifiedCertificate,
-    pub(crate) user_credential: EncryptedCredential,
+    pub(crate) local_credential_params: ArgonParams,
     pub(crate) device_credential: EncryptedCredential,
 }
 
@@ -39,7 +40,7 @@ impl Profile {
         upstream_address: String,
         upstream_certificate: Certificate,
         root_certificate: RootCertificate,
-        user_credential: EncryptedCredential,
+        local_credential_params: ArgonParams,
         device_credential: EncryptedCredential,
     ) -> Self {
         Self {
@@ -47,7 +48,7 @@ impl Profile {
             upstream_address,
             upstream_certificate: upstream_certificate.to_unverified(),
             root_certificate: root_certificate.to_unverified(),
-            user_credential,
+            local_credential_params,
             device_credential,
         }
     }
@@ -94,19 +95,21 @@ impl Client {
         upstream_address: String,
         upstream_certificate: Certificate,
         root_certificate: RootCertificate,
-        user_credentials: Credential,
         device_credentials: Credential,
         password: Vec<u8>,
     ) -> Result<String> {
-        let encrypted_user_credential = user_credentials.export(password.clone()).await?;
-        let encrypted_device_credential = device_credentials.export(password.clone()).await?;
+        let local_credential_params = ArgonParams::strong();
+        let key = local_credential_params
+            .derive_encryption_key(password)
+            .await?;
+        let encrypted_device_credential = device_credentials.export(&key)?;
 
         let profile = Profile::new(
             username,
             upstream_address,
             upstream_certificate,
             root_certificate,
-            encrypted_user_credential,
+            local_credential_params,
             encrypted_device_credential,
         );
 
@@ -160,11 +163,15 @@ impl Client {
             return Err(anyhow!("Profile is empty"));
         };
 
+        let key = profile
+            .local_credential_params
+            .derive_encryption_key(password.clone())
+            .await?;
+
         let mls_db_path = profile.profile_dir().await?.push("mls-store.sqlite");
         let client_db_path = profile.profile_dir().await?.push("client-store.sqlite");
         // debug!("unlocking profile");
-        let user_credential = profile.user_credential.decrypt(password.clone()).await?;
-        let device_credential = profile.device_credential.decrypt(password.clone()).await?;
+        let device_credential = profile.device_credential.decrypt(&key)?;
         let root_certificate = profile.root_certificate.use_as_root()?;
         let upstream_certificate = profile
             .upstream_certificate
@@ -181,6 +188,17 @@ impl Client {
             CancellationToken::new(),
         )
         .await?;
+
+        let user_credential = rpc
+            .upstream_connection()
+            .dispatch(GetUserCredential)
+            .await
+            .map_err(|err| anyhow!(err))?;
+        let key = user_credential
+            .params
+            .derive_encryption_key(password)
+            .await?;
+        let user_credential = user_credential.credential.decrypt(&key)?;
 
         let remote_verifier =
             RemoteVerifier::new(root_certificate.clone(), rpc.upstream_connection());
@@ -240,7 +258,7 @@ impl Client {
             _upstream_address: profile.upstream_address,
             upstream_certificate,
             root_certificate: root_certificate.clone(),
-            user_credential: user_credential,
+            user_credential,
             tunnel_manager,
             mls: mls.clone(),
             message_sender: dispatcher_handle.clone(),
@@ -251,7 +269,6 @@ impl Client {
 
         let connection = client.rpc.upstream_connection();
         let cancel = client.cancel.clone();
-        let password = password.clone();
         let user_credential = client.user_credential.clone();
         let session_mls = mls.clone();
         let message_sender = dispatcher_handle.clone();
@@ -259,16 +276,16 @@ impl Client {
         client.background_tasks.spawn(async move {
             debug!("starting user mls update task");
             let cancel = cancel;
-            let password = password;
             let key_retriever = key_retriever;
             let user_credential = user_credential;
             let verifier = remote_verifier;
             let session_mls = session_mls;
             let message_sender = message_sender;
+            let key = Arc::new(key);
             loop {
                 match connection
                     .dispatch(UpdateUserMls {
-                        password: password.clone(),
+                        key: key.clone(),
                         key_retriever: key_retriever.clone(),
                         user_credential: user_credential.clone(),
                         verifier: verifier.clone(),

@@ -13,7 +13,7 @@ use svalin_rpc::{
     rpc::{
         client::RpcClient,
         command::handler::HandlerCollection,
-        connection::{Connection, ServeableConnection, ServeableConnectionBase},
+        connection::{Connection, ServeableConnectionBase},
     },
 };
 use tokio::time::error::Elapsed;

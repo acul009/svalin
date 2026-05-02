@@ -35,7 +35,7 @@ pub use credential::{
     CreateCertificateError, CreateCredentialsError, Credential, DecodeCredentialsError,
     EncryptedCredential,
 };
-pub use encrypt::{DecryptError, EncryptError, EncryptedData, EncryptedObject};
+pub use encrypt::{DecryptError, EncryptError, EncryptedData, EncryptedObject, EncryptionKey};
 pub use keypair::{ExportedPublicKey, KeyPair};
 // pub use signed_object::{SignedObject, VerifiedObject};
 pub use signed_object::{SignedObject, VerifiedObject};
@@ -57,14 +57,14 @@ pub enum GenerateKeyError {
     UnspecifiedError(ring::error::Unspecified),
 }
 
-pub fn generate_key() -> Result<[u8; 32], GenerateKeyError> {
+pub fn generate_key() -> Result<EncryptionKey, GenerateKeyError> {
     let rand = SystemRandom::new();
 
-    let mut msg = [0u8; 32];
-    rand.fill(&mut msg)
+    let mut key = [0u8; 32];
+    rand.fill(&mut key)
         .map_err(GenerateKeyError::UnspecifiedError)?;
 
-    Ok(msg)
+    Ok(EncryptionKey::dangerous_from_bytes(key))
 }
 
 pub fn generate_short_code() -> String {

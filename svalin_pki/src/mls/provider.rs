@@ -9,7 +9,7 @@ use openmls_sqlx_storage::SqliteStorageProvider;
 use openmls_traits::OpenMlsProvider;
 use serde::{Deserialize, Serialize};
 
-use crate::{DecryptError, EncryptError, EncryptedObject};
+use crate::{DecryptError, EncryptError, EncryptedObject, encrypt::EncryptionKey};
 
 #[derive(Default)]
 pub struct PostcardCodec {}
@@ -90,11 +90,11 @@ impl SvalinStorage {
         (Self::Memory(memory.clone()), ExportHandle { memory })
     }
 
-    pub async fn import(
+    pub fn import(
         map: ExportedMlsStore,
-        password: Vec<u8>,
+        key: &EncryptionKey,
     ) -> Result<(Self, ExportHandle), DecryptError> {
-        let decrypted = map.data.decrypt_with_password(password).await?;
+        let decrypted = map.data.decrypt(key)?;
         let memory = Arc::new(MemoryStorage {
             values: RwLock::new(decrypted),
         });
@@ -108,9 +108,9 @@ pub struct ExportHandle {
 }
 
 impl ExportHandle {
-    pub async fn export(&self, password: Vec<u8>) -> Result<ExportedMlsStore, EncryptError> {
+    pub fn export(&self, key: &EncryptionKey) -> Result<ExportedMlsStore, EncryptError> {
         let store_data = self.memory.values.read().unwrap().clone();
-        let encrypted = EncryptedObject::encrypt_with_password(&store_data, password).await?;
+        let encrypted = EncryptedObject::encrypt(&store_data, key)?;
 
         Ok(ExportedMlsStore { data: encrypted })
     }

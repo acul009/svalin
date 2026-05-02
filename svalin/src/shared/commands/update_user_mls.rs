@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::{Arc, Mutex},
 };
 
@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_client_store::persistent;
 use svalin_pki::{
-    CertificateType, Credential, EncryptedObject, ExactVerififier, SpkiHash, Verifier,
+    CertificateType, Credential, EncryptedObject, EncryptionKey, SpkiHash, Verifier,
     get_current_timestamp,
     mls::{
         SvalinGroupId,
@@ -170,7 +170,7 @@ impl CommandHandler for UpdateUserMlsHandler {
 }
 
 pub struct UpdateUserMls {
-    pub password: Vec<u8>,
+    pub key: Arc<EncryptionKey>,
     pub user_credential: Credential,
     pub key_retriever: RemoteKeyRetriever,
     pub verifier: RemoteVerifier,
@@ -200,12 +200,8 @@ impl CommandDispatcher for UpdateUserMls {
         debug!("Updating user MLS");
         let data = session.read_object::<UpdateData>().await?;
 
-        let (mls_store, export_handle) =
-            SvalinStorage::import(data.mls_store, self.password.clone()).await?;
-        let mut persistent_data = data
-            .persistent_data
-            .decrypt_with_password(self.password.clone())
-            .await?;
+        let (mls_store, export_handle) = SvalinStorage::import(data.mls_store, &self.key)?;
+        let mut persistent_data = data.persistent_data.decrypt(&self.key)?;
         let client = MlsClient::new(
             self.user_credential,
             mls_store,
@@ -247,9 +243,8 @@ impl CommandDispatcher for UpdateUserMls {
             key_packages.push(key_package);
         }
 
-        let encrypted_data =
-            EncryptedObject::encrypt_with_password(&persistent_data, self.password.clone()).await?;
-        let exported_mls_store = export_handle.export(self.password.clone()).await?;
+        let encrypted_data = EncryptedObject::encrypt(&persistent_data, &self.key)?;
+        let exported_mls_store = export_handle.export(&self.key)?;
 
         debug!("MLS client processed messages, sending response");
 

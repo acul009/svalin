@@ -170,7 +170,6 @@ impl Login {
             self.address,
             login_data.server_cert,
             login_data.root_cert,
-            login_data.user_credential,
             login_data.device_credential,
             password,
         )

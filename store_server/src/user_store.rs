@@ -9,15 +9,17 @@ use svalin_pki::argon2::password_hash::ParamsString;
 use svalin_pki::curve25519_dalek::{self, RistrettoPoint, Scalar};
 use svalin_pki::mls::provider::ExportedMlsStore;
 use svalin_pki::{
-    AddCertificateError, CertificateChainBuilder, CertificateType, EncryptedCredential,
-    EncryptedObject, SpkiHash, UnverifiedCertificate, UnverifiedCertificateChain,
-    serde_paramsstring,
+    AddCertificateError, ArgonParams, CertificateChainBuilder, CertificateType,
+    EncryptedCredential, EncryptedObject, SpkiHash, UnverifiedCertificate,
+    UnverifiedCertificateChain, serde_paramsstring,
 };
 use totp_rs::TOTP;
 
 #[derive(Serialize, Deserialize)]
 pub struct StoredUser {
     pub encrypted_credential: EncryptedCredential,
+    // The parameters used to derive the credential key from the password
+    pub credential_key_params: ArgonParams,
     pub totp_secret: TOTP,
     /// The username of whoever is registering
     pub username: Vec<u8>,
@@ -46,6 +48,7 @@ impl UserStore {
         &self,
         username: Vec<u8>,
         encrypted_credential: EncryptedCredential,
+        credential_key_params: ArgonParams,
         totp_secret: TOTP,
         secret_exponent: Scalar,
         params: ParamsString,
@@ -68,6 +71,7 @@ impl UserStore {
         let user = StoredUser {
             username,
             encrypted_credential,
+            credential_key_params,
             totp_secret,
             secret_exponent,
             params,

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Credential, KeyPair,
     certificate::UnverifiedCertificate,
-    get_current_timestamp,
+    generate_key, get_current_timestamp,
     keypair::ExportedPublicKey,
     signed_message::{Sign, Verify},
 };
@@ -76,17 +76,11 @@ async fn test_on_disk_storage() {
 
     let mut pw_seed = [0u8; 32];
     rand.fill(&mut pw_seed).unwrap();
-    let pw = String::from_utf8(
-        pw_seed
-            .iter()
-            .map(|rand_num| (*rand_num & 0b00011111u8) + 58u8)
-            .collect(),
-    )
-    .unwrap();
+    let key = generate_key().unwrap();
 
-    let encrypted_credentials = original.export(pw.clone().into()).await.unwrap();
+    let encrypted_credentials = original.export(&key).unwrap();
 
-    let copy = encrypted_credentials.decrypt(pw.into()).await.unwrap();
+    let copy = encrypted_credentials.decrypt(&key).unwrap();
 
     assert_eq!(copy.certificate(), original.certificate());
 }

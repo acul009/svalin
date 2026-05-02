@@ -1,4 +1,5 @@
 pub mod get_key_packages;
+pub mod get_user_credentials;
 pub mod init;
 pub mod list_user_sessions;
 pub mod load_certificate_chain;

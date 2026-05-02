@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use aucpace::{AuCPaceClient, ClientMessage};
 use serde::{Deserialize, Serialize};
-use svalin_pki::EncryptedObject;
 use svalin_pki::argon2::password_hash::rand_core::OsRng;
 use svalin_pki::mls::provider::{ExportedMlsStore, SvalinStorage};
 use svalin_pki::{
@@ -11,6 +10,7 @@ use svalin_pki::{
     EncryptError, EncryptedCredential, ExportedPublicKey, KeyPair, RootCertificate, Sha512,
     UnverifiedCertificate, argon2::Argon2, serde_paramsstring,
 };
+use svalin_pki::{ArgonParams, EncryptedObject};
 use svalin_pki::{
     argon2::password_hash::ParamsString,
     curve25519_dalek::{RistrettoPoint, Scalar},
@@ -38,6 +38,7 @@ pub struct ServerInitSuccess {
 pub struct InitRequest {
     server_cert: UnverifiedCertificate,
     encrypted_credential: EncryptedCredential,
+    credential_key_params: ArgonParams,
     totp_secret: TOTP,
     /// The username of the user being added
     username: Vec<u8>,
@@ -103,6 +104,7 @@ impl CommandHandler for InitHandler {
             &self.user_store,
             init_request.username,
             init_request.encrypted_credential,
+            init_request.credential_key_params,
             init_request.totp_secret,
             init_request.secret_exponent,
             init_request.params,
@@ -153,6 +155,8 @@ pub enum InitError {
     AucPaceError(aucpace::Error),
     #[error("error encrypting root credential: {0}")]
     EncryptError(#[from] EncryptError),
+    #[error(transparent)]
+    Unspecified(#[from] anyhow::Error),
     #[error("server sent error status back")]
     ServerError,
 }
@@ -240,20 +244,23 @@ impl CommandDispatcher for Init {
         };
 
         // send init request
+        let credential_key_params = ArgonParams::strong();
+        let key = credential_key_params
+            .derive_encryption_key(self.password)
+            .await?;
         let empty_client_state = persistent::State::empty();
-        let persistent_data =
-            EncryptedObject::encrypt_with_password(&empty_client_state, self.password.clone())
-                .await?;
+        let persistent_data = EncryptedObject::encrypt(&empty_client_state, &key)?;
 
         let (_, export_handle) = SvalinStorage::new_memory();
-        let user_mls_store = export_handle.export(self.password.clone()).await?;
+        let user_mls_store = export_handle.export(&key)?;
 
-        let encrypted_credential = self.root.export(self.password).await?;
+        let encrypted_credential = self.root.export(&key)?;
 
         let init_request = InitRequest {
             username: self.username.clone(),
             totp_secret: self.totp.clone(),
             encrypted_credential,
+            credential_key_params,
             params,
             secret_exponent,
             server_cert: server_cert.clone().to_unverified(),

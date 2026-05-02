@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use svalin_client_store::persistent::{self, DeviceState};
+use svalin_client_store::persistent::{self};
 use svalin_pki::SpkiHash;
 
 #[derive(Clone)]

@@ -20,6 +20,7 @@ use crate::{
     shared::{
         commands::{
             get_key_packages::GetKeyPackagesHandler,
+            get_user_credentials::GetUserCredentialHandler,
             load_certificate_chain::LoadCertificateChainHandler,
             login::LoginHandler,
             public_server_status::{PublicStatus, PublicStatusHandler},
@@ -76,6 +77,9 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 self.root_cert.clone(),
                 self.server_cert.clone(),
             ))
+            .add(GetUserCredentialHandler {
+                store: self.store.users.clone(),
+            })
             .add(LoadCertificateChainHandler::new(ChainLoader::new(
                 self.store.users.clone(),
                 self.store.agents.clone(),

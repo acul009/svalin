@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zeroize::Zeroize;
 
+use crate::EncryptionKey;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ArgonCost {
     m_cost: u32,
@@ -154,7 +156,7 @@ impl ArgonParams {
         }
     }
 
-    pub async fn derive_key(&self, mut secret: Vec<u8>) -> Result<[u8; 32], DeriveKeyError> {
+    async fn derive_key(&self, mut secret: Vec<u8>) -> Result<[u8; 32], DeriveKeyError> {
         let argon = self.cost.get_argon_hasher();
 
         let salt_bytes = self.salt.as_slice().to_owned();
@@ -175,6 +177,11 @@ impl ArgonParams {
         .map_err(DeriveKeyError::JoinError)?;
 
         result
+    }
+
+    pub async fn derive_encryption_key(&self, secret: Vec<u8>) -> anyhow::Result<EncryptionKey> {
+        let hash = self.derive_key(secret).await?;
+        Ok(EncryptionKey::dangerous_from_bytes(hash))
     }
 
     pub async fn derive_password_hash(self, secret: Vec<u8>) -> Result<PasswordHash> {

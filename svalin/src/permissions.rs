@@ -11,7 +11,7 @@ use svalin_rpc::{
 use crate::{
     message_streaming::{with_agent, with_client},
     shared::commands::{
-        get_key_packages::GetKeyPackagesHandler,
+        get_key_packages::GetKeyPackagesHandler, get_user_credentials::GetUserCredentialHandler,
         load_certificate_chain::LoadCertificateChainHandler,
         public_server_status::PublicStatusHandler, update_user_mls::UpdateUserMlsHandler,
     },
@@ -27,6 +27,7 @@ pub enum Permission {
     ViewPublicInformation,
     AuthenticatedOnly,
     AnonymousOnly,
+    SessionOnly,
 }
 
 impl From<&PermissionPrecursor<PingHandler>> for Permission {
@@ -104,5 +105,11 @@ impl From<&PermissionPrecursor<with_client::MessageHandler>> for Permission {
 impl From<&PermissionPrecursor<with_client::MessageSender>> for Permission {
     fn from(_value: &PermissionPrecursor<with_client::MessageSender>) -> Self {
         Permission::UserOrSession
+    }
+}
+
+impl From<&PermissionPrecursor<GetUserCredentialHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<GetUserCredentialHandler>) -> Self {
+        Permission::SessionOnly
     }
 }
