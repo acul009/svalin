@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use svalin_pki::{
     Certificate, CreateCertificateError, DeriveKeyError, ExportedPublicKey,
-    mls::{agent::CreateDeviceGroupError, key_package::KeyPackageError},
+    mls::{agent::CreateSvalinGroupError, key_package::KeyPackageError},
 };
 use svalin_rpc::{
     rpc::{
@@ -111,7 +111,7 @@ pub enum AcceptJoinError {
     #[error("error establishing encrypted tunnel: {0}")]
     AucPaceError(#[from] AucPaceClientError),
     #[error("error creating device group: {0}")]
-    CreateDeviceGroupError(CreateDeviceGroupError<anyhow::Error>),
+    CreateDeviceGroupError(CreateSvalinGroupError<anyhow::Error>),
     #[error("error uploading agent data to server: {0}")]
     UploadToServerError(#[from] ConnectionDispatchError<UploadAgentCommandError>),
 }

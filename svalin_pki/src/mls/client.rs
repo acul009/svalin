@@ -10,6 +10,7 @@ use serde::de::DeserializeOwned;
 use crate::{
     CertificateType, Credential, SpkiHash, VerifyError, get_current_timestamp,
     mls::{
+        agent::CreateSvalinGroupError,
         group_id::{ParseGroupIdError, SvalinGroupId},
         harness::MlsHarness,
         key_package::KeyPackage,
@@ -126,11 +127,27 @@ where
 
         match &id {
             SvalinGroupId::DeviceGroup(device) => {
-                self.harness
+                let certificate = self
+                    .harness
                     .verifier()
                     .verify_spki_hash(device, get_current_timestamp())
                     .await?;
+
+                if certificate.certificate_type() != CertificateType::Agent {
+                    return Err(HandleWelcomeError::InvalidGroupId);
+                }
                 // No additional verification for now
+            }
+            SvalinGroupId::DeviceMetaGroup(device) => {
+                let certificate = self
+                    .harness
+                    .verifier()
+                    .verify_spki_hash(device, get_current_timestamp())
+                    .await?;
+
+                if certificate.certificate_type() != CertificateType::Agent {
+                    return Err(HandleWelcomeError::InvalidGroupId);
+                }
             }
         }
 
@@ -210,6 +227,29 @@ where
 
         Ok(message_to_server)
     }
+
+    pub async fn create_meta_group_if_missing(
+        &self,
+        spki_hash: SpkiHash,
+    ) -> Result<Option<MessageToServerTransport>, CreateSvalinGroupError<KeyRetriever::Error>> {
+        let certificate = self
+            .harness
+            .verifier()
+            .verify_spki_hash(&spki_hash, get_current_timestamp())
+            .await?;
+        if certificate.certificate_type() != CertificateType::Agent {
+            return Err(CreateSvalinGroupError::WrongCertificateType(
+                certificate.certificate_type(),
+                CertificateType::Agent,
+            ));
+        }
+
+        let group_id = SvalinGroupId::DeviceMetaGroup(spki_hash);
+
+        self.harness
+            .create_group_if_not_exists(&group_id, self.me())
+            .await
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -252,4 +292,6 @@ pub enum HandleWelcomeError<RetrieverError> {
     LibraryError(#[from] LibraryError),
     #[error("verify error: {0}")]
     VerifyError(#[from] VerifyError),
+    #[error("invalid group id")]
+    InvalidGroupId,
 }

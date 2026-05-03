@@ -9,8 +9,11 @@ use crate::{
     CertificateType, SpkiHash, get_current_timestamp,
     mls::{
         SvalinGroupId,
+        agent::CreateSvalinGroupError,
         key_package::{KeyPackage, KeyPackageError, UnverifiedKeyPackage},
         key_retriever::{self},
+        processor::MlsProcessorHandle,
+        transport_types::MessageToServerTransport,
     },
 };
 
@@ -62,6 +65,7 @@ impl<KeyRetriever, Verifier, Processor> MlsHarness<KeyRetriever, Verifier, Proce
     }
 }
 
+// Shared between client, agent and server
 impl<KeyRetriever, Verifier, Processor> MlsHarness<KeyRetriever, Verifier, Processor>
 where
     KeyRetriever: key_retriever::KeyRetriever,
@@ -150,6 +154,71 @@ where
         key_package
             .verify(self.crypto(), self.protocol_version(), self.verifier())
             .await
+    }
+}
+
+// shared between client and agent only
+impl<KeyRetriever, Verifier> MlsHarness<KeyRetriever, Verifier, MlsProcessorHandle>
+where
+    KeyRetriever: key_retriever::KeyRetriever,
+    Verifier: crate::Verifier,
+{
+    pub(crate) async fn create_group_if_not_exists(
+        &self,
+        group_id: &SvalinGroupId,
+        me: &SpkiHash,
+    ) -> Result<Option<MessageToServerTransport>, CreateSvalinGroupError<KeyRetriever::Error>> {
+        if self
+            .processor()
+            .group_exists(group_id.to_group_id())
+            .await?
+        {
+            return Ok(None);
+        }
+
+        let members = self.get_required_key_packages(&group_id, me).await?;
+
+        let new_group = self
+            .processor()
+            .create_group(members, group_id.to_group_id())
+            .await?;
+
+        Ok(Some(MessageToServerTransport::NewDeviceGroup {
+            device_group: new_group,
+        }))
+    }
+
+    async fn get_required_key_packages(
+        &self,
+        group_id: &SvalinGroupId,
+        me: &SpkiHash,
+    ) -> Result<Vec<KeyPackage>, CreateSvalinGroupError<KeyRetriever::Error>>
+    where
+        KeyRetriever: crate::mls::key_retriever::KeyRetriever,
+        Verifier: crate::Verifier,
+    {
+        let required_members = self
+            .key_retriever()
+            .get_required_group_members(&group_id)
+            .await
+            .map_err(CreateSvalinGroupError::KeyRetrieverError)?
+            .into_iter()
+            .filter(|spki_hash| spki_hash != me)
+            .collect::<Vec<_>>();
+
+        let unverified = self
+            .key_retriever()
+            .get_key_packages(&required_members)
+            .await
+            .map_err(CreateSvalinGroupError::KeyRetrieverError)?;
+
+        let mut members = Vec::with_capacity(unverified.len());
+        for member in unverified {
+            let member = self.verify_key_package(member).await?;
+            members.push(member);
+        }
+
+        Ok(members)
     }
 }
 

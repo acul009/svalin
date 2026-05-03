@@ -164,50 +164,12 @@ where
 
     pub async fn create_device_group_if_missing(
         &self,
-    ) -> Result<Option<MessageToServerTransport>, CreateDeviceGroupError<KeyRetriever::Error>> {
+    ) -> Result<Option<MessageToServerTransport>, CreateSvalinGroupError<KeyRetriever::Error>> {
         let group_id = SvalinGroupId::DeviceGroup(self.me.spki_hash().clone());
 
-        if self
-            .harness
-            .processor()
-            .group_exists(group_id.to_group_id())
-            .await?
-        {
-            return Ok(None);
-        }
-
-        let required_members = self
-            .harness
-            .key_retriever()
-            .get_required_group_members(&group_id)
+        self.harness
+            .create_group_if_not_exists(&group_id, self.me.spki_hash())
             .await
-            .map_err(CreateDeviceGroupError::KeyRetrieverError)?
-            .into_iter()
-            .filter(|spki_hash| spki_hash != self.me.spki_hash())
-            .collect::<Vec<_>>();
-
-        let unverified = self
-            .harness
-            .key_retriever()
-            .get_key_packages(&required_members)
-            .await
-            .map_err(CreateDeviceGroupError::KeyRetrieverError)?;
-
-        let mut members = Vec::with_capacity(unverified.len());
-        for member in unverified {
-            let member = self.harness.verify_key_package(member).await?;
-            members.push(member);
-        }
-
-        let new_group = self
-            .harness
-            .processor()
-            .create_group(members, group_id.to_group_id())
-            .await?;
-
-        Ok(Some(MessageToServerTransport::NewDeviceGroup {
-            device_group: new_group,
-        }))
     }
 }
 
@@ -254,9 +216,9 @@ pub enum SendDeviceMessageError {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum CreateDeviceGroupError<KeyRetrieverError> {
-    #[error("wrong certificate type: {0}, expected agent")]
-    WrongCertificateType(CertificateType),
+pub enum CreateSvalinGroupError<KeyRetrieverError> {
+    #[error("wrong certificate type: {0}, expected {1}")]
+    WrongCertificateType(CertificateType, CertificateType),
     #[error("error creating mls group: {0}")]
     CreateGroupError(#[from] CreateGroupError),
     #[error("error during key retrieval: {0}")]

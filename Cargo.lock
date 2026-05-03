@@ -3839,6 +3839,7 @@ dependencies = [
  "anyhow",
  "argon2",
  "curve25519-dalek 4.1.3",
+ "hex",
  "openmls",
  "openmls_rust_crypto",
  "openmls_sqlx_storage",

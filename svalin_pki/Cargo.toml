@@ -25,6 +25,7 @@ sha2.workspace = true
 openmls_rust_crypto.workspace = true
 openmls_sqlx_storage.workspace = true
 curve25519-dalek = { workspace = true, features = ["serde", "digest", "rand_core"] }
+hex = "0.4.3"
 
 [dev-dependencies]
 sqlx = { workspace = true, features = ["sqlite", "migrate", "runtime-tokio"] }

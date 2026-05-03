@@ -331,20 +331,6 @@ impl PublicProcessor {
         })
     }
 
-    fn get_group_members(&mut self, group_id: GroupId) -> Result<Vec<SpkiHash>, GetMembersError> {
-        let group = Self::get_group(&mut self.group_cache, self.provider.storage(), group_id)?;
-
-        let members = group
-            .members()
-            .map(|member| {
-                let spki_hash: SpkiHash = member.credential.deserialized()?;
-                Ok(spki_hash)
-            })
-            .collect::<Result<_, tls_codec::Error>>()?;
-
-        Ok(members)
-    }
-
     fn get_member(
         &mut self,
         group_id: GroupId,

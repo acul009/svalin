@@ -1,3 +1,4 @@
+use hex::ToHex;
 use openmls::group::GroupId;
 
 use crate::SpkiHash;
@@ -5,29 +6,53 @@ use crate::SpkiHash;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SvalinGroupId {
     DeviceGroup(SpkiHash),
+    DeviceMetaGroup(SpkiHash),
 }
 
 impl SvalinGroupId {
     pub(crate) fn to_group_id(&self) -> GroupId {
-        match self {
+        let bytes = match self {
             SvalinGroupId::DeviceGroup(spki_hash) => {
                 let mut bytes = b"device/".to_vec();
-                bytes.extend_from_slice(spki_hash.as_slice());
-                GroupId::from_slice(&bytes)
+                let hex = spki_hash.as_slice().encode_hex::<String>();
+                bytes.extend_from_slice(hex.as_bytes());
+                bytes
             }
-        }
+            SvalinGroupId::DeviceMetaGroup(spki_hash) => {
+                let mut bytes = b"meta/".to_vec();
+                let hex = spki_hash.as_slice().encode_hex::<String>();
+                bytes.extend_from_slice(hex.as_bytes());
+                bytes
+            }
+        };
+
+        GroupId::from_slice(&bytes)
     }
 
     pub(crate) fn from_group_id(group_id: &GroupId) -> Result<Self, ParseGroupIdError> {
-        if group_id.as_slice().starts_with(b"device/") {
-            if group_id.as_slice().len() != 39 {
-                return Err(ParseGroupIdError::WrongSliceLength);
+        let mut parts = group_id.as_slice().split(|c| *c == b'/');
+        let Some(first) = parts.next() else {
+            return Err(ParseGroupIdError::MissingGroupType);
+        };
+
+        match first {
+            b"device/" => {
+                let Some(spki_hash) = parts.next() else {
+                    return Err(ParseGroupIdError::MissingData);
+                };
+                let spki_hash = SpkiHash::from_slice(&spki_hash)
+                    .map_err(|_| ParseGroupIdError::WrongSliceLength)?;
+                Ok(Self::DeviceGroup(spki_hash))
             }
-            let spki_hash =
-                SpkiHash::from_slice(&group_id.as_slice()[7..39]).expect("already checked length");
-            Ok(Self::DeviceGroup(spki_hash))
-        } else {
-            Err(ParseGroupIdError::UnknownGroupType)
+            b"meta/" => {
+                let Some(spki_hash) = parts.next() else {
+                    return Err(ParseGroupIdError::MissingData);
+                };
+                let spki_hash = SpkiHash::from_slice(&spki_hash)
+                    .map_err(|_| ParseGroupIdError::WrongSliceLength)?;
+                Ok(Self::DeviceMetaGroup(spki_hash))
+            }
+            _ => Err(ParseGroupIdError::UnknownGroupType),
         }
     }
 }
@@ -38,4 +63,8 @@ pub enum ParseGroupIdError {
     WrongSliceLength,
     #[error("unknown group type")]
     UnknownGroupType,
+    #[error("missing data")]
+    MissingData,
+    #[error("missing group type")]
+    MissingGroupType,
 }

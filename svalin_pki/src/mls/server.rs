@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use openmls_sqlx_storage::SqliteStorageProvider;
 
 use crate::{
-    SpkiHash,
+    CertificateType, SpkiHash, VerifyError, get_current_timestamp,
     mls::{
         group_id::{ParseGroupIdError, SvalinGroupId},
         harness::MlsHarness,
@@ -76,6 +76,32 @@ where
             .collect::<Result<HashSet<_>, _>>()?;
 
         let id = SvalinGroupId::from_group_id(temp_group.group_id())?;
+
+        match &id {
+            SvalinGroupId::DeviceGroup(spki_hash) => {
+                let certificate = self
+                    .harness
+                    .verifier()
+                    .verify_spki_hash(spki_hash, get_current_timestamp())
+                    .await
+                    .map_err(AddDeviceGroupError::VerifierError)?;
+                if certificate.certificate_type() != CertificateType::Agent {
+                    return Err(AddDeviceGroupError::InvalidGroupId);
+                }
+            }
+            SvalinGroupId::DeviceMetaGroup(spki_hash) => {
+                let certificate = self
+                    .harness
+                    .verifier()
+                    .verify_spki_hash(spki_hash, get_current_timestamp())
+                    .await
+                    .map_err(AddDeviceGroupError::VerifierError)?;
+                if certificate.certificate_type() != CertificateType::Agent {
+                    return Err(AddDeviceGroupError::InvalidGroupId);
+                }
+            }
+        }
+
         let required_members = self
             .harness
             .key_retriever()
@@ -245,8 +271,12 @@ pub enum AddDeviceGroupError<KeyRetrieverError> {
     ParseGroupIdError(#[from] ParseGroupIdError),
     #[error("key retriever error: {0}")]
     KeyRetrieverError(#[source] KeyRetrieverError),
+    #[error("verifier error: {0}")]
+    VerifierError(#[source] VerifyError),
     #[error("expected a different group")]
     UnexpectedGroup,
     #[error("missing member: {0}")]
     MissingMember(SpkiHash),
+    #[error("invalid group id")]
+    InvalidGroupId,
 }
