@@ -61,7 +61,7 @@ impl MessageToServerTransport {
         let transport = match self {
             Self::GroupMessage(message) => MessageToMemberTransport::GroupMessage(message),
             Self::NewDeviceGroup { device_group } => {
-                MessageToMemberTransport::Welcome(device_group.welcome)
+                MessageToMemberTransport::Welcome(device_group.welcome.unwrap())
             }
             Self::AddToGroup(add_to_group) => {
                 MessageToMemberTransport::AddToGroup(add_to_group.commit)
@@ -99,7 +99,13 @@ impl MessageToMemberTransport {
     pub(crate) fn unpack(&self) -> Result<MessageToMember, tls_codec::Error> {
         let unpacked = match self {
             MessageToMemberTransport::Welcome(welcome) => {
-                MessageToMember::Welcome(Welcome::tls_deserialize_exact_bytes(&welcome)?)
+                let message = MlsMessageIn::tls_deserialize_exact_bytes(&welcome)?;
+                let MlsMessageBodyIn::Welcome(welcome) = message.extract() else {
+                    return Err(tls_codec::Error::DecodingError(
+                        "Expected a welcome message, but got something else".into(),
+                    ));
+                };
+                MessageToMember::Welcome(welcome)
             }
             MessageToMemberTransport::GroupMessage(message) => {
                 let message = MlsMessageIn::tls_deserialize_exact_bytes(&message)?;
@@ -134,7 +140,7 @@ pub(crate) enum MessageToMember {
 #[derive(Serialize, Deserialize)]
 pub struct NewGroupTransport {
     pub(crate) group_info: Vec<u8>,
-    pub(crate) welcome: Vec<u8>,
+    pub(crate) welcome: Option<Vec<u8>>,
 }
 
 impl NewGroupTransport {
@@ -147,7 +153,7 @@ impl NewGroupTransport {
 
     #[cfg(test)]
     pub fn to_member(self) -> Result<MessageToMember, tls_codec::Error> {
-        let transport = MessageToMemberTransport::Welcome(self.welcome);
+        let transport = MessageToMemberTransport::Welcome(self.welcome.unwrap());
 
         transport.unpack()
     }
@@ -156,7 +162,7 @@ impl NewGroupTransport {
 #[derive(Clone)]
 pub struct NewGroup {
     pub(crate) group_info: VerifiableGroupInfo,
-    pub(crate) welcome: Vec<u8>,
+    pub(crate) welcome: Option<Vec<u8>>,
 }
 
 #[derive(Serialize, Deserialize)]

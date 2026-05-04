@@ -34,37 +34,27 @@ impl KeyRetriever for RemoteKeyRetriever {
                     .await?;
 
                 let timestamp = get_current_timestamp();
-
                 let chain = chain.verify(&self.root, timestamp)?;
-
                 let required_members = chain.iter().map(|cert| cert.spki_hash().clone()).collect();
-                tracing::debug!(
-                    "found required members for device {}: {:?}",
-                    spki_hash,
-                    required_members
-                );
 
-                // This was kind of a bad idea - the client should add it's sessions when they are needed.
-                // Otherwise everyone would have access to how many sessions a user has. - sounds like a bad idea.
-                //
-                // for user_certificate in chain.iter().rev().skip(1) {
-                //     required_members.push(user_certificate.spki_hash().clone());
-                //     let user_sessions = self
-                //         .connection
-                //         .dispatch(ListUserSessions(user_certificate.spki_hash()))
-                //         .await
-                //         .map_err(|err| anyhow!(err))?;
+                Ok(required_members)
+            }
+            SvalinGroupId::DeviceMetaGroup(spki_hash) => {
+                let chain = self
+                    .connection
+                    .dispatch(ChainRequest(spki_hash.clone()))
+                    .await?;
 
-                //     for session in user_sessions.into_iter() {
-                //         match session.verify_signature(user_certificate, timestamp) {
-                //             Ok(certificate) => {
-                //                 required_members.push(certificate.spki_hash().clone());
-                //             }
-                //             // TODO: report this error somewhere
-                //             Err(_) => {}
-                //         }
-                //     }
-                // }
+                let timestamp = get_current_timestamp();
+                let chain = chain.verify(&self.root, timestamp)?;
+                let required_members = chain
+                    .iter()
+                    // Skip the device itself
+                    .take(chain.iter().len() - 1)
+                    .map(|cert| cert.spki_hash().clone())
+                    .collect();
+
+                tracing::debug!("required members for group {id:?}: {required_members:?}");
 
                 Ok(required_members)
             }

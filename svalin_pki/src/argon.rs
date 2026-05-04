@@ -18,9 +18,9 @@ impl ArgonCost {
     pub fn strong() -> Self {
         #[cfg(test)]
         return Self {
-            m_cost: 64,
+            m_cost: 1,
             t_cost: 1,
-            p_cost: 2,
+            p_cost: 1,
         };
         #[cfg(not(test))]
         Self {
@@ -33,9 +33,9 @@ impl ArgonCost {
     pub fn basic() -> Self {
         #[cfg(test)]
         return Self {
-            m_cost: 64,
+            m_cost: 1,
             t_cost: 1,
-            p_cost: 2,
+            p_cost: 1,
         };
         #[cfg(not(test))]
         Self {

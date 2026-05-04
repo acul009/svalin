@@ -55,7 +55,7 @@ where
     async fn add_svalin_group(
         &self,
         new_group: NewGroup,
-    ) -> Result<MessageToSend, AddDeviceGroupError<KeyRetriever::Error>> {
+    ) -> Result<Option<MessageToSend>, AddDeviceGroupError<KeyRetriever::Error>> {
         // I somehow need to inspect this group without creating it, but that means I have to manually verify it and therefore get the public key myself...
         //
         // So I found 2 ways to do this:
@@ -167,7 +167,7 @@ where
                     .await
                     .map_err(|err| anyhow!(err))?;
 
-                Ok(vec![to_send])
+                Ok(to_send.into_iter().collect())
             }
             MessageToServer::AddToGroup(add_to_group) => {
                 self.handle_add_to_group(add_to_group).await
@@ -178,7 +178,7 @@ where
     async fn add_device_group(
         &self,
         new_group: NewGroup,
-    ) -> Result<MessageToSend, AddDeviceGroupError<KeyRetriever::Error>> {
+    ) -> Result<Option<MessageToSend>, AddDeviceGroupError<KeyRetriever::Error>> {
         let svalin_id = SvalinGroupId::from_group_id(new_group.group_info.group_id())?;
         match &svalin_id {
             SvalinGroupId::DeviceGroup(_spki_hash) => {

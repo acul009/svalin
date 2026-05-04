@@ -110,7 +110,10 @@ impl PublicProcessorHandle {
         recv.await?
     }
 
-    pub async fn add_group(&self, new_group: NewGroup) -> Result<MessageToSend, AddGroupError> {
+    pub async fn add_group(
+        &self,
+        new_group: NewGroup,
+    ) -> Result<Option<MessageToSend>, AddGroupError> {
         let (send, recv) = oneshot::channel();
 
         let _ = self
@@ -172,7 +175,7 @@ enum PublicProcessorRequest {
     },
     AddGroup {
         new_group: NewGroup,
-        response: oneshot::Sender<Result<MessageToSend, AddGroupError>>,
+        response: oneshot::Sender<Result<Option<MessageToSend>, AddGroupError>>,
     },
     CheckGroup {
         new_group: NewGroup,
@@ -303,7 +306,7 @@ impl PublicProcessor {
         Ok(group)
     }
 
-    fn add_group(&mut self, new_group: NewGroup) -> Result<MessageToSend, AddGroupError> {
+    fn add_group(&mut self, new_group: NewGroup) -> Result<Option<MessageToSend>, AddGroupError> {
         let Some(ratchet_tree) = new_group.group_info.extensions().ratchet_tree() else {
             return Err(AddGroupError::MissingRatchetTree);
         };
@@ -325,10 +328,15 @@ impl PublicProcessor {
             })
             .collect::<Result<Vec<SpkiHash>, tls_codec::Error>>()?;
 
-        Ok(MessageToSend {
-            receivers: members,
-            message: MessageToMemberTransport::Welcome(new_group.welcome),
-        })
+        if let Some(welcome) = new_group.welcome {
+            Ok(Some(MessageToSend {
+                receivers: members,
+                message: MessageToMemberTransport::Welcome(welcome),
+            }))
+        } else {
+            tracing::debug!("no welcome message");
+            Ok(None)
+        }
     }
 
     fn get_member(

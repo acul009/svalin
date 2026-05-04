@@ -238,6 +238,7 @@ impl Client {
 
         let client_store = Arc::new(ClientStore::open(client_db_path).await?);
 
+        // Initialize the client message receiver
         let (message_receiver, client_state_handle) = ClientMessageReceiver::initialize(
             dispatcher_handle.clone(),
             mls.clone(),
@@ -245,7 +246,7 @@ impl Client {
             client_store,
         )
         .await?;
-
+        // and start it
         let connection = rpc.upstream_connection();
         background_tasks.spawn(async move {
             if let Err(err) = connection.dispatch(message_receiver).await {
@@ -301,13 +302,17 @@ impl Client {
                             ))
                             .await
                         {
-                            tracing::error!("error while sending main state update: {}", err);
+                            tracing::error!("error while sending main state update: {:#}", err);
                         }
                     }
-                    Err(err) => tracing::error!("error while updating user mls: {}", err),
+                    Err(err) => tracing::error!("error while updating user mls: {:#}", err),
                 }
+                #[cfg(not(test))]
+                let timeout = Duration::from_secs(30);
+                #[cfg(test)]
+                let timeout = Duration::from_secs(10);
                 if cancel
-                    .run_until_cancelled(tokio::time::sleep(Duration::from_secs(30)))
+                    .run_until_cancelled(tokio::time::sleep(timeout))
                     .await
                     .is_none()
                 {

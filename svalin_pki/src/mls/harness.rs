@@ -206,6 +206,13 @@ where
             .filter(|spki_hash| spki_hash != me)
             .collect::<Vec<_>>();
 
+        if required_members.is_empty() {
+            tracing::debug!("no required key packages for group {group_id:?}");
+            return Ok(Vec::new());
+        }
+
+        tracing::debug!("retrieving key packages for group {group_id:?}: {required_members:?}");
+
         let unverified = self
             .key_retriever()
             .get_key_packages(&required_members)

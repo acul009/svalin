@@ -405,6 +405,17 @@ impl MlsProcessor {
         let mut entry = self.group_cache.entry(group_id).insert_entry(group);
         let group = entry.get_mut();
 
+        if members.is_empty() {
+            tracing::debug!("Creating new group with no additional members");
+            let group_info =
+                group.export_group_info(self.provider.crypto(), &self.svalin_credential, true)?;
+
+            return Ok(NewGroupTransport {
+                group_info: group_info.tls_serialize_detached()?,
+                welcome: None,
+            });
+        }
+
         let mls_key_packages = members.into_iter().map(KeyPackage::unpack);
 
         let bundle = group
@@ -430,7 +441,7 @@ impl MlsProcessor {
 
         Ok(NewGroupTransport {
             group_info: group_info.tls_serialize_detached()?,
-            welcome: welcome.tls_serialize_detached()?,
+            welcome: Some(welcome.tls_serialize_detached()?),
         })
     }
 
@@ -597,7 +608,7 @@ impl MlsProcessor {
 
 #[derive(Debug, thiserror::Error)]
 pub enum GetGroupError {
-    #[error("give group does not exist")]
+    #[error("group does not exist")]
     UnknownGroup,
     #[error("storage error: {0}")]
     StorageError(<SvalinProvider as openmls::storage::OpenMlsProvider>::StorageError),

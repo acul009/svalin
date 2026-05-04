@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::Result;
+use hex::ToHex;
 use rustls::pki_types::CertificateDer;
 use serde::de::Visitor;
 use serde::{Deserialize, Serialize, de};
@@ -227,6 +228,15 @@ impl SpkiHash {
         let mut bytes = [0u8; 32];
         bytes.copy_from_slice(slice);
         Ok(Self(bytes))
+    }
+
+    pub(crate) fn to_hex(&self) -> String {
+        self.0.encode_hex()
+    }
+
+    pub(crate) fn from_hex(hex: &[u8]) -> Result<Self, ()> {
+        let bytes = hex::decode(hex).map_err(|_| ())?;
+        Self::from_slice(&bytes)
     }
 }
 

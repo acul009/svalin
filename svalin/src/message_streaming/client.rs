@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use svalin_client_store::ClientStore;
-use svalin_pki::mls::client::MlsClient;
+use svalin_client_store::{ClientStore, persistent};
+use svalin_pki::mls::client::{MessageData, MessageDataContent, MlsClient};
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
 use svalin_sysctl::sytem_report::SystemReport;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -155,20 +155,30 @@ impl ClientMessageReceiver {
     async fn handle(&self, message: MessageToClient) -> Result<bool, anyhow::Error> {
         match message {
             MessageToClient::Mls(message) => {
-                let _message = self
+                let message = self
                     .mls
                     .handle_message::<SystemReport>(&message)
                     .await
                     .map_err(|err| anyhow!(err))?;
-                todo!();
+
+                match message.content {
+                    MessageDataContent::Internal => {}
+                    MessageDataContent::Report(spki_hash, report) => {
+                        self.update_client_state(ClientStateUpdate::Persistent(
+                            persistent::Message::UpdateSystemReport(spki_hash, report),
+                        ))
+                        .await;
+                    }
+                }
             }
             MessageToClient::AgentOnlineStatus(spki_hash, online) => {
                 self.update_client_state(ClientStateUpdate::AgentOnlineStatus(spki_hash, online))
                     .await;
-                Ok(false)
             }
-            MessageToClient::Goodbye => Ok(true),
+            MessageToClient::Goodbye => return Ok(true),
         }
+
+        Ok(false)
     }
 
     async fn update_client_state(&self, update: ClientStateUpdate) {

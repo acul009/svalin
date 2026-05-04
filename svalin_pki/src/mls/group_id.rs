@@ -1,4 +1,3 @@
-use hex::ToHex;
 use openmls::group::GroupId;
 
 use crate::SpkiHash;
@@ -14,13 +13,13 @@ impl SvalinGroupId {
         let bytes = match self {
             SvalinGroupId::DeviceGroup(spki_hash) => {
                 let mut bytes = b"device/".to_vec();
-                let hex = spki_hash.as_slice().encode_hex::<String>();
+                let hex = spki_hash.to_hex();
                 bytes.extend_from_slice(hex.as_bytes());
                 bytes
             }
             SvalinGroupId::DeviceMetaGroup(spki_hash) => {
                 let mut bytes = b"meta/".to_vec();
-                let hex = spki_hash.as_slice().encode_hex::<String>();
+                let hex = spki_hash.to_hex();
                 bytes.extend_from_slice(hex.as_bytes());
                 bytes
             }
@@ -36,19 +35,19 @@ impl SvalinGroupId {
         };
 
         match first {
-            b"device/" => {
+            b"device" => {
                 let Some(spki_hash) = parts.next() else {
                     return Err(ParseGroupIdError::MissingData);
                 };
-                let spki_hash = SpkiHash::from_slice(&spki_hash)
+                let spki_hash = SpkiHash::from_hex(&spki_hash)
                     .map_err(|_| ParseGroupIdError::WrongSliceLength)?;
                 Ok(Self::DeviceGroup(spki_hash))
             }
-            b"meta/" => {
+            b"meta" => {
                 let Some(spki_hash) = parts.next() else {
                     return Err(ParseGroupIdError::MissingData);
                 };
-                let spki_hash = SpkiHash::from_slice(&spki_hash)
+                let spki_hash = SpkiHash::from_hex(&spki_hash)
                     .map_err(|_| ParseGroupIdError::WrongSliceLength)?;
                 Ok(Self::DeviceMetaGroup(spki_hash))
             }
@@ -67,4 +66,24 @@ pub enum ParseGroupIdError {
     MissingData,
     #[error("missing group type")]
     MissingGroupType,
+}
+
+#[cfg(test)]
+mod tests {
+    use ring::rand::{SecureRandom, SystemRandom};
+
+    use super::*;
+
+    #[test]
+    fn test_group_id() {
+        let mut raw = [0u8; 32];
+        // fill with random data
+        let rand = SystemRandom::new();
+        rand.fill(&mut raw).unwrap();
+
+        let group_id = SvalinGroupId::DeviceGroup(SpkiHash::from_slice(&raw).unwrap());
+        let encoded = group_id.to_group_id();
+        let decoded = SvalinGroupId::from_group_id(&encoded).unwrap();
+        assert_eq!(group_id, decoded);
+    }
 }

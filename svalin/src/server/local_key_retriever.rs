@@ -55,6 +55,27 @@ impl KeyRetriever for LocalKeyRetriever {
 
                 Ok(required_members)
             }
+            SvalinGroupId::DeviceMetaGroup(spki_hash) => {
+                let agent = self
+                    .agent_store
+                    .get_agent(&spki_hash)
+                    .await?
+                    .ok_or_else(|| anyhow!("agent not found"))?;
+                let chain = CertificateChainBuilder::new(agent);
+
+                let timestamp = get_current_timestamp();
+
+                let chain = self.user_store.complete_certificate_chain(chain).await?;
+                let chain = chain.verify(&self.root, timestamp)?;
+
+                let required_members = chain
+                    .iter()
+                    .skip(1)
+                    .map(|cert| cert.spki_hash().clone())
+                    .collect();
+
+                Ok(required_members)
+            }
         }
     }
 

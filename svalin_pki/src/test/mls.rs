@@ -109,7 +109,11 @@ async fn test_public_processor() {
 
     let public_processor = create_public_processor().await;
 
-    let to_send = public_processor.add_group(new_group).await.unwrap();
+    let to_send = public_processor
+        .add_group(new_group)
+        .await
+        .unwrap()
+        .unwrap();
     let members = to_send
         .receivers
         .into_iter()

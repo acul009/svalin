@@ -15,7 +15,7 @@ use svalin_pki::{
         client::{MessageDataContent, MlsClient},
         key_package::UnverifiedKeyPackage,
         provider::{ExportedMlsStore, SvalinStorage},
-        transport_types::MessageToMemberTransport,
+        transport_types::{MessageToMemberTransport, MessageToServerTransport},
     },
 };
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
@@ -74,6 +74,7 @@ struct UpdateResponse {
     persistent_data: EncryptedObject<persistent::State>,
     handled: Vec<Uuid>,
     key_packages: Vec<UnverifiedKeyPackage>,
+    messages: Vec<MessageToServerTransport>,
 }
 
 #[async_trait]
@@ -161,6 +162,13 @@ impl CommandHandler for UpdateUserMlsHandler {
             .aknowledge_messages(&user_hash, &response.handled)
             .await?;
 
+        for message in response.messages {
+            let to_send = self.mls.process_message(message).await?;
+            for message in to_send {
+                self.message_store.add_message(message).await?;
+            }
+        }
+
         session.write_object(&()).await?;
 
         // explicit drop, so I don't accidentally drop it beforehand
@@ -198,16 +206,24 @@ impl CommandDispatcher for UpdateUserMls {
         session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
         debug!("Updating user MLS");
-        let data = session.read_object::<UpdateData>().await?;
+        let data = session
+            .read_object::<UpdateData>()
+            .await
+            .context("Failed to read data")?;
 
-        let (mls_store, export_handle) = SvalinStorage::import(data.mls_store, &self.key)?;
-        let mut persistent_data = data.persistent_data.decrypt(&self.key)?;
+        let (mls_store, export_handle) = SvalinStorage::import(data.mls_store, &self.key)
+            .context("error importing mls storage")?;
+        let mut persistent_data = data
+            .persistent_data
+            .decrypt(&self.key)
+            .context("error decrypting persistent data")?;
         let client = MlsClient::new(
             self.user_credential,
             mls_store,
             self.key_retriever,
             self.verifier,
-        )?;
+        )
+        .context("error building mls client")?;
         debug!("Temporary MLS client created, processing messages");
 
         let mut handled = Vec::new();
@@ -216,7 +232,7 @@ impl CommandDispatcher for UpdateUserMls {
             let processed = client
                 .handle_message::<SystemReport>(&message)
                 .await
-                .map_err(|err| anyhow!(err))?;
+                .context("error processing message")?;
 
             handled.push(uuid);
 
@@ -229,11 +245,28 @@ impl CommandDispatcher for UpdateUserMls {
             }
         }
 
+        let mut messages = Vec::new();
+
         for (device, _) in persistent_data.devices() {
             let group = SvalinGroupId::DeviceGroup(device.clone());
             if !client.is_member(&group, self.session_mls.me()).await? {
                 let key_package = self.session_mls.create_key_package().await?;
-                client.add_member(&group, key_package).await?;
+                let message = client.add_member(&group, key_package).await?;
+                messages.push(message);
+            }
+
+            if let Some(message) = client
+                .create_meta_group_if_missing(device.clone())
+                .await
+                .map_err(|err| anyhow!(err))?
+            {
+                messages.push(message);
+            }
+            let meta_group = SvalinGroupId::DeviceMetaGroup(device.clone());
+            if !client.is_member(&meta_group, self.session_mls.me()).await? {
+                let key_package = self.session_mls.create_key_package().await?;
+                let message = client.add_member(&meta_group, key_package).await?;
+                messages.push(message);
             }
         }
 
@@ -253,6 +286,7 @@ impl CommandDispatcher for UpdateUserMls {
             persistent_data: encrypted_data,
             handled,
             key_packages,
+            messages,
         };
 
         session.write_object(&response).await?;

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use openmls::{
     error::LibraryError,
     prelude::{PublicMessageIn, Welcome},
@@ -8,9 +8,8 @@ use openmls::{
 use serde::de::DeserializeOwned;
 
 use crate::{
-    CertificateType, Credential, SpkiHash, VerifyError, get_current_timestamp,
+    CertificateType, Credential, SpkiHash, VerifyError, certificate, get_current_timestamp,
     mls::{
-        agent::CreateSvalinGroupError,
         group_id::{ParseGroupIdError, SvalinGroupId},
         harness::MlsHarness,
         key_package::KeyPackage,
@@ -75,12 +74,13 @@ where
         &self,
         message: &MessageToMemberTransport,
     ) -> anyhow::Result<MessageData<Report>> {
-        match message.unpack()? {
+        match message.unpack().context("unpack error")? {
             MessageToMember::Welcome(welcome) => {
                 let group = self
                     .handle_welcome(welcome)
                     .await
-                    .map_err(|err| anyhow!(err))?;
+                    .map_err(|err| anyhow!(err))
+                    .context("handle welcome error")?;
 
                 Ok(MessageData {
                     content: MessageDataContent::Internal,
@@ -126,27 +126,27 @@ where
         let id = SvalinGroupId::from_group_id(staged.group_context().group_id())?;
 
         match &id {
-            SvalinGroupId::DeviceGroup(device) => {
+            SvalinGroupId::DeviceGroup(spki_hash) => {
                 let certificate = self
                     .harness
                     .verifier()
-                    .verify_spki_hash(device, get_current_timestamp())
+                    .verify_spki_hash(spki_hash, get_current_timestamp())
                     .await?;
 
                 if certificate.certificate_type() != CertificateType::Agent {
-                    return Err(HandleWelcomeError::InvalidGroupId);
+                    return Err(HandleWelcomeError::IncorrectCertificateType);
                 }
                 // No additional verification for now
             }
-            SvalinGroupId::DeviceMetaGroup(device) => {
+            SvalinGroupId::DeviceMetaGroup(spki_hash) => {
                 let certificate = self
                     .harness
                     .verifier()
-                    .verify_spki_hash(device, get_current_timestamp())
+                    .verify_spki_hash(spki_hash, get_current_timestamp())
                     .await?;
 
                 if certificate.certificate_type() != CertificateType::Agent {
-                    return Err(HandleWelcomeError::InvalidGroupId);
+                    return Err(HandleWelcomeError::IncorrectCertificateType);
                 }
             }
         }
@@ -231,24 +231,22 @@ where
     pub async fn create_meta_group_if_missing(
         &self,
         spki_hash: SpkiHash,
-    ) -> Result<Option<MessageToServerTransport>, CreateSvalinGroupError<KeyRetriever::Error>> {
+    ) -> anyhow::Result<Option<MessageToServerTransport>> {
         let certificate = self
             .harness
             .verifier()
             .verify_spki_hash(&spki_hash, get_current_timestamp())
             .await?;
         if certificate.certificate_type() != CertificateType::Agent {
-            return Err(CreateSvalinGroupError::WrongCertificateType(
-                certificate.certificate_type(),
-                CertificateType::Agent,
-            ));
+            anyhow::bail!("wrong spki hash type");
         }
-
         let group_id = SvalinGroupId::DeviceMetaGroup(spki_hash);
 
-        self.harness
-            .create_group_if_not_exists(&group_id, self.me())
+        Ok(self
+            .harness
+            .create_group_if_not_exists(&group_id, &self.me)
             .await
+            .map_err(|err| anyhow!(err))?)
     }
 }
 
@@ -292,6 +290,6 @@ pub enum HandleWelcomeError<RetrieverError> {
     LibraryError(#[from] LibraryError),
     #[error("verify error: {0}")]
     VerifyError(#[from] VerifyError),
-    #[error("invalid group id")]
-    InvalidGroupId,
+    #[error("incorrect certificate type")]
+    IncorrectCertificateType,
 }
