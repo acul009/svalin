@@ -8,7 +8,7 @@ use crate::{
         harness::AnyMlsProcessor,
         key_package::{KeyPackage, KeyPackageError},
         provider::{SvalinProvider, SvalinStorage},
-        transport_types::{AddToGroupTransport, MessageToServerTransport, NewGroupTransport},
+        transport_types::{AddToGroupTransport, MessageToServerTransport},
     },
 };
 use anyhow::anyhow;
@@ -26,7 +26,6 @@ use openmls::{
     },
 };
 use openmls_traits::OpenMlsProvider;
-use tls_codec::Serialize;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::Credential;
@@ -134,7 +133,7 @@ impl MlsProcessorHandle {
         &self,
         members: Vec<KeyPackage>,
         group_id: GroupId,
-    ) -> Result<NewGroupTransport, CreateGroupError> {
+    ) -> Result<MessageToServerTransport, CreateGroupError> {
         let (send, recv) = oneshot::channel();
 
         let _ = self
@@ -292,7 +291,7 @@ enum MlsProcessorRequest {
     CreateGroup {
         members: Vec<KeyPackage>,
         group_id: GroupId,
-        response: oneshot::Sender<Result<NewGroupTransport, CreateGroupError>>,
+        response: oneshot::Sender<Result<MessageToServerTransport, CreateGroupError>>,
     },
     CreateMessage {
         group_id: GroupId,
@@ -388,7 +387,7 @@ impl MlsProcessor {
         &mut self,
         members: Vec<KeyPackage>,
         group_id: GroupId,
-    ) -> Result<NewGroupTransport, CreateGroupError> {
+    ) -> Result<MessageToServerTransport, CreateGroupError> {
         let group = MlsGroup::builder()
             .ciphersuite(self.provider.ciphersuite())
             .with_group_id(group_id.clone())
@@ -413,10 +412,9 @@ impl MlsProcessor {
                 unreachable!()
             };
 
-            return Ok(NewGroupTransport {
-                group_info: group_info.tls_serialize_detached()?,
-                welcome: None,
-            });
+            return Ok(MessageToServerTransport::new_device_group(
+                group_info, None,
+            )?);
         }
 
         let mls_key_packages = members.into_iter().map(KeyPackage::unpack);
@@ -442,10 +440,10 @@ impl MlsProcessor {
 
         group.merge_pending_commit(&self.provider)?;
 
-        Ok(NewGroupTransport {
-            group_info: group_info.tls_serialize_detached()?,
-            welcome: Some(welcome.tls_serialize_detached()?),
-        })
+        return Ok(MessageToServerTransport::new_device_group(
+            &group_info,
+            Some(&welcome),
+        )?);
     }
 
     fn stage_join(&mut self, welcome: Welcome) -> Result<StagedWelcome, JoinGroupError> {
@@ -507,9 +505,7 @@ impl MlsProcessor {
             panic!("expected private message");
         };
 
-        Ok(MessageToServerTransport::GroupMessage(
-            message.tls_serialize_detached()?,
-        ))
+        Ok(MessageToServerTransport::message(message)?)
     }
 
     fn process_message(
@@ -589,10 +585,11 @@ impl MlsProcessor {
             group.add_members(&self.provider, &self.svalin_credential, &key_packages)?;
         group.merge_pending_commit(&self.provider)?;
 
-        Ok(MessageToServerTransport::AddToGroup(AddToGroupTransport {
-            commit: commit.to_bytes()?,
-            welcome: welcome.to_bytes()?,
-        }))
+        Ok(MessageToServerTransport::add_to_group(commit, welcome)?)
+        // Ok(MessageToServerTransport::AddToGroup(AddToGroupTransport {
+        //     commit: commit.to_bytes()?,
+        //     welcome: welcome.to_bytes()?,
+        // }))
     }
 
     fn get_member(

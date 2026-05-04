@@ -100,12 +100,15 @@ async fn test_public_processor() {
 
     let group_id = GroupId::from_slice(b"test");
 
-    let new_group = member1
+    let MessageToServer::NewDeviceGroup(new_group) = member1
         .create_group(vec![key_package], group_id.clone())
         .await
         .unwrap()
         .unpack()
-        .unwrap();
+        .unwrap()
+    else {
+        panic!("wrong message type")
+    };
 
     let public_processor = create_public_processor().await;
 

@@ -1,18 +1,18 @@
 use std::fmt::Debug;
 
 use openmls::prelude::{
-    MlsMessageBodyIn, MlsMessageIn, PrivateMessageIn, ProtocolMessage, PublicMessageIn, Welcome,
-    group_info::VerifiableGroupInfo,
+    MlsMessageBodyIn, MlsMessageBodyOut, MlsMessageIn, MlsMessageOut, PrivateMessageIn,
+    ProtocolMessage, PublicMessageIn, Welcome,
+    group_info::{GroupInfo, VerifiableGroupInfo},
 };
-use serde::{Deserialize, Serialize};
-use tls_codec::DeserializeBytes;
+use tls_codec::{DeserializeBytes, Serialize};
 
 use crate::SpkiHash;
 
-#[derive(Serialize, Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub enum MessageToServerTransport {
     GroupMessage(Vec<u8>),
-    NewDeviceGroup { device_group: NewGroupTransport },
+    NewDeviceGroup(NewGroupTransport),
     AddToGroup(AddToGroupTransport),
 }
 
@@ -26,6 +26,15 @@ impl Debug for MessageToServerTransport {
     }
 }
 
+pub(crate) enum MessageToServer {
+    GroupMessage {
+        raw: Vec<u8>,
+        message: ProtocolMessage,
+    },
+    NewDeviceGroup(NewGroup),
+    AddToGroup(AddToGroup),
+}
+
 impl MessageToServerTransport {
     pub(crate) fn unpack(self) -> anyhow::Result<MessageToServer> {
         let to_server = match self {
@@ -34,33 +43,67 @@ impl MessageToServerTransport {
                     MlsMessageIn::tls_deserialize_exact_bytes(&raw)?.try_into_protocol_message()?;
                 MessageToServer::GroupMessage { raw, message }
             }
-            Self::NewDeviceGroup { device_group } => MessageToServer::NewDeviceGroup {
-                device_group: device_group.unpack()?,
-            },
+            Self::NewDeviceGroup(device_group) => {
+                MessageToServer::NewDeviceGroup(device_group.unpack()?)
+            }
             Self::AddToGroup(add_to_group) => MessageToServer::AddToGroup(add_to_group.unpack()?),
         };
 
         Ok(to_server)
     }
-}
 
-pub(crate) enum MessageToServer {
-    GroupMessage {
-        raw: Vec<u8>,
-        message: ProtocolMessage,
-    },
-    NewDeviceGroup {
-        device_group: NewGroup,
-    },
-    AddToGroup(AddToGroup),
-}
+    pub fn message(mls_message: MlsMessageOut) -> Result<Self, tls_codec::Error> {
+        let MlsMessageBodyOut::PrivateMessage(_) = mls_message.body() else {
+            return Err(tls_codec::Error::DecodingError(
+                "Expected a Private MLS message, but got something else".into(),
+            ));
+        };
 
-impl MessageToServerTransport {
+        Ok(Self::GroupMessage(mls_message.tls_serialize_detached()?))
+    }
+
+    pub fn new_device_group(
+        group_info: &GroupInfo,
+        welcome: Option<&Welcome>,
+    ) -> Result<Self, tls_codec::Error> {
+        let welcome = if let Some(welcome) = welcome {
+            Some(welcome.tls_serialize_detached()?)
+        } else {
+            None
+        };
+
+        Ok(Self::NewDeviceGroup(NewGroupTransport {
+            group_info: group_info.tls_serialize_detached()?,
+            welcome: welcome,
+        }))
+    }
+
+    pub(crate) fn add_to_group(
+        commit: MlsMessageOut,
+        welcome: MlsMessageOut,
+    ) -> Result<Self, tls_codec::Error> {
+        let MlsMessageBodyOut::PublicMessage(_) = commit.body() else {
+            return Err(tls_codec::Error::DecodingError(
+                "Expected a Public MLS message, but got something else".into(),
+            ));
+        };
+        let MlsMessageBodyOut::Welcome(welcome) = welcome.body() else {
+            return Err(tls_codec::Error::DecodingError(
+                "Expected a Welcome message, but got something else".into(),
+            ));
+        };
+
+        Ok(Self::AddToGroup(AddToGroupTransport {
+            commit: commit.tls_serialize_detached()?,
+            welcome: welcome.tls_serialize_detached()?,
+        }))
+    }
+
     #[cfg(test)]
     pub fn to_member(self) -> Result<MessageToMember, tls_codec::Error> {
         let transport = match self {
             Self::GroupMessage(message) => MessageToMemberTransport::GroupMessage(message),
-            Self::NewDeviceGroup { device_group } => {
+            Self::NewDeviceGroup(device_group) => {
                 MessageToMemberTransport::Welcome(device_group.welcome.unwrap())
             }
             Self::AddToGroup(add_to_group) => {
@@ -78,7 +121,7 @@ pub struct MessageToSend {
     pub message: MessageToMemberTransport,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub enum MessageToMemberTransport {
     Welcome(Vec<u8>),
     GroupMessage(Vec<u8>),
@@ -138,10 +181,10 @@ pub(crate) enum MessageToMember {
     AddToGroup(PublicMessageIn),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NewGroupTransport {
-    pub(crate) group_info: Vec<u8>,
-    pub(crate) welcome: Option<Vec<u8>>,
+    group_info: Vec<u8>,
+    welcome: Option<Vec<u8>>,
 }
 
 impl NewGroupTransport {
@@ -166,15 +209,15 @@ pub struct NewGroup {
     pub(crate) welcome: Option<Vec<u8>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub enum DeviceMessage<Report> {
     Report(Report),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct AddToGroupTransport {
-    pub(crate) commit: Vec<u8>,
-    pub(crate) welcome: Vec<u8>,
+    commit: Vec<u8>,
+    welcome: Vec<u8>,
 }
 
 impl AddToGroupTransport {

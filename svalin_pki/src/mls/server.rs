@@ -161,7 +161,7 @@ where
                     receivers: processed.receivers,
                 }])
             }
-            MessageToServer::NewDeviceGroup { device_group } => {
+            MessageToServer::NewDeviceGroup(device_group) => {
                 let to_send = self
                     .add_device_group(device_group)
                     .await

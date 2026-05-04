@@ -183,9 +183,7 @@ where
             .create_group(members, group_id.to_group_id())
             .await?;
 
-        Ok(Some(MessageToServerTransport::NewDeviceGroup {
-            device_group: new_group,
-        }))
+        Ok(Some(new_group))
     }
 
     async fn get_required_key_packages(

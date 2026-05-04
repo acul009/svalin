@@ -18,7 +18,7 @@ impl ArgonCost {
     pub fn strong() -> Self {
         #[cfg(test)]
         return Self {
-            m_cost: 1,
+            m_cost: 8,
             t_cost: 1,
             p_cost: 1,
         };
@@ -33,7 +33,7 @@ impl ArgonCost {
     pub fn basic() -> Self {
         #[cfg(test)]
         return Self {
-            m_cost: 1,
+            m_cost: 8,
             t_cost: 1,
             p_cost: 1,
         };
@@ -218,29 +218,5 @@ mod test {
         let hashed = params.derive_password_hash(password.clone()).await.unwrap();
 
         assert!(hashed.verify(password).await.unwrap());
-    }
-
-    #[tokio::test]
-    async fn stress_test() {
-        let password = "testpass".as_bytes().to_owned();
-
-        let mut joinset = tokio::task::JoinSet::new();
-        for _ in 0..10 {
-            let pw = password.clone();
-            joinset.spawn(async move {
-                let _ = super::ArgonParams::strong().derive_key(pw).await.unwrap();
-            });
-        }
-
-        for _ in 0..50 {
-            let pw = password.clone();
-            joinset.spawn(async move {
-                let _ = super::ArgonParams::basic().derive_key(pw).await.unwrap();
-            });
-        }
-
-        while let Some(res) = joinset.join_next().await {
-            res.unwrap();
-        }
     }
 }

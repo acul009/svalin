@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use svalin_client_store::{ClientStore, persistent};
 use svalin_pki::mls::client::{MessageData, MessageDataContent, MlsClient};
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
@@ -159,7 +159,8 @@ impl ClientMessageReceiver {
                     .mls
                     .handle_message::<SystemReport>(&message)
                     .await
-                    .map_err(|err| anyhow!(err))?;
+                    .map_err(|err| anyhow!(err))
+                    .context("error handling mls message")?;
 
                 match message.content {
                     MessageDataContent::Internal => {}
