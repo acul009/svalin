@@ -74,12 +74,24 @@ where
         &self,
         message: &MessageToMemberTransport,
     ) -> anyhow::Result<MessageData<Report>> {
-        match message.unpack().context("unpack error")? {
+        tracing::debug!("handling message: {:?}", message);
+        match message
+            .unpack()
+            .map_err(|err| {
+                tracing::error!("unpack error: {err}");
+                err
+            })
+            .context("unpack error")?
+        {
             MessageToMember::Welcome(welcome) => {
+                tracing::debug!("handling welcome");
                 let group = self
                     .handle_welcome(welcome)
                     .await
-                    .map_err(|err| anyhow!(err))
+                    .map_err(|err| {
+                        tracing::error!("error handling welcome: {}", err);
+                        anyhow!("{}", err)
+                    })
                     .context("handle welcome error")?;
 
                 Ok(MessageData {
@@ -88,12 +100,20 @@ where
                 })
             }
             MessageToMember::GroupMessage(message) => {
-                let processed = self.harness.processor().process_message(message).await?;
-                let group_id = SvalinGroupId::from_group_id(&processed.group_id)?;
+                tracing::debug!("handling group message");
+                let processed = self
+                    .harness
+                    .processor()
+                    .process_message(message)
+                    .await
+                    .context("error processing group message")?;
+                let group_id = SvalinGroupId::from_group_id(&processed.group_id)
+                    .context("error parsing group id")?;
                 let ProcessedContent::Message(decrypted) = processed.content else {
                     anyhow::bail!("expected data message, got something else instead.")
                 };
-                let decoded: DeviceMessage<Report> = postcard::from_bytes(&decrypted)?;
+                let decoded: DeviceMessage<Report> =
+                    postcard::from_bytes(&decrypted).context("postcard error")?;
 
                 match decoded {
                     DeviceMessage::Report(report) => match group_id.clone() {
@@ -114,7 +134,10 @@ where
                     },
                 }
             }
-            MessageToMember::AddToGroup(message) => self.handle_add_to_group(message).await,
+            MessageToMember::AddToGroup(message) => self
+                .handle_add_to_group(message)
+                .await
+                .context("add to group error"),
         }
     }
 
@@ -178,6 +201,8 @@ where
         &self,
         message: PublicMessageIn,
     ) -> anyhow::Result<MessageData<Report>> {
+        tracing::debug!("Handling add to group message");
+
         let processed = self
             .harness
             .processor()

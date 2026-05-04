@@ -409,6 +409,9 @@ impl MlsProcessor {
             tracing::debug!("Creating new group with no additional members");
             let group_info =
                 group.export_group_info(self.provider.crypto(), &self.svalin_credential, true)?;
+            let MlsMessageBodyOut::GroupInfo(group_info) = group_info.body() else {
+                unreachable!()
+            };
 
             return Ok(NewGroupTransport {
                 group_info: group_info.tls_serialize_detached()?,

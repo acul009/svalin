@@ -99,12 +99,13 @@ impl MessageToMemberTransport {
     pub(crate) fn unpack(&self) -> Result<MessageToMember, tls_codec::Error> {
         let unpacked = match self {
             MessageToMemberTransport::Welcome(welcome) => {
-                let message = MlsMessageIn::tls_deserialize_exact_bytes(&welcome)?;
-                let MlsMessageBodyIn::Welcome(welcome) = message.extract() else {
-                    return Err(tls_codec::Error::DecodingError(
-                        "Expected a welcome message, but got something else".into(),
-                    ));
-                };
+                let welcome = Welcome::tls_deserialize_exact_bytes(&welcome)?;
+                // let message = MlsMessageIn::tls_deserialize_exact_bytes(&welcome)?;
+                // let MlsMessageBodyIn::Welcome(welcome) = message.extract() else {
+                //     return Err(tls_codec::Error::DecodingError(
+                //         "Expected a welcome message, but got something else".into(),
+                //     ));
+                // };
                 MessageToMember::Welcome(welcome)
             }
             MessageToMemberTransport::GroupMessage(message) => {

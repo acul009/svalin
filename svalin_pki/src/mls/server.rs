@@ -184,6 +184,9 @@ where
             SvalinGroupId::DeviceGroup(_spki_hash) => {
                 // no additional things to do here
             }
+            SvalinGroupId::DeviceMetaGroup(_spki_hash) => {
+                // maybe verify the spki hash? Unsure to be honest
+            }
             #[allow(unreachable_patterns)]
             _ => {
                 return Err(AddDeviceGroupError::UnexpectedGroup);
