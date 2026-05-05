@@ -163,8 +163,10 @@ impl CommandHandler for UpdateUserMlsHandler {
             .await?;
 
         for message in response.messages {
+            tracing::debug!("received message from user mls: {message:?}");
             let to_send = self.mls.process_message(message).await?;
-            for message in to_send {
+            tracing::debug!("processing resulted in messages: {to_send:?}");
+            for mut message in to_send {
                 self.message_store.add_message(message).await?;
             }
         }
@@ -260,6 +262,7 @@ impl CommandDispatcher for UpdateUserMls {
                 .await
                 .map_err(|err| anyhow!(err))?
             {
+                tracing::debug!("new meta group: {message:?}");
                 messages.push(message);
             }
             let meta_group = SvalinGroupId::DeviceMetaGroup(device.clone());

@@ -70,7 +70,8 @@ impl KeyRetriever for LocalKeyRetriever {
 
                 let required_members = chain
                     .iter()
-                    .skip(1)
+                    // Skip the device itself
+                    .take(chain.iter().len() - 1)
                     .map(|cert| cert.spki_hash().clone())
                     .collect();
 

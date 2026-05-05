@@ -93,6 +93,7 @@ where
                         anyhow!("{}", err)
                     })
                     .context("handle welcome error")?;
+                tracing::debug!("welcome handled successfully");
 
                 Ok(MessageData {
                     content: MessageDataContent::Internal,
@@ -179,17 +180,17 @@ where
             .key_retriever()
             .get_required_group_members(&id)
             .await
-            .map_err(HandleWelcomeError::RetrieverError)?
-            .into_iter()
-            .collect::<HashSet<_>>();
+            .map_err(HandleWelcomeError::RetrieverError)?;
 
         let members = staged
             .members()
             .map(|m| m.credential.deserialized())
             .collect::<Result<HashSet<SpkiHash>, tls_codec::Error>>()?;
 
-        if members != required_members {
-            return Err(HandleWelcomeError::IncorrectMembers);
+        for required in required_members {
+            if !members.contains(&required) {
+                return Err(HandleWelcomeError::IncorrectMembers);
+            }
         }
 
         self.harness.processor().join_group(staged).await?;

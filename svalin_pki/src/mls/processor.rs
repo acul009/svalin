@@ -449,7 +449,7 @@ impl MlsProcessor {
     fn stage_join(&mut self, welcome: Welcome) -> Result<StagedWelcome, JoinGroupError> {
         let join_config = MlsGroupJoinConfig::builder()
             .max_past_epochs(0)
-            .use_ratchet_tree_extension(false)
+            .use_ratchet_tree_extension(true)
             .wire_format_policy(PURE_PLAINTEXT_WIRE_FORMAT_POLICY)
             .sender_ratchet_configuration(SenderRatchetConfiguration::new(0, 0))
             .build();

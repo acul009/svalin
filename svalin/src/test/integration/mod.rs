@@ -204,6 +204,8 @@ async fn integration_tests() {
     let system_report = client_state.persistent().iter().next().unwrap();
     tracing::debug!("client persistent data: {:#?}", system_report);
 
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
     agent_cancel.cancel();
     tokio::time::timeout(Duration::from_secs(1), agent_handle)
         .await

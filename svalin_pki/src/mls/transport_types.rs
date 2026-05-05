@@ -20,7 +20,9 @@ impl Debug for MessageToServerTransport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::GroupMessage(_) => f.debug_tuple("GroupMessage").finish(),
-            Self::NewDeviceGroup { .. } => f.debug_tuple("NewDeviceGroup").finish(),
+            Self::NewDeviceGroup(new_group) => {
+                f.debug_tuple("NewDeviceGroup").field(new_group).finish()
+            }
             Self::AddToGroup(_) => f.debug_tuple("AddToGroup").finish(),
         }
     }
@@ -121,6 +123,12 @@ pub struct MessageToSend {
     pub message: MessageToMemberTransport,
 }
 
+impl MessageToSend {
+    pub fn remove_receiver(&mut self, receiver: &SpkiHash) {
+        self.receivers.retain(|r| r != receiver);
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum MessageToMemberTransport {
     Welcome(Vec<u8>),
@@ -185,6 +193,14 @@ pub(crate) enum MessageToMember {
 pub struct NewGroupTransport {
     group_info: Vec<u8>,
     welcome: Option<Vec<u8>>,
+}
+
+impl Debug for NewGroupTransport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NewGroupTransport")
+            .field("welcome", &self.welcome.as_ref().map(|_| ()))
+            .finish()
+    }
 }
 
 impl NewGroupTransport {
