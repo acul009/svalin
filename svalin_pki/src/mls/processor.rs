@@ -8,7 +8,7 @@ use crate::{
         harness::AnyMlsProcessor,
         key_package::{KeyPackage, KeyPackageError},
         provider::{SvalinProvider, SvalinStorage},
-        transport_types::{AddToGroupTransport, MessageToServerTransport},
+        transport_types::MessageToServerTransport,
     },
 };
 use anyhow::anyhow;

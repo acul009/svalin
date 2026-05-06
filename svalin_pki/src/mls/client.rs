@@ -8,7 +8,7 @@ use openmls::{
 use serde::de::DeserializeOwned;
 
 use crate::{
-    CertificateType, Credential, SpkiHash, VerifyError, certificate, get_current_timestamp,
+    CertificateType, Credential, SpkiHash, VerifyError, get_current_timestamp,
     mls::{
         group_id::{ParseGroupIdError, SvalinGroupId},
         harness::MlsHarness,

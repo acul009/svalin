@@ -20,3 +20,4 @@ tokio-rustls = { workspace = true, features = ["ring"] }
 tokio-util.workspace = true
 thiserror.workspace = true
 aucpace = { workspace = true, features = ["alloc", "serde"] }
+sha2 = "^0.10.9"
