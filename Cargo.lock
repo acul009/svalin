@@ -1138,43 +1138,19 @@ dependencies = [
 
 [[package]]
 name = "cosmic-text"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "173852283a9a57a3cbe365d86e74dc428a09c50421477d5ad6fe9d9509e37737"
-dependencies = [
- "bitflags 2.11.1",
- "fontdb",
- "harfrust 0.3.2",
- "linebender_resource_handle",
- "log",
- "rangemap",
- "rustc-hash 1.1.0",
- "self_cell",
- "skrifa 0.37.0",
- "smol_str 0.2.2",
- "swash",
- "sys-locale",
- "unicode-bidi",
- "unicode-linebreak",
- "unicode-script",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "cosmic-text"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be17b688510d934ce13f48a2beba700e11583e281e0fda99c22bb256a14eda73"
 dependencies = [
  "bitflags 2.11.1",
  "fontdb",
- "harfrust 0.5.2",
+ "harfrust",
  "linebender_resource_handle",
  "log",
  "rangemap",
  "rustc-hash 2.1.2",
  "self_cell",
- "skrifa 0.40.0",
+ "skrifa",
  "smol_str 0.3.6",
  "swash",
  "sys-locale",
@@ -1283,7 +1259,7 @@ name = "cryoglyph"
 version = "0.1.0"
 source = "git+https://github.com/iced-rs/cryoglyph.git?rev=53ba3e879539d19ed8162942126a977ec896cc3b#53ba3e879539d19ed8162942126a977ec896cc3b"
 dependencies = [
- "cosmic-text 0.19.0",
+ "cosmic-text",
  "etagere",
  "lru",
  "rustc-hash 2.1.2",
@@ -1909,15 +1885,6 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "font-types"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39a654f404bbcbd48ea58c617c2993ee91d1cb63727a37bf2323a4edeed1b8c5"
-dependencies = [
- "bytemuck",
-]
-
-[[package]]
-name = "font-types"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b38ad915f6dadd993ced50848a8291a543bd41ca62bc10740d5e64e2ab4cfd7"
@@ -2342,19 +2309,6 @@ dependencies = [
 
 [[package]]
 name = "harfrust"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92c020db12c71d8a12a3fe7607873cade3a01a6287e29d540c8723276221b9d8"
-dependencies = [
- "bitflags 2.11.1",
- "bytemuck",
- "core_maths",
- "read-fonts 0.35.0",
- "smallvec",
-]
-
-[[package]]
-name = "harfrust"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9da2e5ae821f6e96664977bf974d6d6a2d6682f9ccee23e62ec1d134246845f9"
@@ -2362,7 +2316,7 @@ dependencies = [
  "bitflags 2.11.1",
  "bytemuck",
  "core_maths",
- "read-fonts 0.37.0",
+ "read-fonts",
  "smallvec",
 ]
 
@@ -2714,10 +2668,10 @@ source = "git+https://github.com/iced-rs/iced.git#51e9c2d06613efe42c591397c91769
 dependencies = [
  "iced_core 0.15.0-dev",
  "iced_debug",
- "iced_futures 0.15.0-dev",
- "iced_renderer 0.15.0-dev",
+ "iced_futures",
+ "iced_renderer",
  "iced_runtime",
- "iced_widget 0.15.0-dev",
+ "iced_widget",
  "iced_winit",
  "image",
  "thiserror 2.0.18",
@@ -2764,7 +2718,7 @@ version = "0.15.0-dev"
 source = "git+https://github.com/iced-rs/iced.git#51e9c2d06613efe42c591397c91769761640570d"
 dependencies = [
  "iced_core 0.15.0-dev",
- "iced_futures 0.15.0-dev",
+ "iced_futures",
  "log",
 ]
 
@@ -2784,36 +2738,21 @@ dependencies = [
 [[package]]
 name = "iced_fonts"
 version = "0.3.0"
-source = "git+https://github.com/Redhawk18/iced_fonts.git#229df23a81c82ee08351980160c69ac00e6db755"
+source = "git+https://github.com/Redhawk18/iced_fonts.git?branch=no-more-widget#81b7f37c404ea21706d217820c49df647d2ecb4c"
 dependencies = [
  "iced_core 0.14.0",
  "iced_fonts_macros",
- "iced_widget 0.14.2",
 ]
 
 [[package]]
 name = "iced_fonts_macros"
 version = "0.3.0"
-source = "git+https://github.com/Redhawk18/iced_fonts.git#229df23a81c82ee08351980160c69ac00e6db755"
+source = "git+https://github.com/Redhawk18/iced_fonts.git?branch=no-more-widget#81b7f37c404ea21706d217820c49df647d2ecb4c"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
  "ttf-parser",
-]
-
-[[package]]
-name = "iced_futures"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c0c85ccad42dfbec7293c36c018af0ea0dbcc52d137a4a9a0b0f6822a3fdf0a"
-dependencies = [
- "futures",
- "iced_core 0.14.0",
- "log",
- "rustc-hash 2.1.2",
- "wasm-bindgen-futures",
- "wasmtimer",
 ]
 
 [[package]]
@@ -2832,34 +2771,15 @@ dependencies = [
 
 [[package]]
 name = "iced_graphics"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "234ca1c2cec4155055f68fa5fad1b5242c496ac8238d80a259bca382fb44a102"
-dependencies = [
- "bitflags 2.11.1",
- "bytemuck",
- "cosmic-text 0.15.0",
- "half",
- "iced_core 0.14.0",
- "iced_futures 0.14.0",
- "log",
- "raw-window-handle",
- "rustc-hash 2.1.2",
- "thiserror 2.0.18",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "iced_graphics"
 version = "0.15.0-dev"
 source = "git+https://github.com/iced-rs/iced.git#51e9c2d06613efe42c591397c91769761640570d"
 dependencies = [
  "bitflags 2.11.1",
  "bytemuck",
- "cosmic-text 0.19.0",
+ "cosmic-text",
  "half",
  "iced_core 0.15.0-dev",
- "iced_futures 0.15.0-dev",
+ "iced_futures",
  "image",
  "kamadak-exif",
  "log",
@@ -2875,19 +2795,8 @@ name = "iced_program"
 version = "0.15.0-dev"
 source = "git+https://github.com/iced-rs/iced.git#51e9c2d06613efe42c591397c91769761640570d"
 dependencies = [
- "iced_graphics 0.15.0-dev",
+ "iced_graphics",
  "iced_runtime",
-]
-
-[[package]]
-name = "iced_renderer"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "250cc0802408e8c077986ec56c7d07c65f423ee658a4b9fd795a1f2aae5dac05"
-dependencies = [
- "iced_graphics 0.14.0",
- "log",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2895,7 +2804,7 @@ name = "iced_renderer"
 version = "0.15.0-dev"
 source = "git+https://github.com/iced-rs/iced.git#51e9c2d06613efe42c591397c91769761640570d"
 dependencies = [
- "iced_graphics 0.15.0-dev",
+ "iced_graphics",
  "iced_tiny_skia",
  "iced_wgpu",
  "log",
@@ -2909,7 +2818,7 @@ source = "git+https://github.com/iced-rs/iced.git#51e9c2d06613efe42c591397c91769
 dependencies = [
  "bytes",
  "iced_core 0.15.0-dev",
- "iced_futures 0.15.0-dev",
+ "iced_futures",
  "raw-window-handle",
  "sipper",
  "thiserror 2.0.18",
@@ -2921,9 +2830,9 @@ version = "0.15.0-dev"
 source = "git+https://github.com/iced-rs/iced.git#51e9c2d06613efe42c591397c91769761640570d"
 dependencies = [
  "bytemuck",
- "cosmic-text 0.19.0",
+ "cosmic-text",
  "iced_debug",
- "iced_graphics 0.15.0-dev",
+ "iced_graphics",
  "kurbo",
  "log",
  "rustc-hash 2.1.2",
@@ -2943,7 +2852,7 @@ dependencies = [
  "glam",
  "guillotiere",
  "iced_debug",
- "iced_graphics 0.15.0-dev",
+ "iced_graphics",
  "log",
  "lyon",
  "rustc-hash 2.1.2",
@@ -2953,24 +2862,10 @@ dependencies = [
 
 [[package]]
 name = "iced_widget"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1596afa0d3109c2618e8bc12bae6c11d3064df8f95c42dfce570397dbe957ab"
-dependencies = [
- "iced_renderer 0.14.0",
- "log",
- "num-traits",
- "rustc-hash 2.1.2",
- "thiserror 2.0.18",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "iced_widget"
 version = "0.15.0-dev"
 source = "git+https://github.com/iced-rs/iced.git#51e9c2d06613efe42c591397c91769761640570d"
 dependencies = [
- "iced_renderer 0.15.0-dev",
+ "iced_renderer",
  "log",
  "num-traits",
  "rustc-hash 2.1.2",
@@ -5478,24 +5373,13 @@ dependencies = [
 
 [[package]]
 name = "read-fonts"
-version = "0.35.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6717cf23b488adf64b9d711329542ba34de147df262370221940dfabc2c91358"
-dependencies = [
- "bytemuck",
- "core_maths",
- "font-types 0.10.1",
-]
-
-[[package]]
-name = "read-fonts"
 version = "0.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b634fabf032fab15307ffd272149b622260f55974d9fad689292a5d33df02e5"
 dependencies = [
  "bytemuck",
  "core_maths",
- "font-types 0.11.3",
+ "font-types",
 ]
 
 [[package]]
@@ -6250,22 +6134,12 @@ dependencies = [
 
 [[package]]
 name = "skrifa"
-version = "0.37.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c31071dedf532758ecf3fed987cdb4bd9509f900e026ab684b4ecb81ea49841"
-dependencies = [
- "bytemuck",
- "read-fonts 0.35.0",
-]
-
-[[package]]
-name = "skrifa"
 version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fbdfe3d2475fbd7ddd1f3e5cf8288a30eb3e5f95832829570cd88115a7434ac"
 dependencies = [
  "bytemuck",
- "read-fonts 0.37.0",
+ "read-fonts",
 ]
 
 [[package]]
@@ -6691,9 +6565,9 @@ dependencies = [
  "futures",
  "futures-util",
  "iced",
+ "iced_core 0.15.0-dev",
  "iced_fontello",
  "iced_fonts",
- "iced_widget 0.15.0-dev",
  "lyon_algorithms",
  "rust-i18n",
  "svalin",
@@ -6802,7 +6676,7 @@ version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "842f3cd369c2ba38966204f983eaa5e54a8e84a7d7159ed36ade2b6c335aae64"
 dependencies = [
- "skrifa 0.40.0",
+ "skrifa",
  "yazi",
  "zeno",
 ]
@@ -9210,3 +9084,8 @@ dependencies = [
  "syn",
  "winnow 1.0.2",
 ]
+
+[[patch.unused]]
+name = "iced_fonts"
+version = "0.3.0"
+source = "git+https://github.com/Redhawk18/iced_fonts.git#229df23a81c82ee08351980160c69ac00e6db755"

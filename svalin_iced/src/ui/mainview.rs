@@ -169,9 +169,8 @@ impl MainView {
         Subscription::none()
     }
 
-    pub(crate) fn shutdown(&mut self) -> Task<Message> {
-        self.screen = Screen::Loading("Shutting down...".to_string());
-        let client = self.client.clone();
+    pub(crate) fn shutdown(self) -> Task<()> {
+        let client = self.client;
 
         Task::future(async move {
             if let Err(err) = client.close(Duration::from_secs(3)).await {
@@ -179,6 +178,5 @@ impl MainView {
                 process::exit(1);
             }
         })
-        .then(|_| iced::exit())
     }
 }

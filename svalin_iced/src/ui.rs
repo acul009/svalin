@@ -1,10 +1,12 @@
+use std::{mem, time::Duration};
+
 use iced::{Subscription, Task, keyboard, window};
 use mainview::MainView;
 use profile_picker::ProfilePicker;
 use widgets::scaffold;
 // use window_helper::WindowHelper;
 
-use crate::Element;
+use crate::{Element, ui::widgets::loading};
 
 pub mod components;
 mod mainview;
@@ -16,6 +18,7 @@ pub mod widgets;
 pub enum Screen {
     ProfilePicker(ProfilePicker),
     MainView(MainView),
+    Closing,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -61,8 +64,13 @@ impl UI {
             Message::Tab => iced::widget::operation::focus_next(),
             Message::WindowCloseRequest(id) => {
                 if id == self.main_window_id {
-                    if let Screen::MainView(main) = &mut self.screen {
-                        return main.shutdown().map(Message::MainView);
+                    if let Screen::MainView(main) = mem::replace(&mut self.screen, Screen::Closing)
+                    {
+                        // It's a bit hidden, but shutdown takes self.
+                        // That causes all active Arc<Client> to be dropped.
+                        // If the Client is not dropped completely,
+                        // the blocking tasks from the mls processor will stop the shutdown.
+                        return main.shutdown().chain(iced::exit()).discard();
                     }
                     // Todo: proper shutdown
                     iced::exit()
@@ -127,15 +135,18 @@ impl UI {
                     profile_picker.view().map(Message::ProfilePicker)
                 }
                 Screen::MainView(mainview) => mainview.view().map(Message::MainView),
+                Screen::Closing => loading("Shutting down...").into(),
             };
 
             let header = match &self.screen {
                 Screen::ProfilePicker(_) => iced::widget::space().into(),
+                Screen::Closing => iced::widget::space().into(),
                 Screen::MainView(mainview) => mainview.header().map(Message::MainView),
             };
 
             let context = match &self.screen {
                 Screen::ProfilePicker(_) => None,
+                Screen::Closing => None,
                 Screen::MainView(mainview) => {
                     if let Some(context) = mainview.context() {
                         Some(context.map(Message::MainView))
@@ -173,6 +184,7 @@ impl UI {
         ];
 
         match &self.screen {
+            Screen::Closing => (),
             Screen::ProfilePicker(_profile_picker) => (),
             Screen::MainView(mainview) => {
                 subscriptions.push(mainview.subscription().map(Message::MainView));

@@ -28,7 +28,11 @@ impl ClientMessageDispatcherHandle {
         let _ = self.0.send((message, None)).await;
     }
 
-    pub async fn try_send(&self, message: MessageFromClient) -> Result<(), ()> {
+    pub fn try_send(&self, message: MessageFromClient) {
+        let _ = self.0.try_send((message, None));
+    }
+
+    pub async fn send_with_feedback(&self, message: MessageFromClient) -> Result<(), ()> {
         let (send, recv) = oneshot::channel();
         self.0.send((message, Some(send))).await.map_err(|_| ())?;
         recv.await.map_err(|_| ())?

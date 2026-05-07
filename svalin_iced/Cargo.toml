@@ -21,7 +21,7 @@ iced = { git = "https://github.com/iced-rs/iced.git", features = [
     "image",
     "sipper"
 ] }
-iced_widget = { git = "https://github.com/iced-rs/iced.git" }
+iced_core = { git = "https://github.com/iced-rs/iced.git" }
 # iced = { version = "^0.14.0", features = [
 #     "canvas",
 #     "wgpu",
@@ -42,7 +42,7 @@ futures = "0.3.32"
 uuid = "1.23.1"
 rust-i18n = "4.0.0"
 tracing.workspace = true
-iced_fonts = { git = "https://github.com/Redhawk18/iced_fonts.git" }
+iced_fonts = { git = "https://github.com/Redhawk18/iced_fonts.git", branch = "no-more-widget" }
 
 [build-dependencies]
 iced_fontello = {git = "https://github.com/hecrj/iced_fontello.git"}

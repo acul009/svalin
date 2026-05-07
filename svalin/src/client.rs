@@ -85,11 +85,15 @@ impl Client {
     pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {
         self.cancel.cancel();
         self.background_tasks.close();
-        self.message_sender.send(MessageFromClient::Goodbye).await;
+        self.message_sender.try_send(MessageFromClient::Goodbye);
+        tracing::debug!("waiting for client background tasks to shut down...");
 
         let result = timeout(timeout_duration, self.background_tasks.wait()).await;
+        tracing::debug!("waiting for client rpc to shut down...");
 
         let result2 = self.rpc.close(timeout_duration).await;
+
+        tracing::debug!("finished controlled client shutdown!");
 
         match result {
             Err(e) => Err(e),
