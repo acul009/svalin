@@ -175,7 +175,7 @@ impl ClientMessageReceiver {
                     .mls
                     .handle_message::<SystemReport>(&message)
                     .await
-                    .map_err(|err| anyhow!(err))
+                    .map_err(|err| anyhow!("{}", err))
                     .context("error handling mls message")?;
 
                 match message.content {

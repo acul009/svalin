@@ -1,7 +1,8 @@
+use chrono::DateTime;
 use iced::{
     Alignment::Center,
     Color, Length,
-    widget::{button, column, container, row, stack, text},
+    widget::{button, column, container, row, stack, table, text},
 };
 // use iced_fonts::{
 //     BOOTSTRAP_FONT,
@@ -75,10 +76,23 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                                 }
                                 .size(16)
                                 .color(color),
-                                text!("{}", spki_hash)
+                                text!("{}", spki_hash),
+                                text(
+                                    DateTime::from_timestamp_secs(
+                                        persistent.system_report().generated_at as i64
+                                    )
+                                    .map(|datetime| {
+                                        datetime
+                                            .naive_local()
+                                            .format("%Y-%m-%d %H:%M:%S")
+                                            .to_string()
+                                    })
+                                    .unwrap_or_else(|| "Unknown".to_string())
+                                )
                             ]
                             .spacing(20)
-                            .padding(10),
+                            .padding(10)
+                            .width(Length::Fill),
                         )
                         .style(button::subtle)
                         .into()

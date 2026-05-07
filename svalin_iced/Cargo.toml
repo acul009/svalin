@@ -43,6 +43,7 @@ uuid = "1.23.1"
 rust-i18n = "4.0.0"
 tracing.workspace = true
 iced_fonts = { git = "https://github.com/Redhawk18/iced_fonts.git", branch = "no-more-widget" }
+chrono = "0.4.44"
 
 [build-dependencies]
 iced_fontello = {git = "https://github.com/hecrj/iced_fontello.git"}
