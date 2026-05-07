@@ -3,8 +3,13 @@ use iced::{
     Color, Length,
     widget::{button, column, container, row, stack, text},
 };
+use iced_fonts::{
+    BOOTSTRAP_FONT,
+    bootstrap::{self, bootstrap},
+};
 use svalin::client::state::ClientState;
 use svalin_pki::SpkiHash;
+use svalin_sysctl::sytem_report::OS;
 
 use crate::{Element, ui::widgets::icon};
 
@@ -54,15 +59,24 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                     .state
                     .persistent()
                     .iter()
-                    .map(|(spki_hash, persistent)| button(row![
-                        icon::device().color(if device_list.state.agent_online(spki_hash) {
+                    .map(|(spki_hash, persistent)| {
+                        let color = if device_list.state.agent_online(spki_hash) {
                             Color::from_rgb8(0, 255, 0)
                         } else {
                             Color::from_rgb8(255, 0, 0)
-                        }),
-                        text!("{}", spki_hash)
-                    ])
-                    .into()),
+                        };
+
+                        button(row![
+                            match persistent.system_report().os {
+                                OS::Windows => bootstrap::windows(),
+                                OS::Linux => bootstrap::ubuntu(),
+                                OS::Unknown => bootstrap::laptop(),
+                            }
+                            .color(color),
+                            text!("{}", spki_hash)
+                        ])
+                        .into()
+                    }),
             )
         ]
         .into()

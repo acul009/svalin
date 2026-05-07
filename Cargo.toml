@@ -67,3 +67,7 @@ svalin_client_store = { path = "store_client" }
 [patch.crates-io]
 # temporarily needed for rust 1.91 compatibility
 # sha3 = { git = "https://github.com/RustCrypto/hashes.git" }
+iced_fonts = { git = "https://github.com/Redhawk18/iced_fonts.git" }
+iced = { git = "https://github.com/iced-rs/iced.git" }
+iced_core = { git = "https://github.com/iced-rs/iced.git" }
+iced_widget = { git = "https://github.com/iced-rs/iced.git" }
