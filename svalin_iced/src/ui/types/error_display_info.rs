@@ -29,7 +29,7 @@ impl<E> ErrorDisplayInfo<E>
 where
     E: std::fmt::Display,
 {
-    pub fn view<Message>(&self) -> ErrorDisplay<E, Message> {
+    pub fn view<Message>(&self) -> ErrorDisplay<'_, E, Message> {
         error_display(self.error()).title(self.context()).into()
     }
 }

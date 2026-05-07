@@ -10,8 +10,8 @@ svalin_pki = { path = "../svalin_pki" }
 svalin_rpc = { path = "../svalin_rpc" }
 svalin_sysctl = { path = "../svalin_sysctl" }
 
-frozen_term = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git"}
-async_pty = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git" }
+# frozen_term = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git"}
+# async_pty = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git" }
 
 iced = { git = "https://github.com/iced-rs/iced.git", features = [
     "canvas",
@@ -19,6 +19,7 @@ iced = { git = "https://github.com/iced-rs/iced.git", features = [
     "tokio",
     "advanced",
     "image",
+    "sipper"
 ] }
 anyhow = "1.0.102"
 futures-util = "0.3.32"
@@ -31,6 +32,7 @@ tokio-util.workspace = true
 futures = "0.3.32"
 uuid = "1.23.1"
 rust-i18n = "4.0.0"
+tracing.workspace = true
 
 [build-dependencies]
 iced_fontello = {git = "https://github.com/hecrj/iced_fontello.git"}

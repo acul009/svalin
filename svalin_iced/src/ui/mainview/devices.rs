@@ -11,10 +11,7 @@ use iced::{
 use svalin::client::{Client, device::Device};
 use svalin_pki::Certificate;
 
-use crate::{
-    ui::{MapOpt, widgets::icon},
-    util::watch_recipe::WatchRecipe,
-};
+use crate::{ui::widgets::icon, util::watch_recipe::WatchRecipe};
 
 mod add_device;
 mod device_view;
@@ -66,7 +63,7 @@ impl Devices {
 
 impl Devices {
     #[must_use]
-    pub fn update(&mut self, message: Message) -> Action {
+    pub fn update(&mut self, message: Message, client: &Arc<Client>) -> Action {
         match message {
             Message::AddDevice(message) => match &mut self.state {
                 State::AddDevice(add_device) => {

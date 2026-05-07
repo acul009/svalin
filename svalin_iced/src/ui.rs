@@ -1,12 +1,8 @@
-use iced::{
-    Subscription, Task,
-    keyboard::{self, key::Named},
-    window,
-};
+use iced::{Subscription, Task, keyboard, window};
 use mainview::MainView;
 use profile_picker::ProfilePicker;
 use widgets::scaffold;
-use window_helper::WindowHelper;
+// use window_helper::WindowHelper;
 
 use crate::Element;
 
@@ -15,7 +11,7 @@ mod mainview;
 mod profile_picker;
 pub mod types;
 pub mod widgets;
-mod window_helper;
+// mod window_helper;
 
 pub enum Screen {
     ProfilePicker(ProfilePicker),
@@ -25,36 +21,35 @@ pub enum Screen {
 /// Messages emitted by the application and its widgets.
 #[derive(Debug, Clone)]
 pub enum Message {
-    Noop,
     Tab,
     ProfilePicker(profile_picker::Message),
     MainView(mainview::Message),
-    WindowHelper(window_helper::Message),
-    WindowClosed(window::Id),
+    // WindowHelper(window_helper::Message),
+    WindowCloseRequest(window::Id),
 }
 
 pub struct UI {
     screen: Screen,
     main_window_id: window::Id,
-    window_helper: WindowHelper,
+    // window_helper: WindowHelper,
 }
 
 impl UI {
     pub fn start() -> (Self, Task<Message>) {
-        let (id, open) = window::open(window::Settings::default());
+        let (id, open) = window::open(window::Settings {
+            exit_on_close_request: false,
+            ..Default::default()
+        });
 
         let (screen, task) = ProfilePicker::start();
 
-        let task = Task::batch(vec![
-            open.map(|_| Message::Noop),
-            task.map(Message::ProfilePicker),
-        ]);
+        let task = Task::batch(vec![open.discard(), task.map(Message::ProfilePicker)]);
 
         (
             Self {
                 screen: Screen::ProfilePicker(screen),
                 main_window_id: id,
-                window_helper: WindowHelper::new(),
+                // window_helper: WindowHelper::new(),
             },
             task,
         )
@@ -63,14 +58,16 @@ impl UI {
     #[must_use]
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Noop => Task::none(),
             Message::Tab => iced::widget::operation::focus_next(),
-            Message::WindowClosed(id) => {
+            Message::WindowCloseRequest(id) => {
                 if id == self.main_window_id {
+                    if let Screen::MainView(main) = &mut self.screen {
+                        return main.shutdown().map(Message::MainView);
+                    }
                     // Todo: proper shutdown
                     iced::exit()
                 } else {
-                    self.window_helper.close_window(&id);
+                    // self.window_helper.close_window(&id);
                     Task::none()
                 }
             }
@@ -80,11 +77,11 @@ impl UI {
 
                     match action {
                         profile_picker::Action::OpenProfile(client) => {
-                            let state = MainView::new(client);
+                            let (state, task) = MainView::new(client);
 
                             self.screen = Screen::MainView(state);
 
-                            Task::none()
+                            task.map(Message::MainView)
                         }
                         profile_picker::Action::None => Task::none(),
                         profile_picker::Action::Run(task) => task.map(Message::ProfilePicker),
@@ -99,18 +96,18 @@ impl UI {
                     match action {
                         mainview::Action::None => Task::none(),
                         mainview::Action::Run(task) => task.map(Message::MainView),
-                        mainview::Action::OpenTerminal(device) => self
-                            .window_helper
-                            .add_terminal(device)
-                            .map(Message::WindowHelper),
+                        // mainview::Action::OpenTerminal(device) => self
+                        //     .window_helper
+                        //     .add_terminal(device)
+                        //     .map(Message::WindowHelper),
                     }
                 }
                 _ => Task::none(),
             },
-            Message::WindowHelper(message) => self
-                .window_helper
-                .update(message)
-                .map(Message::WindowHelper),
+            // Message::WindowHelper(message) => self
+            //     .window_helper
+            //     .update(message)
+            //     .map(Message::WindowHelper),
         }
     }
 
@@ -118,11 +115,12 @@ impl UI {
         if window_id == self.main_window_id {
             t!("app-title").to_string()
         } else {
-            self.window_helper.title(window_id)
+            "TODO".to_string()
+            // self.window_helper.title(window_id)
         }
     }
 
-    pub fn view(&self, window_id: window::Id) -> Element<Message> {
+    pub fn view(&self, window_id: window::Id) -> Element<'_, Message> {
         if window_id == self.main_window_id {
             let screen: Element<Message> = match &self.screen {
                 Screen::ProfilePicker(profile_picker) => {
@@ -132,45 +130,46 @@ impl UI {
             };
 
             let header = match &self.screen {
-                Screen::ProfilePicker(_) => None,
-                Screen::MainView(mainview) => mainview.header().mapopt(Message::MainView),
-            };
-
-            let dialog = match &self.screen {
-                Screen::ProfilePicker(profile_picker) => {
-                    profile_picker.dialog().mapopt(Message::ProfilePicker)
-                }
-                Screen::MainView(mainview) => mainview.dialog().mapopt(Message::MainView),
+                Screen::ProfilePicker(_) => iced::widget::space().into(),
+                Screen::MainView(mainview) => mainview.header().map(Message::MainView),
             };
 
             let context = match &self.screen {
                 Screen::ProfilePicker(_) => None,
-                Screen::MainView(mainview) => mainview.context().mapopt(Message::MainView),
+                Screen::MainView(mainview) => {
+                    if let Some(context) = mainview.context() {
+                        Some(context.map(Message::MainView))
+                    } else {
+                        None
+                    }
+                }
             };
 
             scaffold(screen)
-                .header_maybe(header)
-                .dialog_maybe(dialog)
+                .header(header)
                 .context_maybe(context)
                 .into()
         } else {
-            self.window_helper
-                .view(window_id)
-                .map(Message::WindowHelper)
+            "Todo".into()
+            // self.window_helper
+            //     .view(window_id)
+            //     .map(Message::WindowHelper)
         }
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
         let mut subscriptions = vec![
-            keyboard::on_key_press(|key, _modifiers| match key {
-                keyboard::Key::Named(named) => match named {
-                    Named::Tab => Some(Message::Tab),
-                    _ => None,
-                },
-                keyboard::Key::Character(_) => None,
-                keyboard::Key::Unidentified => None,
+            keyboard::listen().filter_map(|event| {
+                if let keyboard::Event::KeyPressed { key, .. } = event {
+                    match key {
+                        keyboard::Key::Named(keyboard::key::Named::Tab) => Some(Message::Tab),
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
             }),
-            window::close_events().map(Message::WindowClosed),
+            window::close_requests().map(Message::WindowCloseRequest),
         ];
 
         match &self.screen {
@@ -181,26 +180,5 @@ impl UI {
         };
 
         Subscription::batch(subscriptions)
-    }
-}
-
-pub trait MapOpt<'a, From, To> {
-    fn mapopt<F>(self, f: F) -> Option<Element<'a, To>>
-    where
-        F: Fn(From) -> To,
-        F: 'a;
-}
-
-impl<'a, From, To> MapOpt<'a, From, To> for Option<Element<'a, From>>
-where
-    From: 'a,
-    To: 'a,
-{
-    fn mapopt<F>(self, f: F) -> Option<Element<'a, To>>
-    where
-        F: Fn(From) -> To,
-        F: 'a,
-    {
-        self.map(|element| element.map(f))
     }
 }

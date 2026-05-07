@@ -66,4 +66,4 @@ svalin_client_store = { path = "store_client" }
 
 [patch.crates-io]
 # temporarily needed for rust 1.91 compatibility
-sha3 = { git = "https://github.com/RustCrypto/hashes.git" }
+# sha3 = { git = "https://github.com/RustCrypto/hashes.git" }

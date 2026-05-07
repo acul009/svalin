@@ -147,7 +147,7 @@ impl LoginDialog {
         }
     }
 
-    pub fn view(&self) -> Element<Message> {
+    pub fn view(&self) -> Element<'_, Message> {
         match &self.state {
             State::Loading(message) => loading(message).into(),
             State::Error(display_info) => display_info.view().on_close(Message::Back).into(),

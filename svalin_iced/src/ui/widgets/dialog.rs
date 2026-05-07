@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use iced::{
-    Background, Border, Color, Shadow,
-    widget::{center, container, text},
+    Background, Color,
+    widget::{center, container, float, opaque, text},
 };
 
 use crate::Element;
@@ -15,6 +15,7 @@ pub struct Dialog<'a, Message> {
     controls: Vec<Element<'a, Message>>,
     max_width: iced::Pixels,
     max_height: iced::Pixels,
+    float: bool,
 }
 
 impl<'a, Message> Dialog<'a, Message> {
@@ -25,6 +26,7 @@ impl<'a, Message> Dialog<'a, Message> {
             controls: vec![],
             max_width: 500.into(),
             max_height: 300.into(),
+            float: false,
         }
     }
 
@@ -57,11 +59,16 @@ impl<'a, Message> Dialog<'a, Message> {
         self.max_height = max_height.into();
         self
     }
+
+    pub fn float(mut self) -> Self {
+        self.float = true;
+        self
+    }
 }
 
 impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Message> {
     fn from(value: Dialog<'a, Message>) -> Self {
-        center(
+        let dialog = center(
             container(
                 value.controls.into_iter().fold(
                     value.form.control_maybe(
@@ -73,7 +80,7 @@ impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Mes
                 ),
             )
             .style(|theme| container::Style {
-                background: Some(Background::Color(theme.palette().background)),
+                background: Some(Background::Color(theme.palette().background.base.color)),
                 ..Default::default()
             })
             .max_width(value.max_width)
@@ -82,7 +89,12 @@ impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Mes
         .style(|_| container::Style {
             background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
             ..Default::default()
-        })
-        .into()
+        });
+
+        if value.float {
+            float(opaque(dialog)).into()
+        } else {
+            dialog.into()
+        }
     }
 }

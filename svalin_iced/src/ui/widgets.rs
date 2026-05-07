@@ -1,7 +1,7 @@
 use std::{borrow::Cow, ops::RangeInclusive};
 
-use svalin::client::device::RemoteData;
-use svalin_sysctl::realtime::RealtimeStatus;
+// use svalin::client::device::RemoteData;
+// use svalin_sysctl::realtime::RealtimeStatus;
 
 use crate::Element;
 
@@ -14,7 +14,7 @@ pub mod icon;
 pub mod loading;
 pub mod percent_display;
 pub mod progress_circle;
-pub mod realtime;
+// pub mod realtime;
 pub mod scaffold;
 
 pub fn card<'a, Message>(
@@ -48,9 +48,9 @@ pub fn header<'a, Message>(
     header::Header::new(content)
 }
 
-pub fn realtime(realtime: &RemoteData<RealtimeStatus>) -> realtime::RealtimeDisplay<'_> {
-    realtime::RealtimeDisplay::new(realtime)
-}
+// pub fn realtime(realtime: &RemoteData<RealtimeStatus>) -> realtime::RealtimeDisplay<'_> {
+//     realtime::RealtimeDisplay::new(realtime)
+// }
 
 pub fn progress_circle<'a, Theme>(
     range: RangeInclusive<f32>,

@@ -16,11 +16,14 @@ use crate::ui::{
 #[derive(Debug, Clone)]
 pub enum Message {
     Error(ErrorDisplayInfo<Arc<anyhow::Error>>),
-    Input(Input),
     CopyTOTP,
     Continue,
     Back,
     Client(Arc<Client>),
+    Username(String),
+    Password(String),
+    ConfirmPassword(String),
+    Totp(String),
 }
 
 pub enum Action {
@@ -33,54 +36,17 @@ pub enum Action {
 pub struct InitServer {
     state: State,
     init: Option<Arc<Init>>,
+    username: String,
+    password: String,
+    confirm_password: String,
+    totp_input: String,
 }
 
 enum State {
     Error(ErrorDisplayInfo<Arc<anyhow::Error>>),
     Loading(String),
-    User {
-        username: String,
-        password: String,
-        confirm_password: String,
-    },
-    Totp {
-        username: String,
-        password: String,
-        totp: TOTP,
-        qr: image::Handle,
-        totp_input: String,
-    },
-}
-
-#[derive(Debug, Clone)]
-pub enum Input {
-    Username(String),
-    Password(String),
-    ConfirmPassword(String),
-    Totp(String),
-}
-
-impl Input {
-    fn update(self, state: &mut InitServer) {
-        match &mut state.state {
-            State::User {
-                username,
-                password,
-                confirm_password,
-            } => match self {
-                Self::Username(new_username) => *username = new_username,
-                Self::Password(new_password) => *password = new_password,
-                Self::ConfirmPassword(new_password) => *confirm_password = new_password,
-                _ => (),
-            },
-            State::Totp { totp_input, .. } => {
-                if let Self::Totp(new_totp) = self {
-                    *totp_input = new_totp
-                }
-            }
-            _ => (),
-        }
-    }
+    User,
+    Totp { totp: TOTP, qr: image::Handle },
 }
 
 impl InitServer {
@@ -88,11 +54,11 @@ impl InitServer {
         (
             Self {
                 init: Some(init),
-                state: State::User {
-                    username: String::new(),
-                    password: String::new(),
-                    confirm_password: String::new(),
-                },
+                state: State::User,
+                username: String::new(),
+                password: String::new(),
+                confirm_password: String::new(),
+                totp_input: String::new(),
             },
             iced::widget::operation::focus("username"),
         )
@@ -106,28 +72,33 @@ impl InitServer {
 
                 Action::None
             }
-            Message::Input(input) => {
-                input.update(self);
-
+            Message::Username(username) => {
+                self.username = username;
+                Action::None
+            }
+            Message::Password(password) => {
+                self.password = password;
+                Action::None
+            }
+            Message::ConfirmPassword(confirm_password) => {
+                self.confirm_password = confirm_password;
+                Action::None
+            }
+            Message::Totp(totp) => {
+                self.totp_input = totp;
                 Action::None
             }
             Message::CopyTOTP => {
                 if let State::Totp { totp, .. } = &self.state {
-                    Action::Run(iced::clipboard::write(totp.get_url()))
+                    Action::Run(iced::clipboard::write(totp.get_url()).discard())
                 } else {
                     Action::None
                 }
             }
             Message::Back => match &self.state {
                 State::Loading(_) => Action::None,
-                State::Totp {
-                    username, password, ..
-                } => {
-                    self.state = State::User {
-                        username: username.clone(),
-                        password: password.clone(),
-                        confirm_password: password.clone(),
-                    };
+                State::Totp { .. } => {
+                    self.state = State::User;
 
                     Action::None
                 }
@@ -140,18 +111,14 @@ impl InitServer {
             Message::Continue => {
                 match &self.state {
                     State::Loading(_) | State::Error(_) => Action::None,
-                    State::User {
-                        username,
-                        password,
-                        confirm_password,
-                    } => {
+                    State::User => {
                         // Todo: check inputs
 
-                        if password != confirm_password {
+                        if self.password != self.confirm_password {
                             return Action::None;
                         }
 
-                        match new_totp(username.clone()) {
+                        match new_totp(self.username.clone()) {
                             Err(err) => {
                                 self.state = State::Error(ErrorDisplayInfo::new(
                                     Arc::new(err),
@@ -163,25 +130,14 @@ impl InitServer {
                             Ok(totp) => {
                                 let qr_code = image::Handle::from_bytes(totp.get_qr_png().unwrap());
 
-                                self.state = State::Totp {
-                                    username: username.clone(),
-                                    password: password.clone(),
-                                    totp,
-                                    qr: qr_code,
-                                    totp_input: String::new(),
-                                };
+                                self.state = State::Totp { totp, qr: qr_code };
+                                self.totp_input.clear();
 
                                 Action::Run(iced::widget::operation::focus("totp"))
                             }
                         }
                     }
-                    State::Totp {
-                        username,
-                        password,
-                        totp,
-                        totp_input,
-                        ..
-                    } => match totp.check_current(totp_input) {
+                    State::Totp { totp, .. } => match totp.check_current(&self.totp_input) {
                         Err(err) => {
                             self.error(ErrorDisplayInfo::new(
                                 Arc::new(err.into()),
@@ -210,8 +166,8 @@ impl InitServer {
                                     None => return Action::None,
                                     Some(init) => init,
                                 };
-                                let username = username.clone();
-                                let password = password.clone();
+                                let username = self.username.clone();
+                                let password = self.password.clone();
                                 let totp = totp.clone();
 
                                 self.state =
@@ -259,46 +215,48 @@ impl InitServer {
         self.state = State::Error(display_info);
     }
 
-    pub fn view(&self) -> crate::Element<Message> {
+    pub fn view(&self) -> crate::Element<'_, Message> {
         match &self.state {
             State::Error(display_info) => display_info.view().on_close(Message::Back).into(),
             State::Loading(message) => loading(message).expand().into(),
-            State::User {
-                username,
-                password,
-                confirm_password,
-            } => form()
+            State::User => form()
                 .title(t!("profile-picker.add"))
                 .control(
-                    text_input(&t!("generic.username"), username)
+                    text_input(&t!("generic.username"), &self.username)
                         .id("username")
-                        .on_input(|input| Message::Input(Input::Username(input))),
+                        .on_input(Message::Username),
                 )
                 .control(
-                    text_input(&t!("generic.password"), password)
+                    text_input(&t!("generic.password"), &self.password)
                         .secure(true)
-                        .on_input(|input| Message::Input(Input::Password(input))),
+                        .on_input(Message::Password),
                 )
                 .control(
                     text_input(
                         &t!("profile-picker.input.confirm-password"),
-                        confirm_password,
+                        &self.confirm_password,
                     )
                     .secure(true)
-                    .on_input(|input| Message::Input(Input::ConfirmPassword(input)))
-                    .on_submit(Message::Continue),
+                    .on_input(Message::ConfirmPassword)
+                    .on_submit_maybe(
+                        if self.password == self.confirm_password {
+                            Some(Message::Continue)
+                        } else {
+                            None
+                        },
+                    ),
                 )
                 .button(button(text(t!("generic.back"))).on_press(Message::Back))
                 .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
                 .into(),
-            State::Totp { qr, totp_input, .. } => form()
+            State::Totp { qr, .. } => form()
                 .title(t!("profile-picker.add"))
                 .control(image(qr))
                 .control(button(text(t!("profile-picker.copy-totp"))).on_press(Message::CopyTOTP))
                 .control(
-                    text_input(&t!("profile-picker.input.totp"), totp_input)
+                    text_input(&t!("profile-picker.input.totp"), &self.totp_input)
                         .id("totp")
-                        .on_input(|input| Message::Input(Input::Totp(input)))
+                        .on_input(Message::Totp)
                         .on_submit(Message::Continue),
                 )
                 .button(button(text(t!("generic.back"))).on_press(Message::Back))

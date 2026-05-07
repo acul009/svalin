@@ -60,6 +60,7 @@ impl TakeableCommandHandler for JoinRequestHandler {
     ) -> Result<()> {
         if let Some(mut session) = session.take() {
             let mut join_code = create_join_code();
+            tracing::debug!("added session with join_code: {join_code:?}");
             while let Err(sess) = self.manager.add_session(join_code, session).await {
                 session = sess;
                 tokio::time::sleep(Duration::from_secs(5)).await;

@@ -1,5 +1,5 @@
 use iced::{
-    Color, Length, Shadow, border,
+    Color, Length, Shadow,
     widget::{column, container, row, rule, stack},
 };
 

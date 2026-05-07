@@ -1,8 +1,6 @@
-use std::borrow::Cow;
-
 use iced::{
     Length, Pixels,
-    widget::{column, container, text},
+    widget::{column, container},
 };
 
 use crate::Element;

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use svalin_client_store::persistent::{self};
 use svalin_pki::SpkiHash;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ClientState {
     persistent: persistent::State,
     agents_online: HashSet<SpkiHash>,
@@ -16,6 +16,10 @@ pub enum ClientStateUpdate {
 }
 
 impl ClientState {
+    pub fn empty() -> Self {
+        Self::new(persistent::State::empty())
+    }
+
     pub fn new(persistent: persistent::State) -> Self {
         Self {
             persistent: persistent,
@@ -36,8 +40,8 @@ impl ClientState {
         }
     }
 
-    pub fn agent_online(&self) -> &HashSet<SpkiHash> {
-        &self.agents_online
+    pub fn agent_online(&self, spki_hash: &SpkiHash) -> bool {
+        self.agents_online.contains(spki_hash)
     }
 
     pub fn persistent(&self) -> &HashMap<SpkiHash, persistent::DeviceState> {

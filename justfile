@@ -26,7 +26,7 @@ test $RUST_LOG="svalin=debug":
 integration $RUST_LOG="svalin=debug":
     cargo test -p svalin test::integration -- --nocapture
 
-server $RUST_LOG="debug":
+server $RUST_LOG="svalin=debug":
     cargo run -p svalin server 0.0.0.0:1234
 
 reset:

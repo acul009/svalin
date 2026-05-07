@@ -1,13 +1,12 @@
 use std::ops::RangeInclusive;
 
-use iced::window::RedrawRequest;
 use iced::{Element, Length, window};
 
 impl StyleSheet for iced::Theme {
     type Style = ();
 
     fn appearance(&self, _style: &Self::Style) -> Appearance {
-        let palette = self.extended_palette();
+        let palette = self.palette();
 
         Appearance {
             background: None,
@@ -22,8 +21,7 @@ impl StyleSheet for iced::Theme {
 use iced::advanced::layout;
 use iced::advanced::renderer;
 use iced::advanced::widget::tree::{self, Tree};
-use iced::advanced::{self, Clipboard, Layout, Shell, Widget};
-use iced::event;
+use iced::advanced::{self, Layout, Shell, Widget};
 use iced::mouse;
 use iced::widget::canvas;
 use iced::{Background, Color, Event, Radians, Rectangle, Renderer, Size, Vector};
@@ -130,7 +128,6 @@ where
         _layout: Layout<'_>,
         _cursor: advanced::mouse::Cursor,
         _renderer: &Renderer,
-        _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {

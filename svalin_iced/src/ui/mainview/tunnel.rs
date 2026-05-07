@@ -25,7 +25,6 @@ pub enum Message {
 }
 
 pub struct TunnelUi {
-    client: Arc<Client>,
     recipe: WatchRecipe<String, HashMap<Certificate, HashMap<Uuid, Tunnel>>, Message>,
     tunnels: Vec<(AgentListItem, Vec<(Uuid, TunnelConfig)>)>,
 }
@@ -40,11 +39,7 @@ impl TunnelUi {
 
         let tunnels: Vec<(AgentListItem, Vec<(Uuid, TunnelConfig)>)> = Self::copy_tunnels(&client);
 
-        Self {
-            client,
-            recipe,
-            tunnels,
-        }
+        Self { recipe, tunnels }
     }
 
     fn copy_tunnels(client: &Arc<Client>) -> Vec<(AgentListItem, Vec<(Uuid, TunnelConfig)>)> {

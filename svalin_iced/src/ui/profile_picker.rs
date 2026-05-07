@@ -184,7 +184,7 @@ impl ProfilePicker {
                             t!("profile-picker.error.delete"),
                         ))
                     } else {
-                        Message::None
+                        Message::Reset
                     }
                 }))
             }
@@ -252,8 +252,8 @@ impl ProfilePicker {
         self.state = State::AddProfile { host };
     }
 
-    pub fn view(&self) -> Element<Message> {
-        match &self.state {
+    pub fn view(&self) -> Element<'_, Message> {
+        let content = match &self.state {
             State::InitServer(init_server) => init_server.view().map(Message::InitServer),
             State::LoginDialog(login_dialog) => login_dialog.view().map(Message::LoginDialog),
             State::Error(display_info) => display_info.view().on_close(Message::Reset).into(),
@@ -322,22 +322,17 @@ impl ProfilePicker {
                     button(text(t!("generic.continue"))).on_press(Message::Connect(host.clone())),
                 )
                 .into(),
-        }
-    }
+        };
 
-    pub fn dialog(&self) -> Option<Element<Message>> {
-        if let Some(profile) = &self.confirm_delete {
-            return Some(
-                dialog()
-                    .body(t!("profile-picker.confirm-delete", "profile" => profile))
-                    .button(button(text("Cancel")).on_press(Message::CancelDelete))
-                    .button(
-                        button(text("Delete")).on_press(Message::ConfirmDelete(profile.clone())),
-                    )
-                    .title("Delete Profile")
-                    .into(),
-            );
-        }
-        None
+        let dialog = self.confirm_delete.as_ref().map(|profile| {
+            dialog()
+                .body(t!("profile-picker.confirm-delete", "profile" => profile))
+                .button(button(text("Cancel")).on_press(Message::CancelDelete))
+                .button(button(text("Delete")).on_press(Message::ConfirmDelete(profile.clone())))
+                .title("Delete Profile")
+                .float()
+        });
+
+        stack![content, dialog].into()
     }
 }

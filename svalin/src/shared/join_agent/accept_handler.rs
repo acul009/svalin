@@ -52,6 +52,7 @@ impl CommandHandler for JoinAcceptHandler {
         cancel: CancellationToken,
     ) -> anyhow::Result<()> {
         let join_code: String = session.read_object().await?;
+        tracing::debug!("looking for session with join_code: {join_code:?}");
 
         let agent_session = self.manager.get_session(&join_code);
 
