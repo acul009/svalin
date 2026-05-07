@@ -3,15 +3,15 @@ use iced::{
     Color, Length,
     widget::{button, column, container, row, stack, text},
 };
-use iced_fonts::{
-    BOOTSTRAP_FONT,
-    bootstrap::{self, bootstrap},
-};
+// use iced_fonts::{
+//     BOOTSTRAP_FONT,
+//     bootstrap::{self, bootstrap},
+// };
 use svalin::client::state::ClientState;
 use svalin_pki::SpkiHash;
 use svalin_sysctl::sytem_report::OS;
 
-use crate::{Element, ui::widgets::icon};
+use crate::{Element, bootstrap, ui::widgets::icon};
 
 pub struct DeviceList<'a, Message> {
     state: &'a ClientState,
@@ -66,15 +66,21 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                             Color::from_rgb8(255, 0, 0)
                         };
 
-                        button(row![
-                            match persistent.system_report().os {
-                                OS::Windows => bootstrap::windows(),
-                                OS::Linux => bootstrap::ubuntu(),
-                                OS::Unknown => bootstrap::laptop(),
-                            }
-                            .color(color),
-                            text!("{}", spki_hash)
-                        ])
+                        button(
+                            row![
+                                match persistent.system_report().os {
+                                    OS::Windows => bootstrap::windows(),
+                                    OS::Linux => bootstrap::tux(),
+                                    OS::Unknown => bootstrap::laptop(),
+                                }
+                                .size(16)
+                                .color(color),
+                                text!("{}", spki_hash)
+                            ]
+                            .spacing(20)
+                            .padding(10),
+                        )
+                        .style(button::subtle)
                         .into()
                     }),
             )

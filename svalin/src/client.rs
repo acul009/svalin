@@ -26,6 +26,7 @@ use tokio_util::task::TaskTracker;
 use tunnel_manager::TunnelManager;
 
 use crate::client::state::{ClientState, ClientStateUpdate};
+use crate::message_streaming::MessageFromClient;
 use crate::message_streaming::client::{ClientMessageDispatcherHandle, ClientStateHandle};
 use crate::remote_key_retriever::RemoteKeyRetriever;
 use crate::verifier::remote_verifier::RemoteVerifier;
@@ -84,6 +85,7 @@ impl Client {
     pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {
         self.cancel.cancel();
         self.background_tasks.close();
+        self.message_sender.send(MessageFromClient::Goodbye).await;
 
         let result = timeout(timeout_duration, self.background_tasks.wait()).await;
 

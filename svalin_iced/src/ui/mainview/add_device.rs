@@ -1,9 +1,9 @@
-use std::{mem, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::anyhow;
 use iced::{
     Task,
-    widget::{self, button, operation, text_input},
+    widget::{button, operation, text_input},
 };
 use svalin::client::Client;
 use svalin_pki::Certificate;

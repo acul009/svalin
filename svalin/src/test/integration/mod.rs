@@ -1,5 +1,6 @@
 use std::{panic, process, time::Duration};
 
+use rand::random;
 use std::net::ToSocketAddrs;
 use svalin_client_store::persistent::{self, DeviceState};
 use test_log::test;
@@ -20,10 +21,18 @@ async fn integration_tests() {
         process::exit(1);
     }));
 
+    let port = rand::random_range(1025..65000);
+    let host = format!("localhost:{port}");
+
     // delete test dbs
     let _ = std::fs::remove_dir_all("./test_data");
 
-    let addr = "0.0.0.0:1234".to_socket_addrs().unwrap().next().unwrap();
+    let addr = format!("0.0.0.0:{port}")
+        .as_str()
+        .to_socket_addrs()
+        .unwrap()
+        .next()
+        .unwrap();
     let server_cancel = CancellationToken::new();
     let cancel = server_cancel.clone();
     let (send_server, recv_server) = oneshot::channel();
@@ -40,8 +49,6 @@ async fn integration_tests() {
 
         send_server.send(server).unwrap();
     });
-
-    let host = "localhost:1234".to_owned();
 
     let first_connect = Client::first_connect(host.clone()).await.unwrap();
 
@@ -62,10 +69,10 @@ async fn integration_tests() {
         }
     };
 
+    let profile_name = format!("admin@{host}");
+
     // delete to test login
-    Client::remove_profile("admin@localhost:1234".into())
-        .await
-        .unwrap();
+    Client::remove_profile(&profile_name).await.unwrap();
 
     // // ===== TEST WRONG PASSWORD =====
 
@@ -123,9 +130,15 @@ async fn integration_tests() {
 
     // ===== TEST CLIENT =====
 
-    let client = Client::open_profile("admin@localhost:1234".into(), "admin".as_bytes().to_owned())
-        .await
-        .unwrap();
+    let client_cancel = CancellationToken::new();
+
+    let client = Client::open_profile(
+        &profile_name,
+        "admin".as_bytes().to_owned(),
+        client_cancel.clone(),
+    )
+    .await
+    .unwrap();
 
     let (mut client_state, mut client_state_updates) = client.subscribe_state().await.unwrap();
 
@@ -212,7 +225,7 @@ async fn integration_tests() {
         .unwrap()
         .unwrap();
 
-    // client should go offline
+    // agent should go offline
     let update = timeout(Duration::from_secs(1), client_state_updates.recv())
         .await
         .unwrap()
@@ -223,6 +236,8 @@ async fn integration_tests() {
     } else {
         panic!("expected agent online status update, got: {:?}", &update);
     }
+
+    client.close(Duration::from_secs(3)).await.unwrap();
 
     server_cancel.cancel();
     tokio::time::timeout(Duration::from_secs(1), recv_server)

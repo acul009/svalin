@@ -51,6 +51,10 @@ impl KeyRetriever for RemoteKeyRetriever {
                     .iter()
                     // Skip the device itself
                     .take(chain.iter().len() - 1)
+                    .map(|cert| {
+                        tracing::debug!("required meta member: {:?}", cert.certificate_type());
+                        cert
+                    })
                     .map(|cert| cert.spki_hash().clone())
                     .collect();
 

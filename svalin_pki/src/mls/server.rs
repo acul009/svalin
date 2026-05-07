@@ -107,12 +107,17 @@ where
             .key_retriever()
             .get_required_group_members(&id)
             .await
-            .map_err(AddDeviceGroupError::KeyRetrieverError)?;
+            .map_err(AddDeviceGroupError::KeyRetrieverError)?
+            .into_iter()
+            .collect::<HashSet<_>>();
 
-        for required in required_members.iter() {
-            if !members.contains(required) {
-                return Err(AddDeviceGroupError::MissingMember(required.clone()));
-            }
+        // This isn't adding, this is group creation.
+        // So we have to check that only the required members are part of this group,
+        // otherwise someone who isn't allowed to be in the group might try to create it.
+        // This way we can easily ensure that's not the case and the creating member
+        // can immediatly add others with an add message afterwards.
+        if required_members != members {
+            return Err(AddDeviceGroupError::WrongMembers);
         }
 
         let to_send = self
@@ -282,4 +287,6 @@ pub enum AddDeviceGroupError<KeyRetrieverError> {
     MissingMember(SpkiHash),
     #[error("invalid group id")]
     InvalidGroupId,
+    #[error("wrong members")]
+    WrongMembers,
 }

@@ -128,6 +128,8 @@ impl MessageStore {
             sqlx::query!("DELETE FROM mls_messages WHERE id = ? AND NOT EXISTS ( SELECT 1 FROM mls_message_receivers WHERE message_id = ? ) ", message, message).execute(&mut *tx).await?;
         }
 
+        tx.commit().await?;
+
         Ok(())
     }
 }
@@ -162,7 +164,7 @@ impl SubscriptionManager {
             let mut subscribed = HashMap::new();
 
             while let Some(request) = recv.recv().await {
-                tracing::debug!("handling subscription request: {:?}", request);
+                // tracing::debug!("handling subscription request: {:?}", request);
                 match request {
                     SubscriptionRequest::Subscribe(spki_hash, sender) => {
                         subscribed.insert(spki_hash, sender);
@@ -172,17 +174,17 @@ impl SubscriptionManager {
                         for receiver in message.receivers {
                             if let Some(sender) = subscribed.get(&receiver) {
                                 if sender.is_closed() {
-                                    tracing::debug!("subscriber already closed: {:?}", receiver);
+                                    // tracing::debug!("subscriber already closed: {:?}", receiver);
                                     subscribed.remove(&receiver);
                                 } else {
-                                    tracing::debug!("sending message to: {:?}", receiver);
+                                    // tracing::debug!("sending message to: {:?}", receiver);
                                     if sender.send((uuid.clone(), package.clone())).await.is_err() {
                                         tracing::error!("failed to send message to subscriber");
                                         subscribed.remove(&receiver);
                                     }
                                 }
                             } else {
-                                tracing::debug!("no subscriber found for: {:?}", receiver);
+                                // tracing::debug!("no subscriber found for: {:?}", receiver);
                             }
                         }
                     }

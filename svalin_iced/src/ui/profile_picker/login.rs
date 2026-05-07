@@ -6,6 +6,7 @@ use iced::{
     widget::{button, text, text_input},
 };
 use svalin::client::{Client, Login, LoginError};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     Element,
@@ -124,7 +125,13 @@ impl LoginDialog {
                                     t!("profile-picker.error.login"),
                                 )),
                                 Ok(new_profile) => {
-                                    match Client::open_profile(&new_profile, password).await {
+                                    match Client::open_profile(
+                                        &new_profile,
+                                        password,
+                                        CancellationToken::new(),
+                                    )
+                                    .await
+                                    {
                                         Ok(client) => Message::OpenProfile(client),
                                         Err(e) => Message::Error(ErrorDisplayInfo::new(
                                             e.into(),

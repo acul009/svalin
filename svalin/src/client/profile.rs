@@ -158,7 +158,11 @@ impl Client {
         Ok(())
     }
 
-    pub async fn open_profile(profile_key: &str, password: Vec<u8>) -> Result<Arc<Self>> {
+    pub async fn open_profile(
+        profile_key: &str,
+        password: Vec<u8>,
+        cancel: CancellationToken,
+    ) -> Result<Arc<Self>> {
         let Some(profile) = Self::get_profile(&profile_key).await? else {
             return Err(anyhow!("Profile is empty"));
         };
@@ -185,7 +189,7 @@ impl Client {
             &profile.upstream_address,
             Some(&device_credential),
             verifier,
-            CancellationToken::new(),
+            cancel.clone(),
         )
         .await?;
 
@@ -227,7 +231,6 @@ impl Client {
 
         // Starting Background Tasks
         let background_tasks = TaskTracker::new();
-        let cancel = CancellationToken::new();
 
         let connection = rpc.upstream_connection();
         background_tasks.spawn(async move {

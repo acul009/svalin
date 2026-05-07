@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
 use svalin_client_store::{ClientStore, persistent};
-use svalin_pki::mls::client::{MessageData, MessageDataContent, MlsClient};
+use svalin_pki::mls::client::{MessageDataContent, MlsClient};
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
 use svalin_sysctl::sytem_report::SystemReport;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -67,6 +67,12 @@ impl CommandDispatcher for ClientMessageDispatcher {
     ) -> Result<Self::Output, Self::Error> {
         tracing::debug!("Message Dispatcher connected!");
         while let Some((message, feedback)) = self.0.recv().await {
+            if let MessageFromClient::Goodbye = &message {
+                // The client is stored in a lot of arcs and closing all senders is unfeasable,
+                // so we just listen for the goodbye message
+                break;
+            }
+
             session.write_object(&message).await?;
 
             let result = session.read_object::<Result<(), ()>>().await?;
@@ -74,6 +80,10 @@ impl CommandDispatcher for ClientMessageDispatcher {
                 let _ = feedback.send(result);
             }
         }
+        tracing::debug!("shutting down client message dispatcher");
+
+        session.write_object(&MessageFromClient::Goodbye).await?;
+        let _result = session.read_object::<Result<(), ()>>().await?;
 
         Ok(())
     }
@@ -146,6 +156,8 @@ impl CommandDispatcher for ClientMessageReceiver {
                 tracing::error!("Failed to handle message: {err}");
             }
         }
+
+        tracing::debug!("shutting down client message receiver");
 
         Ok(())
     }

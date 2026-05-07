@@ -6,6 +6,7 @@ use iced::{
     widget::{button, image, text, text_input},
 };
 use svalin::client::{Client, Init};
+use tokio_util::sync::CancellationToken;
 use totp_rs::TOTP;
 
 use crate::ui::{
@@ -186,6 +187,7 @@ impl InitServer {
                                             let client = match Client::open_profile(
                                                 &profile,
                                                 password.into(),
+                                                CancellationToken::new(),
                                             )
                                             .await
                                             {

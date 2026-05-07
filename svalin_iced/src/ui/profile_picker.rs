@@ -9,6 +9,7 @@ use iced::{
 use init_server::InitServer;
 use login::LoginDialog;
 use svalin::client::{Client, FirstConnect, Init, Login};
+use tokio_util::sync::CancellationToken;
 
 use super::{
     types::error_display_info::ErrorDisplayInfo,
@@ -200,7 +201,13 @@ impl ProfilePicker {
                     self.state = State::Loading(t!("profile-picker.unlocking").to_string());
 
                     Action::Run(Task::future(async move {
-                        match Client::open_profile(&profile, password.into_bytes()).await {
+                        match Client::open_profile(
+                            &profile,
+                            password.into_bytes(),
+                            CancellationToken::new(),
+                        )
+                        .await
+                        {
                             Ok(client) => Message::Profile(client),
                             Err(err) => Message::Error(ErrorDisplayInfo::new(
                                 Arc::new(err),

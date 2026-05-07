@@ -16,6 +16,10 @@ pub enum LocationError {
     IoError(#[from] std::io::Error),
     #[error("Neither XDG_CONFIG_HOME nor HOME environment variables are set.")]
     NoHomeSet,
+    #[error("PROGRAMDATA environment variable is not set.")]
+    NoProgramDataSet,
+    #[error("APPDATA environment variable is not set.")]
+    NoAppDataSet,
 }
 
 impl Location {
@@ -34,10 +38,8 @@ impl Location {
         {
             #[cfg(target_os = "windows")]
             {
-                use anyhow::Context;
-
-                let appdata = std::env::var("PROGRAMDATA")
-                    .context("Failed to retrieve PROGRAMMDATA environment variable")?;
+                let appdata =
+                    std::env::var("PROGRAMDATA").map_err(|_| LocationError::NoProgramDataSet)?;
 
                 let mut path = PathBuf::from(appdata);
 
@@ -64,8 +66,7 @@ impl Location {
             {
                 use anyhow::Context;
 
-                let appdata = std::env::var("APPDATA")
-                    .context("Failed to retrieve APPDATA environment variable")?;
+                let appdata = std::env::var("APPDATA").map_err(|_| LocationError::NoAppDataSet)?;
 
                 let path = PathBuf::from(appdata);
 

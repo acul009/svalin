@@ -158,6 +158,10 @@ impl CommandHandler for UpdateUserMlsHandler {
             .update_mls_data(&user_hash, response.mls_store, response.persistent_data)
             .await?;
 
+        tracing::debug!(
+            "user mls aknowledged the following messages: {:?}",
+            &response.handled
+        );
         self.message_store
             .aknowledge_messages(&user_hash, &response.handled)
             .await?;
@@ -167,6 +171,7 @@ impl CommandHandler for UpdateUserMlsHandler {
             let to_send = self.mls.process_message(message).await?;
             tracing::debug!("processing resulted in messages: {to_send:?}");
             for mut message in to_send {
+                message.remove_receiver(&user_hash);
                 self.message_store.add_message(message).await?;
             }
         }
@@ -231,6 +236,7 @@ impl CommandDispatcher for UpdateUserMls {
         let mut handled = Vec::new();
 
         for (uuid, message) in data.messages {
+            tracing::debug!("user mls handling message: {uuid}");
             let processed = client
                 .handle_message::<SystemReport>(&message)
                 .await
