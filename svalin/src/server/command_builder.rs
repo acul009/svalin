@@ -50,7 +50,7 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
 
         let join_manager = crate::shared::join_agent::ServerJoinManager::new();
 
-        let agent_sender = with_agent::MessageSender::new();
+        let agent_sender = with_agent::MessageSender::new(self.store.messages.clone());
         let client_sender =
             with_client::MessageSender::new(server.clone(), self.store.messages.clone());
 

@@ -108,8 +108,10 @@ where
                     .process_message(message)
                     .await
                     .context("error processing group message")?;
+                tracing::debug!("message processed successfully");
                 let group_id = SvalinGroupId::from_group_id(&processed.group_id)
                     .context("error parsing group id")?;
+                tracing::debug!("group id parsed successfully");
                 let ProcessedContent::Message(decrypted) = processed.content else {
                     anyhow::bail!("expected data message, got something else instead.")
                 };
@@ -217,6 +219,8 @@ where
         };
 
         self.harness.check_commit(&group_id, &commit).await?;
+
+        self.harness.processor().commit(commit).await?;
 
         Ok(MessageData {
             group: group_id,

@@ -17,8 +17,8 @@ use openmls::{
     group::{
         AddMembersError, CommitBuilderStageError, CreateCommitError, CreateMessageError,
         ExportGroupInfoError, GroupId, MergePendingCommitError, MlsGroup, MlsGroupJoinConfig,
-        NewGroupError, PURE_PLAINTEXT_WIRE_FORMAT_POLICY, ProcessedWelcome, StagedWelcome,
-        WelcomeError,
+        NewGroupError, PURE_PLAINTEXT_WIRE_FORMAT_POLICY, ProcessedWelcome, StagedCommit,
+        StagedWelcome, WelcomeError,
     },
     prelude::{
         CredentialWithKey, KeyPackageNewError, LeafNodeIndex, MlsMessageBodyOut, ProtocolMessage,
@@ -111,6 +111,10 @@ impl MlsProcessorHandle {
                         let result = client.add_member(group_id, key_package);
                         let _ = response.send(result);
                     }
+                    MlsProcessorRequest::Commit { commit, response } => {
+                        let result = client.commit(commit);
+                        let _ = response.send(result);
+                    }
                 }
             }
         });
@@ -200,6 +204,7 @@ impl MlsProcessorHandle {
         message: impl Into<ProtocolMessage>,
     ) -> Result<ProcessedMessage, ProcessMessageError> {
         let (send, recv) = oneshot::channel();
+        tracing::debug!("sending message to mls processor");
 
         let _ = self
             .channel
@@ -255,6 +260,20 @@ impl MlsProcessorHandle {
             .send(MlsProcessorRequest::AddMember {
                 group_id,
                 key_package,
+                response: send,
+            })
+            .await;
+
+        Ok(recv.await??)
+    }
+
+    pub(crate) async fn commit(&self, commit: Box<StagedCommit>) -> Result<(), anyhow::Error> {
+        let (send, recv) = oneshot::channel();
+
+        let _ = self
+            .channel
+            .send(MlsProcessorRequest::Commit {
+                commit,
                 response: send,
             })
             .await;
@@ -327,6 +346,10 @@ enum MlsProcessorRequest {
         group_id: GroupId,
         index: LeafNodeIndex,
         response: oneshot::Sender<Result<SpkiHash, anyhow::Error>>,
+    },
+    Commit {
+        commit: Box<StagedCommit>,
+        response: oneshot::Sender<Result<(), anyhow::Error>>,
     },
 }
 
@@ -512,15 +535,19 @@ impl MlsProcessor {
         &mut self,
         message: ProtocolMessage,
     ) -> Result<ProcessedMessage, ProcessMessageError> {
+        tracing::debug!("message arrived in processor");
         let message: ProtocolMessage = message.into();
         let group_id = message.group_id().clone();
+        tracing::debug!("message is for group {group_id:?}");
         let group = Self::get_group(
             &mut self.group_cache,
             self.provider.storage(),
             group_id.clone(),
         )?;
 
+        tracing::debug!("found group");
         let processed = group.process_message(&self.provider, message)?;
+        tracing::debug!("message processed");
         let Sender::Member(sender) = processed.sender() else {
             return Err(ProcessMessageError::InvalidSender);
         };
@@ -529,6 +556,8 @@ impl MlsProcessor {
             .expect("sender index should already have been checked")
             .credential
             .deserialized()?;
+
+        tracing::debug!("sender is {sender:?}");
 
         match processed.into_content() {
             openmls::prelude::ProcessedMessageContent::ApplicationMessage(application_message) => {
@@ -603,6 +632,14 @@ impl MlsProcessor {
             .ok_or_else(|| anyhow!("group member not found"))?
             .deserialized()?;
         Ok(member)
+    }
+
+    fn commit(&mut self, commit: Box<StagedCommit>) -> Result<(), anyhow::Error> {
+        let group_id = commit.group_context().group_id().clone();
+        let group = Self::get_group(&mut self.group_cache, &self.provider.storage(), group_id)?;
+        group.merge_staged_commit(&self.provider, *commit)?;
+
+        Ok(())
     }
 }
 

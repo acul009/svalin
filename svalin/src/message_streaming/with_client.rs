@@ -3,7 +3,9 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use dashmap::DashMap;
-use svalin_pki::{Certificate, CertificateType, SpkiHash};
+use svalin_pki::{
+    Certificate, CertificateType, SpkiHash, mls::transport_types::MessageToMemberTransport,
+};
 use svalin_rpc::rpc::{
     command::handler::CommandHandler, peer::Peer, server::RpcServer, session::Session,
 };
@@ -121,6 +123,7 @@ impl CommandHandler for MessageSender {
             peer.spki_hash().clone(),
             sender.clone(),
             self.message_store.clone(),
+            MessageToClient::Mls,
         ));
 
         let spki_hash = peer.spki_hash().clone();
@@ -232,20 +235,22 @@ async fn stream_agent_online_status(
     }
 }
 
-async fn stream_mls_messages(
+pub(super) async fn stream_mls_messages<Message>(
     receiver: SpkiHash,
-    sender: mpsc::Sender<(MessageToClient, Option<oneshot::Sender<Result<(), ()>>>)>,
+    sender: mpsc::Sender<(Message, Option<oneshot::Sender<Result<(), ()>>>)>,
     message_store: Arc<MessageStore>,
+    transform: fn(Arc<MessageToMemberTransport>) -> Message,
 ) {
-    if let Err(e) = stream_mls_messages_inner(receiver, sender, message_store).await {
+    if let Err(e) = stream_mls_messages_inner(receiver, sender, message_store, transform).await {
         tracing::error!("Error streaming mls messages: {}", e);
     }
 }
 
-async fn stream_mls_messages_inner(
+async fn stream_mls_messages_inner<Message>(
     receiver: SpkiHash,
-    sender: mpsc::Sender<(MessageToClient, Option<oneshot::Sender<Result<(), ()>>>)>,
+    sender: mpsc::Sender<(Message, Option<oneshot::Sender<Result<(), ()>>>)>,
     message_store: Arc<MessageStore>,
+    transform: fn(Arc<MessageToMemberTransport>) -> Message,
 ) -> Result<(), anyhow::Error> {
     let current = message_store.load_all_for(&receiver).await?;
     let mut subscription = message_store.subscribe(receiver.clone()).await;
@@ -253,7 +258,7 @@ async fn stream_mls_messages_inner(
         let (send, recv) = oneshot::channel();
 
         let _ = sender
-            .send((MessageToClient::Mls(Arc::new(message.1)), Some(send)))
+            .send((transform(Arc::new(message.1)), Some(send)))
             .await;
 
         recv.await?
@@ -268,9 +273,7 @@ async fn stream_mls_messages_inner(
         tracing::debug!("received message from subscription: {:?}", message);
         let (send, recv) = oneshot::channel();
 
-        let _ = sender
-            .send((MessageToClient::Mls(message.1), Some(send)))
-            .await;
+        let _ = sender.send((transform(message.1), Some(send))).await;
 
         recv.await?
             .map_err(|_| anyhow!("client encountered error with message"))?;

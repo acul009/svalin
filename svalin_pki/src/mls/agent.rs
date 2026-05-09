@@ -73,7 +73,7 @@ where
 
     pub async fn handle_message(
         &self,
-        message: MessageToMemberTransport,
+        message: &MessageToMemberTransport,
     ) -> Result<(), anyhow::Error> {
         let message = message.unpack()?;
 
@@ -106,6 +106,8 @@ where
         }
 
         self.harness.check_commit(&group_id, &commit).await?;
+
+        self.harness.processor().commit(commit).await?;
 
         Ok(())
     }

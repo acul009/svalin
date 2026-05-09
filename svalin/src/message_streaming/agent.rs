@@ -132,12 +132,13 @@ impl AgentMessageReceiver {
         match message {
             MessageToAgent::Mls(message) => {
                 self.mls
-                    .handle_message(message)
+                    .handle_message(&message)
                     .await
                     .map_err(|err| anyhow!(err))?;
-                todo!();
             }
-            MessageToAgent::Goodbye => Ok(true),
+            MessageToAgent::Goodbye => return Ok(true),
         }
+
+        Ok(false)
     }
 }

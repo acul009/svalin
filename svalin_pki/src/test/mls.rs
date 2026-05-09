@@ -96,12 +96,17 @@ async fn test_public_processor() {
     let credential2 = Credential::generate_root().unwrap();
     let spki_hash2 = credential2.certificate().spki_hash().clone();
     let member2 = create_processor(credential2).await;
-    let key_package = member2.create_key_package().await.unwrap();
+    let key_package2 = member2.create_key_package().await.unwrap();
+
+    let credential3 = Credential::generate_root().unwrap();
+    let spki_hash3 = credential3.certificate().spki_hash().clone();
+    let member3 = create_processor(credential3).await;
+    let key_package3 = member3.create_key_package().await.unwrap();
 
     let group_id = GroupId::from_slice(b"test");
 
     let MessageToServer::NewDeviceGroup(new_group) = member1
-        .create_group(vec![key_package], group_id.clone())
+        .create_group(vec![key_package2], group_id.clone())
         .await
         .unwrap()
         .unpack()
@@ -131,6 +136,44 @@ async fn test_public_processor() {
 
     let staged = member2.stage_join(welcome).await.unwrap();
     member2.join_group(staged).await.unwrap();
+
+    let add_member_unpacked = member2
+        .add_member(group_id.clone(), key_package3)
+        .await
+        .unwrap();
+
+    let MessageToServer::AddToGroup(add_member) = add_member_unpacked.unpack().unwrap() else {
+        panic!("wrong message type")
+    };
+
+    let _processed = public_processor
+        .process_message(add_member.commit.into())
+        .await
+        .unwrap();
+
+    let MessageToMember::AddToGroup(commit) =
+        MessageToMemberTransport::AddToGroup(add_member.commit_bytes)
+            .unpack()
+            .unwrap()
+    else {
+        panic!("wrong message type")
+    };
+
+    let processed = member1.process_message(commit.clone()).await.unwrap();
+    let ProcessedContent::Commit(commit) = processed.content else {
+        panic!("wrong message type")
+    };
+    member1.commit(commit).await.unwrap();
+
+    let MessageToMember::Welcome(welcome) = MessageToMemberTransport::Welcome(add_member.welcome)
+        .unpack()
+        .unwrap()
+    else {
+        panic!("wrong message type")
+    };
+
+    let staged = member3.stage_join(welcome).await.unwrap();
+    member3.join_group(staged).await.unwrap();
 
     let test_text = b"Hello MLS!".to_vec();
 

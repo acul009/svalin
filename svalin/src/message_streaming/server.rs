@@ -25,11 +25,7 @@ impl MlsMessageHandler {
             .await
             .map_err(|err| anyhow!(err))?;
         for mut to_send in messages_to_send {
-            to_send.receivers = to_send
-                .receivers
-                .into_iter()
-                .filter(|target| target != sender.spki_hash())
-                .collect();
+            to_send.remove_receiver(sender.spki_hash());
             self.message_store.add_message(to_send).await?;
         }
 

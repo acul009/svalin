@@ -35,10 +35,10 @@ reset:
 reset-win:
     Remove-Item -Path C:\ProgramData\svalin\* -Recurse -Force
 
-agent $RUST_LOG="debug":
+agent $RUST_LOG="svalin=debug":
     cargo run -p svalin agent
 
-agent_init:
+agent_init $RUST_LOG="svalin=debug":
     cargo run -p svalin agent init localhost:1234
 
 gui $RUST_LOG="svalin=debug":

@@ -5,10 +5,13 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use svalin_pki::{Certificate, CertificateType, SpkiHash};
 use svalin_rpc::rpc::{command::handler::CommandHandler, peer::Peer, session::Session};
+use svalin_server_store::MessageStore;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
-use crate::message_streaming::{MessageFromAgent, MessageToAgent, server::MlsMessageHandler};
+use crate::message_streaming::{
+    MessageFromAgent, MessageToAgent, server::MlsMessageHandler, with_client::stream_mls_messages,
+};
 
 pub struct MessageHandler {
     pub mls_handler: Arc<MlsMessageHandler>,
@@ -78,6 +81,7 @@ pub struct MessageSender {
     channels: Arc<
         DashMap<SpkiHash, mpsc::Sender<(MessageToAgent, Option<oneshot::Sender<Result<(), ()>>>)>>,
     >,
+    message_store: Arc<MessageStore>,
 }
 
 #[async_trait]
@@ -103,6 +107,14 @@ impl CommandHandler for MessageSender {
 
         let (sender, receiver) = mpsc::channel(10);
         let spki_hash = peer.spki_hash().clone();
+
+        tokio::spawn(stream_mls_messages(
+            spki_hash.clone(),
+            sender.clone(),
+            self.message_store.clone(),
+            MessageToAgent::Mls,
+        ));
+
         self.channels.insert(spki_hash.clone(), sender);
 
         let result = self.handle_connection(session, receiver).await;
@@ -114,9 +126,10 @@ impl CommandHandler for MessageSender {
 }
 
 impl MessageSender {
-    pub fn new() -> Self {
+    pub fn new(message_store: Arc<MessageStore>) -> Self {
         Self {
             channels: Arc::new(DashMap::new()),
+            message_store,
         }
     }
 
