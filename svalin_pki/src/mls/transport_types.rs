@@ -102,6 +102,7 @@ impl MessageToServerTransport {
     }
 
     #[cfg(test)]
+    #[allow(private_interfaces)]
     pub fn to_member(self) -> Result<MessageToMember, tls_codec::Error> {
         let transport = match self {
             Self::GroupMessage(message) => MessageToMemberTransport::GroupMessage(message),
@@ -212,6 +213,7 @@ impl NewGroupTransport {
     }
 
     #[cfg(test)]
+    #[allow(private_interfaces)]
     pub fn to_member(self) -> Result<MessageToMember, tls_codec::Error> {
         let transport = MessageToMemberTransport::Welcome(self.welcome.unwrap());
 

@@ -31,11 +31,14 @@ impl State {
     pub fn update(&mut self, msg: Message) {
         match msg {
             Message::UpdateSystemReport(spki_hash, system_report) => {
-                self.devices
-                    .entry(spki_hash)
-                    .or_insert_with(|| DeviceState {
-                        system_report: system_report,
-                    });
+                match self.devices.entry(spki_hash) {
+                    std::collections::hash_map::Entry::Occupied(mut occupied_entry) => {
+                        occupied_entry.get_mut().system_report = system_report;
+                    }
+                    std::collections::hash_map::Entry::Vacant(vacant_entry) => {
+                        vacant_entry.insert(DeviceState { system_report });
+                    }
+                }
             }
             Message::UpdateFromMainState(state) => {
                 for (spki_hash, other_device) in state.devices {

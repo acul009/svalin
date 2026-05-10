@@ -53,8 +53,10 @@ async fn send_system_report(
     mls: &MlsAgent<RemoteKeyRetriever, RemoteVerifier>,
     messager_handle: &AgentMessageDispatcherHandle,
 ) -> Result<(), anyhow::Error> {
+    tracing::info!("Generating and sending system report");
     let report = SystemReport::create().await?;
     let message = mls.send_report(report).await?;
     messager_handle.send(MessageFromAgent::Mls(message)).await;
+    tracing::info!("System report sent");
     Ok(())
 }

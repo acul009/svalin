@@ -87,8 +87,9 @@ impl MainView {
                 let (update_task, abort_handle) =
                     Task::stream(sipper(move |mut sender| async move {
                         let mut receiver = receiver;
-                        while let Ok(state) = receiver.recv().await {
-                            sender.send(Message::UpdateState(state)).await;
+                        while let Ok(update) = receiver.recv().await {
+                            tracing::debug!("got state update: {update:?}");
+                            sender.send(Message::UpdateState(update)).await;
                         }
                     }))
                     .abortable();

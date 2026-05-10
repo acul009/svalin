@@ -99,7 +99,6 @@ async fn test_public_processor() {
     let key_package2 = member2.create_key_package().await.unwrap();
 
     let credential3 = Credential::generate_root().unwrap();
-    let spki_hash3 = credential3.certificate().spki_hash().clone();
     let member3 = create_processor(credential3).await;
     let key_package3 = member3.create_key_package().await.unwrap();
 
