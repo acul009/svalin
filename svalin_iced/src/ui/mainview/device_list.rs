@@ -2,7 +2,7 @@ use chrono::DateTime;
 use iced::{
     Alignment::Center,
     Color, Length,
-    widget::{button, column, container, row, stack, table, text},
+    widget::{button, column, container, row, stack, text},
 };
 // use iced_fonts::{
 //     BOOTSTRAP_FONT,
@@ -69,7 +69,7 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
 
                         button(
                             row![
-                                match persistent.system_report().os {
+                                match persistent.os() {
                                     OS::Windows => bootstrap::windows(),
                                     OS::Linux => bootstrap::tux(),
                                     OS::Unknown => bootstrap::laptop(),
@@ -78,16 +78,21 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                                 .color(color),
                                 text!("{}", spki_hash),
                                 text(
-                                    DateTime::from_timestamp_secs(
-                                        persistent.system_report().generated_at as i64
-                                    )
-                                    .map(|datetime| {
-                                        datetime
-                                            .naive_local()
-                                            .format("%Y-%m-%d %H:%M:%S")
-                                            .to_string()
-                                    })
-                                    .unwrap_or_else(|| "Unknown".to_string())
+                                    persistent
+                                        .system_report()
+                                        .map(|report| {
+                                            DateTime::from_timestamp_secs(
+                                                report.generated_at as i64,
+                                            )
+                                        })
+                                        .flatten()
+                                        .map(|datetime| {
+                                            datetime
+                                                .naive_local()
+                                                .format("%Y-%m-%d %H:%M:%S")
+                                                .to_string()
+                                        })
+                                        .unwrap_or_else(|| "Unknown".to_string())
                                 )
                             ]
                             .spacing(20)

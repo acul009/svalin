@@ -1,8 +1,7 @@
 use std::{panic, process, time::Duration};
 
-use rand::random;
 use std::net::ToSocketAddrs;
-use svalin_client_store::persistent::{self, DeviceState};
+use svalin_client_store::persistent::{self};
 use test_log::test;
 use tokio::sync::oneshot;
 use tokio::time::timeout;

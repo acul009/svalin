@@ -40,13 +40,15 @@ impl ClientStore {
             }
             &persistent::Message::UpdateFromMainState(state) => {
                 for (spki_hash, device) in &state.devices {
-                    let report = postcard::to_stdvec(&device.system_report)?;
-                    let spki_hash = spki_hash.as_slice();
-                    let generated_at = device.system_report.generated_at as i64;
+                    if let Some(system_report) = &device.system_report {
+                        let report = postcard::to_stdvec(system_report)?;
+                        let spki_hash = spki_hash.as_slice();
+                        let generated_at = system_report.generated_at as i64;
 
-                    sqlx::query!("INSERT INTO system_reports (spki_hash, report, generated_at) VALUES (?, ?, ?) ON CONFLICT(spki_hash) DO UPDATE SET report = ? where generated_at < ?", spki_hash, report, generated_at, report, generated_at)
+                        sqlx::query!("INSERT INTO system_reports (spki_hash, report, generated_at) VALUES (?, ?, ?) ON CONFLICT(spki_hash) DO UPDATE SET report = ? where generated_at < ?", spki_hash, report, generated_at, report, generated_at)
                         .execute(&self.pool)
                         .await?;
+                    }
                 }
             }
         }

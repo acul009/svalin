@@ -28,7 +28,7 @@ impl SystemReport {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub enum OS {
     Windows,
     Linux,
