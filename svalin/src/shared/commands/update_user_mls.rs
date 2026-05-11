@@ -1,6 +1,8 @@
 use std::{
     collections::HashMap,
+    mem,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
 use anyhow::{Context, anyhow};
@@ -21,6 +23,7 @@ use svalin_pki::{
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
 use svalin_server_store::{KeyPackageStore, MessageStore, UserStore};
 use svalin_sysctl::sytem_report::SystemReport;
+use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 use uuid::Uuid;
@@ -191,10 +194,12 @@ pub struct UpdateUserMls {
     pub verifier: RemoteVerifier,
     pub session_mls: Arc<MlsClient<RemoteKeyRetriever, RemoteVerifier>>,
     pub message_sender: client::ClientMessageDispatcherHandle,
+    pub update_channel: mpsc::Sender<persistent::State>,
+    pub cancel: CancellationToken,
 }
 
 impl CommandDispatcher for UpdateUserMls {
-    type Output = persistent::State;
+    type Output = ();
 
     type Error = anyhow::Error;
 
@@ -213,95 +218,241 @@ impl CommandDispatcher for UpdateUserMls {
         session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
         debug!("Updating user MLS");
-        let data = session
-            .read_object::<UpdateData>()
-            .await
-            .context("Failed to read data")?;
 
-        let (mls_store, export_handle) = SvalinStorage::import(data.mls_store, &self.key)
-            .context("error importing mls storage")?;
-        let mut persistent_data = data
-            .persistent_data
-            .decrypt(&self.key)
-            .context("error decrypting persistent data")?;
-        let client = MlsClient::new(
-            self.user_credential,
-            mls_store,
-            self.key_retriever,
-            self.verifier,
-        )
-        .context("error building mls client")?;
-        debug!("Temporary MLS client created, processing messages");
-
-        let mut handled = Vec::new();
-
-        for (uuid, message) in data.messages {
-            tracing::debug!("user mls handling message: {uuid}");
-            let processed = client
-                .handle_message::<SystemReport>(&message)
+        loop {
+            let Some(state) = self
+                .cancel
+                .run_until_cancelled(session.read_object::<SavedState>())
                 .await
-                .context("error processing message")?;
+            else {
+                return Ok(());
+            };
+            let state = state?;
 
-            handled.push(uuid);
+            let (mls_store, export_handle) = SvalinStorage::import(state.mls_store, &self.key)
+                .context("error importing mls storage")?;
+            let mut persistent_data = state
+                .persistent_data
+                .decrypt(&self.key)
+                .context("error decrypting persistent data")?;
+            let client = MlsClient::new(
+                self.user_credential.clone(),
+                mls_store,
+                self.key_retriever.clone(),
+                self.verifier.clone(),
+            )
+            .context("error building mls client")?;
 
-            match processed.content {
-                MessageDataContent::Report(spki_hash, report) => {
-                    persistent_data
-                        .update(persistent::Message::UpdateSystemReport(spki_hash, report));
+            let mut aknowledge = Vec::new();
+            let mut messages = Vec::new();
+            let mut should_yield = false;
+
+            while !should_yield {
+                let Some(update) = self
+                    .cancel
+                    .run_until_cancelled(tokio::time::timeout(
+                        Duration::from_secs(3),
+                        session.read_object::<Update>(),
+                    ))
+                    .await
+                else {
+                    return Ok(());
+                };
+
+                let send_update;
+
+                if let Ok(update) = update {
+                    let update = update?;
+                    match update {
+                        Update::Message(uuid, message_to_member_transport) => {
+                            let handled = client
+                                .handle_message::<SystemReport>(&message_to_member_transport)
+                                .await?;
+
+                            match handled.content {
+                                MessageDataContent::Report(spki_hash, report) => {
+                                    persistent_data.update(
+                                        persistent::Message::UpdateSystemReport(spki_hash, report),
+                                    );
+                                }
+                                MessageDataContent::Internal => {}
+                            }
+
+                            aknowledge.push(uuid);
+                            send_update = aknowledge.len() >= 10;
+                        }
+                        Update::YieldRequest => {
+                            send_update = true;
+                            should_yield = true;
+                        }
+                    }
+                } else {
+                    // Timeout, so probably at the newest messages
+                    if !aknowledge.is_empty() {
+                        // Here we check if we want to add our session to any needed groups
+                        for (device, _) in persistent_data.devices() {
+                            let group = SvalinGroupId::DeviceGroup(device.clone());
+                            if !client.is_member(&group, self.session_mls.me()).await? {
+                                let key_package = self.session_mls.create_key_package().await?;
+                                let message = client.add_member(&group, key_package).await?;
+                                messages.push(message);
+                            }
+
+                            if let Some(message) = client
+                                .create_meta_group_if_missing(device.clone())
+                                .await
+                                .map_err(|err| anyhow!(err))?
+                            {
+                                tracing::debug!("new meta group: {message:?}");
+                                messages.push(message);
+                            }
+                            let meta_group = SvalinGroupId::DeviceMetaGroup(device.clone());
+                            if !client.is_member(&meta_group, self.session_mls.me()).await? {
+                                let key_package = self.session_mls.create_key_package().await?;
+                                let message = client.add_member(&meta_group, key_package).await?;
+                                messages.push(message);
+                            }
+                        }
+                        send_update = true;
+                    } else {
+                        send_update = false;
+                    }
                 }
-                MessageDataContent::Internal => (),
+
+                if send_update {
+                    let mls_store = export_handle.export(&self.key)?;
+                    let persistent_data = EncryptedObject::encrypt(&persistent_data, &self.key)?;
+                    let state_update = ToServer::StateUpdate {
+                        mls_store,
+                        persistent_data,
+                        aknowledged: mem::replace(&mut aknowledge, Vec::new()),
+                        // TODO
+                        key_packages: Vec::new(),
+                        messages: mem::replace(&mut messages, Vec::new()),
+                    };
+
+                    session.write_object(&state_update).await?;
+                } else {
+                    session.write_object(&ToServer::OK).await?;
+                }
             }
         }
 
-        let mut messages = Vec::new();
+        // let data = session
+        //     .read_object::<UpdateData>()
+        //     .await
+        //     .context("Failed to read data")?;
 
-        for (device, _) in persistent_data.devices() {
-            let group = SvalinGroupId::DeviceGroup(device.clone());
-            if !client.is_member(&group, self.session_mls.me()).await? {
-                let key_package = self.session_mls.create_key_package().await?;
-                let message = client.add_member(&group, key_package).await?;
-                messages.push(message);
-            }
+        // let (mls_store, export_handle) = SvalinStorage::import(data.mls_store, &self.key)
+        //     .context("error importing mls storage")?;
+        // let mut persistent_data = data
+        //     .persistent_data
+        //     .decrypt(&self.key)
+        //     .context("error decrypting persistent data")?;
+        // let client = MlsClient::new(
+        //     self.user_credential,
+        //     mls_store,
+        //     self.key_retriever,
+        //     self.verifier,
+        // )
+        // .context("error building mls client")?;
+        // debug!("Temporary MLS client created, processing messages");
 
-            if let Some(message) = client
-                .create_meta_group_if_missing(device.clone())
-                .await
-                .map_err(|err| anyhow!(err))?
-            {
-                tracing::debug!("new meta group: {message:?}");
-                messages.push(message);
-            }
-            let meta_group = SvalinGroupId::DeviceMetaGroup(device.clone());
-            if !client.is_member(&meta_group, self.session_mls.me()).await? {
-                let key_package = self.session_mls.create_key_package().await?;
-                let message = client.add_member(&meta_group, key_package).await?;
-                messages.push(message);
-            }
-        }
+        // let mut handled = Vec::new();
 
-        let mut key_packages = Vec::new();
-        while data.key_package_count + (key_packages.len() as u64) < 100 {
-            let key_package = client.create_key_package().await?.to_unverified();
-            key_packages.push(key_package);
-        }
+        // for (uuid, message) in data.messages {
+        //     tracing::debug!("user mls handling message: {uuid}");
+        //     let processed = client
+        //         .handle_message::<SystemReport>(&message)
+        //         .await
+        //         .context("error processing message")?;
 
-        let encrypted_data = EncryptedObject::encrypt(&persistent_data, &self.key)?;
-        let exported_mls_store = export_handle.export(&self.key)?;
+        //     handled.push(uuid);
 
-        debug!("MLS client processed messages, sending response");
+        //     match processed.content {
+        //         MessageDataContent::Report(spki_hash, report) => {
+        //             persistent_data
+        //                 .update(persistent::Message::UpdateSystemReport(spki_hash, report));
+        //         }
+        //         MessageDataContent::Internal => (),
+        //     }
+        // }
 
-        let response = UpdateResponse {
-            mls_store: exported_mls_store,
-            persistent_data: encrypted_data,
-            handled,
-            key_packages,
-            messages,
-        };
+        // let mut messages = Vec::new();
 
-        session.write_object(&response).await?;
+        // for (device, _) in persistent_data.devices() {
+        //     let group = SvalinGroupId::DeviceGroup(device.clone());
+        //     if !client.is_member(&group, self.session_mls.me()).await? {
+        //         let key_package = self.session_mls.create_key_package().await?;
+        //         let message = client.add_member(&group, key_package).await?;
+        //         messages.push(message);
+        //     }
 
-        session.read_object::<()>().await?;
+        //     if let Some(message) = client
+        //         .create_meta_group_if_missing(device.clone())
+        //         .await
+        //         .map_err(|err| anyhow!(err))?
+        //     {
+        //         tracing::debug!("new meta group: {message:?}");
+        //         messages.push(message);
+        //     }
+        //     let meta_group = SvalinGroupId::DeviceMetaGroup(device.clone());
+        //     if !client.is_member(&meta_group, self.session_mls.me()).await? {
+        //         let key_package = self.session_mls.create_key_package().await?;
+        //         let message = client.add_member(&meta_group, key_package).await?;
+        //         messages.push(message);
+        //     }
+        // }
 
-        Ok(persistent_data)
+        // let mut key_packages = Vec::new();
+        // while data.key_package_count + (key_packages.len() as u64) < 100 {
+        //     let key_package = client.create_key_package().await?.to_unverified();
+        //     key_packages.push(key_package);
+        // }
+
+        // let encrypted_data = EncryptedObject::encrypt(&persistent_data, &self.key)?;
+        // let exported_mls_store = export_handle.export(&self.key)?;
+
+        // debug!("MLS client processed messages, sending response");
+
+        // let response = UpdateResponse {
+        //     mls_store: exported_mls_store,
+        //     persistent_data: encrypted_data,
+        //     handled,
+        //     key_packages,
+        //     messages,
+        // };
+
+        // session.write_object(&response).await?;
+
+        // session.read_object::<()>().await?;
+
+        // Ok(persistent_data)
     }
+}
+
+#[derive(Serialize, Deserialize)]
+struct SavedState {
+    mls_store: ExportedMlsStore,
+    persistent_data: EncryptedObject<persistent::State>,
+}
+
+#[derive(Serialize, Deserialize)]
+enum Update {
+    Message(Uuid, MessageToMemberTransport),
+    YieldRequest,
+}
+
+#[derive(Serialize, Deserialize)]
+enum ToServer {
+    StateUpdate {
+        mls_store: ExportedMlsStore,
+        persistent_data: EncryptedObject<persistent::State>,
+        key_packages: Vec<UnverifiedKeyPackage>,
+        aknowledged: Vec<Uuid>,
+        // I thought about sending those seperate, but sending a message moves the ratchet,
+        // so it's important that these are synced with the mls_store update
+        messages: Vec<MessageToServerTransport>,
+    },
+    OK,
 }
