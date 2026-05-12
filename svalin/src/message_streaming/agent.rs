@@ -109,6 +109,7 @@ impl CommandDispatcher for AgentMessageReceiver {
             .await
         {
             let message = message_result?;
+            tracing::debug!("agent received message: {message:?}");
 
             let handle_result = self.handle(message).await;
             let shutdown = handle_result.as_ref().cloned().unwrap_or(false);

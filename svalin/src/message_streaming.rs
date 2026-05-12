@@ -12,7 +12,7 @@ pub mod server;
 pub mod with_agent;
 pub mod with_client;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum MessageToAgent {
     Mls(Arc<MessageToMemberTransport>),
     Goodbye,

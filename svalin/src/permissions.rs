@@ -13,7 +13,8 @@ use crate::{
     shared::commands::{
         get_key_packages::GetKeyPackagesHandler, get_user_credentials::GetUserCredentialHandler,
         load_certificate_chain::LoadCertificateChainHandler,
-        public_server_status::PublicStatusHandler, update_user_mls::UpdateUserMlsHandler,
+        public_server_status::PublicStatusHandler,
+        request_system_report::RequestSystemReportHandler, update_user_mls::UpdateUserMlsHandler,
     },
 };
 
@@ -110,6 +111,12 @@ impl From<&PermissionPrecursor<with_client::MessageSender>> for Permission {
 
 impl From<&PermissionPrecursor<GetUserCredentialHandler>> for Permission {
     fn from(_value: &PermissionPrecursor<GetUserCredentialHandler>) -> Self {
+        Permission::SessionOnly
+    }
+}
+
+impl From<&PermissionPrecursor<RequestSystemReportHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<RequestSystemReportHandler>) -> Self {
         Permission::SessionOnly
     }
 }

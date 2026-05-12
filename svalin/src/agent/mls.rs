@@ -1,8 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::anyhow;
+use futures::{FutureExt, select};
 use svalin_pki::mls::agent::MlsAgent;
 use svalin_sysctl::sytem_report::SystemReport;
+use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -33,18 +35,17 @@ pub(super) async fn schedule_system_reports(
     mls: Arc<MlsAgent<RemoteKeyRetriever, RemoteVerifier>>,
     messager_handle: AgentMessageDispatcherHandle,
     cancel: CancellationToken,
+    notify: Arc<Notify>,
 ) {
     loop {
         if let Err(err) = send_system_report(&mls, &messager_handle).await {
             tracing::error!("Failed to send system report: {}", err);
         }
 
-        if cancel
-            .run_until_cancelled(tokio::time::sleep(SYSTEM_REPORT_INTERVAL))
-            .await
-            .is_none()
-        {
-            return;
+        select! {
+            _ = cancel.cancelled().fuse() => return,
+            _ = notify.notified().fuse() => continue,
+            _ = tokio::time::sleep(SYSTEM_REPORT_INTERVAL).fuse() => continue,
         }
     }
 }
@@ -53,10 +54,10 @@ async fn send_system_report(
     mls: &MlsAgent<RemoteKeyRetriever, RemoteVerifier>,
     messager_handle: &AgentMessageDispatcherHandle,
 ) -> Result<(), anyhow::Error> {
-    tracing::info!("Generating and sending system report");
+    tracing::debug!("Generating and sending system report");
     let report = SystemReport::create().await?;
     let message = mls.send_report(report).await?;
     messager_handle.send(MessageFromAgent::Mls(message)).await;
-    tracing::info!("System report sent");
+    tracing::debug!("System report sent");
     Ok(())
 }

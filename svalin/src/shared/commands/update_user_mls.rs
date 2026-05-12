@@ -132,6 +132,13 @@ impl CommandHandler for UpdateUserMlsHandler {
                 _ = cancel.cancelled().fuse() => {
                     break;
                 }
+                response = session.read_object::<ToServer>().fuse() => {
+                    // Todo: make the object reader / chunk reader cancel save with an internal buffer
+                    let response = response?;
+                    tracing::info!("user mls initiative: {response:?}");
+                    self.handle_response(&user_hash, response).await?;
+                    continue;
+                }
                 _ = sleep_until(next_key_package_update).fuse() => {
                     next_key_package_update = Instant::now() + Duration::from_secs(60);
                     Update::KeyPackageCount(self.key_package_store.count_key_packages(&user_hash).await?)
@@ -142,47 +149,59 @@ impl CommandHandler for UpdateUserMlsHandler {
 
             let response = session.read_object::<ToServer>().await?;
             tracing::debug!("user mls respone: {response:?}");
-            match response {
-                ToServer::StateUpdate {
-                    mls_store,
-                    persistent_data,
-                    key_packages,
-                    aknowledged,
-                    messages,
-                } => {
-                    for key_package in key_packages {
-                        let key_package = self
-                            .mls
-                            .verify_key_package(key_package, &user_hash)
-                            .await
-                            .context("error verifying key package")?;
-                        self.key_package_store.add_key_package(key_package).await?;
-                    }
-
-                    self.user_store
-                        .update_mls_data(&user_hash, mls_store, persistent_data)
-                        .await?;
-
-                    self.message_store
-                        .aknowledge_messages(&user_hash, &aknowledged)
-                        .await?;
-
-                    for message in messages {
-                        tracing::debug!("received message from user mls: {message:?}");
-                        let to_send = self.mls.process_message(message).await?;
-                        tracing::debug!("processing resulted in messages: {to_send:?}");
-                        for mut message in to_send {
-                            message.remove_receiver(&user_hash);
-                            self.message_store.add_message(message).await?;
-                        }
-                    }
-                }
-                ToServer::OK => {}
-            }
+            self.handle_response(&user_hash, response).await?;
         }
 
         // explicit drop, so I don't accidentally drop it beforehand
         drop(_user_lock);
+        Ok(())
+    }
+}
+
+impl UpdateUserMlsHandler {
+    async fn handle_response(
+        &self,
+        user_hash: &SpkiHash,
+        response: ToServer,
+    ) -> anyhow::Result<()> {
+        match response {
+            ToServer::StateUpdate {
+                mls_store,
+                persistent_data,
+                key_packages,
+                aknowledged,
+                messages,
+            } => {
+                for key_package in key_packages {
+                    let key_package = self
+                        .mls
+                        .verify_key_package(key_package, user_hash)
+                        .await
+                        .context("error verifying key package")?;
+                    self.key_package_store.add_key_package(key_package).await?;
+                }
+
+                self.user_store
+                    .update_mls_data(&user_hash, mls_store, persistent_data)
+                    .await?;
+
+                self.message_store
+                    .aknowledge_messages(&user_hash, &aknowledged)
+                    .await?;
+
+                for message in messages {
+                    tracing::debug!("received message from user mls: {message:?}");
+                    let to_send = self.mls.process_message(message).await?;
+                    tracing::debug!("processing resulted in messages: {to_send:?}");
+                    for mut message in to_send {
+                        message.remove_receiver(&user_hash);
+                        self.message_store.add_message(message).await?;
+                    }
+                }
+            }
+            ToServer::OK => {}
+        }
+
         Ok(())
     }
 }
@@ -335,39 +354,47 @@ impl CommandDispatcher for UpdateUserMls {
                     }
                 } else {
                     // Timeout, so probably at the newest messages
-                    if !aknowledge.is_empty() {
-                        // long timeout, since everything is taken care of.
-                        // Technically, there's not even a timeout neccesary.
-                        timeout_duration = Duration::from_secs(60);
+                    //
+                    // long next timeout, since everything is taken care of.
+                    // Technically, there's not even a timeout neccesary.
+                    timeout_duration = Duration::from_secs(60);
 
-                        // Here we check if we want to add our session to any needed groups
-                        for (device, _) in persistent_data.devices() {
-                            let group = SvalinGroupId::DeviceGroup(device.clone());
-                            if !client.is_member(&group, self.session_mls.me()).await? {
-                                let key_package = self.session_mls.create_key_package().await?;
-                                let message = client.add_member(&group, key_package).await?;
-                                messages.push(message);
-                            }
-
-                            if let Some(message) = client
-                                .create_meta_group_if_missing(device.clone())
-                                .await
-                                .map_err(|err| anyhow!(err))?
-                            {
-                                tracing::debug!("new meta group: {message:?}");
-                                messages.push(message);
-                            }
-                            let meta_group = SvalinGroupId::DeviceMetaGroup(device.clone());
-                            if !client.is_member(&meta_group, self.session_mls.me()).await? {
-                                let key_package = self.session_mls.create_key_package().await?;
-                                let message = client.add_member(&meta_group, key_package).await?;
-                                messages.push(message);
-                            }
+                    // Here we check if we want to add our session to any needed groups
+                    for (device, _) in persistent_data.devices() {
+                        let group = SvalinGroupId::DeviceGroup(device.clone());
+                        if !client.is_member(&group, self.session_mls.me()).await? {
+                            let key_package = self.session_mls.create_key_package().await?;
+                            let message = client.add_member(&group, key_package).await?;
+                            messages.push(message);
                         }
-                        send_update = true;
-                    } else {
-                        send_update = false;
+
+                        if let Some(message) = client
+                            .create_meta_group_if_missing(device.clone())
+                            .await
+                            .map_err(|err| anyhow!(err))?
+                        {
+                            tracing::debug!("new meta group: {message:?}");
+                            messages.push(message);
+                        }
+                        let meta_group = SvalinGroupId::DeviceMetaGroup(device.clone());
+                        if !client.is_member(&meta_group, self.session_mls.me()).await? {
+                            let key_package = self.session_mls.create_key_package().await?;
+                            let message = client.add_member(&meta_group, key_package).await?;
+                            messages.push(message);
+                        }
                     }
+
+                    // We likely just found a group which contains data we don't have yet.
+                    // So it's a good idea to send that update to the session's state
+                    if !messages.is_empty() {
+                        self.state_handle
+                            .update(ClientStateUpdate::Persistent(
+                                persistent::Message::UpdateFromMainState(persistent_data.clone()),
+                            ))
+                            .await?;
+                    }
+
+                    send_update = !aknowledge.is_empty() || !messages.is_empty();
                 }
 
                 if send_update {
@@ -382,12 +409,6 @@ impl CommandDispatcher for UpdateUserMls {
                     };
 
                     session.write_object(&state_update).await?;
-
-                    self.state_handle
-                        .update(ClientStateUpdate::Persistent(
-                            persistent::Message::UpdateFromMainState(persistent_data.clone()),
-                        ))
-                        .await?;
                 } else {
                     session.write_object(&ToServer::OK).await?;
                 }

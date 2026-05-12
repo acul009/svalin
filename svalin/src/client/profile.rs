@@ -1,9 +1,9 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
-use svalin_client_store::{ClientStore, persistent};
+use svalin_client_store::ClientStore;
 use svalin_pki::{
     ArgonParams, Certificate, Credential, EncryptedCredential, ExactVerififier,
     KnownCertificateVerifier, RootCertificate, UnverifiedCertificate, get_current_timestamp,
@@ -14,7 +14,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, error};
 
 use crate::{
-    client::{state::ClientStateUpdate, tunnel_manager::TunnelManager},
+    client::tunnel_manager::TunnelManager,
     message_streaming::client::{ClientMessageDispatcher, ClientMessageReceiver},
     remote_key_retriever::RemoteKeyRetriever,
     shared::commands::{get_user_credentials::GetUserCredential, update_user_mls::UpdateUserMls},
@@ -263,6 +263,8 @@ impl Client {
             upstream_certificate,
             root_certificate: root_certificate.clone(),
             user_credential,
+            device_credential,
+            verifier: remote_verifier.clone(),
             tunnel_manager,
             mls: mls.clone(),
             message_sender: dispatcher_handle.clone(),

@@ -16,7 +16,7 @@ use svalin_rpc::{
         connection::{Connection, ServeableConnectionBase},
     },
 };
-use tokio::time::error::Elapsed;
+use tokio::{sync::Notify, time::error::Elapsed};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{debug, instrument};
 use update::{
@@ -28,9 +28,10 @@ mod init;
 mod mls;
 pub mod update;
 
-use crate::remote_key_retriever::RemoteKeyRetriever;
-use crate::shared::commands::realtime_status::RealtimeStatusHandler;
 use crate::shared::commands::terminal::RemoteTerminalHandler;
+use crate::shared::commands::{
+    realtime_status::RealtimeStatusHandler, request_system_report::RequestSystemReportHandler,
+};
 use crate::shared::join_agent::AgentInitPayload;
 use crate::util::key_storage::KeySource;
 use crate::util::location::{Location, LocationError};
@@ -42,6 +43,10 @@ use crate::{
 use crate::{
     message_streaming::agent::AgentMessageReceiver,
     permissions::default_permission_handler::DefaultPermissionHandler,
+};
+use crate::{
+    remote_key_retriever::RemoteKeyRetriever,
+    shared::commands::request_system_report::RequestSystemReport,
 };
 
 pub struct Agent {
@@ -119,6 +124,8 @@ impl Agent {
             .await
             .context("error creating updater")?;
 
+        let system_report_notify = Arc::new(Notify::new());
+
         e2e_commands
             .chain()
             .await
@@ -128,7 +135,10 @@ impl Agent {
             .add(TcpForwardHandler)
             .add(InstallationInfoHandler::new(updater.clone()))
             .add(AvailableVersionHandler::new(updater.clone()))
-            .add(StartUpdateHandler::new(updater));
+            .add(StartUpdateHandler::new(updater))
+            .add(RequestSystemReportHandler {
+                notify: system_report_notify.clone(),
+            });
 
         let public_commands = HandlerCollection::new(permission_handler.clone());
 
@@ -187,6 +197,7 @@ impl Agent {
             mls,
             messager_handle,
             cancel.clone(),
+            system_report_notify,
         ));
 
         cancel.cancelled().await;

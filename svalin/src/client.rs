@@ -9,12 +9,13 @@ mod first_connect;
 pub mod tunnel_manager;
 
 pub mod add_agent;
+pub mod device;
 mod profile;
 pub mod state;
 
 pub use first_connect::*;
 use svalin_pki::mls::client::MlsClient;
-use svalin_pki::{Certificate, Credential, RootCertificate};
+use svalin_pki::{Certificate, Credential, RootCertificate, SpkiHash};
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
@@ -25,6 +26,7 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use tunnel_manager::TunnelManager;
 
+use crate::client::device::DeviceHandle;
 use crate::client::state::{ClientState, ClientStateUpdate};
 use crate::message_streaming::MessageFromClient;
 use crate::message_streaming::client::{ClientMessageDispatcherHandle, ClientStateHandle};
@@ -37,12 +39,14 @@ pub struct Client {
     upstream_certificate: Certificate,
     root_certificate: RootCertificate,
     user_credential: Credential,
+    device_credential: Credential,
     mls: Arc<MlsClient<RemoteKeyRetriever, RemoteVerifier>>,
     tunnel_manager: TunnelManager,
     message_sender: ClientMessageDispatcherHandle,
     state_handle: ClientStateHandle,
     background_tasks: TaskTracker,
     cancel: CancellationToken,
+    verifier: RemoteVerifier,
 }
 
 impl Debug for Client {
@@ -80,6 +84,10 @@ impl Client {
 
     pub fn tunnel_manager(&self) -> &TunnelManager {
         &self.tunnel_manager
+    }
+
+    pub fn device(&self, spki_hash: SpkiHash) -> DeviceHandle<'_> {
+        DeviceHandle::new(self, spki_hash)
     }
 
     pub async fn close(&self, timeout_duration: Duration) -> Result<(), Elapsed> {

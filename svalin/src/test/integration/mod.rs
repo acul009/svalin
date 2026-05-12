@@ -191,7 +191,7 @@ async fn integration_tests() {
     debug!("agent was added");
 
     // first update should be the online status
-    let update = timeout(Duration::from_secs(10), client_state_updates.recv())
+    let update = timeout(Duration::from_secs(5), client_state_updates.recv())
         .await
         .unwrap()
         .unwrap();
@@ -203,7 +203,7 @@ async fn integration_tests() {
     }
 
     // second update should be the system report
-    let update = timeout(Duration::from_secs(40), client_state_updates.recv())
+    let update = timeout(Duration::from_secs(5), client_state_updates.recv())
         .await
         .unwrap()
         .unwrap();
@@ -216,8 +216,25 @@ async fn integration_tests() {
     let system_report = client_state.persistent().iter().next().unwrap();
     tracing::debug!("client persistent data: {:#?}", system_report);
 
-    tokio::time::sleep(Duration::from_secs(10)).await;
+    // testing device handle
+    let agent_spki_hash = client_state.persistent().iter().next().unwrap().0.clone();
+    let device = client.device(agent_spki_hash);
+    device.ping().await.unwrap();
 
+    // testing directly receiving system report
+    device.request_system_report().await.unwrap();
+
+    let update = timeout(Duration::from_secs(1), client_state_updates.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    if let ClientStateUpdate::Persistent(persistent::Message::UpdateSystemReport(_, _)) = &update {
+        client_state.update(update);
+    } else {
+        panic!("expected agent online status update, got: {:?}", &update);
+    }
+
+    // controlled agent shutdown
     agent_cancel.cancel();
     tokio::time::timeout(Duration::from_secs(1), agent_handle)
         .await
@@ -236,8 +253,10 @@ async fn integration_tests() {
         panic!("expected agent online status update, got: {:?}", &update);
     }
 
+    // controlled client shutdown
     client.close(Duration::from_secs(3)).await.unwrap();
 
+    // controlled server shutdown
     server_cancel.cancel();
     tokio::time::timeout(Duration::from_secs(1), recv_server)
         .await
