@@ -105,7 +105,6 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 key_package_store: self.store.key_packages.clone(),
             })
             .add(UpdateUserMlsHandler::new(
-                self.verifier.clone(),
                 self.store.users.clone(),
                 self.store.messages.clone(),
                 self.store.key_packages.clone(),

@@ -7,11 +7,11 @@ use std::{
 
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
+use futures::{FutureExt, select};
 use serde::{Deserialize, Serialize};
 use svalin_client_store::persistent;
 use svalin_pki::{
-    CertificateType, Credential, EncryptedObject, EncryptionKey, SpkiHash, Verifier,
-    get_current_timestamp,
+    CertificateType, Credential, EncryptedObject, EncryptionKey, SpkiHash,
     mls::{
         SvalinGroupId,
         client::{MessageDataContent, MlsClient},
@@ -23,37 +23,36 @@ use svalin_pki::{
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
 use svalin_server_store::{KeyPackageStore, MessageStore, UserStore};
 use svalin_sysctl::sytem_report::SystemReport;
-use tokio::sync::mpsc;
+use tokio::{
+    sync::mpsc,
+    time::{Instant, sleep_until},
+};
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
-    message_streaming::client,
-    remote_key_retriever::RemoteKeyRetriever,
-    server::MlsServer,
-    verifier::{local_verifier::LocalVerifier, remote_verifier::RemoteVerifier},
+    client::state::ClientStateUpdate, message_streaming::client::ClientStateHandle,
+    remote_key_retriever::RemoteKeyRetriever, server::MlsServer,
+    verifier::remote_verifier::RemoteVerifier,
 };
 
 pub struct UpdateUserMlsHandler {
     user_store: Arc<UserStore>,
     message_store: Arc<MessageStore>,
     key_package_store: Arc<KeyPackageStore>,
-    verifier: LocalVerifier,
     mls: Arc<MlsServer>,
     user_lock: Mutex<HashMap<SpkiHash, Arc<tokio::sync::Mutex<()>>>>,
 }
 
 impl UpdateUserMlsHandler {
     pub fn new(
-        verifier: LocalVerifier,
         user_store: Arc<UserStore>,
         message_store: Arc<MessageStore>,
         key_package_store: Arc<KeyPackageStore>,
         mls: Arc<MlsServer>,
     ) -> Self {
         Self {
-            verifier,
             user_store,
             message_store,
             key_package_store,
@@ -61,23 +60,6 @@ impl UpdateUserMlsHandler {
             user_lock: Mutex::new(HashMap::new()),
         }
     }
-}
-
-#[derive(Serialize, Deserialize)]
-struct UpdateData {
-    mls_store: ExportedMlsStore,
-    persistent_data: EncryptedObject<persistent::State>,
-    messages: Vec<(Uuid, MessageToMemberTransport)>,
-    key_package_count: u64,
-}
-
-#[derive(Serialize, Deserialize)]
-struct UpdateResponse {
-    mls_store: ExportedMlsStore,
-    persistent_data: EncryptedObject<persistent::State>,
-    handled: Vec<Uuid>,
-    key_packages: Vec<UnverifiedKeyPackage>,
-    messages: Vec<MessageToServerTransport>,
 }
 
 #[async_trait]
@@ -92,7 +74,7 @@ impl CommandHandler for UpdateUserMlsHandler {
         &self,
         session: &mut svalin_rpc::rpc::session::Session,
         _request: Self::Request,
-        _cancel: CancellationToken,
+        cancel: CancellationToken,
     ) -> anyhow::Result<()> {
         let peer = session.peer().certificate()?;
         if peer.certificate_type() != CertificateType::UserSession {
@@ -122,64 +104,82 @@ impl CommandHandler for UpdateUserMlsHandler {
         // I might want to somehow verify that new MlsState too. Maybe with a SignedObject?
         // Either way, the dispatcher should send both the updated MlsState, but also the ids of all messages which were processed.
 
-        let messages = self.message_store.load_all_for(&user_hash).await?;
-        let current_packages = self
-            .key_package_store
-            .count_key_packages(&user_hash)
-            .await?;
-
-        let data = UpdateData {
+        let saved_state = SavedState {
             mls_store: user.mls_store,
             persistent_data: user.persistent_data,
-            messages: messages,
-            key_package_count: current_packages,
         };
-        session.write_object(&data).await?;
+        session.write_object(&saved_state).await?;
 
-        let response = session.read_object::<UpdateResponse>().await?;
+        let (send, mut recv) = mpsc::channel(100);
+        tokio::spawn(stream_mls_messages(
+            user_hash.clone(),
+            send,
+            self.message_store.clone(),
+        ));
 
-        let user_cert = self
-            .verifier
-            .verify_spki_hash(&user_hash, get_current_timestamp())
-            .await?;
-        for key_package in response.key_packages {
-            let key_package = self
-                .mls
-                .verify_key_package(key_package, user_cert.spki_hash())
-                .await
-                .context("error verifying key package")?;
-            self.key_package_store.add_key_package(key_package).await?;
-        }
+        // Yield not implemented yet
+        let mut next_key_package_update = Instant::now();
 
-        let new_count = self
-            .key_package_store
-            .count_key_packages(&user_hash)
-            .await?;
-        debug!("new key package count: {}", new_count);
+        loop {
+            let update = select! {
+                received = recv.recv().fuse() => {
+                    if let Some((uuid, message)) = received {
+                        Update::Message(uuid, message)
+                    } else {
+                        break;
+                    }
+                },
+                _ = cancel.cancelled().fuse() => {
+                    break;
+                }
+                _ = sleep_until(next_key_package_update).fuse() => {
+                    next_key_package_update = Instant::now() + Duration::from_secs(60);
+                    Update::KeyPackageCount(self.key_package_store.count_key_packages(&user_hash).await?)
+                }
+            };
 
-        self.user_store
-            .update_mls_data(&user_hash, response.mls_store, response.persistent_data)
-            .await?;
+            session.write_object(&update).await?;
 
-        tracing::debug!(
-            "user mls aknowledged the following messages: {:?}",
-            &response.handled
-        );
-        self.message_store
-            .aknowledge_messages(&user_hash, &response.handled)
-            .await?;
+            let response = session.read_object::<ToServer>().await?;
+            tracing::debug!("user mls respone: {response:?}");
+            match response {
+                ToServer::StateUpdate {
+                    mls_store,
+                    persistent_data,
+                    key_packages,
+                    aknowledged,
+                    messages,
+                } => {
+                    for key_package in key_packages {
+                        let key_package = self
+                            .mls
+                            .verify_key_package(key_package, &user_hash)
+                            .await
+                            .context("error verifying key package")?;
+                        self.key_package_store.add_key_package(key_package).await?;
+                    }
 
-        for message in response.messages {
-            tracing::debug!("received message from user mls: {message:?}");
-            let to_send = self.mls.process_message(message).await?;
-            tracing::debug!("processing resulted in messages: {to_send:?}");
-            for mut message in to_send {
-                message.remove_receiver(&user_hash);
-                self.message_store.add_message(message).await?;
+                    self.user_store
+                        .update_mls_data(&user_hash, mls_store, persistent_data)
+                        .await?;
+
+                    self.message_store
+                        .aknowledge_messages(&user_hash, &aknowledged)
+                        .await?;
+
+                    for message in messages {
+                        tracing::debug!("received message from user mls: {message:?}");
+                        let to_send = self.mls.process_message(message).await?;
+                        tracing::debug!("processing resulted in messages: {to_send:?}");
+                        for mut message in to_send {
+                            message.remove_receiver(&user_hash);
+                            self.message_store.add_message(message).await?;
+                        }
+                    }
+                }
+                ToServer::OK => {}
             }
         }
-
-        session.write_object(&()).await?;
 
         // explicit drop, so I don't accidentally drop it beforehand
         drop(_user_lock);
@@ -187,16 +187,47 @@ impl CommandHandler for UpdateUserMlsHandler {
     }
 }
 
+async fn stream_mls_messages(
+    receiver: SpkiHash,
+    sender: mpsc::Sender<(Uuid, Arc<MessageToMemberTransport>)>,
+    message_store: Arc<MessageStore>,
+) {
+    if let Err(e) = stream_mls_messages_inner(receiver, sender, message_store).await {
+        tracing::error!("Error streaming mls messages: {}", e);
+    }
+}
+
+async fn stream_mls_messages_inner(
+    receiver: SpkiHash,
+    sender: mpsc::Sender<(Uuid, Arc<MessageToMemberTransport>)>,
+    message_store: Arc<MessageStore>,
+) -> Result<(), anyhow::Error> {
+    let current = message_store.load_all_for(&receiver).await?;
+    let mut subscription = message_store.subscribe(receiver.clone()).await;
+    for (uuid, message) in current {
+        if let Err(e) = sender.send((uuid, Arc::new(message))).await {
+            anyhow::bail!("Error sending message: {}", e);
+        }
+    }
+
+    while let Some(message) = subscription.recv().await {
+        let _ = sender.send(message).await;
+    }
+
+    Ok(())
+}
+
 pub struct UpdateUserMls {
-    pub key: Arc<EncryptionKey>,
+    pub key: EncryptionKey,
     pub user_credential: Credential,
     pub key_retriever: RemoteKeyRetriever,
     pub verifier: RemoteVerifier,
     pub session_mls: Arc<MlsClient<RemoteKeyRetriever, RemoteVerifier>>,
-    pub message_sender: client::ClientMessageDispatcherHandle,
-    pub update_channel: mpsc::Sender<persistent::State>,
+    pub state_handle: ClientStateHandle,
     pub cancel: CancellationToken,
 }
+
+const WANTED_KEY_PACKAGES: u64 = 100;
 
 impl CommandDispatcher for UpdateUserMls {
     type Output = ();
@@ -245,13 +276,15 @@ impl CommandDispatcher for UpdateUserMls {
 
             let mut aknowledge = Vec::new();
             let mut messages = Vec::new();
+            let mut key_packages = Vec::new();
             let mut should_yield = false;
+            let mut timeout_duration = Duration::from_secs(3);
 
             while !should_yield {
                 let Some(update) = self
                     .cancel
                     .run_until_cancelled(tokio::time::timeout(
-                        Duration::from_secs(3),
+                        timeout_duration,
                         session.read_object::<Update>(),
                     ))
                     .await
@@ -262,7 +295,12 @@ impl CommandDispatcher for UpdateUserMls {
                 let send_update;
 
                 if let Ok(update) = update {
+                    // No timeout, so other messages might follow directly afterwards
                     let update = update?;
+                    // Next timeout should be short, so we can send out updates as soon as possible
+                    // A bit of timeout is still good, so we have some debounce.
+                    timeout_duration = Duration::from_secs(3);
+                    tracing::debug!("user mls update: {update:?}");
                     match update {
                         Update::Message(uuid, message_to_member_transport) => {
                             let handled = client
@@ -281,6 +319,15 @@ impl CommandDispatcher for UpdateUserMls {
                             aknowledge.push(uuid);
                             send_update = aknowledge.len() >= 10;
                         }
+                        Update::KeyPackageCount(mut key_package_count) => {
+                            send_update = key_package_count < WANTED_KEY_PACKAGES;
+                            while key_package_count < WANTED_KEY_PACKAGES {
+                                let key_package =
+                                    client.create_key_package().await?.to_unverified();
+                                key_packages.push(key_package);
+                                key_package_count += 1;
+                            }
+                        }
                         Update::YieldRequest => {
                             send_update = true;
                             should_yield = true;
@@ -289,6 +336,10 @@ impl CommandDispatcher for UpdateUserMls {
                 } else {
                     // Timeout, so probably at the newest messages
                     if !aknowledge.is_empty() {
+                        // long timeout, since everything is taken care of.
+                        // Technically, there's not even a timeout neccesary.
+                        timeout_duration = Duration::from_secs(60);
+
                         // Here we check if we want to add our session to any needed groups
                         for (device, _) in persistent_data.devices() {
                             let group = SvalinGroupId::DeviceGroup(device.clone());
@@ -321,113 +372,27 @@ impl CommandDispatcher for UpdateUserMls {
 
                 if send_update {
                     let mls_store = export_handle.export(&self.key)?;
-                    let persistent_data = EncryptedObject::encrypt(&persistent_data, &self.key)?;
                     let state_update = ToServer::StateUpdate {
                         mls_store,
-                        persistent_data,
+                        persistent_data: EncryptedObject::encrypt(&persistent_data, &self.key)?,
                         aknowledged: mem::replace(&mut aknowledge, Vec::new()),
                         // TODO
-                        key_packages: Vec::new(),
+                        key_packages: mem::replace(&mut key_packages, Vec::new()),
                         messages: mem::replace(&mut messages, Vec::new()),
                     };
 
                     session.write_object(&state_update).await?;
+
+                    self.state_handle
+                        .update(ClientStateUpdate::Persistent(
+                            persistent::Message::UpdateFromMainState(persistent_data.clone()),
+                        ))
+                        .await?;
                 } else {
                     session.write_object(&ToServer::OK).await?;
                 }
             }
         }
-
-        // let data = session
-        //     .read_object::<UpdateData>()
-        //     .await
-        //     .context("Failed to read data")?;
-
-        // let (mls_store, export_handle) = SvalinStorage::import(data.mls_store, &self.key)
-        //     .context("error importing mls storage")?;
-        // let mut persistent_data = data
-        //     .persistent_data
-        //     .decrypt(&self.key)
-        //     .context("error decrypting persistent data")?;
-        // let client = MlsClient::new(
-        //     self.user_credential,
-        //     mls_store,
-        //     self.key_retriever,
-        //     self.verifier,
-        // )
-        // .context("error building mls client")?;
-        // debug!("Temporary MLS client created, processing messages");
-
-        // let mut handled = Vec::new();
-
-        // for (uuid, message) in data.messages {
-        //     tracing::debug!("user mls handling message: {uuid}");
-        //     let processed = client
-        //         .handle_message::<SystemReport>(&message)
-        //         .await
-        //         .context("error processing message")?;
-
-        //     handled.push(uuid);
-
-        //     match processed.content {
-        //         MessageDataContent::Report(spki_hash, report) => {
-        //             persistent_data
-        //                 .update(persistent::Message::UpdateSystemReport(spki_hash, report));
-        //         }
-        //         MessageDataContent::Internal => (),
-        //     }
-        // }
-
-        // let mut messages = Vec::new();
-
-        // for (device, _) in persistent_data.devices() {
-        //     let group = SvalinGroupId::DeviceGroup(device.clone());
-        //     if !client.is_member(&group, self.session_mls.me()).await? {
-        //         let key_package = self.session_mls.create_key_package().await?;
-        //         let message = client.add_member(&group, key_package).await?;
-        //         messages.push(message);
-        //     }
-
-        //     if let Some(message) = client
-        //         .create_meta_group_if_missing(device.clone())
-        //         .await
-        //         .map_err(|err| anyhow!(err))?
-        //     {
-        //         tracing::debug!("new meta group: {message:?}");
-        //         messages.push(message);
-        //     }
-        //     let meta_group = SvalinGroupId::DeviceMetaGroup(device.clone());
-        //     if !client.is_member(&meta_group, self.session_mls.me()).await? {
-        //         let key_package = self.session_mls.create_key_package().await?;
-        //         let message = client.add_member(&meta_group, key_package).await?;
-        //         messages.push(message);
-        //     }
-        // }
-
-        // let mut key_packages = Vec::new();
-        // while data.key_package_count + (key_packages.len() as u64) < 100 {
-        //     let key_package = client.create_key_package().await?.to_unverified();
-        //     key_packages.push(key_package);
-        // }
-
-        // let encrypted_data = EncryptedObject::encrypt(&persistent_data, &self.key)?;
-        // let exported_mls_store = export_handle.export(&self.key)?;
-
-        // debug!("MLS client processed messages, sending response");
-
-        // let response = UpdateResponse {
-        //     mls_store: exported_mls_store,
-        //     persistent_data: encrypted_data,
-        //     handled,
-        //     key_packages,
-        //     messages,
-        // };
-
-        // session.write_object(&response).await?;
-
-        // session.read_object::<()>().await?;
-
-        // Ok(persistent_data)
     }
 }
 
@@ -437,13 +402,14 @@ struct SavedState {
     persistent_data: EncryptedObject<persistent::State>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 enum Update {
-    Message(Uuid, MessageToMemberTransport),
+    Message(Uuid, Arc<MessageToMemberTransport>),
+    KeyPackageCount(u64),
     YieldRequest,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 enum ToServer {
     StateUpdate {
         mls_store: ExportedMlsStore,

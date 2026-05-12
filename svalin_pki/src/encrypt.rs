@@ -7,6 +7,7 @@ use ring::aead::{
     SealingKey, UnboundKey,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use zeroize::ZeroizeOnDrop;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 enum EncryptionAlgorithm {
@@ -23,6 +24,7 @@ impl From<EncryptionAlgorithm> for &'static ring::aead::Algorithm {
     }
 }
 
+#[derive(ZeroizeOnDrop)]
 pub struct EncryptionKey([u8; 32]);
 
 impl EncryptionKey {

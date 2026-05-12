@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::Debug,
     sync::{Arc, RwLock},
 };
 
@@ -79,6 +80,12 @@ pub enum SvalinStorage {
 #[derive(Serialize, Deserialize)]
 pub struct ExportedMlsStore {
     data: EncryptedObject<HashMap<Vec<u8>, Vec<u8>>>,
+}
+
+impl Debug for ExportedMlsStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExportedMlsStore").finish()
+    }
 }
 
 impl SvalinStorage {

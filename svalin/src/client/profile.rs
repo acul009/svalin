@@ -275,52 +275,23 @@ impl Client {
         let cancel = client.cancel.clone();
         let user_credential = client.user_credential.clone();
         let session_mls = mls.clone();
-        let message_sender = dispatcher_handle.clone();
         let state_handle = client.state_handle.clone();
         client.background_tasks.spawn(async move {
             debug!("starting user mls update task");
-            let cancel = cancel;
-            let key_retriever = key_retriever;
-            let user_credential = user_credential;
             let verifier = remote_verifier;
-            let session_mls = session_mls;
-            let message_sender = message_sender;
-            let key = Arc::new(key);
-            loop {
-                match connection
-                    .dispatch(UpdateUserMls {
-                        key: key.clone(),
-                        key_retriever: key_retriever.clone(),
-                        user_credential: user_credential.clone(),
-                        verifier: verifier.clone(),
-                        session_mls: session_mls.clone(),
-                        message_sender: message_sender.clone(),
-                    })
-                    .await
-                {
-                    Ok(main_state) => {
-                        if let Err(err) = state_handle
-                            .update(ClientStateUpdate::Persistent(
-                                persistent::Message::UpdateFromMainState(main_state),
-                            ))
-                            .await
-                        {
-                            tracing::error!("error while sending main state update: {:#}", err);
-                        }
-                    }
-                    Err(err) => tracing::error!("error while updating user mls: {:#}", err),
-                }
-                #[cfg(not(test))]
-                let timeout = Duration::from_secs(30);
-                #[cfg(test)]
-                let timeout = Duration::from_secs(10);
-                if cancel
-                    .run_until_cancelled(tokio::time::sleep(timeout))
-                    .await
-                    .is_none()
-                {
-                    break;
-                }
+            if let Err(err) = connection
+                .dispatch(UpdateUserMls {
+                    key: key,
+                    key_retriever: key_retriever,
+                    user_credential: user_credential,
+                    verifier: verifier,
+                    session_mls: session_mls,
+                    cancel,
+                    state_handle,
+                })
+                .await
+            {
+                tracing::error!("failed to update user mls: {}", err);
             }
         });
 
