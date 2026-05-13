@@ -143,12 +143,6 @@ impl WaitForConfirm {
             .await
             .context("error saving init data")?;
 
-        tokio::time::sleep(Duration::from_secs(3)).await;
-
-        Agent::run(cancel)
-            .await
-            .context("error opening agent after init")?;
-
         Ok(())
     }
 }

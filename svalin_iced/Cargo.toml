@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 
 svalin = { path = "../svalin" }
+svalin_client_store = { path = "../store_client" }
 svalin_pki = { path = "../svalin_pki" }
 svalin_rpc = { path = "../svalin_rpc" }
 svalin_sysctl = { path = "../svalin_sysctl" }

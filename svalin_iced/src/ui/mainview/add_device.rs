@@ -6,7 +6,7 @@ use iced::{
     widget::{button, operation, text_input},
 };
 use svalin::client::Client;
-use svalin_pki::Certificate;
+use svalin_pki::{Certificate, SpkiHash};
 use tokio::sync::oneshot;
 
 use crate::{
@@ -52,7 +52,7 @@ pub enum Action {
     None,
     Run(Task<Message>),
     Close,
-    Done(Certificate),
+    Done(SpkiHash),
 }
 
 impl AddDevice {
@@ -154,7 +154,7 @@ impl AddDevice {
 
                 Action::None
             }
-            Message::Done(certificate) => Action::Done(certificate),
+            Message::Done(certificate) => Action::Done(certificate.spki_hash().clone()),
         }
     }
 

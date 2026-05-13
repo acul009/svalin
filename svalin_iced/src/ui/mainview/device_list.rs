@@ -99,6 +99,9 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                             .padding(10)
                             .width(Length::Fill),
                         )
+                        .on_press_maybe(
+                            device_list.on_select.as_ref().map(|f| f(spki_hash.clone())),
+                        )
                         .style(button::subtle)
                         .into()
                     }),

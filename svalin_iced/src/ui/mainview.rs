@@ -9,12 +9,17 @@ use svalin::client::{
     Client,
     state::{ClientState, ClientStateUpdate},
 };
+use svalin_pki::SpkiHash;
 use tokio::sync::broadcast;
 
-use crate::ui::widgets::{error_display, loading};
+use crate::ui::{
+    mainview::device_view::DeviceView,
+    widgets::{error_display, loading},
+};
 
 mod add_device;
 mod device_list;
+mod device_view;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -22,7 +27,9 @@ pub enum Message {
     Error(Arc<anyhow::Error>),
     UpdateState(ClientStateUpdate),
     OpenAddDevice,
+    SelectDevice(SpkiHash),
     AddDevice(add_device::Message),
+    DeviceView(device_view::Message),
 }
 
 pub enum Action {
@@ -35,6 +42,7 @@ enum Screen {
     Loading(String),
     DeviceList,
     AddDevice(add_device::AddDevice),
+    DeviceView(device_view::DeviceView),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,6 +109,10 @@ impl MainView {
                 self.state.update(update);
                 Action::None
             }
+            Message::SelectDevice(spki_hash) => {
+                self.screen = Screen::DeviceView(DeviceView::new(spki_hash));
+                Action::None
+            }
             Message::OpenAddDevice => {
                 let (add_device, task) = add_device::AddDevice::new();
                 self.screen = Screen::AddDevice(add_device);
@@ -113,11 +125,29 @@ impl MainView {
 
                 match add_device.update(message, &self.client) {
                     add_device::Action::None => Action::None,
-                    add_device::Action::Close | add_device::Action::Done(_) => {
+                    add_device::Action::Close => {
                         self.screen = Screen::DeviceList;
                         Action::None
                     }
+                    add_device::Action::Done(spki_hash) => {
+                        self.screen = Screen::DeviceView(DeviceView::new(spki_hash));
+                        Action::None
+                    }
                     add_device::Action::Run(task) => Action::Run(task.map(Message::AddDevice)),
+                }
+            }
+            Message::DeviceView(message) => {
+                let Screen::DeviceView(device_view) = &mut self.screen else {
+                    return Action::None;
+                };
+
+                match device_view.update(message) {
+                    device_view::Action::None => Action::None,
+                    device_view::Action::Back => {
+                        self.screen = Screen::DeviceList;
+                        Action::None
+                    }
+                    device_view::Action::Run(task) => Action::Run(task.map(Message::DeviceView)),
                 }
             }
         }
@@ -132,8 +162,12 @@ impl MainView {
             Screen::Loading(text) => loading(text).into(),
             Screen::DeviceList => device_list::DeviceList::new(&self.state)
                 .on_new(Message::OpenAddDevice)
+                .on_select(Message::SelectDevice)
                 .into(),
             Screen::AddDevice(add_device) => add_device.view().map(Message::AddDevice),
+            Screen::DeviceView(device_view) => {
+                device_view.view(&self.state).map(Message::DeviceView)
+            }
         }
     }
 

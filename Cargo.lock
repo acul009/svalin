@@ -6609,6 +6609,7 @@ dependencies = [
  "lyon_algorithms",
  "rust-i18n",
  "svalin",
+ "svalin_client_store",
  "svalin_pki",
  "svalin_rpc",
  "svalin_sysctl",

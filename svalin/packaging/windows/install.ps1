@@ -53,7 +53,7 @@ Welcome to the Svalin setup script. What do you want to do?
 $choice = Get-UserChoice -Prompt $prompt -ValidChoices @("1", "2", "0")
 
 switch ($choice) {
-    "0" { 
+    "0" {
         Write-Host ""
         Write-Host "Goodbye!"
         Write-Host ""
@@ -116,7 +116,11 @@ Do you want to continue? (y/n)
             exit 1
         }
 
+        $needs_init = $true
+
         if (Test-Path "$default_install_path") {
+            $needs_init = $false
+
             $prompt = @"
 It seems like Svalin is already installed under "$default_install_path".
 
@@ -203,8 +207,37 @@ Do you want to overwrite it? (y/n)
         Write-Host "Svalin agent has been installed successfully!"
         Write-Host ""
         Write-Host ""
+
+        if (-not $needs_init) {
+            exit 0
+        }
+
+        $success = $false
+        while (-not $success) {
+            try {
+                $host = Read-Host "Please enter the hostname and ort to connect to:"
+                & "$default_install_path\svalin.exe" init $host
+                $success = $true
+            } catch {
+            }
+        }
+
+        Start-Service -Name "$agent_service_name"
+        Set-Service -Name "$agent_service_name" -StartupType Automatic
     }
-    "2" { 
+    "2" {
         Write-Host "Uninstalling Svalin agent..."
+
+        Stop-Service -Name "$agent_service_name" -Force
+        Remove-Service -Name "$agent_service_name" -Force
+
+        Remove-Item -Path "$default_install_path" -Recurse -Force
+        Remove-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$agent_name" -Recurse -Force
+
+        Write-Host ""
+        Write-Host ""
+        Write-Host "Svalin agent has been uninstalled successfully!"
+        Write-Host ""
+        Write-Host ""
     }
 }
