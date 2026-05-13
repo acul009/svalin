@@ -172,7 +172,12 @@ impl MainView {
     }
 
     pub fn header(&self) -> crate::Element<'_, Message> {
-        widget::space().into()
+        match &self.screen {
+            Screen::DeviceView(device_view) => {
+                device_view.header(&self.state).map(Message::DeviceView)
+            }
+            _ => widget::space().into(),
+        }
     }
 
     pub fn context(&self) -> Option<crate::Element<'_, Message>> {

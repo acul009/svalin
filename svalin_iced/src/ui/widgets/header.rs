@@ -1,11 +1,13 @@
 use iced::{
     Length,
+    alignment::Vertical,
     widget::{button, row},
 };
 
-use crate::Element;
-
-use super::icon;
+use crate::{
+    Element, bootstrap,
+    ui::widgets::scaffold::{HEADER_HEIGHT, HEADER_PADDING},
+};
 
 pub struct Header<'a, Message> {
     content: Element<'a, Message>,
@@ -39,7 +41,7 @@ impl<'a, Message: Clone + 'static> From<Header<'a, Message>> for Element<'a, Mes
             None => row!(),
             Some(on_back) => row![
                 button(
-                    icon::back()
+                    bootstrap::arrow_left()
                         .size(20)
                         .width(Length::Fill)
                         .height(Length::Fill)
@@ -47,10 +49,10 @@ impl<'a, Message: Clone + 'static> From<Header<'a, Message>> for Element<'a, Mes
                 )
                 .on_press(on_back)
                 .height(Length::Fill)
-                .width(40),
+                .width(HEADER_HEIGHT),
             ]
-            .padding(5)
-            .spacing(5),
+            .align_y(Vertical::Center)
+            .spacing(HEADER_PADDING),
         };
 
         row = row.push(header.content);

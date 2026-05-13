@@ -10,18 +10,14 @@ pub mod dialog;
 pub mod error_display;
 pub mod form;
 pub mod header;
-pub mod icon;
 pub mod loading;
 pub mod percent_display;
 pub mod progress_circle;
 // pub mod realtime;
 pub mod scaffold;
 
-pub fn card<'a, Message>(
-    title: impl Into<Element<'a, Message>>,
-    content: impl Into<Element<'a, Message>>,
-) -> card::Card<'a, Message> {
-    card::Card::new(title, content)
+pub fn card<'a, Message>(content: impl Into<Element<'a, Message>>) -> card::Card<'a, Message> {
+    card::Card::new(content)
 }
 
 pub fn form<'a, Message>() -> form::Form<'a, Message> {

@@ -10,9 +10,9 @@ use iced::{
 // };
 use svalin::client::state::ClientState;
 use svalin_pki::SpkiHash;
-use svalin_sysctl::sytem_report::OS;
+use svalin_sysctl::sytem_report::OSFamily;
 
-use crate::{Element, bootstrap, ui::widgets::icon};
+use crate::{Element, bootstrap};
 
 pub struct DeviceList<'a, Message> {
     state: &'a ClientState,
@@ -45,7 +45,7 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
         stack![
             container(
                 button(
-                    row![icon::add().size(30), text(t!("device_list.add"))]
+                    row![bootstrap::plus().size(30), text(t!("device_list.add"))]
                         .align_y(Center)
                         .spacing(10)
                         .padding([0, 10])
@@ -70,9 +70,9 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                         button(
                             row![
                                 match persistent.os() {
-                                    OS::Windows => bootstrap::windows(),
-                                    OS::Linux => bootstrap::tux(),
-                                    OS::Unknown => bootstrap::laptop(),
+                                    OSFamily::Windows => bootstrap::windows(),
+                                    OSFamily::Linux => bootstrap::tux(),
+                                    OSFamily::Unknown => bootstrap::laptop(),
                                 }
                                 .size(16)
                                 .color(color),

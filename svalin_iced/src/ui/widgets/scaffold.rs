@@ -1,5 +1,6 @@
 use iced::{
-    Color, Length, Shadow,
+    Color, Length, Pixels, Shadow,
+    alignment::Vertical,
     widget::{column, container, row, rule, stack},
 };
 
@@ -73,6 +74,9 @@ impl<'a, Message> Scaffold<'a, Message> {
     }
 }
 
+pub const HEADER_HEIGHT: Pixels = Pixels(35.0);
+pub const HEADER_PADDING: Pixels = Pixels(7.5);
+
 impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, Message> {
     fn from(scaffold: Scaffold<'a, Message>) -> Self {
         let has_header = scaffold.header.is_some();
@@ -89,7 +93,10 @@ impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, M
                             },
                             ..Default::default()
                         })
-                        .height(50)
+                        .align_y(Vertical::Center)
+                        .padding(HEADER_PADDING)
+                        .height(HEADER_HEIGHT + HEADER_PADDING + HEADER_PADDING)
+                        .width(Length::Fill)
                 }),
                 has_header.then(|| rule::horizontal(2)),
                 row![

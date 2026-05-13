@@ -67,8 +67,10 @@ impl ClientStore {
             let row = row?;
             let spki_hash = SpkiHash::from_slice(&row.spki_hash)
                 .expect("values should have been checked when saving in the db");
-            let report = postcard::from_bytes(&row.report)?;
-            state.update(Message::UpdateSystemReport(spki_hash, report));
+            match postcard::from_bytes(&row.report) {
+                Ok(report) => state.update(Message::UpdateSystemReport(spki_hash, report)),
+                Err(err) => tracing::error!("failed to load report: {}", err),
+            }
         }
 
         Ok(state)

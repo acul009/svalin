@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::Element;
+use crate::{Element, bootstrap};
 use iced::{
     Length, Task,
     alignment::Vertical,
@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::{
     types::error_display_info::ErrorDisplayInfo,
-    widgets::{dialog, form, icon, loading},
+    widgets::{dialog, form, loading},
 };
 
 mod init_server;
@@ -272,7 +272,7 @@ impl ProfilePicker {
                             .on_press(Message::SelectProfile(p.clone()))
                             .width(Length::Fill)
                             .height(Length::Fill),
-                        button(icon::delete().size(20).height(Length::Fill).center())
+                        button(bootstrap::trash().size(20).height(Length::Fill).center())
                             .on_press(Message::DeleteProfile(p.clone()))
                             .width(60)
                             .height(Length::Fill)
@@ -285,7 +285,7 @@ impl ProfilePicker {
 
                 let overlay = container(
                     button(
-                        row![icon::add().size(30), text(t!("profile-picker.add"))]
+                        row![bootstrap::plus().size(30), text(t!("profile-picker.add"))]
                             .align_y(Vertical::Center)
                             .spacing(10)
                             .padding([0, 10]),

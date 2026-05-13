@@ -1,4 +1,4 @@
-use ui::{UI, widgets::icon};
+use ui::UI;
 
 pub mod ui;
 pub mod util;
@@ -27,7 +27,6 @@ fn main() {
         .title(UI::title)
         .subscription(UI::subscription)
         .theme(|_: &'_ UI, _| iced::Theme::Dark)
-        .font(icon::FONT)
         .font(BOOTSTRAP_FONT_BYTES)
         .antialiasing(true)
         .run()

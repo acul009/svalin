@@ -6,21 +6,23 @@ use iced::{
 use crate::Element;
 
 pub struct Card<'a, Message> {
-    title: Element<'a, Message>,
+    title: Option<Element<'a, Message>>,
     content: Element<'a, Message>,
     padding: Pixels,
 }
 
 impl<'a, Message> Card<'a, Message> {
-    pub fn new(
-        title: impl Into<Element<'a, Message>>,
-        content: impl Into<Element<'a, Message>>,
-    ) -> Self {
+    pub fn new(content: impl Into<Element<'a, Message>>) -> Self {
         Self {
-            title: title.into(),
+            title: None,
             content: content.into(),
             padding: Pixels(16.0),
         }
+    }
+
+    pub fn title(mut self, title: impl Into<Element<'a, Message>>) -> Self {
+        self.title = Some(title.into());
+        self
     }
 
     pub fn padding(mut self, padding: Pixels) -> Self {

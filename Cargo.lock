@@ -6592,6 +6592,7 @@ dependencies = [
  "svalin_pki",
  "svalin_sysctl",
  "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]

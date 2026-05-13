@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap, fmt::Debug};
 
 use serde::{Deserialize, Serialize};
 use svalin_pki::SpkiHash;
-use svalin_sysctl::sytem_report::{OS, SystemReport};
+use svalin_sysctl::sytem_report::{OSFamily, SystemReport};
 
 /// This contains the persistent state of the clients available information.
 /// It is not meant to contain live information like current cpu usage or online status.
@@ -76,12 +76,17 @@ impl DeviceState {
     }
 
     pub fn name(&self) -> Cow<'_, str> {
+        if let Some(report) = self.system_report() {
+            if let Some(hostname) = &report.hostname {
+                return hostname.into();
+            }
+        }
         self.spki_hash.to_string().into()
     }
 
-    pub fn os(&self) -> OS {
+    pub fn os(&self) -> OSFamily {
         self.system_report()
-            .map(|report| report.os)
-            .unwrap_or(OS::Unknown)
+            .map(|report| report.os_family)
+            .unwrap_or(OSFamily::Unknown)
     }
 }
