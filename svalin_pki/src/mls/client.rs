@@ -79,7 +79,7 @@ where
             .unpack()
             .map_err(|err| {
                 tracing::error!("unpack error: {err}");
-                err
+                anyhow!("{}", err)
             })
             .context("unpack error")?
         {

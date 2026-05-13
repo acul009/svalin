@@ -607,6 +607,11 @@ impl MlsProcessor {
         group_id: GroupId,
         key_package: KeyPackage,
     ) -> Result<MessageToServerTransport, anyhow::Error> {
+        tracing::debug!(
+            "Adding member {} to group {}",
+            key_package.spki_hash(),
+            String::from_utf8_lossy(group_id.as_slice())
+        );
         let group = Self::get_group(&mut self.group_cache, &self.provider.storage(), group_id)?;
         let key_packages = [key_package.unpack()];
 
