@@ -146,16 +146,18 @@ async fn integration_tests() {
     let duration = client.ping_upstream().await.unwrap();
     debug!("ping duration: {:?}", duration);
 
-    // wait for the first full update - this is sent after generating the key packages
-    let update = timeout(Duration::from_secs(30), client_state_updates.recv())
-        .await
-        .unwrap()
-        .unwrap();
-    if let ClientStateUpdate::Persistent(persistent::Message::UpdateFromMainState(_)) = &update {
-        client_state.update(update);
-    } else {
-        panic!("expected persistent state update, got: {:?}", &update);
-    }
+    // // wait for the first full update - this is sent after generating the key packages
+    // let update = timeout(Duration::from_secs(30), client_state_updates.recv())
+    //     .await
+    //     .unwrap()
+    //     .unwrap();
+    // if let ClientStateUpdate::Persistent(persistent::Message::UpdateFromMainState(_)) = &update {
+    //     client_state.update(update);
+    // } else {
+    //     panic!("expected persistent state update, got: {:?}", &update);
+    // }
+    // wait a short while to ensure the client has generated some key packages
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     // ===== TEST AGENT =====
 

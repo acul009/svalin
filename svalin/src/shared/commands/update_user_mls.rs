@@ -136,7 +136,12 @@ impl CommandHandler for UpdateUserMlsHandler {
                     // Todo: make the object reader / chunk reader cancel save with an internal buffer
                     let response = response?;
                     tracing::info!("user mls initiative: {response:?}");
-                    self.handle_response(&user_hash, response).await?;
+
+                    let handle_result = self.handle_response(&user_hash, response).await;
+                    let send_result = handle_result.as_ref().map(|_| ()).map_err(|_| ());
+                    session.write_object(&send_result).await?;
+                    handle_result?;
+
                     continue;
                 }
                 _ = sleep_until(next_key_package_update).fuse() => {
@@ -149,7 +154,11 @@ impl CommandHandler for UpdateUserMlsHandler {
 
             let response = session.read_object::<ToServer>().await?;
             tracing::debug!("user mls respone: {response:?}");
-            self.handle_response(&user_hash, response).await?;
+
+            let handle_result = self.handle_response(&user_hash, response).await;
+            let send_result = handle_result.as_ref().map(|_| ()).map_err(|_| ());
+            session.write_object(&send_result).await?;
+            handle_result?;
         }
 
         // explicit drop, so I don't accidentally drop it beforehand
@@ -384,20 +393,14 @@ impl CommandDispatcher for UpdateUserMls {
                         }
                     }
 
-                    // We likely just found a group which contains data we don't have yet.
-                    // So it's a good idea to send that update to the session's state
-                    if !messages.is_empty() {
-                        self.state_handle
-                            .update(ClientStateUpdate::Persistent(
-                                persistent::Message::UpdateFromMainState(persistent_data.clone()),
-                            ))
-                            .await?;
-                    }
-
                     send_update = !aknowledge.is_empty() || !messages.is_empty();
                 }
 
                 if send_update {
+                    // We likely just found a group which contains data we don't have yet.
+                    // So it's a good idea to send that update to the session's state
+                    let update_session_state = !messages.is_empty();
+
                     let mls_store = export_handle.export(&self.key)?;
                     let state_update = ToServer::StateUpdate {
                         mls_store,
@@ -409,8 +412,22 @@ impl CommandDispatcher for UpdateUserMls {
                     };
 
                     session.write_object(&state_update).await?;
+                    if session.read_object::<Result<(), ()>>().await.is_err() {
+                        tracing::error!("server warned about error in user mls update");
+                    }
+
+                    if update_session_state {
+                        self.state_handle
+                            .update(ClientStateUpdate::Persistent(
+                                persistent::Message::UpdateFromMainState(persistent_data.clone()),
+                            ))
+                            .await?;
+                    }
                 } else {
                     session.write_object(&ToServer::OK).await?;
+                    if session.read_object::<Result<(), ()>>().await.is_err() {
+                        tracing::error!("server warned about error in user mls update");
+                    }
                 }
             }
         }
