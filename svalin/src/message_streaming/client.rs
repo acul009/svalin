@@ -4,7 +4,6 @@ use anyhow::{Context, anyhow};
 use svalin_client_store::{ClientStore, persistent};
 use svalin_pki::mls::client::MessageDataContent;
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
-use svalin_sysctl::sytem_report::SystemReport;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
@@ -182,6 +181,12 @@ impl ClientMessageReceiver {
                     MessageDataContent::Report(spki_hash, report) => {
                         self.update_client_state(ClientStateUpdate::Persistent(
                             persistent::Message::UpdateSystemReport(spki_hash, report),
+                        ))
+                        .await;
+                    }
+                    MessageDataContent::MetaInfo(spki_hash, meta_info) => {
+                        self.update_client_state(ClientStateUpdate::Persistent(
+                            persistent::Message::UpdateMetaInfo(spki_hash, meta_info),
                         ))
                         .await;
                     }

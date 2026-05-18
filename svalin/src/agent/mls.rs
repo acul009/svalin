@@ -2,22 +2,20 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use futures::{FutureExt, select};
-use svalin_pki::mls::agent::MlsAgent;
 use svalin_sysctl::sytem_report::SystemReport;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     message_streaming::{MessageFromAgent, agent::AgentMessageDispatcherHandle},
-    remote_key_retriever::RemoteKeyRetriever,
-    verifier::remote_verifier::RemoteVerifier,
+    mls::MlsAgent,
 };
 
 // Todo: repeat this periodically if it fails - also needs to account for dropping the welcome message to the server
 // That basically means the server should send a signal to the agent upon connecting if this group is missing, causing a recreation
 // The recreation will need to be checked though, so we're not accidentally deleting a modified group because of a malicious server
 pub(super) async fn ensure_group_exists(
-    mls: &MlsAgent<RemoteKeyRetriever, RemoteVerifier>,
+    mls: &MlsAgent,
     messager_handle: &AgentMessageDispatcherHandle,
 ) -> Result<(), anyhow::Error> {
     if let Some(message) = mls
@@ -32,7 +30,7 @@ pub(super) async fn ensure_group_exists(
 
 const SYSTEM_REPORT_INTERVAL: Duration = Duration::from_secs(60 * 30); // 24 hours
 pub(super) async fn schedule_system_reports(
-    mls: Arc<MlsAgent<RemoteKeyRetriever, RemoteVerifier>>,
+    mls: Arc<MlsAgent>,
     messager_handle: AgentMessageDispatcherHandle,
     cancel: CancellationToken,
     notify: Arc<Notify>,
@@ -51,7 +49,7 @@ pub(super) async fn schedule_system_reports(
 }
 
 async fn send_system_report(
-    mls: &MlsAgent<RemoteKeyRetriever, RemoteVerifier>,
+    mls: &MlsAgent,
     messager_handle: &AgentMessageDispatcherHandle,
 ) -> Result<(), anyhow::Error> {
     tracing::debug!("Generating and sending system report");

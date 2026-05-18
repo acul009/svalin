@@ -14,7 +14,7 @@ use svalin_pki::{
     CertificateType, Credential, EncryptedObject, EncryptionKey, SpkiHash,
     mls::{
         SvalinGroupId,
-        client::{MessageDataContent, MlsClient},
+        client::MessageDataContent,
         key_package::UnverifiedKeyPackage,
         provider::{ExportedMlsStore, SvalinStorage},
         transport_types::{MessageToMemberTransport, MessageToServerTransport},
@@ -22,7 +22,6 @@ use svalin_pki::{
 };
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
 use svalin_server_store::{KeyPackageStore, MessageStore, UserStore};
-use svalin_sysctl::sytem_report::SystemReport;
 use tokio::{
     sync::mpsc,
     time::{Instant, sleep_until},
@@ -32,7 +31,7 @@ use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
-    client::state::ClientStateUpdate, message_streaming::client::ClientStateHandle,
+    client::state::ClientStateUpdate, message_streaming::client::ClientStateHandle, mls::MlsClient,
     remote_key_retriever::RemoteKeyRetriever, server::MlsServer,
     verifier::remote_verifier::RemoteVerifier,
 };
@@ -250,7 +249,7 @@ pub struct UpdateUserMls {
     pub user_credential: Credential,
     pub key_retriever: RemoteKeyRetriever,
     pub verifier: RemoteVerifier,
-    pub session_mls: Arc<MlsClient<RemoteKeyRetriever, RemoteVerifier>>,
+    pub session_mls: Arc<MlsClient>,
     pub state_handle: ClientStateHandle,
     pub cancel: CancellationToken,
 }
@@ -331,15 +330,19 @@ impl CommandDispatcher for UpdateUserMls {
                     tracing::debug!("user mls update: {update:?}");
                     match update {
                         Update::Message(uuid, message_to_member_transport) => {
-                            let handled = client
-                                .handle_message::<SystemReport>(&message_to_member_transport)
-                                .await?;
+                            let handled =
+                                client.handle_message(&message_to_member_transport).await?;
 
                             match handled.content {
                                 MessageDataContent::Report(spki_hash, report) => {
                                     persistent_data.update(
                                         persistent::Message::UpdateSystemReport(spki_hash, report),
                                     );
+                                }
+                                MessageDataContent::MetaInfo(spki_hash, meta_info) => {
+                                    persistent_data.update(persistent::Message::UpdateMetaInfo(
+                                        spki_hash, meta_info,
+                                    ));
                                 }
                                 MessageDataContent::Internal => {}
                             }

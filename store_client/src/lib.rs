@@ -32,9 +32,18 @@ impl ClientStore {
             persistent::Message::UpdateSystemReport(spki_hash, system_report) => {
                 let report = postcard::to_stdvec(system_report)?;
                 let spki_hash = spki_hash.as_slice();
-                let generated_at = system_report.generated_at as i64;
+                let generated_at = system_report.system_report.generated_at as i64;
 
                 sqlx::query!("INSERT INTO system_reports (spki_hash, report, generated_at) VALUES (?, ?, ?) ON CONFLICT(spki_hash) DO UPDATE SET report = ? where generated_at < ?", spki_hash, report, generated_at, report, generated_at)
+                    .execute(&self.pool)
+                    .await?;
+            }
+            persistent::Message::UpdateMetaInfo(spki_hash, meta_info) => {
+                let info = postcard::to_stdvec(meta_info)?;
+                let spki_hash = spki_hash.as_slice();
+                let updated_at = meta_info.updated_at as i64;
+
+                sqlx::query!("INSERT INTO meta_info (spki_hash, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(spki_hash) DO UPDATE SET data = ? where updated_at < ?", spki_hash, info, updated_at, info, updated_at)
                     .execute(&self.pool)
                     .await?;
             }
@@ -43,7 +52,7 @@ impl ClientStore {
                     if let Some(system_report) = &device.report {
                         let report = postcard::to_stdvec(system_report)?;
                         let spki_hash = spki_hash.as_slice();
-                        let generated_at = system_report.generated_at as i64;
+                        let generated_at = system_report.system_report.generated_at as i64;
 
                         sqlx::query!("INSERT INTO system_reports (spki_hash, report, generated_at) VALUES (?, ?, ?) ON CONFLICT(spki_hash) DO UPDATE SET report = ? where generated_at < ?", spki_hash, report, generated_at, report, generated_at)
                         .execute(&self.pool)

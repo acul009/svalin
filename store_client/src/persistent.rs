@@ -17,7 +17,8 @@ pub struct State {
 
 #[derive(Clone, Debug)]
 pub enum Message {
-    UpdateSystemReport(SpkiHash, Svalin),
+    UpdateSystemReport(SpkiHash, SvalinReport),
+    UpdateMetaInfo(SpkiHash, SvalinMetaInfo),
     UpdateFromMainState(State),
 }
 
@@ -33,11 +34,20 @@ impl State {
             Message::UpdateSystemReport(spki_hash, system_report) => {
                 self.get_device_entry(spki_hash).report = Some(system_report)
             }
+            Message::UpdateMetaInfo(spki_hash, meta_info) => {
+                self.get_device_entry(spki_hash).meta_info = Some(meta_info)
+            }
             Message::UpdateFromMainState(state) => {
                 for (spki_hash, other_device) in state.devices {
                     let device = self.get_device_entry(spki_hash);
-                    let current_report = device.report().map(|r| r.generated_at).unwrap_or(0);
-                    let other_report = other_device.report().map(|r| r.generated_at).unwrap_or(0);
+                    let current_report = device
+                        .report()
+                        .map(|r| r.system_report.generated_at)
+                        .unwrap_or(0);
+                    let other_report = other_device
+                        .report()
+                        .map(|r| r.system_report.generated_at)
+                        .unwrap_or(0);
                     if current_report < other_report {
                         device.report = other_device.report;
                     }
@@ -78,8 +88,8 @@ impl DeviceState {
     }
 
     pub fn name(&self) -> Cow<'_, str> {
-        if let Some(report) = self.system_report() {
-            if let Some(hostname) = &report.hostname {
+        if let Some(report) = self.report() {
+            if let Some(hostname) = &report.system_report.hostname {
                 return hostname.into();
             }
         }
@@ -87,8 +97,8 @@ impl DeviceState {
     }
 
     pub fn os(&self) -> OSFamily {
-        self.system_report()
-            .map(|report| report.os_family)
+        self.report()
+            .map(|report| report.system_report.os_family)
             .unwrap_or(OSFamily::Unknown)
     }
 }
@@ -100,6 +110,7 @@ pub struct SvalinReport {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SvalinMetaInfo {
+    pub updated_at: u64,
     pub name: String,
     pub group: String,
 }

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use svalin_sysctl::sytem_report::SystemReport;
+use svalin_client_store::persistent::{SvalinMetaInfo, SvalinReport};
 
 use crate::{
     remote_key_retriever::RemoteKeyRetriever,

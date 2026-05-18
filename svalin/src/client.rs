@@ -14,7 +14,6 @@ mod profile;
 pub mod state;
 
 pub use first_connect::*;
-use svalin_pki::mls::client::MlsClient;
 use svalin_pki::{Certificate, Credential, RootCertificate, SpkiHash};
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
@@ -30,7 +29,7 @@ use crate::client::device::DeviceHandle;
 use crate::client::state::{ClientState, ClientStateUpdate};
 use crate::message_streaming::MessageFromClient;
 use crate::message_streaming::client::{ClientMessageDispatcherHandle, ClientStateHandle};
-use crate::remote_key_retriever::RemoteKeyRetriever;
+use crate::mls::MlsClient;
 use crate::verifier::remote_verifier::RemoteVerifier;
 
 pub struct Client {
@@ -40,7 +39,7 @@ pub struct Client {
     root_certificate: RootCertificate,
     user_credential: Credential,
     device_credential: Credential,
-    mls: Arc<MlsClient<RemoteKeyRetriever, RemoteVerifier>>,
+    mls: Arc<MlsClient>,
     tunnel_manager: TunnelManager,
     message_sender: ClientMessageDispatcherHandle,
     state_handle: ClientStateHandle,
