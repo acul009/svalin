@@ -5,8 +5,7 @@ use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
     Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier, RootCertificate,
-    UnverifiedCertificate, get_current_timestamp,
-    mls::{agent::MlsAgent, provider::PostcardCodec},
+    UnverifiedCertificate, get_current_timestamp, mls::provider::PostcardCodec,
 };
 use svalin_rpc::{
     commands::{deauthenticate::DeauthenticateHandler, e2e::E2EHandler, ping::PingHandler},
@@ -44,17 +43,14 @@ use crate::{
     message_streaming::agent::AgentMessageReceiver,
     permissions::default_permission_handler::DefaultPermissionHandler,
 };
-use crate::{
-    remote_key_retriever::RemoteKeyRetriever,
-    shared::commands::request_system_report::RequestSystemReport,
-};
+use crate::{mls::MlsAgent, remote_key_retriever::RemoteKeyRetriever};
 
 pub struct Agent {
     rpc: Arc<RpcClient>,
     root_certificate: RootCertificate,
     credentials: Credential,
     cancel: CancellationToken,
-    mls: MlsAgent<RemoteKeyRetriever, RemoteVerifier>,
+    mls: MlsAgent,
     tasks: TaskTracker,
 }
 

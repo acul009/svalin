@@ -1,11 +1,10 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, marker::PhantomData};
 
 use anyhow::{Context, anyhow};
 use openmls::{
     error::LibraryError,
     prelude::{PublicMessageIn, Welcome},
 };
-use serde::de::DeserializeOwned;
 
 use crate::{
     CertificateType, Credential, SpkiHash, VerifyError, get_current_timestamp,
@@ -20,29 +19,33 @@ use crate::{
         provider::SvalinStorage,
         transport_types::{
             DeviceMessage, MessageToMember, MessageToMemberTransport, MessageToServerTransport,
+            MessageTypes,
         },
     },
 };
 
-pub struct MlsClient<KeyRetriever, Verifier> {
+pub struct MlsClient<Types: MessageTypes, KeyRetriever, Verifier> {
     me: SpkiHash,
     harness: MlsHarness<KeyRetriever, Verifier, MlsProcessorHandle>,
+    _types: PhantomData<Types>,
 }
 
-pub struct MessageData<Report> {
+pub struct MessageData<Types: MessageTypes> {
     pub group: SvalinGroupId,
-    pub content: MessageDataContent<Report>,
+    pub content: MessageDataContent<Types>,
 }
 
-pub enum MessageDataContent<Report> {
-    Report(SpkiHash, Report),
+pub enum MessageDataContent<Types: MessageTypes> {
+    Report(SpkiHash, Types::Report),
+    MetaInfo(SpkiHash, Types::MetaInfo),
     Internal,
 }
 
-impl<KeyRetriever, Verifier> MlsClient<KeyRetriever, Verifier>
+impl<Types, KeyRetriever, Verifier> MlsClient<Types, KeyRetriever, Verifier>
 where
     KeyRetriever: crate::mls::key_retriever::KeyRetriever,
     Verifier: crate::Verifier,
+    Types: MessageTypes,
 {
     pub fn new(
         credential: Credential,
@@ -63,6 +66,7 @@ where
         Ok(Self {
             me,
             harness: MlsHarness::new(key_retriever, verifier, processor),
+            _types: PhantomData,
         })
     }
 
@@ -70,10 +74,10 @@ where
         &self.me
     }
 
-    pub async fn handle_message<Report: DeserializeOwned>(
+    pub async fn handle_message(
         &self,
         message: &MessageToMemberTransport,
-    ) -> anyhow::Result<MessageData<Report>> {
+    ) -> anyhow::Result<MessageData<Types>> {
         tracing::debug!("handling message: {:?}", message);
         match message
             .unpack()
@@ -115,7 +119,7 @@ where
                 let ProcessedContent::Message(decrypted) = processed.content else {
                     anyhow::bail!("expected data message, got something else instead.")
                 };
-                let decoded: DeviceMessage<Report> =
+                let decoded: DeviceMessage<Types::Report> =
                     postcard::from_bytes(&decrypted).context("postcard error")?;
 
                 match decoded {
@@ -200,10 +204,10 @@ where
         Ok(id)
     }
 
-    async fn handle_add_to_group<Report>(
+    async fn handle_add_to_group(
         &self,
         message: PublicMessageIn,
-    ) -> anyhow::Result<MessageData<Report>> {
+    ) -> anyhow::Result<MessageData<Types>> {
         tracing::debug!("Handling add to group message");
 
         let processed = self

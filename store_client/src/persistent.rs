@@ -17,7 +17,7 @@ pub struct State {
 
 #[derive(Clone, Debug)]
 pub enum Message {
-    UpdateSystemReport(SpkiHash, SystemReport),
+    UpdateSystemReport(SpkiHash, Svalin),
     UpdateFromMainState(State),
 }
 
@@ -31,19 +31,15 @@ impl State {
     pub fn update(&mut self, msg: Message) {
         match msg {
             Message::UpdateSystemReport(spki_hash, system_report) => {
-                self.get_device_entry(spki_hash).system_report = Some(system_report)
+                self.get_device_entry(spki_hash).report = Some(system_report)
             }
             Message::UpdateFromMainState(state) => {
                 for (spki_hash, other_device) in state.devices {
                     let device = self.get_device_entry(spki_hash);
-                    let current_report =
-                        device.system_report().map(|r| r.generated_at).unwrap_or(0);
-                    let other_report = other_device
-                        .system_report()
-                        .map(|r| r.generated_at)
-                        .unwrap_or(0);
+                    let current_report = device.report().map(|r| r.generated_at).unwrap_or(0);
+                    let other_report = other_device.report().map(|r| r.generated_at).unwrap_or(0);
                     if current_report < other_report {
-                        device.system_report = other_device.system_report;
+                        device.report = other_device.report;
                     }
                 }
             }
@@ -55,7 +51,8 @@ impl State {
             .entry(spki_hash.clone())
             .or_insert_with(|| DeviceState {
                 spki_hash,
-                system_report: None,
+                report: None,
+                meta_info: None,
             })
     }
 
@@ -67,12 +64,17 @@ impl State {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DeviceState {
     spki_hash: SpkiHash,
-    pub(crate) system_report: Option<SystemReport>,
+    pub(crate) report: Option<SvalinReport>,
+    pub(crate) meta_info: Option<SvalinMetaInfo>,
 }
 
 impl DeviceState {
-    pub fn system_report(&self) -> Option<&SystemReport> {
-        self.system_report.as_ref()
+    pub fn report(&self) -> Option<&SvalinReport> {
+        self.report.as_ref()
+    }
+
+    pub fn meta_info(&self) -> Option<&SvalinMetaInfo> {
+        self.meta_info.as_ref()
     }
 
     pub fn name(&self) -> Cow<'_, str> {
@@ -89,4 +91,15 @@ impl DeviceState {
             .map(|report| report.os_family)
             .unwrap_or(OSFamily::Unknown)
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SvalinReport {
+    pub system_report: SystemReport,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SvalinMetaInfo {
+    pub name: String,
+    pub group: String,
 }

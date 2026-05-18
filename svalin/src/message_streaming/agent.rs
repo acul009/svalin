@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use svalin_pki::mls::agent::MlsAgent;
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
@@ -11,8 +10,7 @@ use crate::{
         MessageFromAgent, MessageToAgent,
         with_agent::{MessageHandler, MessageSender},
     },
-    remote_key_retriever::RemoteKeyRetriever,
-    verifier::remote_verifier::RemoteVerifier,
+    mls::MlsAgent,
 };
 
 #[derive(Clone)]
@@ -80,7 +78,7 @@ impl CommandDispatcher for AgentMessageDispatcher {
 
 pub struct AgentMessageReceiver {
     pub sender: AgentMessageDispatcherHandle,
-    pub mls: Arc<MlsAgent<RemoteKeyRetriever, RemoteVerifier>>,
+    pub mls: Arc<MlsAgent>,
     pub cancel: CancellationToken,
 }
 

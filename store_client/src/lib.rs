@@ -40,7 +40,7 @@ impl ClientStore {
             }
             &persistent::Message::UpdateFromMainState(state) => {
                 for (spki_hash, device) in &state.devices {
-                    if let Some(system_report) = &device.system_report {
+                    if let Some(system_report) = &device.report {
                         let report = postcard::to_stdvec(system_report)?;
                         let spki_hash = spki_hash.as_slice();
                         let generated_at = system_report.generated_at as i64;

@@ -5,6 +5,7 @@ use openmls::prelude::{
     ProtocolMessage, PublicMessageIn, Welcome,
     group_info::{GroupInfo, VerifiableGroupInfo},
 };
+use serde::de::DeserializeOwned;
 use tls_codec::{DeserializeBytes, Serialize};
 
 use crate::SpkiHash;
@@ -259,4 +260,10 @@ pub struct AddToGroup {
     pub(crate) commit: PublicMessageIn,
     pub(crate) commit_bytes: Vec<u8>,
     pub(crate) welcome: Vec<u8>,
+}
+
+// Just need the deserialize on the main type to get the derive macro to work
+pub trait MessageTypes: DeserializeOwned {
+    type Report: serde::Serialize + DeserializeOwned;
+    type MetaInfo: serde::Serialize + DeserializeOwned;
 }

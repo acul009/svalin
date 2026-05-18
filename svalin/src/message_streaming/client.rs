@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
 use svalin_client_store::{ClientStore, persistent};
-use svalin_pki::mls::client::{MessageDataContent, MlsClient};
+use svalin_pki::mls::client::MessageDataContent;
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
 use svalin_sysctl::sytem_report::SystemReport;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -14,8 +14,7 @@ use crate::{
         MessageFromClient, MessageToClient,
         with_client::{MessageHandler, MessageSender},
     },
-    remote_key_retriever::RemoteKeyRetriever,
-    verifier::remote_verifier::RemoteVerifier,
+    mls::MlsClient,
 };
 
 #[derive(Clone)]
@@ -95,7 +94,7 @@ impl CommandDispatcher for ClientMessageDispatcher {
 
 pub struct ClientMessageReceiver {
     _to_server: ClientMessageDispatcherHandle,
-    mls: Arc<MlsClient<RemoteKeyRetriever, RemoteVerifier>>,
+    mls: Arc<MlsClient>,
     cancel: CancellationToken,
     update_sender: mpsc::Sender<ClientStateRequest>,
 }
@@ -103,7 +102,7 @@ pub struct ClientMessageReceiver {
 impl ClientMessageReceiver {
     pub async fn initialize(
         sender: ClientMessageDispatcherHandle,
-        mls: Arc<MlsClient<RemoteKeyRetriever, RemoteVerifier>>,
+        mls: Arc<MlsClient>,
         cancel: CancellationToken,
         store: Arc<ClientStore>,
     ) -> Result<(Self, ClientStateHandle), anyhow::Error> {
@@ -173,7 +172,7 @@ impl ClientMessageReceiver {
             MessageToClient::Mls(message) => {
                 let message = self
                     .mls
-                    .handle_message::<SystemReport>(&message)
+                    .handle_message(&message)
                     .await
                     .map_err(|err| anyhow!("{}", err))
                     .context("error handling mls message")?;

@@ -79,7 +79,7 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                                 text!("{}", spki_hash),
                                 text(
                                     persistent
-                                        .system_report()
+                                        .report()
                                         .map(|report| {
                                             DateTime::from_timestamp_secs(
                                                 report.generated_at as i64,

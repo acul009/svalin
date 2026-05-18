@@ -1,7 +1,8 @@
+use std::marker::PhantomData;
+
 use anyhow::anyhow;
 use openmls::{error::LibraryError, prelude::PublicMessageIn};
 use openmls_sqlx_storage::SqliteStorageProvider;
-use serde::Serialize;
 use tokio::task::JoinError;
 
 use crate::{
@@ -18,14 +19,16 @@ use crate::{
         provider::{PostcardCodec, SvalinProvider},
         transport_types::{
             DeviceMessage, MessageToMember, MessageToMemberTransport, MessageToServerTransport,
+            MessageTypes,
         },
     },
 };
 
-pub struct MlsAgent<KeyRetriever, Verifier> {
+pub struct MlsAgent<Types: MessageTypes, KeyRetriever, Verifier> {
     me: Certificate,
     my_device_group: SvalinGroupId,
     harness: MlsHarness<KeyRetriever, Verifier, MlsProcessorHandle>,
+    _types: PhantomData<Types>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -40,10 +43,11 @@ pub enum MlsAgentCreateError {
     JoinError(#[from] JoinError),
 }
 
-impl<KeyRetriever, Verifier> MlsAgent<KeyRetriever, Verifier>
+impl<Types, KeyRetriever, Verifier> MlsAgent<Types, KeyRetriever, Verifier>
 where
     KeyRetriever: crate::mls::key_retriever::KeyRetriever,
     Verifier: crate::Verifier,
+    Types: MessageTypes,
 {
     pub async fn new(
         credential: Credential,
@@ -64,6 +68,7 @@ where
             my_device_group: SvalinGroupId::DeviceGroup(me.spki_hash().clone()),
             me,
             harness: MlsHarness::new(key_retriever, verifier, processor),
+            _types: PhantomData,
         })
     }
 
@@ -148,9 +153,9 @@ where
     //     Ok(())
     // }
 
-    pub async fn send_report<Report: Serialize>(
+    pub async fn send_report(
         &self,
-        report: Report,
+        report: &Types::Report,
     ) -> Result<MessageToServerTransport, SendDeviceMessageError> {
         let group_id = SvalinGroupId::DeviceGroup(self.me.spki_hash().clone()).to_group_id();
         let message = DeviceMessage::Report(report);

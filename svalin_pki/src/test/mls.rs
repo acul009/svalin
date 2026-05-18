@@ -2,20 +2,23 @@ use std::{cell::RefCell, collections::HashMap, fmt::Display, sync::Arc};
 
 use openmls::group::GroupId;
 use openmls_sqlx_storage::SqliteStorageProvider;
+use serde::Deserialize;
 use sqlx::SqlitePool;
 
 use crate::{
     Certificate, Credential, KeyPair, SpkiHash, Verifier, VerifyError,
     mls::{
         agent::MlsAgent,
-        client::{MessageData, MessageDataContent, MlsClient},
+        client::{MessageDataContent, MlsClient},
         key_package::{KeyPackage, UnverifiedKeyPackage},
         key_retriever::KeyRetriever,
         processor::{MlsProcessorHandle, ProcessedContent},
         provider::PostcardCodec,
         public_processor::PublicProcessorHandle,
         server::MlsServer,
-        transport_types::{MessageToMember, MessageToMemberTransport, MessageToServer},
+        transport_types::{
+            MessageToMember, MessageToMemberTransport, MessageToServer, MessageTypes,
+        },
     },
 };
 
@@ -41,6 +44,14 @@ async fn test_key_package_creation() {
     let credential = Credential::generate_root().unwrap();
     let processor = create_processor(credential).await;
     let _key_package = processor.create_key_package().await.unwrap();
+}
+
+#[derive(Deserialize)]
+struct Types {}
+
+impl MessageTypes for Types {
+    type Report = String;
+    type MetaInfo = String;
 }
 
 #[tokio::test]
@@ -326,7 +337,7 @@ async fn test_device_group() {
     let agent_credential = keypair.upgrade(cert.to_unverified()).unwrap();
     verifier.push(agent_credential.certificate().clone());
 
-    let client = MlsClient::new(
+    let client = MlsClient::<Types, _, _>::new(
         client_credential.clone(),
         client_storage.into(),
         retriever.clone(),
@@ -335,7 +346,7 @@ async fn test_device_group() {
     .unwrap();
     retriever.add(client.create_key_package().await.unwrap());
 
-    let agent = MlsAgent::new(
+    let agent = MlsAgent::<Types, _, _>::new(
         agent_credential.clone(),
         agent_storage,
         retriever.clone(),
@@ -358,17 +369,14 @@ async fn test_device_group() {
     let server = MlsServer::new(storage, verifier.clone(), retriever.clone());
     let welcome = server.process_message(new_group).await.unwrap();
 
-    client
-        .handle_message::<String>(&welcome[0].message)
-        .await
-        .unwrap();
+    client.handle_message(&welcome[0].message).await.unwrap();
 
     let report = "Test Data".to_string();
     let to_server = agent.send_report(report.clone()).await.unwrap();
 
     let to_send = server.process_message(to_server).await.unwrap();
 
-    let received: MessageData<String> = client.handle_message(&to_send[0].message).await.unwrap();
+    let received = client.handle_message(&to_send[0].message).await.unwrap();
 
     let MessageDataContent::Report(sender, received_report) = received.content else {
         panic!("wrong message type")
