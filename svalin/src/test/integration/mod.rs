@@ -176,7 +176,8 @@ async fn integration_tests() {
             .send(confirm.confirm_code().to_owned())
             .unwrap();
         debug!("agent waiting for confirmation");
-        confirm.wait_for_confirm(cancel).await.unwrap();
+        confirm.wait_for_confirm(cancel.clone()).await.unwrap();
+        Agent::run(cancel).await.unwrap()
     });
 
     let (send, recv) = oneshot::channel();

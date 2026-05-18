@@ -2,6 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use futures::{FutureExt, select};
+use svalin_client_store::persistent::SvalinReport;
 use svalin_sysctl::sytem_report::SystemReport;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
@@ -53,9 +54,20 @@ async fn send_system_report(
     messager_handle: &AgentMessageDispatcherHandle,
 ) -> Result<(), anyhow::Error> {
     tracing::debug!("Generating and sending system report");
-    let report = SystemReport::create().await?;
-    let message = mls.send_report(report).await?;
+    let report = generate_system_report().await?;
+    let message = mls.send_report(&report).await?;
     messager_handle.send(MessageFromAgent::Mls(message)).await;
     tracing::debug!("System report sent");
     Ok(())
+}
+
+async fn generate_system_report() -> anyhow::Result<SvalinReport> {
+    let system_report = SystemReport::create().await?;
+
+    let report = SvalinReport {
+        current_version_identifiert: env!("GIT_COMMIT_HASH").into(),
+        system_report,
+    };
+
+    Ok(report)
 }

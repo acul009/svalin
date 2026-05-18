@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use anyhow::{Context, Result, anyhow};
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;

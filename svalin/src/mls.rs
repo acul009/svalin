@@ -8,7 +8,7 @@ use crate::{
 };
 
 #[derive(Serialize, Deserialize)]
-struct MlsTypes {}
+pub struct MlsTypes {}
 
 impl svalin_pki::mls::transport_types::MessageTypes for MlsTypes {
     type Report = SvalinReport;

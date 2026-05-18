@@ -8,7 +8,7 @@ use svalin_pki::SpkiHash;
 
 use crate::{
     Element, bootstrap,
-    ui::widgets::{card, header, scaffold::HEADER_HEIGHT},
+    ui::widgets::{card, header},
 };
 
 #[derive(Debug, Clone)]
@@ -43,7 +43,8 @@ impl DeviceView {
         };
 
         scrollable(
-            column![if let Some(report) = persistent.system_report() {
+            column![if let Some(report) = persistent.report() {
+                let report = &report.system_report;
                 Some(
                     card(
                         column![

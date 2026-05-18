@@ -120,7 +120,7 @@ impl Session {
             .map_err(SessionDispatchError::WriteHeaderError)?;
 
         let request = dispatcher.get_request();
-        self.write_object(&request)
+        self.write_object(request)
             .await
             .map_err(SessionDispatchError::WriteRequestError)?;
 

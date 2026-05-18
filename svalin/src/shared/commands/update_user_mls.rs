@@ -136,6 +136,10 @@ impl CommandHandler for UpdateUserMlsHandler {
                     let response = response?;
                     tracing::info!("user mls initiative: {response:?}");
 
+                    if let ToServer::Goodbye = &response {
+                        break;
+                    }
+
                     let handle_result = self.handle_response(&user_hash, response).await;
                     let send_result = handle_result.as_ref().map(|_| ()).map_err(|_| ());
                     session.write_object(&send_result).await?;
@@ -151,14 +155,16 @@ impl CommandHandler for UpdateUserMlsHandler {
 
             session.write_object(&update).await?;
 
-            let response = session.read_object::<ToServer>().await?;
-            tracing::debug!("user mls respone: {response:?}");
+            // let response = session.read_object::<ToServer>().await?;
+            // tracing::debug!("user mls respone: {response:?}");
 
-            let handle_result = self.handle_response(&user_hash, response).await;
-            let send_result = handle_result.as_ref().map(|_| ()).map_err(|_| ());
-            session.write_object(&send_result).await?;
-            handle_result?;
+            // let handle_result = self.handle_response(&user_hash, response).await;
+            // let send_result = handle_result.as_ref().map(|_| ()).map_err(|_| ());
+            // session.write_object(&send_result).await?;
+            // handle_result?;
         }
+
+        session.write_object(&Update::Goodbye).await?;
 
         // explicit drop, so I don't accidentally drop it beforehand
         drop(_user_lock);
@@ -207,7 +213,7 @@ impl UpdateUserMlsHandler {
                     }
                 }
             }
-            ToServer::OK => {}
+            ToServer::Goodbye => unreachable!(),
         }
 
         Ok(())
@@ -316,6 +322,7 @@ impl CommandDispatcher for UpdateUserMls {
                     ))
                     .await
                 else {
+                    session.write_object(&ToServer::Goodbye).await?;
                     return Ok(());
                 };
 
@@ -362,6 +369,9 @@ impl CommandDispatcher for UpdateUserMls {
                         Update::YieldRequest => {
                             send_update = true;
                             should_yield = true;
+                        }
+                        Update::Goodbye => {
+                            return Ok(());
                         }
                     }
                 } else {
@@ -426,11 +436,6 @@ impl CommandDispatcher for UpdateUserMls {
                             ))
                             .await?;
                     }
-                } else {
-                    session.write_object(&ToServer::OK).await?;
-                    if session.read_object::<Result<(), ()>>().await.is_err() {
-                        tracing::error!("server warned about error in user mls update");
-                    }
                 }
             }
         }
@@ -448,6 +453,7 @@ enum Update {
     Message(Uuid, Arc<MessageToMemberTransport>),
     KeyPackageCount(u64),
     YieldRequest,
+    Goodbye,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -461,5 +467,5 @@ enum ToServer {
         // so it's important that these are synced with the mls_store update
         messages: Vec<MessageToServerTransport>,
     },
-    OK,
+    Goodbye,
 }

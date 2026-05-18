@@ -32,7 +32,7 @@ impl CommandHandler for PingHandler {
         _: Self::Request,
         _: CancellationToken,
     ) -> anyhow::Result<()> {
-        let ping: u64 = session.read_object().await?;
+        let ping: u128 = session.read_object().await?;
         session.write_object(&ping).await?;
 
         Ok(())

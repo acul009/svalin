@@ -1,4 +1,4 @@
-use std::{mem, time::Duration};
+use std::mem;
 
 use iced::{Subscription, Task, keyboard, window};
 use mainview::MainView;

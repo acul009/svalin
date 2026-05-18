@@ -82,7 +82,7 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                                         .report()
                                         .map(|report| {
                                             DateTime::from_timestamp_secs(
-                                                report.generated_at as i64,
+                                                report.system_report.generated_at as i64,
                                             )
                                         })
                                         .flatten()

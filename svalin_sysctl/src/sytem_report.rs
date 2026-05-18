@@ -67,7 +67,7 @@ impl SystemReport {
             threads: sys.cpus().len(),
         };
 
-        let disks = sysinfo::Disks::new_with_refreshed_list()
+        let mut disks = sysinfo::Disks::new_with_refreshed_list()
             .iter()
             .map(|disk| Disk {
                 name: disk.name().to_string_lossy().to_string(),
@@ -77,7 +77,9 @@ impl SystemReport {
                 total_space: disk.total_space(),
                 available_space: disk.available_space(),
             })
-            .collect();
+            .collect::<Vec<_>>();
+        disks.sort_by_cached_key(|disk| disk.mount_point.clone());
+
         Ok(Self {
             os_family: os,
             os: sysinfo::System::long_os_version(),
