@@ -55,7 +55,7 @@ async fn send_system_report(
 ) -> Result<(), anyhow::Error> {
     tracing::debug!("Generating and sending system report");
     let report = generate_system_report().await?;
-    let message = mls.send_report(&report).await?;
+    let message = mls.send_report(report).await?;
     messager_handle.send(MessageFromAgent::Mls(message)).await;
     tracing::debug!("System report sent");
     Ok(())

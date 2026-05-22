@@ -1,12 +1,15 @@
 use anyhow::anyhow;
 use std::time::Duration;
+use svalin_client_store::persistent::{self, SvalinMetaInfo};
 use svalin_pki::{SpkiHash, Verifier, get_current_timestamp};
 use svalin_rpc::{
     commands::{forward::ForwardConnection, ping::Ping},
     rpc::connection::{Connection, direct_connection::DirectConnection},
 };
 
-use crate::shared::commands::request_system_report::RequestSystemReport;
+use crate::{
+    client::state::ClientStateUpdate, shared::commands::request_system_report::RequestSystemReport,
+};
 
 pub struct DeviceHandle<'a>(&'a super::Client, SpkiHash);
 
@@ -26,6 +29,18 @@ impl<'a> DeviceHandle<'a> {
             .dispatch(RequestSystemReport)
             .await
             .map_err(|err| anyhow!("{}", err))?)
+    }
+
+    pub async fn update_metainfo(&self, metainfo: SvalinMetaInfo) -> anyhow::Result<()> {
+        self.0.mls.send_meta_info(metainfo.clone()).await?;
+        self.0
+            .state_handle
+            .update(ClientStateUpdate::Persistent(
+                persistent::Message::UpdateMetaInfo(self.1.clone(), metainfo),
+            ))
+            .await?;
+
+        Ok(())
     }
 
     async fn connection(&self) -> anyhow::Result<ForwardConnection<DirectConnection>> {

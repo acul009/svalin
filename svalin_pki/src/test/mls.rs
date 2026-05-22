@@ -372,7 +372,7 @@ async fn test_device_group() {
     client.handle_message(&welcome[0].message).await.unwrap();
 
     let report = "Test Data".to_string();
-    let to_server = agent.send_report(&report).await.unwrap();
+    let to_server = agent.send_report(report.clone()).await.unwrap();
 
     let to_send = server.process_message(to_server).await.unwrap();
 

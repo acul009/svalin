@@ -229,8 +229,9 @@ pub struct NewGroup {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub enum DeviceMessage<Report> {
-    Report(Report),
+pub enum SvalinMessage<Types: MessageTypes> {
+    Report(Types::Report),
+    MetaInfo(Types::MetaInfo),
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

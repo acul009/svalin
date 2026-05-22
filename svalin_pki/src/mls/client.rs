@@ -18,8 +18,8 @@ use crate::{
         },
         provider::SvalinStorage,
         transport_types::{
-            DeviceMessage, MessageToMember, MessageToMemberTransport, MessageToServerTransport,
-            MessageTypes,
+            MessageToMember, MessageToMemberTransport, MessageToServerTransport, MessageTypes,
+            SvalinMessage,
         },
     },
 };
@@ -119,11 +119,11 @@ where
                 let ProcessedContent::Message(decrypted) = processed.content else {
                     anyhow::bail!("expected data message, got something else instead.")
                 };
-                let decoded: DeviceMessage<Types::Report> =
+                let decoded: SvalinMessage<Types> =
                     postcard::from_bytes(&decrypted).context("postcard error")?;
 
                 match decoded {
-                    DeviceMessage::Report(report) => match group_id.clone() {
+                    SvalinMessage::Report(report) => match group_id.clone() {
                         SvalinGroupId::DeviceGroup(device) => {
                             if device != processed.sender {
                                 anyhow::bail!(
@@ -136,6 +136,14 @@ where
                                 })
                             }
                         }
+                        #[allow(unreachable_patterns)]
+                        _ => anyhow::bail!("unallowed message type"),
+                    },
+                    SvalinMessage::MetaInfo(meta_info) => match group_id.clone() {
+                        SvalinGroupId::DeviceMetaGroup(device) => Ok(MessageData {
+                            group: group_id,
+                            content: MessageDataContent::MetaInfo(device, meta_info),
+                        }),
                         #[allow(unreachable_patterns)]
                         _ => anyhow::bail!("unallowed message type"),
                     },
@@ -281,6 +289,22 @@ where
             .create_group_if_not_exists(&group_id, &self.me)
             .await
             .map_err(|err| anyhow!(err))?)
+    }
+
+    pub async fn send_meta_info(
+        &self,
+        metainfo: Types::MetaInfo,
+    ) -> anyhow::Result<MessageToServerTransport> {
+        let group_id = SvalinGroupId::DeviceMetaGroup(self.me.clone()).to_group_id();
+        let message = SvalinMessage::<Types>::MetaInfo(metainfo);
+        let encoded = postcard::to_stdvec(&message)?;
+        let to_server = self
+            .harness
+            .processor()
+            .create_message(group_id, encoded)
+            .await?;
+
+        Ok(to_server)
     }
 }
 

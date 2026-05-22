@@ -18,8 +18,8 @@ use crate::{
         },
         provider::{PostcardCodec, SvalinProvider},
         transport_types::{
-            DeviceMessage, MessageToMember, MessageToMemberTransport, MessageToServerTransport,
-            MessageTypes,
+            MessageToMember, MessageToMemberTransport, MessageToServerTransport, MessageTypes,
+            SvalinMessage,
         },
     },
 };
@@ -155,10 +155,10 @@ where
 
     pub async fn send_report(
         &self,
-        report: &Types::Report,
+        report: Types::Report,
     ) -> Result<MessageToServerTransport, SendDeviceMessageError> {
         let group_id = SvalinGroupId::DeviceGroup(self.me.spki_hash().clone()).to_group_id();
-        let message = DeviceMessage::Report(report);
+        let message = SvalinMessage::<Types>::Report(report);
         let encoded = postcard::to_stdvec(&message)?;
         let to_server = self
             .harness

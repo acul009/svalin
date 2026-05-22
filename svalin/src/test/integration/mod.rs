@@ -1,7 +1,8 @@
 use std::{panic, process, time::Duration};
 
 use std::net::ToSocketAddrs;
-use svalin_client_store::persistent::{self};
+use svalin_client_store::persistent::{self, SvalinMetaInfo};
+use svalin_pki::get_current_timestamp;
 use test_log::test;
 use tokio::sync::oneshot;
 use tokio::time::timeout;
@@ -237,6 +238,30 @@ async fn integration_tests() {
         panic!("expected agent online status update, got: {:?}", &update);
     }
 
+    // testing sending meta info
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    let meta_info = SvalinMetaInfo {
+        updated_at: get_current_timestamp(),
+        name: "Test Device".into(),
+        group: "Test Group".into(),
+    };
+    device.update_metainfo(meta_info).await.unwrap();
+
+    let update = timeout(Duration::from_secs(5), client_state_updates.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    if let ClientStateUpdate::Persistent(persistent::Message::UpdateMetaInfo(_, _)) = &update {
+        client_state.update(update);
+    } else {
+        panic!("expected update from main status update, got {:?}", &update);
+    }
+
+    // =====================================================================
+    // Controlled shutdown
+    // =====================================================================
+
     // controlled agent shutdown
     agent_cancel.cancel();
     tokio::time::timeout(Duration::from_secs(1), agent_handle)
@@ -266,41 +291,5 @@ async fn integration_tests() {
         .unwrap()
         .unwrap();
 
-    // let device = device_list.borrow().first_key_value().unwrap().1.clone();
-
-    // if !device.item().online_status {
-    //     panic!("Device is not online");
-    // }
-
-    // let ping = device.ping().await.unwrap();
-
-    // tokio::time::sleep(Duration::from_secs(10)).await;
-
-    // // By this point I'm hoping that the device has uploaded some key packages
-    // client
-    //     .ensure_device_group_exists(device.item().certificate.spki_hash())
-    //     .await
-    //     .unwrap();
-
-    // debug!("ping through forward connection: {}µs", ping.as_micros());
-
-    // client.close(Duration::from_secs(1)).await.unwrap();
-
-    // debug!("closing server");
-
-    // // TODO: make this actually work properly
-    // let _ = recv_server
-    //     .await
-    //     .unwrap()
-    //     .close(Duration::from_secs(1))
-    //     .await
-    //     .unwrap();
-
-    // debug!("server closed");
-
-    // agent_handle.abort();
-
-    // TODO: actually program this so you can shutdown the programm in a controlled
-    // manner again
     process::exit(0);
 }
