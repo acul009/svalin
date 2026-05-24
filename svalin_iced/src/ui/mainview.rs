@@ -96,7 +96,7 @@ impl MainView {
                     Task::stream(sipper(move |mut sender| async move {
                         let mut receiver = receiver;
                         while let Ok(update) = receiver.recv().await {
-                            tracing::debug!("got state update: {update:?}");
+                            tracing::trace!("got state update: {update:?}");
                             sender.send(Message::UpdateState(update)).await;
                         }
                     }))

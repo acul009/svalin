@@ -56,7 +56,7 @@ where
 
             let session2 = Session::new(transport, Peer::Anonymous);
 
-            // debug!("session deauthenticated, handing to next handler");
+            // tracing::trace!("session deauthenticated, handing to next handler");
 
             session2.handle(&self.handler_collection, cancel).await
         } else {

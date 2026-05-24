@@ -52,22 +52,22 @@ impl Verifier for RemoteVerifier {
         spki_hash: &SpkiHash,
         time: u64,
     ) -> Result<svalin_pki::Certificate, svalin_pki::VerifyError> {
-        // tracing::debug!("entering remote agent verifier");
+        // tracing::trace!("entering remote agent verifier");
         let mut found = false;
         if let Some(cached) = self.0.cache.get(spki_hash) {
             found = true;
-            // debug!("found in cache");
+            // tracing::trace!("found in cache");
             if cached.check_validity_at(get_current_timestamp()).is_ok() {
-                // debug!("returning from cache");
+                // tracing::trace!("returning from cache");
                 return Ok(cached.clone());
             }
-            // debug!("cache not valid anymore!");
+            // tracing::trace!("cache not valid anymore!");
         }
         if found {
             self.0.cache.remove(spki_hash);
         }
 
-        // debug!("dispatching chain request");
+        // tracing::trace!("dispatching chain request");
         let unverified_chain = self
             .0
             .connection
@@ -75,7 +75,7 @@ impl Verifier for RemoteVerifier {
             .await
             .map_err(|err| VerifyError::InternalError(err.into()))?;
 
-        // debug!("verifying received chain");
+        // tracing::trace!("verifying received chain");
         let chain = unverified_chain.verify(&self.0.root, time)?;
 
         let leaf = chain.take_leaf();
@@ -86,7 +86,7 @@ impl Verifier for RemoteVerifier {
 
         self.0.cache.insert(leaf.spki_hash().clone(), leaf.clone());
 
-        // tracing::debug!("exiting remote agent verifier");
+        // tracing::trace!("exiting remote agent verifier");
         Ok(leaf)
     }
 }

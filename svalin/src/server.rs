@@ -20,7 +20,7 @@ use tokio::{
     time::{error::Elapsed, timeout},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::{
     server::{chain_loader::ChainLoader, local_key_retriever::LocalKeyRetriever},
@@ -118,15 +118,15 @@ impl Server {
             .await
             .context("error opening config")?;
 
-        // debug!("opening DB");
+        // tracing::trace!("opening DB");
         let db_path = Self::data_dir().await?.push("db.sqlite");
-        tracing::debug!("opening server db: {db_path}");
-        // tracing::debug!("opening server store at: {}", &db_path);
+        tracing::trace!("opening server db: {db_path}");
+        // tracing::trace!("opening server store at: {}", &db_path);
         let store = ServerStore::open(&db_path)
             .await
             .context("error opending server store")?;
 
-        // debug!("creating socket");
+        // tracing::trace!("creating socket");
 
         let socket = RpcServer::create_socket(config.addr).context("failed to create socket")?;
 
@@ -135,7 +135,7 @@ impl Server {
             None => {
                 // initialize
 
-                debug!("Server is not yet initialized, starting initialization routine");
+                tracing::trace!("Server is not yet initialized, starting initialization routine");
 
                 let init_success = Self::init_server(
                     socket.clone(),
@@ -145,7 +145,7 @@ impl Server {
                 .await
                 .context("failed to initialize server")?;
 
-                debug!("Initialisation complete, waiting for init server shutdown");
+                tracing::trace!("Initialisation complete, waiting for init server shutdown");
 
                 // Sleep until the init server has shut down and released the Port
                 tokio::time::sleep(INIT_SERVER_SHUTDOWN_COUNTDOWN).await;
@@ -245,7 +245,7 @@ impl Server {
 
         let temp_credentials = Credential::generate_root()?;
 
-        debug!("starting up init server");
+        tracing::trace!("starting up init server");
         let rpc = RpcServer::build()
             .credentials(temp_credentials)
             .cancellation_token(cancel)
@@ -255,10 +255,10 @@ impl Server {
             .start_server(socket)
             .await?;
 
-        debug!("init server running");
+        tracing::trace!("init server running");
 
         if let Ok(result) = recv.await {
-            debug!("successfully initialized server");
+            tracing::trace!("successfully initialized server");
             rpc.close(Duration::from_secs(1)).await?;
             Ok(result)
         } else {

@@ -3,7 +3,6 @@ use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
 
 use crate::shared::commands::public_server_status::GetPutblicStatus;
 use crate::shared::join_agent::AgentInitPayload;
@@ -17,7 +16,7 @@ impl Agent {
             return Err(anyhow!("Agent is already initialized"));
         }
 
-        debug!("try connecting to {address}");
+        tracing::trace!("try connecting to {address}");
 
         let client = RpcClient::connect(
             &address,
@@ -27,15 +26,15 @@ impl Agent {
         )
         .await?;
 
-        debug!("successfully connected");
+        tracing::trace!("successfully connected");
 
         let conn = client.upstream_connection();
 
-        // debug!("requesting public status");
+        // tracing::trace!("requesting public status");
 
         let server_status = conn.dispatch(GetPutblicStatus).await?;
 
-        // debug!("public status: {server_status:?}");
+        // tracing::trace!("public status: {server_status:?}");
 
         match server_status {
             crate::shared::commands::public_server_status::PublicStatus::WaitingForInit => {

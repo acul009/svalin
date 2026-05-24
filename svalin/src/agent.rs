@@ -17,7 +17,7 @@ use svalin_rpc::{
 };
 use tokio::{sync::Notify, time::error::Elapsed};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::{debug, instrument};
+use tracing::instrument;
 use update::{
     Updater, request_available_version::AvailableVersionHandler,
     request_installation_info::InstallationInfoHandler, start_agent_update::StartUpdateHandler,
@@ -57,14 +57,14 @@ pub struct Agent {
 impl Agent {
     #[instrument]
     pub async fn run(cancel: CancellationToken) -> Result<()> {
-        debug!("opening agent configuration");
+        tracing::trace!("opening agent configuration");
 
         let config = Self::get_config()
             .await
             .context("error loading config")?
             .ok_or_else(|| anyhow!("agent is not yet initialized"))?;
 
-        // debug!("decrypting agent credentials");
+        // tracing::trace!("decrypting agent credentials");
 
         let credentials = config
             .key_source
@@ -72,7 +72,7 @@ impl Agent {
             .await
             .context("error decrypting credentials")?;
 
-        // debug!("building upstream verifier");
+        // tracing::trace!("building upstream verifier");
         let root_certificate = config.root_certificate.use_as_root()?;
 
         let upstream_certificate = config
@@ -82,7 +82,7 @@ impl Agent {
 
         let verifier = ExactVerififier::new(upstream_certificate).to_tls_verifier();
 
-        debug!("trying to connect to server");
+        tracing::trace!("trying to connect to server");
 
         let rpc = RpcClient::connect(
             &config.upstream_address,
@@ -93,7 +93,7 @@ impl Agent {
         .await
         .context("error connecting rpc")?;
 
-        debug!("connection to server established");
+        tracing::trace!("connection to server established");
 
         let storage_provider = Self::open_mls_store().await?;
 
@@ -154,7 +154,7 @@ impl Agent {
             .await
             .add(DeauthenticateHandler::new(public_commands));
 
-        debug!("Starting agent background tasks");
+        tracing::trace!("Starting agent background tasks");
         let tasks = TaskTracker::new();
 
         let (messager_handle, message_dispatcher) = AgentMessageDispatcher::new();
@@ -181,7 +181,7 @@ impl Agent {
 
         let connection = rpc.upstream_connection();
         tasks.spawn(async move {
-            debug!("Agent will now start serving requests");
+            tracing::trace!("Agent will now start serving requests");
             if let Err(err) = rpc.serve(server_commands).await {
                 tracing::error!("Failed to serve requests: {err}");
             }

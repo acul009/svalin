@@ -44,10 +44,10 @@ async fn run() {
 
     match app.command {
         Command::Server { address } => {
-            tracing::debug!("User wants to run server");
+            tracing::trace!("User wants to run server");
 
             let address = address.parse().unwrap();
-            tracing::debug!("Server address parsed successfully");
+            tracing::trace!("Server address parsed successfully");
             let mutex = Arc::new(Mutex::<Option<Server>>::new(None));
             let mutex2 = mutex.clone();
 
@@ -56,7 +56,7 @@ async fn run() {
             let cancel3 = cancel.clone();
 
             tokio::spawn(async move {
-                tracing::debug!("Starting server");
+                tracing::trace!("Starting server");
                 // This needs to be in a seperate task since the init server will block on
                 // start_server
                 let server = Server::build()

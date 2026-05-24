@@ -20,13 +20,13 @@ sqlx:
     cd store_server; cargo sqlx prepare -D sqlite:///$PWD/sqlx.sqlite -- -p svalin_server_store
     cd store_server; cargo sqlx database drop -D sqlite:///$PWD/sqlx.sqlite -y
 
-test $RUST_LOG="svalin=debug":
+test $RUST_LOG="svalin=trace":
     cargo test -p svalin_pki -p svalin_rpc -p svalin -- --nocapture
 
-integration $RUST_LOG="svalin=debug":
+integration $RUST_LOG="svalin=trace":
     cargo test -p svalin test::integration -- --nocapture
 
-server $RUST_LOG="svalin=debug":
+server $RUST_LOG="svalin=trace":
     cargo run -p svalin server 0.0.0.0:1234
 
 reset:
@@ -35,13 +35,13 @@ reset:
 reset-win:
     Remove-Item -Path C:\ProgramData\svalin\* -Recurse -Force
 
-agent $RUST_LOG="svalin=debug":
+agent $RUST_LOG="svalin=trace":
     cargo run -p svalin agent
 
-agent_init $RUST_LOG="svalin=debug":
+agent_init $RUST_LOG="svalin=trace":
     cargo run -p svalin agent init localhost:1234
 
-gui $RUST_LOG="svalin=debug":
+gui $RUST_LOG="svalin=trace":
     cargo run -p svalin_iced
 
 build-debian: build-cross

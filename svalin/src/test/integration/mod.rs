@@ -8,7 +8,6 @@ use tokio::sync::oneshot;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use totp_rs::TOTP;
-use tracing::debug;
 
 use crate::client::state::ClientStateUpdate;
 use crate::{agent::Agent, client::Client, server::Server};
@@ -45,7 +44,7 @@ async fn integration_tests() {
             .await
             .unwrap();
 
-        debug!("server started");
+        tracing::trace!("server started");
 
         send_server.send(server).unwrap();
     });
@@ -142,10 +141,10 @@ async fn integration_tests() {
 
     let (mut client_state, mut client_state_updates) = client.subscribe_state().await.unwrap();
 
-    debug!("Login successful!");
+    tracing::trace!("Login successful!");
 
     let duration = client.ping_upstream().await.unwrap();
-    debug!("ping duration: {:?}", duration);
+    tracing::trace!("ping duration: {:?}", duration);
 
     // // wait for the first full update - this is sent after generating the key packages
     // let update = timeout(Duration::from_secs(30), client_state_updates.recv())
@@ -162,21 +161,21 @@ async fn integration_tests() {
 
     // ===== TEST AGENT =====
 
-    debug!("initializing agent!");
+    tracing::trace!("initializing agent!");
     let waiting = Agent::init(host.clone()).await.unwrap();
     let join_code = waiting.join_code().to_owned();
-    debug!("received join code");
+    tracing::trace!("received join code");
     let (confirm_send, confirm_recv) = oneshot::channel();
 
     let agent_cancel = CancellationToken::new();
     let cancel = agent_cancel.clone();
     let agent_handle = tokio::spawn(async move {
         let confirm = waiting.wait_for_init().await.unwrap();
-        debug!("generated confirm code");
+        tracing::trace!("generated confirm code");
         confirm_send
             .send(confirm.confirm_code().to_owned())
             .unwrap();
-        debug!("agent waiting for confirmation");
+        tracing::trace!("agent waiting for confirmation");
         confirm.wait_for_confirm(cancel.clone()).await.unwrap();
         Agent::run(cancel).await.unwrap()
     });
@@ -186,13 +185,13 @@ async fn integration_tests() {
     let add_agent_handle =
         tokio::spawn(async move { client2.add_agent_with_code(join_code, send).await });
 
-    debug!("waiting to receive confirm code");
+    tracing::trace!("waiting to receive confirm code");
 
     let confirm = recv.await.unwrap();
     confirm.send(confirm_recv.await.unwrap()).unwrap();
 
     add_agent_handle.await.unwrap().unwrap();
-    debug!("agent was added");
+    tracing::trace!("agent was added");
 
     // first update should be the online status
     let update = timeout(Duration::from_secs(5), client_state_updates.recv())
@@ -201,7 +200,7 @@ async fn integration_tests() {
         .unwrap();
     if let ClientStateUpdate::AgentOnlineStatus(_, true) = &update {
         client_state.update(update);
-        debug!("agent is online");
+        tracing::trace!("agent is online");
     } else {
         panic!("expected agent online status update, got: {:?}", &update);
     }
@@ -218,7 +217,7 @@ async fn integration_tests() {
     }
 
     let system_report = client_state.persistent().iter().next().unwrap();
-    tracing::debug!("client persistent data: {:#?}", system_report);
+    tracing::trace!("client persistent data: {:#?}", system_report);
 
     // testing device handle
     let agent_spki_hash = client_state.persistent().iter().next().unwrap().0.clone();
@@ -287,7 +286,7 @@ async fn integration_tests() {
         .unwrap();
     if let ClientStateUpdate::AgentOnlineStatus(_, false) = &update {
         client_state.update(update);
-        debug!("agent is offline");
+        tracing::trace!("agent is offline");
     } else {
         panic!("expected agent online status update, got: {:?}", &update);
     }

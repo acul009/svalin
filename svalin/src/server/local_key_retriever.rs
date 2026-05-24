@@ -73,7 +73,7 @@ impl KeyRetriever for LocalKeyRetriever {
                     // Skip the device itself
                     .take(chain.iter().len() - 1)
                     .map(|cert| {
-                        tracing::debug!(
+                        tracing::trace!(
                             "server required meta member: {:?}",
                             cert.certificate_type()
                         );

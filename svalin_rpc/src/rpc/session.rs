@@ -95,7 +95,7 @@ impl Session {
 
         let key = header.command_key.clone();
 
-        // debug!("requested command: {key}");
+        // tracing::trace!("requested command: {key}");
 
         commands
             .handle_session(self, header, cancel)
@@ -133,7 +133,7 @@ impl Session {
                 return Err(SessionDispatchError::SessionDeclined { code, message });
             }
             SessionResponseHeader::Accept => {
-                // debug!("Peer accepted command: {}", D::key());
+                // tracing::trace!("Peer accepted command: {}", D::key());
             }
         };
 
@@ -154,7 +154,7 @@ impl Session {
     pub async fn read_object<W: serde::de::DeserializeOwned>(
         &mut self,
     ) -> Result<W, SessionReadError> {
-        // debug!("Reading: {}", std::any::type_name::<W>());
+        // tracing::trace!("Reading: {}", std::any::type_name::<W>());
         Ok(self.transport.read_object().await?)
     }
 
@@ -162,12 +162,12 @@ impl Session {
         &mut self,
         object: &W,
     ) -> Result<(), SessionWriteError> {
-        // debug!("Writing: {}", std::any::type_name::<W>());
+        // tracing::trace!("Writing: {}", std::any::type_name::<W>());
         Ok(self.transport.write_object(object).await?)
     }
 
     pub(crate) async fn shutdown(mut self) {
-        // debug!("Shutting down session");
+        // tracing::trace!("Shutting down session");
         if let Err(err) = self.transport.shutdown().await {
             error!("error shuting down session: {err}");
         }

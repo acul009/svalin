@@ -27,7 +27,6 @@ use svalin_server_store::UserStore;
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use totp_rs::TOTP;
-use tracing::debug;
 
 pub struct ServerInitSuccess {
     pub credential: Credential,
@@ -81,7 +80,7 @@ impl CommandHandler for InitHandler {
         _request: Self::Request,
         _: CancellationToken,
     ) -> anyhow::Result<()> {
-        debug!("incoming init request");
+        tracing::trace!("incoming init request");
         let mut guard = self.channel.lock().await;
 
         if guard.is_none() {
@@ -114,7 +113,7 @@ impl CommandHandler for InitHandler {
         )
         .await?;
 
-        debug!("init request handled");
+        tracing::trace!("init request handled");
 
         let Some(channel) = guard.take() else {
             return Err(anyhow!("channel not found"));
@@ -204,7 +203,7 @@ impl CommandDispatcher for Init {
     }
 
     async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {
-        debug!("sending init request");
+        tracing::trace!("sending init request");
 
         // Create server certificate
 
@@ -284,7 +283,7 @@ impl CommandDispatcher for Init {
             .await
             .map_err(InitError::WriteConfirmError)?;
 
-        debug!("init completed");
+        tracing::trace!("init completed");
         match server_result {
             Ok(()) => Ok(ClientInitSuccess {
                 root_credential: self.root.clone(),

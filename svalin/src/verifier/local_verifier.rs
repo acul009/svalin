@@ -39,7 +39,7 @@ impl Verifier for LocalVerifier {
             )));
         }
 
-        // tracing::debug!("exiting incoming connection verifier");
+        // tracing::trace!("exiting incoming connection verifier");
         Ok(cert)
     }
 }

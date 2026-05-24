@@ -52,7 +52,7 @@ impl CommandHandler for JoinAcceptHandler {
         cancel: CancellationToken,
     ) -> anyhow::Result<()> {
         let join_code: String = session.read_object().await?;
-        tracing::debug!("looking for session with join_code: {join_code:?}");
+        tracing::trace!("looking for session with join_code: {join_code:?}");
 
         let agent_session = self.manager.get_session(&join_code);
 
@@ -61,7 +61,7 @@ impl CommandHandler for JoinAcceptHandler {
                 let answer: Result<(), ()> = Ok(());
                 session.write_object(&answer).await?;
 
-                // debug!("forwarding session to agent");
+                // tracing::trace!("forwarding session to agent");
 
                 let transport1 = session.borrow_transport();
                 let transport2 = agent_session.borrow_transport();
@@ -71,7 +71,7 @@ impl CommandHandler for JoinAcceptHandler {
                         result = copy_bidirectional(transport1,transport2) => {result?;}
                 }
 
-                // debug!("finished forwarding join accept session");
+                // tracing::trace!("finished forwarding join accept session");
 
                 Ok(())
             }
@@ -201,14 +201,14 @@ async fn handle_agent_enroll(
     // and providing the agent with the root and upstream certificates.
 
     let public_key: ExportedPublicKey = session_e2e.read_object().await?;
-    // debug!("received public key: {:?}", public_key);
+    // tracing::trace!("received public key: {:?}", public_key);
 
     // Creating certificate for agent
     let agent_cert = client
         .user_credential()
         .create_agent_certificate_for_key(&public_key)?;
 
-    // debug!("created agent certificate, sending to agent");
+    // tracing::trace!("created agent certificate, sending to agent");
 
     // Sending all 3 required certificates to the agent
     session_e2e.write_object(agent_cert.as_unverified()).await?;
@@ -219,7 +219,7 @@ async fn handle_agent_enroll(
         .write_object(client.upstream_certificate().as_unverified())
         .await?;
 
-    // debug!("creating mls group for agent");
+    // tracing::trace!("creating mls group for agent");
 
     // // Now the agent has it's credentials to both connect to the server and work with MLS.
     // // The next step here is to create an MLS group to both distribute system reports from the agent
@@ -235,7 +235,7 @@ async fn handle_agent_enroll(
 
     let upload_result = client.upload_agent(&agent_cert).await;
 
-    // debug!("upload finished, sending confirmation to agent");
+    // tracing::trace!("upload finished, sending confirmation to agent");
 
     match upload_result {
         Ok(_) => session_e2e.write_object::<Result<(), ()>>(&Ok(())).await?,

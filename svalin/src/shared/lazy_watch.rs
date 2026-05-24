@@ -47,7 +47,7 @@ where
 
         if lock.receiver_count == 0 {
             lock.handler.start(&self.sender);
-            debug!("starting lazy watch");
+            tracing::trace!("starting lazy watch");
         }
 
         lock.receiver_count += 1;
@@ -103,7 +103,7 @@ where
 
         if lock.receiver_count == 0 {
             lock.handler.stop();
-            debug!("stopping lazy watch");
+            tracing::trace!("stopping lazy watch");
         }
     }
 }

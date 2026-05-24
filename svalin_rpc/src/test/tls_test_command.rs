@@ -58,7 +58,7 @@ impl TakeableCommandHandler for TlsTestCommandHandler {
 
             let mut session_ready = Session::new(Box::new(tls_transport), Peer::Anonymous);
 
-            let ping: u64 = session_ready.read_object().await?;
+            let ping: u128 = session_ready.read_object().await?;
             session_ready.write_object(&ping).await?;
 
             *session = Some(session_ready);

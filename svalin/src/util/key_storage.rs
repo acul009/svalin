@@ -1,7 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Credential, EncryptedCredential, EncryptionKey};
-use tracing::debug;
 
 /// The keysource enum is saved in the configuration and specifies how to
 /// load the key for decrypting the credentials. This will enable the use of
@@ -37,7 +36,7 @@ impl KeySource {
         encrypted_credentials: EncryptedCredential,
     ) -> Result<Credential> {
         let key = self.to_key().await?;
-        debug!("headless password loaded, decrypting...");
+        tracing::trace!("headless password loaded, decrypting...");
         Ok(encrypted_credentials.decrypt(&key)?)
     }
 }

@@ -38,11 +38,11 @@ impl CommandHandler for RealtimeStatusHandler {
         _: Self::Request,
         cancel: CancellationToken,
     ) -> Result<()> {
-        // debug!("realtime status requested");
+        // tracing::trace!("realtime status requested");
         loop {
             let status = RealtimeStatus::get().await;
-            // debug!("sending realtime status");
-            // debug!("cpu: {:?}", status.cpu);
+            // tracing::trace!("sending realtime status");
+            // tracing::trace!("cpu: {:?}", status.cpu);
 
             session.write_object(&status).await?;
 
@@ -89,7 +89,7 @@ impl CommandDispatcher for SubscribeRealtimeStatus {
                 status  = session.read_object::<RealtimeStatus>() => {
                     match status {
                         Ok(status) => {
-                            // debug!("received realtime status");
+                            // tracing::trace!("received realtime status");
                             if let Err(_) = self.send.send(RemoteData::Ready(status)) {
                                 return Ok(());
                             }

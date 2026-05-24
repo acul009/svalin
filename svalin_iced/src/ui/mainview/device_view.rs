@@ -1,7 +1,7 @@
 use iced::{
     Length, Task,
     alignment::Horizontal,
-    widget::{self, button, center, column, container, row, rule, scrollable, space, table, text},
+    widget::{self, center, column, container, row, rule, scrollable, space, text},
 };
 use svalin::client::state::ClientState;
 use svalin_pki::SpkiHash;

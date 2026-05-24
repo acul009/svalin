@@ -67,7 +67,7 @@ impl CommandDispatcher for ClientMessageDispatcher {
         mut self,
         session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
-        tracing::debug!("Message Dispatcher connected!");
+        tracing::trace!("Message Dispatcher connected!");
         while let Some((message, feedback)) = self.0.recv().await {
             if let MessageFromClient::Goodbye = &message {
                 // The client is stored in a lot of arcs and closing all senders is unfeasable,
@@ -82,7 +82,7 @@ impl CommandDispatcher for ClientMessageDispatcher {
                 let _ = feedback.send(result);
             }
         }
-        tracing::debug!("shutting down client message dispatcher");
+        tracing::trace!("shutting down client message dispatcher");
 
         session.write_object(&MessageFromClient::Goodbye).await?;
         let _result = session.read_object::<Result<(), ()>>().await?;
@@ -137,7 +137,7 @@ impl CommandDispatcher for ClientMessageReceiver {
         self,
         session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
-        tracing::debug!("client message receiver connected!");
+        tracing::trace!("client message receiver connected!");
         while let Some(message_result) = self
             .cancel
             .run_until_cancelled(session.read_object::<MessageToClient>())
@@ -159,7 +159,7 @@ impl CommandDispatcher for ClientMessageReceiver {
             }
         }
 
-        tracing::debug!("shutting down client message receiver");
+        tracing::trace!("shutting down client message receiver");
 
         Ok(())
     }
@@ -169,7 +169,7 @@ impl ClientMessageReceiver {
     async fn handle(&self, message: MessageToClient) -> Result<bool, anyhow::Error> {
         match message {
             MessageToClient::Mls(message) => {
-                tracing::debug!("client received message: {:?}", message);
+                tracing::trace!("client received message: {:?}", message);
                 let message = self
                     .mls
                     .handle_message(&message)

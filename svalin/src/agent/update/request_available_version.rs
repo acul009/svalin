@@ -9,7 +9,6 @@ use svalin_rpc::rpc::{
     session::{Session, SessionReadError},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
 
 use crate::permissions::Permission;
 
@@ -45,7 +44,7 @@ impl CommandHandler for AvailableVersionHandler {
         channel: Self::Request,
         _: CancellationToken,
     ) -> anyhow::Result<()> {
-        debug!("requested update check for {:?}", channel);
+        tracing::trace!("requested update check for {:?}", channel);
         let version = self.updater.check_channel_version(&channel).await?;
 
         session.write_object(&version).await?;

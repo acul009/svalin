@@ -71,21 +71,21 @@ impl CommandDispatcher for Ping {
             .expect("Time went backwards")
             .as_nanos();
 
-        // debug!("sending ping");
+        // tracing::trace!("sending ping");
 
         session
             .write_object(&ping)
             .await
             .map_err(PingError::WritePingError)?;
 
-        // debug!("ping sent, waiting for pong!");
+        // tracing::trace!("ping sent, waiting for pong!");
 
         let pong: u128 = session
             .read_object()
             .await
             .map_err(PingError::ReadPongError)?;
 
-        // debug!("pong received");
+        // tracing::trace!("pong received");
 
         let now: u128 = SystemTime::now()
             .duration_since(UNIX_EPOCH)

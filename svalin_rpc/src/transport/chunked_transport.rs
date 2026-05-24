@@ -55,7 +55,7 @@ impl ChunkTransport {
             .await
             .map_err(|err| ChunkReaderError::BodyReadError(err))?;
 
-        // debug!("read chunk: {:x?}", &chunk);
+        // tracing::trace!("read chunk: {:x?}", &chunk);
 
         Ok(chunk)
     }
@@ -112,7 +112,7 @@ impl ChunkLength {
         if len > 1 << 31 {
             panic!("len too big")
         }
-        // debug!("original chunk: {:x?}", chunk);
+        // tracing::trace!("original chunk: {:x?}", chunk);
         let len: u32 = len.try_into().unwrap();
         if len < 0b1000_0000 {
             let lenbytes = len.to_be_bytes();

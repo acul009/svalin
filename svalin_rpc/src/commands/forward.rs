@@ -51,12 +51,12 @@ impl CommandHandler for ForwardHandler {
         target: Self::Request,
         cancel: CancellationToken,
     ) -> anyhow::Result<()> {
-        // debug!("received forward request to {:?}", target);
+        // tracing::trace!("received forward request to {:?}", target);
 
         match self.server.open_session_with(target).await {
             Ok(forward_session) => match forward_session.dispatch(Deauthenticate).await {
                 Ok(mut forward_session) => {
-                    // debug!("deauth successful, forwarding session");
+                    // tracing::trace!("deauth successful, forwarding session");
 
                     session
                         .write_object::<Result<(), ForwardError>>(&Ok(()))

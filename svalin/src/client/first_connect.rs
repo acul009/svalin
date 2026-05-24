@@ -9,7 +9,7 @@ use svalin_rpc::rpc::session::SessionDispatchError;
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, instrument};
+use tracing::instrument;
 
 use crate::server::INIT_SERVER_SHUTDOWN_COUNTDOWN;
 use crate::shared::commands::login::LoginDispatcherError;
@@ -22,7 +22,7 @@ use super::Client;
 impl Client {
     #[instrument]
     pub async fn first_connect(address: String) -> Result<FirstConnect> {
-        debug!("try connecting to {address}");
+        tracing::trace!("try connecting to {address}");
 
         let client = RpcClient::connect(
             &address,
@@ -31,22 +31,22 @@ impl Client {
             CancellationToken::new(),
         )
         .await?;
-        debug!("successfully connected");
+        tracing::trace!("successfully connected");
 
         let conn = client.upstream_connection();
 
-        // debug!("requesting public status");
+        // tracing::trace!("requesting public status");
 
         let server_status = conn.dispatch(GetPutblicStatus).await?;
 
-        // debug!("public status: {server_status:?}");
+        // tracing::trace!("public status: {server_status:?}");
 
         let first_connect = match server_status {
             PublicStatus::WaitingForInit => FirstConnect::Init(Init { client, address }),
             PublicStatus::Ready => FirstConnect::Login(Login { client, address }),
         };
 
-        // debug!("returning from first connect");
+        // tracing::trace!("returning from first connect");
 
         Ok(first_connect)
     }

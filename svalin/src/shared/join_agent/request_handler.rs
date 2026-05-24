@@ -24,7 +24,6 @@ use svalin_rpc::{
 };
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
 
 use crate::agent::CreateMlsStoreError;
 
@@ -60,7 +59,7 @@ impl TakeableCommandHandler for JoinRequestHandler {
     ) -> Result<()> {
         if let Some(mut session) = session.take() {
             let mut join_code = create_join_code();
-            tracing::debug!("added session with join_code: {join_code:?}");
+            tracing::trace!("added session with join_code: {join_code:?}");
             while let Err(sess) = self.manager.add_session(join_code, session).await {
                 session = sess;
                 tokio::time::sleep(Duration::from_secs(5)).await;
@@ -160,17 +159,17 @@ impl TakeableCommandDispatcher for RequestJoin {
                 .await
                 .map_err(RequestJoinError::JoinCodeReadError)?;
 
-            // debug!("received join code from server: {join_code}");
+            // tracing::trace!("received join code from server: {join_code}");
 
             self.join_code_channel
                 .send(join_code.clone())
                 .map_err(|_| RequestJoinError::ChannelSendError)?;
 
-            // debug!("waiting for client to confirm join code");
+            // tracing::trace!("waiting for client to confirm join code");
 
             let confirm_code = svalin_pki::generate_short_code();
 
-            // debug!("generated confirm code: {confirm_code}");
+            // tracing::trace!("generated confirm code: {confirm_code}");
 
             self.confirm_code_channel
                 .send(confirm_code.clone())
@@ -184,7 +183,7 @@ impl TakeableCommandDispatcher for RequestJoin {
 
             let keypair = KeyPair::generate();
             let public_key = keypair.export_public_key();
-            // debug!("sending request: {:?}", public_key);
+            // tracing::trace!("sending request: {:?}", public_key);
             session
                 .write_object(&public_key)
                 .await
@@ -211,7 +210,7 @@ impl TakeableCommandDispatcher for RequestJoin {
                 .verify_signature(&root, get_current_timestamp())
                 .map_err(RequestJoinError::VerifyUpstreamCertError)?;
 
-            // debug!("received all neccessary data to initialize agent, creating key package");
+            // tracing::trace!("received all neccessary data to initialize agent, creating key package");
 
             // let storage_provider = Agent::create_new_mls_store()
             //     .await
@@ -224,7 +223,7 @@ impl TakeableCommandDispatcher for RequestJoin {
             // .map_err(RequestJoinError::CreateKeyPackageError)?
             // .to_unverified();
 
-            // debug!("sending key package");
+            // tracing::trace!("sending key package");
             // session
             //     .write_object(&key_package)
             //     .await
@@ -237,7 +236,7 @@ impl TakeableCommandDispatcher for RequestJoin {
 
             upload_to_server_result.map_err(|_| RequestJoinError::UploadToServerError)?;
 
-            debug!("confirmation received, initializing agent");
+            tracing::trace!("confirmation received, initializing agent");
 
             Ok(AgentInitPayload {
                 credentials: my_credentials,

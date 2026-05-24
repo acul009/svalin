@@ -204,7 +204,7 @@ impl MlsProcessorHandle {
         message: impl Into<ProtocolMessage>,
     ) -> Result<ProcessedMessage, ProcessMessageError> {
         let (send, recv) = oneshot::channel();
-        tracing::debug!("sending message to mls processor");
+        tracing::trace!("sending message to mls processor");
 
         let _ = self
             .channel
@@ -428,7 +428,7 @@ impl MlsProcessor {
         let group = entry.get_mut();
 
         if members.is_empty() {
-            tracing::debug!("Creating new group with no additional members");
+            tracing::trace!("Creating new group with no additional members");
             let group_info =
                 group.export_group_info(self.provider.crypto(), &self.svalin_credential, true)?;
             let MlsMessageBodyOut::GroupInfo(group_info) = group_info.body() else {
@@ -535,19 +535,19 @@ impl MlsProcessor {
         &mut self,
         message: ProtocolMessage,
     ) -> Result<ProcessedMessage, ProcessMessageError> {
-        tracing::debug!("message arrived in processor");
+        tracing::trace!("message arrived in processor");
         let message: ProtocolMessage = message.into();
         let group_id = message.group_id().clone();
-        tracing::debug!("message is for group {group_id:?}");
+        tracing::trace!("message is for group {group_id:?}");
         let group = Self::get_group(
             &mut self.group_cache,
             self.provider.storage(),
             group_id.clone(),
         )?;
 
-        tracing::debug!("found group");
+        tracing::trace!("found group");
         let processed = group.process_message(&self.provider, message)?;
-        tracing::debug!("message processed");
+        tracing::trace!("message processed");
         let Sender::Member(sender) = processed.sender() else {
             return Err(ProcessMessageError::InvalidSender);
         };
@@ -557,7 +557,7 @@ impl MlsProcessor {
             .credential
             .deserialized()?;
 
-        tracing::debug!("sender is {sender:?}");
+        tracing::trace!("sender is {sender:?}");
 
         match processed.into_content() {
             openmls::prelude::ProcessedMessageContent::ApplicationMessage(application_message) => {
@@ -607,7 +607,7 @@ impl MlsProcessor {
         group_id: GroupId,
         key_package: KeyPackage,
     ) -> Result<MessageToServerTransport, anyhow::Error> {
-        tracing::debug!(
+        tracing::trace!(
             "Adding member {} to group {}",
             key_package.spki_hash(),
             String::from_utf8_lossy(group_id.as_slice())

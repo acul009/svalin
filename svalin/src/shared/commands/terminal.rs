@@ -66,7 +66,7 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
                     packet = session.read_object() => {
                         let packet = packet?;
 
-                        // debug!("got terminal packet: {packet:?}");
+                        // tracing::trace!("got terminal packet: {packet:?}");
                         match packet {
                             TerminalPacket::Close => {
                                 break;

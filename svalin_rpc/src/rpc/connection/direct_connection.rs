@@ -73,7 +73,7 @@ impl DirectConnection {
             }
         };
 
-        // debug!("connection with peer: {peer:?}");
+        // tracing::trace!("connection with peer: {peer:?}");
 
         Ok(DirectConnection { conn, peer })
     }

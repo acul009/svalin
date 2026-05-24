@@ -6,7 +6,6 @@ use tls_test_command::{TlsTest, TlsTestCommandHandler};
 mod aucpace_test_command;
 use aucpace_test_command::{AucPaceTest, AucPaceTestCommandHandler};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::debug;
 
 mod tls_test_command;
 
@@ -48,7 +47,7 @@ async fn ping_test() {
         .await
         .unwrap();
 
-    debug!("trying to connect client");
+    tracing::trace!("trying to connect client");
 
     let client = RpcClient::connect(
         address,
@@ -59,7 +58,7 @@ async fn ping_test() {
     .await
     .unwrap();
 
-    debug!("client connected");
+    tracing::trace!("client connected");
 
     let connection = client.upstream_connection();
 
@@ -101,7 +100,7 @@ async fn tls_test() {
         .await
         .unwrap();
 
-    debug!("trying to connect client");
+    tracing::trace!("trying to connect client");
 
     let client = RpcClient::connect(
         address,
@@ -112,7 +111,7 @@ async fn tls_test() {
     .await
     .unwrap();
 
-    debug!("client connected");
+    tracing::trace!("client connected");
 
     let connection = client.upstream_connection();
 
@@ -154,7 +153,7 @@ async fn aucpace_test() {
         .await
         .unwrap();
 
-    debug!("trying to connect client");
+    tracing::trace!("trying to connect client");
 
     let client = RpcClient::connect(
         address,
@@ -165,7 +164,7 @@ async fn aucpace_test() {
     .await
     .unwrap();
 
-    debug!("client connected");
+    tracing::trace!("client connected");
 
     let connection = client.upstream_connection();
 
@@ -201,7 +200,7 @@ async fn perm_test() {
         .await
         .unwrap();
 
-    debug!("trying to connect client");
+    tracing::trace!("trying to connect client");
 
     let client = RpcClient::connect(
         address,
@@ -212,7 +211,7 @@ async fn perm_test() {
     .await
     .unwrap();
 
-    debug!("client connected");
+    tracing::trace!("client connected");
 
     let connection = client.upstream_connection();
 

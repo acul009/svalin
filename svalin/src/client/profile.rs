@@ -11,7 +11,7 @@ use svalin_pki::{
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::{
     client::tunnel_manager::TunnelManager,
@@ -174,17 +174,17 @@ impl Client {
 
         let mls_db_path = profile.profile_dir().await?.push("mls-store.sqlite");
         let client_db_path = profile.profile_dir().await?.push("client-store.sqlite");
-        // debug!("unlocking profile");
+        // tracing::trace!("unlocking profile");
         let device_credential = profile.device_credential.decrypt(&key)?;
         let root_certificate = profile.root_certificate.use_as_root()?;
         let upstream_certificate = profile
             .upstream_certificate
             .verify_signature(&root_certificate, get_current_timestamp())?;
 
-        // debug!("creating verifier");
+        // tracing::trace!("creating verifier");
         let verifier = ExactVerififier::new(upstream_certificate.clone()).to_tls_verifier();
 
-        // debug!("connecting to server");
+        // tracing::trace!("connecting to server");
         let rpc = RpcClient::connect(
             &profile.upstream_address,
             Some(&device_credential),
@@ -207,9 +207,9 @@ impl Client {
         let remote_verifier =
             RemoteVerifier::new(root_certificate.clone(), rpc.upstream_connection());
 
-        // debug!("connected to server");
+        // tracing::trace!("connected to server");
 
-        // debug!("opening sqlite database: {}", db_path.display());
+        // tracing::trace!("opening sqlite database: {}", db_path.display());
         let url = mls_db_path
             .as_path()
             .to_str()
@@ -279,7 +279,7 @@ impl Client {
         let session_mls = mls.clone();
         let state_handle = client.state_handle.clone();
         client.background_tasks.spawn(async move {
-            debug!("starting user mls update task");
+            tracing::trace!("starting user mls update task");
             let verifier = remote_verifier;
             if let Err(err) = connection
                 .dispatch(UpdateUserMls {

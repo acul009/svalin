@@ -162,7 +162,7 @@ impl ArgonParams {
         let salt_bytes = self.salt.as_slice().to_owned();
 
         let result = tokio::task::spawn_blocking(move || {
-            // debug!("running blocking task");
+            // tracing::trace!("running blocking task");
             let mut hash = [0u8; 32];
             let result = argon
                 .hash_password_into(&secret, &salt_bytes, &mut hash)

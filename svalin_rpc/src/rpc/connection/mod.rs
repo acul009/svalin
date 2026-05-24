@@ -71,14 +71,14 @@ where
     P::Permission: 'static,
 {
     async fn serve(&self, commands: HandlerCollection<P>, cancel: CancellationToken) -> Result<()> {
-        // debug!("waiting for incoming data stream");
+        // tracing::trace!("waiting for incoming data stream");
         let open_sessions = TaskTracker::new();
 
         loop {
             let cancel2 = cancel.clone();
             select! {
                 _ = cancel.cancelled() => {
-                    // debug!("canceling connection serve loop");
+                    // tracing::trace!("canceling connection serve loop");
                     break;
                 }
                 session = self.accept_raw_session() => {

@@ -8,7 +8,6 @@ use tokio::{
     sync::watch,
 };
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
 
 pub mod request_available_version;
 pub mod request_installation_info;
@@ -182,7 +181,7 @@ impl Updater {
             return Err(UpdaterError::UnsupportedInstallMethod);
         }
 
-        debug!("install type supports updating");
+        tracing::trace!("install type supports updating");
 
         match install_method {
             InstallMethod::Dpkg => Self::get_github_channel_version(channel).await,
@@ -219,7 +218,7 @@ impl Updater {
             .json()
             .await?;
 
-        // debug!("releases: {:?}", releases);
+        // tracing::trace!("releases: {:?}", releases);
 
         Ok(releases)
     }

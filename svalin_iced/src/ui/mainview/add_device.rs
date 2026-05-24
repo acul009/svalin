@@ -106,7 +106,7 @@ impl AddDevice {
 
                 let (send, recv) = oneshot::channel();
                 let join_code = self.join_code.clone();
-                tracing::debug!("sending join code: {join_code:?}");
+                tracing::trace!("sending join code: {join_code:?}");
 
                 let (add_task, handle) = Task::future(async move {
                     match client.add_agent_with_code(join_code, send).await {

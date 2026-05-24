@@ -334,7 +334,7 @@ impl PublicProcessor {
                 message: MessageToMemberTransport::Welcome(welcome),
             }))
         } else {
-            tracing::debug!("no welcome message");
+            tracing::trace!("no welcome message");
             Ok(None)
         }
     }

@@ -52,13 +52,13 @@ impl KeyRetriever for RemoteKeyRetriever {
                     // Skip the device itself
                     .take(chain.iter().len() - 1)
                     .map(|cert| {
-                        tracing::debug!("required meta member: {:?}", cert.certificate_type());
+                        tracing::trace!("required meta member: {:?}", cert.certificate_type());
                         cert
                     })
                     .map(|cert| cert.spki_hash().clone())
                     .collect();
 
-                tracing::debug!("required members for group {id:?}: {required_members:?}");
+                tracing::trace!("required members for group {id:?}: {required_members:?}");
 
                 Ok(required_members)
             }

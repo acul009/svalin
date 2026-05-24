@@ -17,7 +17,7 @@ use svalin_pki::{
     serde_paramsstring, serde_saltstring,
 };
 use tokio::io::{AsyncRead, AsyncWrite};
-use tracing::{debug, instrument};
+use tracing::instrument;
 
 use crate::{
     rpc::{
@@ -187,7 +187,7 @@ where
         let db = PseudoDatabase::new(verifier, salt, params);
 
         // ===== SSID Establishment =====
-        debug!("Starting SSID establishment");
+        tracing::trace!("Starting SSID establishment");
         let mut pake_server: AuCPaceServer<_, _, NONCE_LENGTH> =
             aucpace::Server::new(password_hash::rand_core::OsRng);
 
@@ -197,7 +197,7 @@ where
             .await?;
 
         // ===== Augmentation Layer =====
-        debug!("Starting augmentation layer");
+        tracing::trace!("Starting augmentation layer");
         let client_nonce: Nonce = session.read_object().await?;
 
         let pake_server = pake_server.agree_ssid(client_nonce.to_array());
@@ -214,7 +214,7 @@ where
         session.write_object(&client_info).await?;
 
         // ===== CPace substep =====
-        debug!("Starting CPace layer");
+        tracing::trace!("Starting CPace layer");
         let server_nonce = Nonce::generate();
         session.write_object(&server_nonce).await?;
         let client_nonce: Nonce = session.read_object().await?;
@@ -226,7 +226,7 @@ where
         let client_key: PublicKey = session.read_object().await?;
 
         // ===== Explicit Mutual Authentication =====
-        debug!("Starting explicit mutual authentication");
+        tracing::trace!("Starting explicit mutual authentication");
 
         let pake_server = pake_server.receive_client_pubkey(client_key.0)?;
         let client_authenticator: Authenticator = session.read_object().await?;
@@ -252,7 +252,7 @@ where
         let key = EncryptionKey::dangerous_from_bytes(key);
 
         // ===== Create TLS Tunnel =====
-        debug!("Creating TLS tunnel");
+        tracing::trace!("Creating TLS tunnel");
         let (transport, _) = session.destructure();
         let transport = transport.into_any().downcast::<T>().unwrap();
 

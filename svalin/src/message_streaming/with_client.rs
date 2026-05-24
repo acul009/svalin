@@ -110,7 +110,7 @@ impl CommandHandler for MessageSender {
             return Err(anyhow!("Expected peer to be a session"));
         };
 
-        tracing::debug!("client {peer:?} now receiving messages");
+        tracing::trace!("client {peer:?} now receiving messages");
 
         let (sender, receiver) = mpsc::channel(10);
 
@@ -152,7 +152,7 @@ impl MessageSender {
         mut receiver: mpsc::Receiver<(MessageToClient, Option<oneshot::Sender<Result<(), ()>>>)>,
     ) -> Result<(), anyhow::Error> {
         while let Some((message, feedback)) = receiver.recv().await {
-            tracing::debug!("Sending message to client: {:?}", message);
+            tracing::trace!("Sending message to client: {:?}", message);
             session.write_object(&message).await?;
 
             let response = session.read_object::<Result<(), ()>>().await?;
@@ -270,7 +270,7 @@ async fn stream_mls_messages_inner<Message>(
     }
 
     while let Some(message) = subscription.recv().await {
-        tracing::debug!("received message from subscription: {:?}", message);
+        tracing::trace!("received message from subscription: {:?}", message);
         let (send, recv) = oneshot::channel();
 
         let _ = sender.send((transform(message.1), Some(send))).await;

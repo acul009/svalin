@@ -54,7 +54,7 @@ impl CommandDispatcher for GetKeyPackages {
                 .iter()
                 .map(|key_package| key_package.spki_hash())
                 .collect::<Result<HashSet<SpkiHash>, _>>()?;
-            // tracing::debug!("received key packages: {:?}", received_packages);
+            // tracing::trace!("received key packages: {:?}", received_packages);
             if received_packages.len() > packages.len() {
                 return Err(GetKeyPackagesDispatcherError::ToManyKeyPackages);
             }
@@ -92,7 +92,7 @@ impl CommandHandler for GetKeyPackagesHandler {
             .await
         {
             Ok(key_packages) => {
-                // tracing::debug!("sending key packages: {:?}", key_packages);
+                // tracing::trace!("sending key packages: {:?}", key_packages);
                 session.write_object(&Some(key_packages)).await?;
                 Ok(())
             }

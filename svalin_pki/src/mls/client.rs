@@ -78,7 +78,7 @@ where
         &self,
         message: &MessageToMemberTransport,
     ) -> anyhow::Result<MessageData<Types>> {
-        tracing::debug!("handling message: {:?}", message);
+        tracing::trace!("handling message: {:?}", message);
         match message
             .unpack()
             .map_err(|err| {
@@ -88,7 +88,7 @@ where
             .context("unpack error")?
         {
             MessageToMember::Welcome(welcome) => {
-                tracing::debug!("handling welcome");
+                tracing::trace!("handling welcome");
                 let group = self
                     .handle_welcome(welcome)
                     .await
@@ -97,7 +97,7 @@ where
                         anyhow!("{}", err)
                     })
                     .context("handle welcome error")?;
-                tracing::debug!("welcome handled successfully");
+                tracing::trace!("welcome handled successfully");
 
                 Ok(MessageData {
                     content: MessageDataContent::Internal,
@@ -105,17 +105,17 @@ where
                 })
             }
             MessageToMember::GroupMessage(message) => {
-                tracing::debug!("handling group message");
+                tracing::trace!("handling group message");
                 let processed = self
                     .harness
                     .processor()
                     .process_message(message)
                     .await
                     .context("error processing group message")?;
-                tracing::debug!("message processed successfully");
+                tracing::trace!("message processed successfully");
                 let group_id = SvalinGroupId::from_group_id(&processed.group_id)
                     .context("error parsing group id")?;
-                tracing::debug!("group id parsed successfully");
+                tracing::trace!("group id parsed successfully");
                 let ProcessedContent::Message(decrypted) = processed.content else {
                     anyhow::bail!("expected data message, got something else instead.")
                 };
@@ -209,7 +209,7 @@ where
 
         self.harness.processor().join_group(staged).await?;
 
-        tracing::debug!("joined group {id:?}");
+        tracing::trace!("joined group {id:?}");
 
         Ok(id)
     }
@@ -218,7 +218,7 @@ where
         &self,
         message: PublicMessageIn,
     ) -> anyhow::Result<MessageData<Types>> {
-        tracing::debug!("Handling add to group message");
+        tracing::trace!("Handling add to group message");
 
         let processed = self
             .harness

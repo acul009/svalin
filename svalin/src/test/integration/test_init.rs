@@ -52,7 +52,7 @@ async fn test_init() {
     let mut conn = client.rpc().upstream_connection();
 
     let duration = conn.ping().await.unwrap();
-    debug!("ping duration: {:?}", duration);
+    tracing::trace!("ping duration: {:?}", duration);
 
     client.close();
 

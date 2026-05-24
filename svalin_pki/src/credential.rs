@@ -45,11 +45,11 @@ impl EncryptedCredential {
         self,
         encryption_key: &EncryptionKey,
     ) -> Result<Credential, DecodeCredentialsError> {
-        // debug!("decrypting credentials with password");
+        // tracing::trace!("decrypting credentials with password");
 
         let decrypted_keypair = KeyPair::decrypt(self.encrypted_keypair, encryption_key)?;
 
-        // debug!("credentials decrypted");
+        // tracing::trace!("credentials decrypted");
 
         Credential::new(decrypted_keypair, self.certificate)
             .map_err(DecodeCredentialsError::CreateCredentialsError)

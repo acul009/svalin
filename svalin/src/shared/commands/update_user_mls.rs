@@ -27,7 +27,6 @@ use tokio::{
     time::{Instant, sleep_until},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
@@ -134,7 +133,7 @@ impl CommandHandler for UpdateUserMlsHandler {
                 response = session.read_object::<ToServer>().fuse() => {
                     // Todo: make the object reader / chunk reader cancel save with an internal buffer
                     let response = response?;
-                    tracing::debug!("user mls initiative: {response:?}");
+                    tracing::trace!("user mls initiative: {response:?}");
 
                     if let ToServer::Goodbye = &response {
                         break;
@@ -156,7 +155,7 @@ impl CommandHandler for UpdateUserMlsHandler {
             session.write_object(&update).await?;
 
             // let response = session.read_object::<ToServer>().await?;
-            // tracing::debug!("user mls respone: {response:?}");
+            // tracing::trace!("user mls respone: {response:?}");
 
             // let handle_result = self.handle_response(&user_hash, response).await;
             // let send_result = handle_result.as_ref().map(|_| ()).map_err(|_| ());
@@ -204,9 +203,9 @@ impl UpdateUserMlsHandler {
                     .await?;
 
                 for message in messages {
-                    tracing::debug!("received message from user mls: {message:?}");
+                    tracing::trace!("received message from user mls: {message:?}");
                     let to_send = self.mls.process_message(message).await?;
-                    tracing::debug!("processing resulted in messages: {to_send:?}");
+                    tracing::trace!("processing resulted in messages: {to_send:?}");
                     for mut message in to_send {
                         message.remove_receiver(&user_hash);
                         self.message_store.add_message(message).await?;
@@ -281,7 +280,7 @@ impl CommandDispatcher for UpdateUserMls {
         self,
         session: &mut svalin_rpc::rpc::session::Session,
     ) -> Result<Self::Output, Self::Error> {
-        debug!("Updating user MLS");
+        tracing::trace!("Updating user MLS");
 
         loop {
             let Some(state) = self
@@ -334,7 +333,7 @@ impl CommandDispatcher for UpdateUserMls {
                     // Next timeout should be short, so we can send out updates as soon as possible
                     // A bit of timeout is still good, so we have some debounce.
                     timeout_duration = Duration::from_secs(3);
-                    tracing::debug!("user mls update: {update:?}");
+                    tracing::trace!("user mls update: {update:?}");
                     match update {
                         Update::Message(uuid, message_to_member_transport) => {
                             let handled =
@@ -395,17 +394,17 @@ impl CommandDispatcher for UpdateUserMls {
                             .await
                             .map_err(|err| anyhow!(err))?
                         {
-                            tracing::debug!("new meta group: {message:?}");
+                            tracing::trace!("new meta group: {message:?}");
                             messages.push(message);
                         }
                         let meta_group = SvalinGroupId::DeviceMetaGroup(device.clone());
                         if !client.is_member(&meta_group, self.session_mls.me()).await? {
-                            tracing::debug!("adding client to meta group");
+                            tracing::trace!("adding client to meta group");
                             let key_package = self.session_mls.create_key_package().await?;
                             let message = client.add_member(&meta_group, key_package).await?;
                             messages.push(message);
                         } else {
-                            tracing::debug!("already in meta group");
+                            tracing::trace!("already in meta group");
                         }
                     }
 
@@ -413,7 +412,7 @@ impl CommandDispatcher for UpdateUserMls {
                 }
 
                 if send_update {
-                    tracing::debug!("sending user mls update");
+                    tracing::trace!("sending user mls update");
                     // We likely just found a group which contains data we don't have yet.
                     // So it's a good idea to send that update to the session's state
                     let update_session_state = !messages.is_empty();

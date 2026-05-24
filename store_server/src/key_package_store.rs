@@ -59,7 +59,7 @@ impl KeyPackageStore {
         let mut key_packages = Vec::with_capacity(entities.len());
 
         for spki_hash in entities {
-            // tracing::debug!("Loading key package for {spki_hash}");
+            // tracing::trace!("Loading key package for {spki_hash}");
             let spki_hash_slice = spki_hash.as_slice();
             let key_package = sqlx::query!(
                 "SELECT id, data FROM key_packages WHERE spki_hash == ? LIMIT 1",
