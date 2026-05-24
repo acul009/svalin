@@ -169,6 +169,7 @@ impl ClientMessageReceiver {
     async fn handle(&self, message: MessageToClient) -> Result<bool, anyhow::Error> {
         match message {
             MessageToClient::Mls(message) => {
+                tracing::debug!("client received message: {:?}", message);
                 let message = self
                     .mls
                     .handle_message(&message)

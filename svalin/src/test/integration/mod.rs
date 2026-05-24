@@ -222,7 +222,7 @@ async fn integration_tests() {
 
     // testing device handle
     let agent_spki_hash = client_state.persistent().iter().next().unwrap().0.clone();
-    let device = client.device(agent_spki_hash);
+    let device = client.device(agent_spki_hash.clone());
     device.ping().await.unwrap();
 
     // testing directly receiving system report
@@ -257,6 +257,17 @@ async fn integration_tests() {
     } else {
         panic!("expected update from main status update, got {:?}", &update);
     }
+
+    assert_eq!(
+        client_state
+            .persistent()
+            .get(&agent_spki_hash)
+            .unwrap()
+            .meta_info()
+            .unwrap()
+            .name,
+        "Test Device"
+    );
 
     // =====================================================================
     // Controlled shutdown

@@ -32,7 +32,10 @@ impl<'a> DeviceHandle<'a> {
     }
 
     pub async fn update_metainfo(&self, metainfo: SvalinMetaInfo) -> anyhow::Result<()> {
-        self.0.mls.send_meta_info(metainfo.clone()).await?;
+        self.0
+            .mls
+            .send_meta_info(self.1.clone(), metainfo.clone())
+            .await?;
         self.0
             .state_handle
             .update(ClientStateUpdate::Persistent(

@@ -209,6 +209,8 @@ where
 
         self.harness.processor().join_group(staged).await?;
 
+        tracing::debug!("joined group {id:?}");
+
         Ok(id)
     }
 
@@ -293,9 +295,10 @@ where
 
     pub async fn send_meta_info(
         &self,
+        spki_hash: SpkiHash,
         metainfo: Types::MetaInfo,
     ) -> anyhow::Result<MessageToServerTransport> {
-        let group_id = SvalinGroupId::DeviceMetaGroup(self.me.clone()).to_group_id();
+        let group_id = SvalinGroupId::DeviceMetaGroup(spki_hash).to_group_id();
         let message = SvalinMessage::<Types>::MetaInfo(metainfo);
         let encoded = postcard::to_stdvec(&message)?;
         let to_server = self

@@ -134,7 +134,7 @@ impl CommandHandler for UpdateUserMlsHandler {
                 response = session.read_object::<ToServer>().fuse() => {
                     // Todo: make the object reader / chunk reader cancel save with an internal buffer
                     let response = response?;
-                    tracing::info!("user mls initiative: {response:?}");
+                    tracing::debug!("user mls initiative: {response:?}");
 
                     if let ToServer::Goodbye = &response {
                         break;
@@ -400,9 +400,12 @@ impl CommandDispatcher for UpdateUserMls {
                         }
                         let meta_group = SvalinGroupId::DeviceMetaGroup(device.clone());
                         if !client.is_member(&meta_group, self.session_mls.me()).await? {
+                            tracing::debug!("adding client to meta group");
                             let key_package = self.session_mls.create_key_package().await?;
                             let message = client.add_member(&meta_group, key_package).await?;
                             messages.push(message);
+                        } else {
+                            tracing::debug!("already in meta group");
                         }
                     }
 
@@ -410,6 +413,7 @@ impl CommandDispatcher for UpdateUserMls {
                 }
 
                 if send_update {
+                    tracing::debug!("sending user mls update");
                     // We likely just found a group which contains data we don't have yet.
                     // So it's a good idea to send that update to the session's state
                     let update_session_state = !messages.is_empty();
