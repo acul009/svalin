@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT spki_hash as \"spki_hash!\", data FROM meta_info",
+  "describe": {
+    "columns": [
+      {
+        "name": "spki_hash!",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "data",
+        "ordinal": 1,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "0c60b9d5eba7dad3398a0c7d4d7af3c9abb956917960032d54b01c3652767f94"
+}

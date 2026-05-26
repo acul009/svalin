@@ -88,6 +88,11 @@ impl DeviceState {
     }
 
     pub fn name(&self) -> Cow<'_, str> {
+        if let Some(meta) = self.meta_info() {
+            if !meta.name.is_empty() {
+                return meta.name.as_str().into();
+            }
+        }
         if let Some(report) = self.report() {
             if let Some(hostname) = &report.system_report.hostname {
                 return hostname.into();
@@ -114,4 +119,5 @@ pub struct SvalinMetaInfo {
     pub updated_at: u64,
     pub name: String,
     pub group: String,
+    pub notes: String,
 }

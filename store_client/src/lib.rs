@@ -90,6 +90,20 @@ impl ClientStore {
             }
         }
 
+        let mut meta_info =
+            sqlx::query!(r#"SELECT spki_hash as "spki_hash!", data FROM meta_info"#)
+                .fetch(&self.pool);
+
+        while let Some(row) = meta_info.next().await {
+            let row = row?;
+            let spki_hash = SpkiHash::from_slice(&row.spki_hash)
+                .expect("values should have been checked when saving in the db");
+            match postcard::from_bytes(&row.data) {
+                Ok(data) => state.update(Message::UpdateMetaInfo(spki_hash, data)),
+                Err(err) => tracing::error!("failed to load meta info: {}", err),
+            }
+        }
+
         Ok(state)
     }
 

@@ -141,7 +141,7 @@ impl MainView {
                     return Action::None;
                 };
 
-                match device_view.update(message) {
+                match device_view.update(message, &self.state, &self.client) {
                     device_view::Action::None => Action::None,
                     device_view::Action::Back => {
                         self.screen = Screen::DeviceList;

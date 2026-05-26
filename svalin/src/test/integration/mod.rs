@@ -244,6 +244,7 @@ async fn integration_tests() {
         updated_at: get_current_timestamp(),
         name: "Test Device".into(),
         group: "Test Group".into(),
+        notes: "Test Notes".into(),
     };
     device.update_metainfo(meta_info).await.unwrap();
 

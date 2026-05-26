@@ -17,8 +17,6 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum Message {
     JoinCode(String),
-    Name(String),
-    Group(String),
     ConfirmCode(String),
 
     ConnectToDevice,
@@ -34,7 +32,6 @@ pub enum Screen {
     Loading(String),
     Error(Arc<anyhow::Error>),
     JoinCode,
-    Name,
     Confirm,
 }
 
@@ -42,8 +39,6 @@ pub struct AddDevice {
     screen: Screen,
     join_code: String,
     confirm_code: String,
-    name: String,
-    group: String,
     confirm_sender: Option<oneshot::Sender<String>>,
     _handle: Option<iced::task::Handle>,
 }
@@ -62,8 +57,6 @@ impl AddDevice {
                 screen: Screen::JoinCode,
                 join_code: String::new(),
                 confirm_code: String::new(),
-                name: String::new(),
-                group: String::new(),
                 confirm_sender: None,
                 _handle: None,
             },
@@ -80,14 +73,6 @@ impl AddDevice {
             }
             Message::ConfirmCode(confirm_code) => {
                 self.confirm_code = confirm_code.chars().filter(|c| c.is_numeric()).collect();
-                Action::None
-            }
-            Message::Name(name) => {
-                self.name = name;
-                Action::None
-            }
-            Message::Group(group) => {
-                self.group = group;
                 Action::None
             }
             Message::Error(err) => {
@@ -131,7 +116,7 @@ impl AddDevice {
             Message::WaitForConfirm(confirm) => {
                 let confirm = Arc::into_inner(confirm).unwrap();
                 self.confirm_sender = Some(confirm);
-                self.screen = Screen::Name;
+                self.screen = Screen::Confirm;
                 Action::Run(operation::focus("device_name"))
             }
             Message::SwitchToConfirm => {
@@ -171,20 +156,6 @@ impl AddDevice {
                 )
                 .button(button("Cancel").on_press(Message::Cancel))
                 .button(button("Continue").on_press(Message::ConnectToDevice))
-                .into(),
-            Screen::Name => dialog()
-                .control(
-                    text_input("Device Name", &self.name)
-                        .on_input(Message::Name)
-                        .id("device_name"),
-                )
-                .control(
-                    text_input("Group", &self.group)
-                        .on_input(Message::Group)
-                        .on_submit(Message::SwitchToConfirm),
-                )
-                .button(button("Cancel").on_press(Message::Cancel))
-                .button(button("Continue").on_press(Message::SwitchToConfirm))
                 .into(),
             Screen::Confirm => dialog()
                 .control(

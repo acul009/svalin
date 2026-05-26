@@ -76,7 +76,7 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                                 }
                                 .size(16)
                                 .color(color),
-                                text!("{}", spki_hash),
+                                text(persistent.name()),
                                 text(
                                     persistent
                                         .report()
