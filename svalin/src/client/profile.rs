@@ -66,7 +66,7 @@ impl Client {
     async fn data_dir() -> Result<Location, LocationError> {
         Location::user_data_dir()?
             .push("client")
-            .ensure_exists()
+            .ensure_parent_exists()
             .await
     }
 
@@ -127,9 +127,9 @@ impl Client {
     async fn save_profile(profile: &Profile) -> Result<()> {
         let location = Self::profile_dir(&profile.name())
             .await?
-            .ensure_exists()
-            .await?
-            .push("profile.json");
+            .push("profile.json")
+            .ensure_parent_exists()
+            .await?;
 
         let json = serde_json::to_string_pretty(profile)?;
         tokio::fs::write(location, json).await?;

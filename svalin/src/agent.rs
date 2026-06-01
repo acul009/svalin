@@ -226,19 +226,16 @@ impl Agent {
         Ok(())
     }
 
-    async fn data_dir() -> Result<Location, LocationError> {
-        Location::system_data_dir()?
-            .push("agent")
-            .ensure_exists()
-            .await
+    pub fn data_dir() -> Result<Location, LocationError> {
+        Ok(Location::system_data_dir()?.push("agent"))
     }
 
-    async fn config_path() -> Result<Location, LocationError> {
-        Ok(Self::data_dir().await?.push("config.json"))
+    fn config_path() -> Result<Location, LocationError> {
+        Ok(Self::data_dir()?.push("config.json"))
     }
 
     async fn get_config() -> Result<Option<AgentConfig>> {
-        let location = Self::config_path().await?;
+        let location = Self::config_path()?;
         if tokio::fs::try_exists(&location).await? {
             let config = tokio::fs::read(&location).await?;
             Ok(Some(serde_json::from_slice(&config)?))
@@ -247,12 +244,12 @@ impl Agent {
         }
     }
 
-    async fn mls_db_path() -> Result<Location, LocationError> {
-        Ok(Self::data_dir().await?.push("mls-store.sqlite"))
+    fn mls_db_path() -> Result<Location, LocationError> {
+        Ok(Self::data_dir()?.push("mls-store.sqlite"))
     }
 
     async fn open_mls_store() -> Result<SqliteStorageProvider<PostcardCodec>, OpenMlsStoreError> {
-        let location = Self::mls_db_path().await?;
+        let location = Self::mls_db_path()?;
 
         let path = location
             .as_path()
@@ -263,7 +260,7 @@ impl Agent {
     }
 
     async fn save_config(config: &AgentConfig) -> Result<()> {
-        let location = Self::config_path().await?;
+        let location = Self::config_path()?.ensure_parent_exists().await?;
         let config = serde_json::to_vec_pretty(config)?;
         tokio::fs::write(&location, config).await?;
         Ok(())

@@ -9124,8 +9124,3 @@ dependencies = [
  "syn",
  "winnow 1.0.2",
 ]
-
-[[patch.unused]]
-name = "iced_fonts"
-version = "0.3.0"
-source = "git+https://github.com/Redhawk18/iced_fonts.git#229df23a81c82ee08351980160c69ac00e6db755"

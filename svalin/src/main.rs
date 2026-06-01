@@ -4,7 +4,7 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
-use svalin::{agent::Agent, server::Server};
+use svalin::{agent::Agent, installer, server::Server};
 
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber;
@@ -29,6 +29,10 @@ enum Command {
 
 #[derive(Debug, Subcommand)]
 enum AgentAction {
+    /// Install the agent with default settings
+    Install,
+    /// Uninstall the agent and delete all data
+    Uninstall,
     /// Initialize the agent by connecting to a server
     Init { address: String },
 }
@@ -88,6 +92,12 @@ async fn run() {
             }
         }
         Command::Agent { action } => match action {
+            Some(AgentAction::Install) => {
+                installer::install_agent().await.unwrap();
+            }
+            Some(AgentAction::Uninstall) => {
+                installer::uninstall_agent().await.unwrap();
+            }
             Some(AgentAction::Init { address }) => {
                 let mut welcome_message = "-".repeat(40);
                 welcome_message.push_str("Svalin Agent");

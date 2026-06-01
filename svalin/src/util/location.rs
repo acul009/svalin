@@ -100,9 +100,11 @@ impl Location {
         self
     }
 
-    pub async fn ensure_exists(self) -> Result<Self, LocationError> {
-        if !self.exists().await {
-            tokio::fs::create_dir_all(&self.path).await?;
+    pub async fn ensure_parent_exists(self) -> Result<Self, LocationError> {
+        let parent = self.parent().unwrap();
+        let parent_exists = tokio::fs::try_exists(&parent).await.unwrap_or(false);
+        if !parent_exists {
+            tokio::fs::create_dir_all(&parent).await?;
         }
 
         Ok(self)

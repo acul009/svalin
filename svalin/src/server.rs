@@ -73,19 +73,16 @@ impl Server {
         config_builder::new()
     }
 
-    async fn data_dir() -> Result<Location, LocationError> {
-        Location::system_data_dir()?
-            .push("server")
-            .ensure_exists()
-            .await
+    fn data_dir() -> Result<Location, LocationError> {
+        Ok(Location::system_data_dir()?.push("server"))
     }
 
-    async fn base_config_path() -> Result<Location> {
-        Ok(Self::data_dir().await?.push("base_config.json"))
+    fn base_config_path() -> Result<Location> {
+        Ok(Self::data_dir()?.push("base_config.json"))
     }
 
     async fn get_base_config() -> Result<Option<BaseConfig>> {
-        let location = Self::base_config_path().await?;
+        let location = Self::base_config_path()?.ensure_parent_exists().await?;
         if tokio::fs::try_exists(&location).await? {
             let config = tokio::fs::read(&location).await?;
             Ok(Some(serde_json::from_slice(&config)?))
@@ -95,7 +92,7 @@ impl Server {
     }
 
     async fn save_base_config(config: &BaseConfig) -> Result<()> {
-        let location = Self::base_config_path().await?;
+        let location = Self::base_config_path()?;
         let config = serde_json::to_vec_pretty(config)?;
         tokio::fs::write(&location, config).await?;
         Ok(())
@@ -105,7 +102,7 @@ impl Server {
         verifier: LocalVerifier,
         key_retriever: LocalKeyRetriever,
     ) -> Result<Arc<MlsServer>> {
-        let location = Self::data_dir().await?.push("mls-store.sqlite");
+        let location = Self::data_dir()?.push("mls-store.sqlite");
         let storage_provider = SqliteStorageProvider::open(location.as_path()).await?;
 
         let mls = MlsServer::new(storage_provider, verifier, key_retriever);
@@ -119,7 +116,7 @@ impl Server {
             .context("error opening config")?;
 
         // tracing::trace!("opening DB");
-        let db_path = Self::data_dir().await?.push("db.sqlite");
+        let db_path = Self::data_dir()?.push("db.sqlite");
         tracing::trace!("opening server db: {db_path}");
         // tracing::trace!("opening server store at: {}", &db_path);
         let store = ServerStore::open(&db_path)
