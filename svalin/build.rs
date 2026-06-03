@@ -11,7 +11,6 @@ fn main() {
 
     println!("cargo:rustc-env=GIT_COMMIT_HASH={}", hash);
 
-    // These always trigger rebuild, which is annoying. I gotta find a way to fix this
-    // println!("cargo:rerun-if-changed=.git/HEAD");
-    // println!("cargo:rerun-if-changed=.git/refs/heads");
+    println!("cargo:rerun-if-changed=../.git/HEAD");
+    println!("cargo:rerun-if-changed=../.git/refs/heads");
 }
