@@ -25,6 +25,8 @@ enum Command {
         #[clap(subcommand)]
         action: Option<AgentAction>,
     },
+    /// Get version information
+    Version,
 }
 
 #[derive(Debug, Subcommand)]
@@ -132,5 +134,8 @@ async fn run() {
                 }
             }
         },
+        Command::Version => {
+            println!("Commit: {}", env!("GIT_COMMIT_HASH"))
+        }
     }
 }
