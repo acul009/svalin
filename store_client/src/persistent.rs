@@ -110,7 +110,7 @@ impl DeviceState {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SvalinReport {
-    pub current_version_identifiert: String,
+    pub current_version_identifier: String,
     pub system_report: SystemReport,
 }
 

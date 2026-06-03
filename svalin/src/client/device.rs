@@ -8,7 +8,8 @@ use svalin_rpc::{
 };
 
 use crate::{
-    client::state::ClientStateUpdate, shared::commands::request_system_report::RequestSystemReport,
+    client::state::ClientStateUpdate,
+    shared::commands::{request_system_report::RequestSystemReport, update_agent::UpdateAgent},
 };
 
 pub struct DeviceHandle<'a>(&'a super::Client, SpkiHash);
@@ -42,6 +43,16 @@ impl<'a> DeviceHandle<'a> {
                 persistent::Message::UpdateMetaInfo(self.1.clone(), metainfo),
             ))
             .await?;
+
+        Ok(())
+    }
+
+    pub async fn update_agent(&self, url: String) -> anyhow::Result<()> {
+        self.connection()
+            .await?
+            .dispatch(UpdateAgent(url))
+            .await
+            .map_err(|err| anyhow!("{err}"))?;
 
         Ok(())
     }

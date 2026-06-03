@@ -18,19 +18,15 @@ use svalin_rpc::{
 use tokio::{sync::Notify, time::error::Elapsed};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::instrument;
-use update::{
-    Updater, request_available_version::AvailableVersionHandler,
-    request_installation_info::InstallationInfoHandler, start_agent_update::StartUpdateHandler,
-};
 
 mod init;
 mod mls;
-pub mod update;
+// pub mod update;
 
-use crate::shared::commands::terminal::RemoteTerminalHandler;
 use crate::shared::commands::{
     realtime_status::RealtimeStatusHandler, request_system_report::RequestSystemReportHandler,
 };
+use crate::shared::commands::{terminal::RemoteTerminalHandler, update_agent::UpdateAgentHandler};
 use crate::shared::join_agent::AgentInitPayload;
 use crate::util::key_storage::KeySource;
 use crate::util::location::{Location, LocationError};
@@ -57,6 +53,12 @@ pub struct Agent {
 impl Agent {
     #[instrument]
     pub async fn run(cancel: CancellationToken) -> Result<()> {
+        tracing::trace!("deleting temp files");
+        let temp_dir = Self::temp_dir()?;
+        if tokio::fs::try_exists(&temp_dir).await.unwrap_or(false) {
+            tokio::fs::remove_dir_all(&temp_dir).await?;
+        }
+
         tracing::trace!("opening agent configuration");
 
         let config = Self::get_config()
@@ -116,10 +118,6 @@ impl Agent {
 
         let e2e_commands = HandlerCollection::new(permission_handler.clone());
 
-        let updater = Updater::new(cancel.clone())
-            .await
-            .context("error creating updater")?;
-
         let system_report_notify = Arc::new(Notify::new());
 
         e2e_commands
@@ -129,9 +127,7 @@ impl Agent {
             .add(RealtimeStatusHandler)
             .add(RemoteTerminalHandler)
             .add(TcpForwardHandler)
-            .add(InstallationInfoHandler::new(updater.clone()))
-            .add(AvailableVersionHandler::new(updater.clone()))
-            .add(StartUpdateHandler::new(updater))
+            .add(UpdateAgentHandler::new())
             .add(RequestSystemReportHandler {
                 notify: system_report_notify.clone(),
             });
@@ -228,6 +224,10 @@ impl Agent {
 
     pub fn data_dir() -> Result<Location, LocationError> {
         Ok(Location::system_data_dir()?.push("agent"))
+    }
+
+    pub fn temp_dir() -> Result<Location, LocationError> {
+        Ok(Location::system_temp_dir()?.push("svalin-agent"))
     }
 
     fn config_path() -> Result<Location, LocationError> {

@@ -1,3 +1,3 @@
 mod agent;
 
-pub use agent::{install_agent, uninstall_agent};
+pub use agent::{install_agent, uninstall_agent, update::update_agent};

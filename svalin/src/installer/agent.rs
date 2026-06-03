@@ -1,14 +1,11 @@
-use std::{env, io::Write, time::Duration};
+use std::env;
 
 use anyhow::{Context, anyhow};
-use svalin_pki::{Sha512, curve25519_dalek::digest::Digest};
 
 use crate::{agent::Agent, util::location::Location};
-use tokio::{
-    fs::File,
-    io::{AsyncReadExt, AsyncWriteExt},
-    process::Command,
-};
+use tokio::{fs::File, io::AsyncWriteExt, process::Command};
+
+pub mod update;
 
 #[cfg(windows)]
 const EXECUTABLE_NAME: &str = "svalin.exe";

@@ -8,4 +8,5 @@ pub mod public_server_status;
 pub mod realtime_status;
 pub mod request_system_report;
 pub mod terminal;
+pub mod update_agent;
 pub mod update_user_mls;

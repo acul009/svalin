@@ -38,6 +38,10 @@ reset-win:
 agent $RUST_LOG="svalin=trace":
     cargo run -p svalin agent
 
+agent_install $RUST_LOG="svalin=trace":
+    cargo build -p svalin
+    sudo target/debug/svalin agent install
+
 agent_init $RUST_LOG="svalin=trace":
     cargo run -p svalin agent init localhost:1234
 

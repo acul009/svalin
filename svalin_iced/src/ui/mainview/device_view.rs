@@ -8,24 +8,22 @@ use iced::{
     },
 };
 use svalin::client::{Client, state::ClientState};
-use svalin_client_store::persistent::SvalinMetaInfo;
-use svalin_pki::{SpkiHash, get_current_timestamp};
-use svalin_sysctl::sytem_report::SystemReport;
+use svalin_client_store::persistent::{SvalinMetaInfo, SvalinReport};
+use svalin_pki::SpkiHash;
 
 use crate::{
     Element, bootstrap,
     ui::widgets::{card, header},
 };
 
+mod meta_display;
+
 #[derive(Debug, Clone)]
 pub enum Message {
     Back,
-    EditMeta,
-    CancelEditMeta,
-    ChangeName(String),
-    ChangeGroup(String),
-    ChangeNotes(String),
-    SaveMeta,
+    MetaDisplay(meta_display::Message),
+    UpdateUrlChanged(String),
+    Update,
 }
 
 pub enum Action {
@@ -36,7 +34,8 @@ pub enum Action {
 
 pub struct DeviceView {
     spki_hash: SpkiHash,
-    edit_meta: Option<SvalinMetaInfo>,
+    meta_display: meta_display::MetaDisplay,
+    update_url: String,
 }
 
 const PLACEHOLDER_META: &'static SvalinMetaInfo = &SvalinMetaInfo {
@@ -50,7 +49,8 @@ impl DeviceView {
     pub fn new(spki_hash: SpkiHash) -> Self {
         Self {
             spki_hash,
-            edit_meta: None,
+            update_url: String::new(),
+            meta_display: meta_display::MetaDisplay::new(),
         }
     }
 
@@ -70,45 +70,42 @@ impl DeviceView {
 
         match message {
             Message::Back => Action::Back,
-            Message::EditMeta => {
-                let meta = persistent.meta_info().unwrap_or(&PLACEHOLDER_META).clone();
-                self.edit_meta = Some(meta);
-                Action::None
-            }
-            Message::CancelEditMeta => {
-                self.edit_meta = None;
-                Action::None
-            }
-            Message::ChangeName(name) => {
-                if let Some(meta) = &mut self.edit_meta {
-                    meta.name = name;
-                }
-                Action::None
-            }
-            Message::ChangeGroup(group) => {
-                if let Some(meta) = &mut self.edit_meta {
-                    meta.group = group;
-                }
-                Action::None
-            }
-            Message::ChangeNotes(notes) => {
-                if let Some(meta) = &mut self.edit_meta {
-                    meta.notes = notes;
-                }
-                Action::None
-            }
-            Message::SaveMeta => {
-                let Some(mut meta) = self.edit_meta.take() else {
+            Message::MetaDisplay(message) => {
+                let meta = persistent.meta_info().unwrap_or(&PLACEHOLDER_META);
+                let Some(new_meta) = self.meta_display.update(message, &meta) else {
                     return Action::None;
                 };
-                meta.updated_at = get_current_timestamp();
+
                 let client = client.clone();
                 let spki_hash = self.spki_hash.clone();
                 Action::Run(
                     Task::future(async move {
-                        if let Err(err) = client.device(spki_hash).update_metainfo(meta).await {
+                        if let Err(err) = client.device(spki_hash).update_metainfo(new_meta).await {
                             // TODO: Show error to user, probably refactor out the whole meta info gui
                             tracing::error!(?err, "Failed to update meta info");
+                        }
+                    })
+                    .discard(),
+                )
+            }
+            Message::UpdateUrlChanged(update_url) => {
+                self.update_url = update_url;
+                Action::None
+            }
+            Message::Update => {
+                if self.update_url.is_empty() {
+                    return Action::None;
+                }
+
+                let client = client.clone();
+                let spki_hash = self.spki_hash.clone();
+                let update_url = self.update_url.clone();
+
+                Action::Run(
+                    Task::future(async move {
+                        if let Err(err) = client.device(spki_hash).update_agent(update_url).await {
+                            // TODO: Show error to user, probably refactor out the whole meta info gui
+                            tracing::error!(?err, "Failed to update device");
                         }
                     })
                     .discard(),
@@ -126,50 +123,27 @@ impl DeviceView {
 
         scrollable(
             column![
-                if let Some(meta) = &self.edit_meta {
-                    card(
-                        column![
-                            row![
-                                "Name:",
-                                space::horizontal(),
-                                text_input("", &meta.name).on_input(Message::ChangeName)
-                            ],
-                            row![
-                                "Group:",
-                                space::horizontal(),
-                                text_input("", &meta.group).on_input(Message::ChangeGroup)
-                            ],
-                            row![
-                                "Notes:",
-                                space::horizontal(),
-                                text_input("", &meta.notes).on_input(Message::ChangeNotes)
-                            ],
-                        ]
-                        .spacing(10),
+                if client_state.agent_online(&self.spki_hash) {
+                    Some(
+                        card(
+                            column![
+                                text_input("Update URL", &self.update_url)
+                                    .on_input(Message::UpdateUrlChanged),
+                                button("Update").on_press_maybe(if self.update_url.is_empty() {
+                                    None
+                                } else {
+                                    Some(Message::Update)
+                                },)
+                            ]
+                            .spacing(10),
+                        )
+                        .title("Actions"),
                     )
-                    .title(row![
-                        "Device Information",
-                        space::horizontal(),
-                        button(bootstrap::floppy()).on_press(Message::SaveMeta),
-                        button(bootstrap::x_square()).on_press(Message::CancelEditMeta)
-                    ])
                 } else {
-                    card(
-                        column![
-                            row!["Name:", space::horizontal(), text(&meta.name)],
-                            row!["Group:", space::horizontal(), text(&meta.group)],
-                            row!["Notes:", space::horizontal(), text(&meta.notes)],
-                        ]
-                        .spacing(10),
-                    )
-                    .title(row![
-                        "Device Information",
-                        space::horizontal(),
-                        button(bootstrap::pencil()).on_press(Message::EditMeta)
-                    ])
+                    None
                 },
+                self.meta_display.view(&meta).map(Message::MetaDisplay),
                 if let Some(report) = persistent.report() {
-                    let report = &report.system_report;
                     Some(device_report(report))
                 } else {
                     None
@@ -192,9 +166,15 @@ impl DeviceView {
     }
 }
 
-fn device_report(report: &SystemReport) -> Element<'_, Message> {
+fn device_report(svalin_report: &SvalinReport) -> Element<'_, Message> {
+    let report = &svalin_report.system_report;
     card(
         column![
+            row![
+                "Agent Version:",
+                space::horizontal(),
+                svalin_report.current_version_identifier.as_str()
+            ],
             row![
                 "Hostname:",
                 space::horizontal(),

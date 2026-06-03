@@ -95,6 +95,11 @@ impl Location {
         }
     }
 
+    pub fn system_temp_dir() -> Result<Self, LocationError> {
+        let temp_dir = Self::new(std::env::temp_dir()).push("svalin");
+        Ok(temp_dir)
+    }
+
     pub fn push(mut self, path: impl AsRef<Path>) -> Self {
         self.path.push(path);
         self
