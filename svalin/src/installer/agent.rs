@@ -26,6 +26,7 @@ pub async fn install_agent() -> anyhow::Result<()> {
         current_location.display(),
         install_to
     );
+
     tokio::fs::copy(&current_location, &install_to)
         .await
         .context("Failed to copy myself into installation directory")?;
@@ -189,7 +190,7 @@ async fn create_systemd_service(executable: &Location) -> anyhow::Result<()> {
         .await?;
 
     let Some(status) = Command::new("systemctl")
-        .arg("status")
+        .arg("is-active")
         .arg(SYSTEMD_SERVICE_NAME)
         .status()
         .await?

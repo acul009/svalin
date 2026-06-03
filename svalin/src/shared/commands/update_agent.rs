@@ -1,3 +1,4 @@
+use anyhow::Context;
 use async_trait::async_trait;
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
@@ -40,6 +41,7 @@ impl CommandHandler for UpdateAgentHandler {
 
         select! {
             update_result = crate::installer::update_agent(&request) => {
+                let update_result = update_result.context("error while executing update");
                 let send_result: Result<(), String> = match &update_result {
                     Ok(_) => Ok(()),
                     Err(e) => Err(e.to_string()),
