@@ -2,6 +2,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use anyhow::Result;
 
+use rand::{Rng, rng};
 use ring::aead::{
     AES_256_GCM, Aad, BoundKey, CHACHA20_POLY1305, NONCE_LEN, Nonce, NonceSequence, OpeningKey,
     SealingKey, UnboundKey,
@@ -92,23 +93,37 @@ where
     }
 }
 
-struct NonceCounter {
-    counter: u64,
+pub struct NonceCounter {
+    mask: [u8; NONCE_LEN],
+    counter: u128,
 }
 
 impl NonceCounter {
-    fn new() -> Self {
-        Self { counter: 1 }
+    pub fn new() -> Self {
+        let mut mask = [0u8; NONCE_LEN];
+        rng().fill_bytes(&mut mask);
+        Self { mask, counter: 0 }
     }
 }
 
 impl NonceSequence for NonceCounter {
-    fn advance(&mut self) -> std::prelude::v1::Result<ring::aead::Nonce, ring::error::Unspecified> {
-        let bytes = self.counter.to_be_bytes();
-        self.counter += 1;
+    fn advance(&mut self) -> Result<Nonce, ring::error::Unspecified> {
+        let counter = self.counter + 1;
 
-        let mut nonce_bytes = [0u8; NONCE_LEN];
-        nonce_bytes[..8].clone_from_slice(&bytes);
+        if counter >= (1u128 << NONCE_LEN * 8) {
+            return Err(ring::error::Unspecified);
+        }
+        self.counter = counter;
+
+        let mut nonce_bytes = self.mask;
+        let count_bytes = self.counter.to_be_bytes(); // [u8; 16]
+        // XOR the lower 12 bytes of the u128 into all 12 nonce bytes
+        for (n, c) in nonce_bytes
+            .iter_mut()
+            .zip(count_bytes[(16 - NONCE_LEN)..].iter())
+        {
+            *n ^= c;
+        }
 
         Nonce::try_assume_unique_for_key(&nonce_bytes)
     }
