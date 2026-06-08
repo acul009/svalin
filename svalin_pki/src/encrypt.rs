@@ -44,6 +44,7 @@ impl AsRef<[u8; 32]> for EncryptionKey {
 pub struct EncryptedData {
     ciphertext: Vec<u8>,
     alg: EncryptionAlgorithm,
+    nonce_mask: [u8; NONCE_LEN],
 }
 
 #[derive(Serialize, Deserialize)]
@@ -99,9 +100,7 @@ pub struct NonceCounter {
 }
 
 impl NonceCounter {
-    pub fn new() -> Self {
-        let mut mask = [0u8; NONCE_LEN];
-        rng().fill_bytes(&mut mask);
+    pub fn new(mask: [u8; NONCE_LEN]) -> Self {
         Self { mask, counter: 0 }
     }
 }
@@ -165,9 +164,12 @@ impl EncryptedData {
     ) -> Result<Self, EncryptError> {
         let ring_alg = alg.into();
 
+        let mut nonce_mask = [0u8; NONCE_LEN];
+        rng().fill_bytes(&mut nonce_mask);
+
         let unbound = UnboundKey::new(ring_alg, encryption_key.0.as_ref())
             .map_err(EncryptError::CreateUnboundError)?;
-        let mut sealing = SealingKey::new(unbound, NonceCounter::new());
+        let mut sealing = SealingKey::new(unbound, NonceCounter::new(nonce_mask.clone()));
 
         let mut encrypted = data.to_owned();
 
@@ -178,6 +180,7 @@ impl EncryptedData {
         Ok(Self {
             alg,
             ciphertext: encrypted,
+            nonce_mask,
         })
     }
 
@@ -186,7 +189,7 @@ impl EncryptedData {
 
         let unbound = UnboundKey::new(ring_alg, encryption_key.0.as_ref())
             .map_err(DecryptError::CreateUnboundError)?;
-        let mut opening = OpeningKey::new(unbound, NonceCounter::new());
+        let mut opening = OpeningKey::new(unbound, NonceCounter::new(self.nonce_mask));
 
         let cleartext_len = opening
             .open_in_place(Aad::empty(), &mut self.ciphertext)
