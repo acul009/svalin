@@ -4,8 +4,8 @@ use anyhow::{Context, Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Credential, EncryptedCredential, ExactVerififier, KnownCertificateVerifier, RootCertificate,
-    UnverifiedCertificate, get_current_timestamp, mls::provider::PostcardCodec,
+    EncryptedCredential, ExactVerififier, KnownCertificateVerifier, UnverifiedCertificate,
+    get_current_timestamp, mls::provider::PostcardCodec,
 };
 use svalin_rpc::{
     commands::{deauthenticate::DeauthenticateHandler, e2e::E2EHandler, ping::PingHandler},
@@ -15,7 +15,7 @@ use svalin_rpc::{
         connection::{Connection, ServeableConnectionBase},
     },
 };
-use tokio::{sync::Notify, time::error::Elapsed};
+use tokio::sync::Notify;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::instrument;
 

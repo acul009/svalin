@@ -1,3 +1,5 @@
+use std::process::Stdio;
+
 use anyhow::Context;
 use futures::StreamExt;
 use tokio::{fs, io::AsyncWriteExt};
@@ -20,6 +22,11 @@ pub async fn update_agent(url: &str) -> anyhow::Result<()> {
         .ensure_parent_exists()
         .await
         .context("could not create temp dir")?;
+
+    if fs::try_exists(&temp_path).await.unwrap_or(false) {
+        let _ = fs::remove_file(&temp_path).await;
+    }
+
     let mut installer = fs::File::options()
         .write(true)
         .create(true)
@@ -44,18 +51,25 @@ pub async fn update_agent(url: &str) -> anyhow::Result<()> {
         .sync_all()
         .await
         .context("error while syncing file")?;
+    drop(installer);
 
     let mut command = tokio::process::Command::new(temp_path.as_path().as_os_str());
-    command.arg("agent").arg("install");
-    match command
-        .status()
+    let output = command
+        .arg("agent")
+        .arg("install")
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("could not spawn installer")?
+        .wait_with_output()
         .await
-        .context("error while executing installer")?
-        .code()
-    {
-        None => anyhow::bail!("unknown error while executing installer"),
+        .context("error while waiting for installer")?;
+
+    let err = String::from_utf8_lossy(&output.stderr);
+
+    match output.status.code() {
+        None => anyhow::bail!("unknown error while executing installer: {}\n", err),
         Some(0) => {}
-        Some(code) => anyhow::bail!("installer exited with code {}", code),
+        Some(code) => anyhow::bail!("installer exited with code {}\n{}\n", code, err),
     }
 
     Ok(())
