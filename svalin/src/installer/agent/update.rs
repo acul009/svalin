@@ -4,6 +4,10 @@ use anyhow::Context;
 use futures::StreamExt;
 use tokio::{fs, io::AsyncWriteExt};
 
+use crate::{
+    agent,
+    util::location::{Location, LocationError},
+};
 #[cfg(target_os = "linux")]
 use crate::{
     agent,
@@ -27,10 +31,13 @@ pub async fn update_agent(url: &str) -> anyhow::Result<()> {
         let _ = fs::remove_file(&temp_path).await;
     }
 
-    let mut installer = fs::File::options()
-        .write(true)
-        .create(true)
-        .mode(0o755)
+    let mut options = fs::File::options();
+    options.write(true).create(true);
+
+    #[cfg(target_os = "linux")]
+    options.mode(0o755);
+
+    let mut installer = options
         .open(&temp_path)
         .await
         .context("could not create file to download into")?;
@@ -75,7 +82,11 @@ pub async fn update_agent(url: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(target_os = "linux")]
 fn get_update_temp_path() -> Result<Location, LocationError> {
-    Ok(agent::temp_dir()?.push("svalin-update"))
+    #[cfg(target_os = "windows")]
+    const EXE_NAME: &str = "svalin-update.exe";
+    #[cfg(not(target_os = "windows"))]
+    const EXE_NAME: &str = "svalin-update";
+
+    Ok(agent::temp_dir()?.push(EXE_NAME))
 }

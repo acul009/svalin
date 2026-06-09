@@ -2,12 +2,18 @@ use std::env;
 
 use anyhow::{Context, anyhow};
 
-use crate::{agent, util::location::Location};
+#[cfg(target_os = "linux")]
+use crate::agent;
+use crate::util::location::Location;
+#[cfg(target_os = "linux")]
+use tokio::{fs::File, io::AsyncWriteExt};
 use tokio::{
-    fs::{self, File},
-    io::AsyncWriteExt,
+    fs::{self},
     process::Command,
 };
+
+#[cfg(target_os = "windows")]
+pub const WINDOWS_SERVICE_NAME: &str = "svalin-agent";
 
 pub mod update;
 
@@ -132,7 +138,7 @@ fn get_base_install_location() -> Location {
 #[cfg(target_os = "windows")]
 async fn create_service(executable: &Location) -> anyhow::Result<()> {
     let mut command = Command::new("sc.exe");
-    command.arg("query").arg("svalin-agent");
+    command.arg("query").arg(WINDOWS_SERVICE_NAME);
     let output = command.output().await?;
 
     // Check if the service already exists
@@ -140,7 +146,7 @@ async fn create_service(executable: &Location) -> anyhow::Result<()> {
         let mut command = Command::new("sc.exe");
         command
             .arg("config")
-            .arg("svalin-agent")
+            .arg(WINDOWS_SERVICE_NAME)
             .arg("binPath=")
             .arg(executable.display().to_string());
         let output = command.output().await?;
@@ -153,7 +159,7 @@ async fn create_service(executable: &Location) -> anyhow::Result<()> {
                 .arg("-NoProfile")
                 .arg("-NonInteractive")
                 .arg("-Command")
-                .arg("Restart-Service -Name svalin-agent");
+                .arg(format!("Restart-Service -Name {}", WINDOWS_SERVICE_NAME));
 
             match command.status().await?.code() {
                 Some(0) => Ok(()),
@@ -167,7 +173,7 @@ async fn create_service(executable: &Location) -> anyhow::Result<()> {
         let mut command = Command::new("sc.exe");
         command
             .arg("create")
-            .arg("svalin-agent")
+            .arg(WINDOWS_SERVICE_NAME)
             .arg("binPath=")
             .arg(executable.display().to_string())
             .arg("start=")
@@ -196,7 +202,7 @@ async fn create_service(executable: &Location) -> anyhow::Result<()> {
 #[cfg(target_os = "windows")]
 async fn remove_service() -> anyhow::Result<()> {
     let mut command = Command::new("sc.exe");
-    command.arg("delete").arg("svalin-agent");
+    command.arg("delete").arg(WINDOWS_SERVICE_NAME);
 
     match command.status().await?.code() {
         Some(0) => Ok(()),
@@ -217,6 +223,7 @@ async fn remove_service() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
 async fn systemd_available() -> bool {
     Command::new("systemctl")
         .arg("--version")
@@ -225,8 +232,11 @@ async fn systemd_available() -> bool {
         .is_ok()
 }
 
+#[cfg(target_os = "linux")]
 const SYSTEMD_SERVICE_NAME: &str = "svalin-agent.service";
+#[cfg(target_os = "linux")]
 const SYSTEMD_SERVICE_LOCATION: &str = "/etc/systemd/system/svalin-agent.service";
+#[cfg(target_os = "linux")]
 const SYSTEMD_SERVICE_TEMPLATE: &str = "
 
 [Unit]
@@ -243,6 +253,7 @@ Restart=on-failure
 WantedBy=multi-user.target
 ";
 
+#[cfg(target_os = "linux")]
 async fn create_systemd_service(executable: &Location) -> anyhow::Result<()> {
     let service_file_contents =
         SYSTEMD_SERVICE_TEMPLATE.replace("{}", &format!("{} agent", executable));
@@ -292,6 +303,7 @@ async fn create_systemd_service(executable: &Location) -> anyhow::Result<()> {
     }
 }
 
+#[cfg(target_os = "linux")]
 async fn remove_systemd_service() -> anyhow::Result<()> {
     let status = Command::new("systemctl")
         .arg("disable")

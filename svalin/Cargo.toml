@@ -41,6 +41,7 @@ openmls_sqlx_storage.workspace = true
 svalin_server_store.workspace = true
 svalin_client_store.workspace = true
 windows-registry = "0.6.1"
+windows-service = "0.8.1"
 
 [package.metadata.deb]
 depends = "libc6 (>= 2.31)"

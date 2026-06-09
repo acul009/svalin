@@ -65,8 +65,6 @@ impl Location {
         {
             #[cfg(target_os = "windows")]
             {
-                use anyhow::Context;
-
                 let appdata = std::env::var("APPDATA").map_err(|_| LocationError::NoAppDataSet)?;
 
                 let path = PathBuf::from(appdata);
