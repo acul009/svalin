@@ -20,3 +20,7 @@ pub mod verifier;
 #[cfg(test)]
 mod test;
 // mod wip;
+
+pub fn commit() -> &'static str {
+    env!("GIT_COMMIT_HASH")
+}

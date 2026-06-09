@@ -65,9 +65,10 @@ pub async fn uninstall_agent() -> anyhow::Result<()> {
     #[cfg(windows)]
     {
         todo!("Defer deletion of data and install dir");
-        println!("Deffered deletion of agent data until next restart.");
+        println!("Defered deletion of agent data until next restart.");
     }
 
+    #[cfg(target_os = "windows")]
     remove_installation_entry().await?;
 
     remove_service().await?;
@@ -87,7 +88,7 @@ async fn get_agent_install_location() -> anyhow::Result<Location> {
 }
 
 async fn get_installation_identifier() -> anyhow::Result<String> {
-    return Ok(env!("GIT_COMMIT_HASH").into());
+    return Ok(crate::commit().into());
     // let mut hasher = Sha512::new();
     // let current_location = env::current_exe()?;
     // let mut file = File::open(&current_location).await?;
@@ -109,7 +110,7 @@ async fn get_installation_identifier() -> anyhow::Result<String> {
 
 #[cfg(target_os = "windows")]
 fn get_base_install_location() -> Location {
-    todo!()
+    Location::new(std::env::var_os("ProgramFiles").unwrap_or_else(|| "C:\\Program Files".into()))
 }
 
 #[cfg(target_os = "linux")]
@@ -119,7 +120,56 @@ fn get_base_install_location() -> Location {
 
 #[cfg(target_os = "windows")]
 async fn create_service(executable: &Location) -> anyhow::Result<()> {
-    todo!()
+    let mut command = Command::new("sc.exe");
+    command.arg("query").arg("svalin-agent");
+    let output = command.output().await?;
+
+    // Check if the service already exists
+    if output.status.success() {
+        let mut command = Command::new("sc.exe");
+        command
+            .arg("config")
+            .arg("svalin-agent")
+            .arg("binPath=")
+            .arg(executable.display().to_string());
+        let output = command.output().await?;
+
+        // Only restart if already running
+        let out_string = String::from_utf8_lossy(&output.stdout);
+        if out_string.contains("RUNNING") {
+            let mut command = Command::new("powershell.exe");
+            command
+                .arg("-NoProfile")
+                .arg("-NonInteractive")
+                .arg("-Command")
+                .arg("Restart-Service -Name svalin-agent");
+
+            match command.status().await?.code() {
+                Some(0) => Ok(()),
+                Some(code) => Err(anyhow!("Failed to restart service, exit code: {code}")),
+                None => Err(anyhow!("Failed to restart service")),
+            }
+        } else {
+            Ok(())
+        }
+    } else {
+        let mut command = Command::new("sc.exe");
+        command
+            .arg("create")
+            .arg("svalin-agent")
+            .arg("binPath=")
+            .arg(executable.display().to_string())
+            .arg("start=")
+            .arg("demand")
+            .arg("DisplayName=")
+            .arg("Svalin Agent");
+
+        match command.status().await?.code() {
+            Some(0) => Ok(()),
+            Some(code) => Err(anyhow!("Failed to create service, exit code: {code}")),
+            None => Err(anyhow!("Failed to create service")),
+        }
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -133,8 +183,15 @@ async fn create_service(executable: &Location) -> anyhow::Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-async fn remove_service(executable: &Location) -> anyhow::Result<()> {
-    todo!()
+async fn remove_service() -> anyhow::Result<()> {
+    let mut command = Command::new("sc.exe");
+    command.arg("delete").arg("svalin-agent");
+
+    match command.status().await?.code() {
+        Some(0) => Ok(()),
+        Some(code) => Err(anyhow!("Failed to create service, exit code: {code}")),
+        None => Err(anyhow!("Failed to create service")),
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -247,20 +304,39 @@ async fn remove_systemd_service() -> anyhow::Result<()> {
     }
 }
 
+const REGISTRY_PATH: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\svalin-agent";
+
 #[cfg(target_os = "windows")]
 async fn create_installation_entry(executable: &Location) -> anyhow::Result<()> {
-    // Set the needed registry keys here.
-    todo!()
-}
+    use std::os::windows::fs::MetadataExt;
 
-#[cfg(target_os = "linux")]
-async fn remove_installation_entry() -> anyhow::Result<()> {
-    // Linux has no central application registry.
+    let key = windows_registry::LOCAL_MACHINE.create(REGISTRY_PATH)?;
+    key.set_string("DisplayName", "Svalin Agent")?;
+    key.set_string("DisplayVersion", crate::commit())?;
+    key.set_string(
+        "InstallLocation",
+        executable
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .display()
+            .to_string(),
+    )?;
+
+    let metadata = tokio::fs::File::open(executable).await?.metadata().await?;
+    key.set_u32("EstimatedSize", (metadata.file_size() / 1024) as u32)?;
+
+    key.set_string(
+        "UninstallString",
+        format!("{} agent uninstall", executable.display()),
+    )?;
+
     Ok(())
 }
 
 #[cfg(target_os = "windows")]
-async fn remove_installation_entry(executable: &Location) -> anyhow::Result<()> {
-    // Remove the needed registry keys here.
-    todo!()
+async fn remove_installation_entry() -> anyhow::Result<()> {
+    windows_registry::LOCAL_MACHINE.remove_tree(REGISTRY_PATH)?;
+    Ok(())
 }

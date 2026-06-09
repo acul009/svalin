@@ -65,7 +65,7 @@ async fn generate_system_report() -> anyhow::Result<SvalinReport> {
     let system_report = SystemReport::create().await?;
 
     let report = SvalinReport {
-        current_version_identifier: env!("GIT_COMMIT_HASH").into(),
+        current_version_identifier: crate::commit().into(),
         system_report,
     };
 
