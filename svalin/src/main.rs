@@ -4,7 +4,7 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
-use svalin::{agent::Agent, installer, server::Server};
+use svalin::{agent, installer, server::Server};
 
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber;
@@ -108,7 +108,7 @@ async fn run() {
 
                 println!("connecting to {address}...");
 
-                let waiting_for_init = Agent::init(address).await.unwrap();
+                let waiting_for_init = agent::init(address).await.unwrap();
 
                 let cancel = CancellationToken::new();
 
@@ -129,7 +129,7 @@ async fn run() {
                     cancel2.cancel();
                 });
 
-                if let Err(err) = Agent::run(cancel).await {
+                if let Err(err) = agent::run(cancel).await {
                     tracing::error!("Failed to run agent: {err:#}");
                 }
             }

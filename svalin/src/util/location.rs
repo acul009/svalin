@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::Result;
 
+#[derive(Clone)]
 pub struct Location {
     path: PathBuf,
 }

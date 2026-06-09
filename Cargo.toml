@@ -70,3 +70,11 @@ svalin_client_store = { path = "store_client" }
 iced = { git = "https://github.com/iced-rs/iced.git" }
 iced_core = { git = "https://github.com/iced-rs/iced.git" }
 iced_widget = { git = "https://github.com/iced-rs/iced.git" }
+
+
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

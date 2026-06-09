@@ -2,8 +2,12 @@ use std::env;
 
 use anyhow::{Context, anyhow};
 
-use crate::{agent::Agent, util::location::Location};
-use tokio::{fs::File, io::AsyncWriteExt, process::Command};
+use crate::{agent, util::location::Location};
+use tokio::{
+    fs::{self, File},
+    io::AsyncWriteExt,
+    process::Command,
+};
 
 pub mod update;
 
@@ -45,14 +49,32 @@ pub async fn install_agent() -> anyhow::Result<()> {
     Ok(())
 }
 
+pub async fn cleanup_old_installations() -> anyhow::Result<()> {
+    let current_location = std::env::current_exe()?;
+
+    let base = get_base_install_location();
+    if !current_location.starts_with(&base) {
+        return Ok(());
+    }
+
+    for char in 'a'..='z' {
+        let path = base.clone().push(char.to_string());
+        if fs::try_exists(&path).await? && !current_location.starts_with(&path) {
+            fs::remove_dir_all(&path).await?;
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn uninstall_agent() -> anyhow::Result<()> {
     #[cfg(not(windows))]
     {
-        if tokio::fs::try_exists(Agent::data_dir()?)
+        if tokio::fs::try_exists(agent::data_dir()?)
             .await
             .unwrap_or(false)
         {
-            tokio::fs::remove_dir_all(Agent::data_dir()?).await?;
+            tokio::fs::remove_dir_all(agent::data_dir()?).await?;
         }
         if tokio::fs::try_exists(get_base_install_location())
             .await
@@ -75,6 +97,7 @@ pub async fn uninstall_agent() -> anyhow::Result<()> {
 
     #[cfg(windows)]
     {
+        todo!();
         println!(
             "To remove any leftover data, please restart your computer. Windows will then delete the remaining files."
         );
@@ -84,28 +107,16 @@ pub async fn uninstall_agent() -> anyhow::Result<()> {
 }
 
 async fn get_agent_install_location() -> anyhow::Result<Location> {
-    Ok(get_base_install_location().push(get_installation_identifier().await?))
-}
+    let base = get_base_install_location();
 
-async fn get_installation_identifier() -> anyhow::Result<String> {
-    return Ok(crate::commit().into());
-    // let mut hasher = Sha512::new();
-    // let current_location = env::current_exe()?;
-    // let mut file = File::open(&current_location).await?;
-    // let mut buffer = vec![0; 1024 * 1024];
-    // while let Ok(bytes_read) = file.read(&mut buffer).await {
-    //     if bytes_read == 0 {
-    //         break;
-    //     }
-    //     hasher.write_all(&buffer[0..bytes_read])?;
-    // }
+    for char in 'a'..='z' {
+        let path = base.clone().push(char.to_string());
+        if !fs::try_exists(&path).await? {
+            return Ok(path);
+        }
+    }
 
-    // let mut identifier = String::new();
-    // for byte in hasher.finalize() {
-    //     identifier.push_str(&format!("{:02x}", byte));
-    // }
-
-    // Ok(identifier)
+    Err(anyhow::anyhow!("No available installation locations"))
 }
 
 #[cfg(target_os = "windows")]

@@ -14,14 +14,14 @@ pub enum Message {
     Save,
 }
 
-pub struct MetaDisplay {
+pub struct State {
     edit: bool,
     name: String,
     group: String,
     notes: text_editor::Content,
 }
 
-impl MetaDisplay {
+impl State {
     pub fn new() -> Self {
         Self {
             edit: false,

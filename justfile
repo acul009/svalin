@@ -39,8 +39,12 @@ agent $RUST_LOG="svalin=trace":
     cargo run -p svalin agent
 
 agent_install $RUST_LOG="svalin=trace":
-    cargo build -p svalin
-    sudo target/debug/svalin agent install
+    cargo build --release -p svalin
+    sudo target/release/svalin agent install
+
+agent_uninstall $RUST_LOG="svalin=trace":
+    cargo build --release -p svalin
+    sudo target/release/svalin agent uninstall
 
 agent_init $RUST_LOG="svalin=trace":
     cargo run -p svalin agent init localhost:1234

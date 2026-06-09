@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 use totp_rs::TOTP;
 
 use crate::client::state::ClientStateUpdate;
-use crate::{agent::Agent, client::Client, server::Server};
+use crate::{agent, client::Client, server::Server};
 
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn integration_tests() {
@@ -162,7 +162,7 @@ async fn integration_tests() {
     // ===== TEST AGENT =====
 
     tracing::trace!("initializing agent!");
-    let waiting = Agent::init(host.clone()).await.unwrap();
+    let waiting = agent::init(host.clone()).await.unwrap();
     let join_code = waiting.join_code().to_owned();
     tracing::trace!("received join code");
     let (confirm_send, confirm_recv) = oneshot::channel();
@@ -177,7 +177,7 @@ async fn integration_tests() {
             .unwrap();
         tracing::trace!("agent waiting for confirmation");
         confirm.wait_for_confirm(cancel.clone()).await.unwrap();
-        Agent::run(cancel).await.unwrap()
+        agent::run(cancel).await.unwrap()
     });
 
     let (send, recv) = oneshot::channel();

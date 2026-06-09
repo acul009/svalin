@@ -3,9 +3,7 @@ use std::sync::Arc;
 use iced::{
     Length, Task,
     alignment::Horizontal,
-    widget::{
-        self, button, center, column, container, row, rule, scrollable, space, text, text_input,
-    },
+    widget::{self, center, column, container, row, rule, scrollable, space, text},
 };
 use svalin::client::{Client, state::ClientState};
 use svalin_client_store::persistent::{SvalinMetaInfo, SvalinReport};
@@ -17,13 +15,13 @@ use crate::{
 };
 
 mod meta_display;
+mod update;
 
 #[derive(Debug, Clone)]
 pub enum Message {
     Back,
     MetaDisplay(meta_display::Message),
-    UpdateUrlChanged(String),
-    Update,
+    Update(update::Message),
 }
 
 pub enum Action {
@@ -32,10 +30,10 @@ pub enum Action {
     Run(Task<Message>),
 }
 
-pub struct DeviceView {
+pub struct State {
     spki_hash: SpkiHash,
-    meta_display: meta_display::MetaDisplay,
-    update_url: String,
+    meta_display: meta_display::State,
+    update: update::State,
 }
 
 const PLACEHOLDER_META: &'static SvalinMetaInfo = &SvalinMetaInfo {
@@ -45,12 +43,12 @@ const PLACEHOLDER_META: &'static SvalinMetaInfo = &SvalinMetaInfo {
     notes: String::new(),
 };
 
-impl DeviceView {
+impl State {
     pub fn new(spki_hash: SpkiHash) -> Self {
         Self {
             spki_hash,
-            update_url: String::new(),
-            meta_display: meta_display::MetaDisplay::new(),
+            meta_display: meta_display::State::new(),
+            update: update::State::new(),
         }
     }
 
@@ -81,35 +79,33 @@ impl DeviceView {
                 Action::Run(
                     Task::future(async move {
                         if let Err(err) = client.device(spki_hash).update_metainfo(new_meta).await {
-                            // TODO: Show error to user, probably refactor out the whole meta info gui
+                            // TODO: Show error to user
                             tracing::error!(?err, "Failed to update meta info");
                         }
                     })
                     .discard(),
                 )
             }
-            Message::UpdateUrlChanged(update_url) => {
-                self.update_url = update_url;
-                Action::None
-            }
-            Message::Update => {
-                if self.update_url.is_empty() {
-                    return Action::None;
+            Message::Update(message) => {
+                match self.update.update(message) {
+                    update::Action::StartAgentUpdate(update_url) => {
+                        let client = client.clone();
+                        let spki_hash = self.spki_hash.clone();
+
+                        Action::Run(
+                            Task::future(async move {
+                                if let Err(err) =
+                                    client.device(spki_hash).update_agent(update_url).await
+                                {
+                                    // TODO: Show error to user
+                                    tracing::error!(?err, "Failed to update device");
+                                }
+                            })
+                            .discard(),
+                        )
+                    }
+                    update::Action::None => Action::None,
                 }
-
-                let client = client.clone();
-                let spki_hash = self.spki_hash.clone();
-                let update_url = self.update_url.clone();
-
-                Action::Run(
-                    Task::future(async move {
-                        if let Err(err) = client.device(spki_hash).update_agent(update_url).await {
-                            // TODO: Show error to user, probably refactor out the whole meta info gui
-                            tracing::error!(?err, "Failed to update device");
-                        }
-                    })
-                    .discard(),
-                )
             }
         }
     }
@@ -124,21 +120,7 @@ impl DeviceView {
         scrollable(
             column![
                 if client_state.agent_online(&self.spki_hash) {
-                    Some(
-                        card(
-                            column![
-                                text_input("Update URL", &self.update_url)
-                                    .on_input(Message::UpdateUrlChanged),
-                                button("Update").on_press_maybe(if self.update_url.is_empty() {
-                                    None
-                                } else {
-                                    Some(Message::Update)
-                                },)
-                            ]
-                            .spacing(10),
-                        )
-                        .title("Actions"),
-                    )
+                    Some(self.update.view().map(Message::Update))
                 } else {
                     None
                 },

@@ -4,7 +4,7 @@ use tokio::{fs, io::AsyncWriteExt};
 
 #[cfg(target_os = "linux")]
 use crate::{
-    agent::Agent,
+    agent,
     util::location::{Location, LocationError},
 };
 
@@ -63,5 +63,5 @@ pub async fn update_agent(url: &str) -> anyhow::Result<()> {
 
 #[cfg(target_os = "linux")]
 fn get_update_temp_path() -> Result<Location, LocationError> {
-    Ok(Agent::temp_dir()?.push("svalin-update"))
+    Ok(agent::temp_dir()?.push("svalin-update"))
 }

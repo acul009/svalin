@@ -12,10 +12,7 @@ use svalin::client::{
 use svalin_pki::SpkiHash;
 use tokio::sync::broadcast;
 
-use crate::ui::{
-    mainview::device_view::DeviceView,
-    widgets::{error_display, loading},
-};
+use crate::ui::widgets::{error_display, loading};
 
 mod add_device;
 mod device_list;
@@ -42,7 +39,7 @@ enum Screen {
     Loading(String),
     DeviceList,
     AddDevice(add_device::AddDevice),
-    DeviceView(device_view::DeviceView),
+    DeviceView(device_view::State),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -110,7 +107,7 @@ impl MainView {
                 Action::None
             }
             Message::SelectDevice(spki_hash) => {
-                self.screen = Screen::DeviceView(DeviceView::new(spki_hash));
+                self.screen = Screen::DeviceView(device_view::State::new(spki_hash));
                 Action::None
             }
             Message::OpenAddDevice => {
@@ -130,7 +127,7 @@ impl MainView {
                         Action::None
                     }
                     add_device::Action::Done(spki_hash) => {
-                        self.screen = Screen::DeviceView(DeviceView::new(spki_hash));
+                        self.screen = Screen::DeviceView(device_view::State::new(spki_hash));
                         Action::None
                     }
                     add_device::Action::Run(task) => Action::Run(task.map(Message::AddDevice)),

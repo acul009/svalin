@@ -8,78 +8,73 @@ use crate::shared::commands::public_server_status::GetPutblicStatus;
 use crate::shared::join_agent::AgentInitPayload;
 use crate::shared::join_agent::request_handler::RequestJoin;
 
-use super::Agent;
+pub async fn init(address: String) -> Result<WaitingForInit> {
+    if super::get_config().await?.is_some() {
+        return Err(anyhow!("Agent is already initialized"));
+    }
 
-impl Agent {
-    pub async fn init(address: String) -> Result<WaitingForInit> {
-        if Self::get_config().await?.is_some() {
-            return Err(anyhow!("Agent is already initialized"));
+    tracing::trace!("try connecting to {address}");
+
+    let client = RpcClient::connect(
+        &address,
+        None,
+        SkipServerVerification::new(),
+        CancellationToken::new(),
+    )
+    .await?;
+
+    tracing::trace!("successfully connected");
+
+    let conn = client.upstream_connection();
+
+    // tracing::trace!("requesting public status");
+
+    let server_status = conn.dispatch(GetPutblicStatus).await?;
+
+    // tracing::trace!("public status: {server_status:?}");
+
+    match server_status {
+        crate::shared::commands::public_server_status::PublicStatus::WaitingForInit => {
+            Err(anyhow!("Server is not ready to accept agents"))
         }
 
-        tracing::trace!("try connecting to {address}");
+        crate::shared::commands::public_server_status::PublicStatus::Ready => {
+            // register agent with server first
 
-        let client = RpcClient::connect(
-            &address,
-            None,
-            SkipServerVerification::new(),
-            CancellationToken::new(),
-        )
-        .await?;
+            let (join_code_send, join_code_recv) = tokio::sync::oneshot::channel::<String>();
 
-        tracing::trace!("successfully connected");
+            let (confirm_code_send, confirm_code_recv) = tokio::sync::oneshot::channel::<String>();
 
-        let conn = client.upstream_connection();
+            let (join_success_send, join_success_recv) =
+                tokio::sync::oneshot::channel::<AgentInitPayload>();
 
-        // tracing::trace!("requesting public status");
+            let conn2 = client.upstream_connection();
 
-        let server_status = conn.dispatch(GetPutblicStatus).await?;
-
-        // tracing::trace!("public status: {server_status:?}");
-
-        match server_status {
-            crate::shared::commands::public_server_status::PublicStatus::WaitingForInit => {
-                Err(anyhow!("Server is not ready to accept agents"))
-            }
-
-            crate::shared::commands::public_server_status::PublicStatus::Ready => {
-                // register agent with server first
-
-                let (join_code_send, join_code_recv) = tokio::sync::oneshot::channel::<String>();
-
-                let (confirm_code_send, confirm_code_recv) =
-                    tokio::sync::oneshot::channel::<String>();
-
-                let (join_success_send, join_success_recv) =
-                    tokio::sync::oneshot::channel::<AgentInitPayload>();
-
-                let conn2 = client.upstream_connection();
-
-                tokio::spawn(async move {
-                    match conn2
-                        .dispatch(RequestJoin {
-                            address,
-                            join_code_channel: join_code_send,
-                            confirm_code_channel: confirm_code_send,
-                        })
-                        .await
-                    {
-                        Ok(init_payload) => {
-                            join_success_send.send(init_payload).unwrap();
-                        }
-                        Err(err) => {
-                            tracing::error!("failed to request join: {err}");
-                        }
+            tokio::spawn(async move {
+                match conn2
+                    .dispatch(RequestJoin {
+                        address,
+                        join_code_channel: join_code_send,
+                        confirm_code_channel: confirm_code_send,
+                    })
+                    .await
+                {
+                    Ok(init_payload) => {
+                        join_success_send.send(init_payload).unwrap();
                     }
-                });
+                    Err(err) => {
+                        tracing::error!("failed to request join: {err}");
+                    }
+                }
+            });
 
-                let join_code = join_code_recv.await?;
+            let join_code = join_code_recv.await?;
 
-                Ok(WaitingForInit::new(
-                    join_code,
-                    confirm_code_recv,
-                    join_success_recv,
-                ))
-            }
+            Ok(WaitingForInit::new(
+                join_code,
+                confirm_code_recv,
+                join_success_recv,
+            ))
         }
     }
 }
@@ -136,7 +131,7 @@ impl WaitForConfirm {
     pub async fn wait_for_confirm(self, cancel: CancellationToken) -> Result<()> {
         let init_data = self.success_channel.await?;
 
-        Agent::init_with(init_data)
+        super::init_with(init_data)
             .await
             .context("error saving init data")?;
 
