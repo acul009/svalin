@@ -65,19 +65,49 @@ fn run_service_agent() -> anyhow::Result<()> {
             ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
             ServiceType,
         },
-        service_control_handler::{self, ServiceControlHandlerResult},
+        service_control_handler::{self, ServiceControlHandlerResult, ServiceStatusHandle},
     };
     const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
+
+    let cancel = CancellationToken::new();
+    let cancel2 = cancel.clone();
+    let status_handle_arc = Arc::new(Mutex::new(None::<ServiceStatusHandle>));
+    let status_handle_arc2 = status_handle_arc.clone();
 
     let event_handler = move |control_event: ServiceControl| -> ServiceControlHandlerResult {
         use windows_service::service::ServiceControl;
         match control_event {
+            ServiceControl::Stop => {
+                cancel2.cancel();
+
+                {
+                    let _ = status_handle_arc2
+                        .lock()
+                        .unwrap()
+                        .unwrap()
+                        .set_service_status(ServiceStatus {
+                            service_type: SERVICE_TYPE,
+                            current_state: ServiceState::StopPending,
+                            controls_accepted: ServiceControlAccept::empty(),
+                            exit_code: ServiceExitCode::Win32(0),
+                            checkpoint: 0,
+                            wait_hint: Duration::from_secs(20),
+                            process_id: None,
+                        });
+                }
+
+                ServiceControlHandlerResult::NoError
+            }
             _ => ServiceControlHandlerResult::NotImplemented,
         }
     };
 
     let status_handle =
         service_control_handler::register(installer::WINDOWS_SERVICE_NAME, event_handler)?;
+    {
+        let mut slot = status_handle_arc.lock().unwrap();
+        *slot = Some(status_handle.clone());
+    }
 
     status_handle.set_service_status(ServiceStatus {
         service_type: SERVICE_TYPE,
@@ -89,9 +119,19 @@ fn run_service_agent() -> anyhow::Result<()> {
         process_id: None,
     })?;
 
-    todo!();
+    let run_result = run_async(run_agent(cancel));
 
-    Ok(())
+    let _ = status_handle.set_service_status(ServiceStatus {
+        service_type: SERVICE_TYPE,
+        current_state: ServiceState::Stopped,
+        controls_accepted: ServiceControlAccept::empty(),
+        exit_code: ServiceExitCode::Win32(0),
+        checkpoint: 0,
+        wait_hint: Duration::default(),
+        process_id: None,
+    });
+
+    run_result
 }
 
 fn main() {
@@ -112,10 +152,10 @@ fn main() {
                     service_dispatcher::start(installer::WINDOWS_SERVICE_NAME, ffi_service_agent)
                         .unwrap();
                 } else {
-                    run_async(run_agent()).unwrap()
+                    run_async(run_agent(CancellationToken::new())).unwrap()
                 }
                 #[cfg(not(target_os = "windows"))]
-                run_async(run_agent()).unwrap()
+                run_async(run_agent(CancellationToken::new())).unwrap()
             }
             AgentAction::Install => run_async(installer::install_agent()).unwrap(),
             AgentAction::Uninstall => run_async(installer::uninstall_agent()).unwrap(),
@@ -202,8 +242,7 @@ async fn init_agent(address: String) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn run_agent() -> anyhow::Result<()> {
-    let cancel = CancellationToken::new();
+async fn run_agent(cancel: CancellationToken) -> anyhow::Result<()> {
     let cancel2 = cancel.clone();
     tokio::spawn(async move {
         // Wait for shutdown signal

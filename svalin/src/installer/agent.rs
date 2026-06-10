@@ -148,7 +148,7 @@ async fn create_service(executable: &Location) -> anyhow::Result<()> {
             .arg("config")
             .arg(WINDOWS_SERVICE_NAME)
             .arg("binPath=")
-            .arg(executable.display().to_string());
+            .arg(bin_path_arg(executable));
         let output = command.output().await?;
 
         // Only restart if already running
@@ -175,7 +175,7 @@ async fn create_service(executable: &Location) -> anyhow::Result<()> {
             .arg("create")
             .arg(WINDOWS_SERVICE_NAME)
             .arg("binPath=")
-            .arg(executable.display().to_string())
+            .arg(bin_path_arg(executable))
             .arg("start=")
             .arg("demand")
             .arg("DisplayName=")
@@ -187,6 +187,14 @@ async fn create_service(executable: &Location) -> anyhow::Result<()> {
             None => Err(anyhow!("Failed to create service")),
         }
     }
+}
+
+#[cfg(target_os = "windows")]
+fn bin_path_arg(executable: &Location) -> String {
+    format!(
+        "\"{}\" agent run --service",
+        executable.display().to_string()
+    )
 }
 
 #[cfg(target_os = "linux")]
