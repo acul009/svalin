@@ -11,7 +11,7 @@ FROM debian:bullseye-slim
 RUN mkdir -p /var/lib/svalin/server
 WORKDIR /var/lib/svalin/server
 
-COPY --from=builder ./target/release/svalin /usr/local/bin/svalin
+COPY --from=builder /build/target/release/svalin /usr/local/bin/svalin
 
 EXPOSE 1234
 
