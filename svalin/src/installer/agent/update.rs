@@ -8,11 +8,6 @@ use crate::{
     agent,
     util::location::{Location, LocationError},
 };
-#[cfg(target_os = "linux")]
-use crate::{
-    agent,
-    util::location::{Location, LocationError},
-};
 
 pub async fn update_agent(url: &str) -> anyhow::Result<()> {
     let res = reqwest::get(url)

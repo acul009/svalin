@@ -335,6 +335,7 @@ async fn remove_systemd_service() -> anyhow::Result<()> {
     }
 }
 
+#[cfg(target_os = "windows")]
 const REGISTRY_PATH: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\svalin-agent";
 
 #[cfg(target_os = "windows")]
