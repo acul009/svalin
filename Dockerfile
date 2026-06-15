@@ -1,9 +1,17 @@
+FROM rust:slim-trixie as builder
+
+WORKDIR /build
+
+COPY . .
+
+RUN cargo build --release -p svalin
+
 FROM debian:bullseye-slim
 
 RUN mkdir -p /var/lib/svalin/server
 WORKDIR /var/lib/svalin/server
 
-COPY ./target/release/svalin /usr/local/bin/svalin
+COPY --from=builder ./target/release/svalin /usr/local/bin/svalin
 
 EXPOSE 1234
 
