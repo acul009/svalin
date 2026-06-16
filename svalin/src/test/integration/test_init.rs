@@ -13,7 +13,7 @@ async fn test_init() {
     let init_complete2 = init_complete.clone();
 
     let server_handle = tokio::spawn(async move {
-        let addr = "0.0.0.0:1234".to_socket_addrs().unwrap().next().unwrap();
+        let addr = "0.0.0.0:55411".to_socket_addrs().unwrap().next().unwrap();
         // delete the test db
         let _ = std::fs::remove_file("./server_test.jammdb");
         let db = marmelade::DB::open("./server_test.jammdb").expect("failed to open client db");
@@ -29,7 +29,7 @@ async fn test_init() {
     // delete test client db
     let _ = std::fs::remove_file("./client.jammdb");
 
-    let host = "localhost:1234".to_owned();
+    let host = "localhost:55411".to_owned();
 
     match Client::first_connect(host).await.unwrap() {
         crate::client::FirstConnect::Init(init) => {
@@ -45,9 +45,12 @@ async fn test_init() {
 
     init_complete.notified().await;
 
-    let client = Client::open_profile("admin@localhost:1234".into(), "admin".as_bytes().to_owned())
-        .await
-        .unwrap();
+    let client = Client::open_profile(
+        "admin@localhost:55411".into(),
+        "admin".as_bytes().to_owned(),
+    )
+    .await
+    .unwrap();
 
     let mut conn = client.rpc().upstream_connection();
 

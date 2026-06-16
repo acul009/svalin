@@ -27,7 +27,7 @@ integration $RUST_LOG="svalin=trace":
     cargo test -p svalin test::integration -- --nocapture
 
 server $RUST_LOG="svalin=trace":
-    cargo run -p svalin server 0.0.0.0:1234
+    cargo run -p svalin server 0.0.0.0:55411
 
 reset:
     rm -r /var/lib/svalin/*
@@ -47,7 +47,7 @@ agent_uninstall $RUST_LOG="svalin=trace":
     sudo target/release/svalin agent uninstall
 
 agent_init $RUST_LOG="svalin=trace":
-    cargo run -p svalin agent init localhost:1234
+    cargo run -p svalin agent init localhost:55411
 
 gui $RUST_LOG="svalin=trace":
     cargo run -p svalin_iced

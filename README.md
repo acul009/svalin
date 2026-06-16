@@ -25,6 +25,7 @@ Svalin is supposed to be the first open-source end-to-end-secured remote managme
 This codebase is still far from where I want it to be, but I have to start somewhere.
 
 Svalin has the following guidelines:
+
 - Be easy to setup and use
 - Be secure by default
 - Allow self-hosting
@@ -47,11 +48,13 @@ Whereever I can, I try to switch to open source projects which allow me to self 
 and which don't just come with a "Trust be Bro" guarantee.
 
 Teamviewer pros:
+
 - Easy to use
 - quick to get started
 - once you get your devices registered it's quite reliable
 
 Teamviewer cons:
+
 - It's expensive
 - The "RMM" features are not great
 - The new group system and client keep acting up
@@ -59,16 +62,18 @@ Teamviewer cons:
 - no way to just access a remote webinterface directly (at least not easily)
 
 RPort pros:
+
 - great linux support
 - nice dashboard informations for connected devices
 - easy to connect to devices with webinterface
 
 RPort cons:
+
 - Once the server is compromised, all devices are
 - No builtin remote desktop
 
-
 I started thinking about what I would like my perfect remote software to look like.
+
 - Easy to use, if possible, should not require any terminal knowledge
 - End to end encryption that the server cannot break
 - Can pierce through NAT, no special configuration on controlled nodes needed
@@ -106,13 +111,15 @@ TLDR: Rustdesk is primarily a remote software while Svalin is more similar to a 
 WIP - this isn't really complete yet.
 
 Pre-Flight-Checklist:
-- [X] add graceful shutdown
-- [X] create a debian package
-- [X] create a docker image
-- [X] add logic for login ( don't forget fake hashing parameters )
+
+- [x] add graceful shutdown
+- [x] create a debian package
+- [x] create a docker image
+- [x] add logic for login ( don't forget fake hashing parameters )
 - [ ] add remote terminal
 
 Svalin currently has 2 executables:
+
 - svalin
   This can run both the server and the agent.
 - svalin_iced
@@ -139,7 +146,7 @@ Make sure the client and agents can reach the udp port you specified.
 The client does not yet have an official installation method.
 
 When starting the client without any existing profiles, you will be asked to create one.
-enter the server address with port (e.g. `svalin.example.com:1234`) and follow the steps to create your root user.
+enter the server address with port (e.g. `svalin.example.com:55411`) and follow the steps to create your root user.
 
 > [!CAUTION]
 > **MAKE SURE YOU WRITE DOWN YOUR ROOT PASSWORD - YOU CANNOT RECOVER IT**
@@ -243,6 +250,7 @@ By comparing the hash of the latest transactions between an agent and a server, 
 Every device working with this log will verify it's integrity and plausability by itself, making manipulation extremely difficult.
 
 Each Transaction contains the following data:
+
 - incremental transaction id
 - Timestamp
 - Hash of previous transaction
@@ -250,11 +258,13 @@ Each Transaction contains the following data:
 - data
 
 For this to work, the log must conform to these standarts:
+
 - [ ] Each transaction is signed
 - [ ] Transactions are synchronized (easy with only one server)
 - [ ] Transactions are serializeable
 
 There are some challenges left though:
+
 - [ ] How are old transactions treated when a certificate used to sign them runs out?
 - [ ] How are old transactions treated when a certificate used to sign them gets revoked?
 - [ ] When should an entity other than agent and server get access? Becauses that might leak the certificates.
