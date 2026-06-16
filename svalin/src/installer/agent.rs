@@ -103,7 +103,9 @@ pub async fn uninstall_agent() -> anyhow::Result<()> {
 
     #[cfg(windows)]
     {
-        todo!();
+        todo!(
+            "Self deleting isn't implemented yet, due to the difficulty in windows. You can manually delete the \"svalin-agent\" folder in your Program files as well as the \"svalin\" folder in your ProgramData"
+        );
         println!(
             "To remove any leftover data, please restart your computer. Windows will then delete the remaining files."
         );
@@ -128,6 +130,7 @@ async fn get_agent_install_location() -> anyhow::Result<Location> {
 #[cfg(target_os = "windows")]
 fn get_base_install_location() -> Location {
     Location::new(std::env::var_os("ProgramFiles").unwrap_or_else(|| "C:\\Program Files".into()))
+        .push("svalin-agent")
 }
 
 #[cfg(target_os = "linux")]
