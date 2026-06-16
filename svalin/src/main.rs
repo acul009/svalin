@@ -1,5 +1,3 @@
-#[cfg(target_os = "windows")]
-use std::ffi::OsStr;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -55,7 +53,7 @@ enum AgentAction {
 define_windows_service!(ffi_service_agent, service_agent);
 
 #[cfg(target_os = "windows")]
-fn service_agent(_arguments: Vec<OsString>) {
+fn service_agent(_arguments: Vec<std::ffi::OsString>) {
     if let Err(err) = run_service_agent() {
         tracing::error!("Error running service agent: {:#?}", err);
     }
