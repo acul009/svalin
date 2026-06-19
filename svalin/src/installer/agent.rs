@@ -152,7 +152,6 @@ async fn create_service(executable: &Location) -> anyhow::Result<()> {
             .arg(WINDOWS_SERVICE_NAME)
             .arg("binPath=")
             .arg(bin_path_arg(executable));
-        let output = command.output().await?;
 
         // Only restart if already running
         let out_string = String::from_utf8_lossy(&output.stdout);
