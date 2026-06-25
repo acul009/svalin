@@ -6,7 +6,7 @@ COPY . .
 
 RUN cargo build --release -p svalin
 
-FROM debian:bullseye-slim
+FROM debian:trixie-slim
 
 RUN mkdir -p /var/lib/svalin/server
 WORKDIR /var/lib/svalin/server
