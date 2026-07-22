@@ -100,6 +100,7 @@ where
                     return Err(AddDeviceGroupError::InvalidGroupId);
                 }
             }
+            SvalinGroupId::GlobalGroup => {}
         }
 
         let required_members = self

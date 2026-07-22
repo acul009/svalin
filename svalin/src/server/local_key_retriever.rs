@@ -84,6 +84,7 @@ impl KeyRetriever for LocalKeyRetriever {
 
                 Ok(required_members)
             }
+            SvalinGroupId::GlobalGroup => Ok(vec![self.root.spki_hash().clone()]),
         }
     }
 

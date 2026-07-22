@@ -187,6 +187,7 @@ where
                     return Err(HandleWelcomeError::IncorrectCertificateType);
                 }
             }
+            SvalinGroupId::GlobalGroup => {}
         }
 
         let required_members = self
@@ -249,13 +250,12 @@ where
     pub async fn is_member(
         &self,
         group_id: &SvalinGroupId,
-        spki_hash: &SpkiHash,
+        spki_hash: SpkiHash,
     ) -> anyhow::Result<bool> {
         self.harness
             .processor()
-            .list_members(group_id.to_group_id())
+            .is_member(group_id.to_group_id(), spki_hash)
             .await
-            .map(|members| members.contains(spki_hash))
     }
 
     pub async fn add_member(

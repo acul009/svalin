@@ -26,6 +26,7 @@ use openmls::{
     },
 };
 use openmls_traits::OpenMlsProvider;
+use tls_codec::Serialize;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::Credential;
@@ -91,8 +92,12 @@ impl MlsProcessorHandle {
                         let result = client.group_exists(group_id);
                         let _ = response.send(result);
                     }
-                    MlsProcessorRequest::ListMembers { group_id, response } => {
-                        let result = client.list_members(group_id);
+                    MlsProcessorRequest::IsMember {
+                        group_id,
+                        spki_hash,
+                        response,
+                    } => {
+                        let result = client.is_member(group_id, spki_hash);
                         let _ = response.send(result);
                     }
                     MlsProcessorRequest::GetMember {
@@ -231,16 +236,18 @@ impl MlsProcessorHandle {
         recv.await?
     }
 
-    pub(crate) async fn list_members(
+    pub(crate) async fn is_member(
         &self,
         group_id: GroupId,
-    ) -> Result<Vec<SpkiHash>, anyhow::Error> {
+        spki_hash: SpkiHash,
+    ) -> Result<bool, anyhow::Error> {
         let (send, recv) = oneshot::channel();
 
         let _ = self
             .channel
-            .send(MlsProcessorRequest::ListMembers {
+            .send(MlsProcessorRequest::IsMember {
                 group_id,
+                spki_hash,
                 response: send,
             })
             .await;
@@ -333,9 +340,10 @@ enum MlsProcessorRequest {
         group_id: GroupId,
         response: oneshot::Sender<Result<bool, GroupExistsError>>,
     },
-    ListMembers {
+    IsMember {
         group_id: GroupId,
-        response: oneshot::Sender<Result<Vec<SpkiHash>, anyhow::Error>>,
+        spki_hash: SpkiHash,
+        response: oneshot::Sender<Result<bool, anyhow::Error>>,
     },
     AddMember {
         group_id: GroupId,
@@ -591,15 +599,17 @@ impl MlsProcessor {
         }
     }
 
-    fn list_members(&mut self, group_id: GroupId) -> Result<Vec<SpkiHash>, anyhow::Error> {
+    fn is_member(&mut self, group_id: GroupId, spki_hash: SpkiHash) -> Result<bool, anyhow::Error> {
         let group = Self::get_group(&mut self.group_cache, &self.provider.storage(), group_id)?;
 
-        let members = group
-            .members()
-            .map(|member| member.credential.deserialized())
-            .collect::<Result<_, _>>()?;
+        let serialized = spki_hash.tls_serialize_detached()?;
 
-        Ok(members)
+        let is_member = group
+            .members()
+            .find(|member| member.credential.serialized_content() == &serialized)
+            .is_some();
+
+        Ok(is_member)
     }
 
     fn add_member(

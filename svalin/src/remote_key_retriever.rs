@@ -62,6 +62,7 @@ impl KeyRetriever for RemoteKeyRetriever {
 
                 Ok(required_members)
             }
+            SvalinGroupId::GlobalGroup => Ok(vec![self.root.spki_hash().clone()]),
         }
     }
 
