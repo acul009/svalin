@@ -7,7 +7,7 @@ edition = "2024"
 serde.workspace = true
 anyhow.workspace = true
 portable-pty.workspace = true
-sysinfo = { workspace = true, features = ["windows", "serde"] }
+sysinfo = { workspace = true, features = ["serde"] }
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
