@@ -22,7 +22,7 @@ use openmls::{
     },
     prelude::{
         CredentialWithKey, KeyPackageNewError, LeafNodeIndex, MlsMessageBodyOut, ProtocolMessage,
-        Sender, SenderRatchetConfiguration, Welcome,
+        Sender, SenderRatchetConfiguration, Welcome, tls_codec,
     },
 };
 use openmls_traits::OpenMlsProvider;

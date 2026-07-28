@@ -22,12 +22,11 @@ use serde::Serialize;
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 
 pub use crate::codec::Codec;
-use crate::migrator::MigratorWrapper;
 pub use sqlx::Error;
 
 mod codec;
 mod group_data;
-mod migrator;
+// mod migrator;
 mod storage_provider;
 mod wrappers;
 
@@ -74,8 +73,10 @@ impl<C: Codec> SqliteStorageProvider<C> {
     /// migration support.
     pub async fn run_migrations(&self) -> Result<(), sqlx::migrate::MigrateError> {
         sqlx::migrate!("./migrations")
-            .run(MigratorWrapper(self.pool.clone()))
+            .dangerous_set_table_name("_openmls_sqlx_migrations")
+            .run(&self.pool)
             .await?;
+
         Ok(())
     }
 

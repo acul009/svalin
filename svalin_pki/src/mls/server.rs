@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use anyhow::anyhow;
+use openmls::prelude::tls_codec;
 use openmls_sqlx_storage::SqliteStorageProvider;
 
 use crate::{

@@ -20,7 +20,6 @@ x509-parser = { workspace = true, features = ["ring", "validate", "verify"] }
 zeroize = { workspace = true, features = ["aarch64", "derive", "std"] }
 openmls = { workspace = true, features = ["openmls_rust_crypto"] }
 openmls_traits.workspace = true
-tls_codec.workspace = true
 sha2.workspace = true
 openmls_rust_crypto.workspace = true
 openmls_sqlx_storage.workspace = true

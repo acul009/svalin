@@ -4,6 +4,7 @@ use openmls::prelude::{
     MlsMessageBodyIn, MlsMessageBodyOut, MlsMessageIn, MlsMessageOut, PrivateMessageIn,
     ProtocolMessage, PublicMessageIn, Welcome,
     group_info::{GroupInfo, VerifiableGroupInfo},
+    tls_codec,
 };
 use serde::de::DeserializeOwned;
 use tls_codec::{DeserializeBytes, Serialize};

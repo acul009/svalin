@@ -6,12 +6,12 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use hex::ToHex;
+use openmls::prelude::tls_codec::{self, TlsDeserialize, TlsSerialize, TlsSize};
 use rustls::pki_types::CertificateDer;
 use serde::de::Visitor;
 use serde::{Deserialize, Serialize, de};
 use thiserror::Error;
 use time::Duration;
-use tls_codec::{TlsDeserialize, TlsSerialize, TlsSize};
 use x509_parser::error::X509Error;
 use x509_parser::prelude::Validity;
 use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};

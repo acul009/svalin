@@ -1,6 +1,8 @@
 use std::fmt::Debug;
 
-use openmls::prelude::{KeyPackageIn, KeyPackageVerifyError, OpenMlsCrypto, ProtocolVersion};
+use openmls::prelude::{
+    KeyPackageIn, KeyPackageVerifyError, OpenMlsCrypto, ProtocolVersion, tls_codec,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{Certificate, SpkiHash, Verifier, VerifyError, get_current_timestamp};

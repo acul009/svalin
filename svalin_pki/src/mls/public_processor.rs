@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use openmls::{
     framing::errors::ProtocolMessageError,
     group::{GroupId, MergeCommitError, ProposalStore, PublicGroup, PublicProcessMessageError},
-    prelude::{CreationFromExternalError, ProtocolMessage},
+    prelude::{CreationFromExternalError, ProtocolMessage, tls_codec},
 };
 use openmls_rust_crypto::{MemoryStorage, MemoryStorageError};
 use openmls_sqlx_storage::SqliteStorageProvider;

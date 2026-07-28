@@ -3,7 +3,7 @@ use std::{collections::HashSet, marker::PhantomData};
 use anyhow::{Context, anyhow};
 use openmls::{
     error::LibraryError,
-    prelude::{PublicMessageIn, Welcome},
+    prelude::{PublicMessageIn, Welcome, tls_codec},
 };
 
 use crate::{

@@ -1,7 +1,10 @@
 use std::marker::PhantomData;
 
 use anyhow::anyhow;
-use openmls::{error::LibraryError, prelude::PublicMessageIn};
+use openmls::{
+    error::LibraryError,
+    prelude::{PublicMessageIn, tls_codec},
+};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use tokio::task::JoinError;
 
