@@ -2,11 +2,8 @@ use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Credential, KeyPair,
-    certificate::UnverifiedCertificate,
-    generate_key, get_current_timestamp,
+    Credential, KeyPair, certificate::UnverifiedCertificate, generate_key, get_current_timestamp,
     keypair::ExportedPublicKey,
-    signed_message::{Sign, Verify},
 };
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -30,21 +27,6 @@ fn test_certificate_serde_serialization() {
     let rebuilt: SerializationTestStruct = postcard::from_bytes(&encoded).unwrap();
 
     assert_eq!(test_struct, rebuilt);
-}
-
-#[test]
-pub fn cert_verify_message() {
-    let credentials = Credential::generate_temporary().unwrap();
-    let rand = SystemRandom::new();
-
-    let mut msg = [0u8; 1024];
-    rand.fill(&mut msg).unwrap();
-
-    let signed = credentials.sign(&msg).unwrap();
-
-    let msg2 = credentials.certificate().verify(&signed).unwrap();
-
-    assert_eq!(msg, msg2.as_ref());
 }
 
 #[test]

@@ -1,7 +1,7 @@
 use openmls::prelude::CredentialType;
 use openmls_traits::signatures::SignerError;
 
-use crate::{Credential, SpkiHash, signed_message::CanSign};
+use crate::{Credential, SpkiHash};
 
 pub mod agent;
 pub mod client;
@@ -29,7 +29,12 @@ impl From<&SpkiHash> for openmls::credentials::Credential {
 
 impl openmls_traits::signatures::Signer for Credential {
     fn sign(&self, payload: &[u8]) -> Result<Vec<u8>, SignerError> {
-        Ok(self.borrow_keypair().sign(payload).as_ref().to_vec())
+        Ok(self
+            .keypair()
+            .signing_keypair()
+            .sign(payload)
+            .as_ref()
+            .to_vec())
     }
 
     fn signature_scheme(&self) -> openmls::prelude::SignatureScheme {

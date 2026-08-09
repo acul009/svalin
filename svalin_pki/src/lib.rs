@@ -6,10 +6,11 @@ mod credential;
 mod encrypt;
 mod keypair;
 pub mod mls;
+pub mod secure_chain;
 pub mod serde_paramsstring;
 pub mod serde_saltstring;
-mod signed_message;
-mod signed_object;
+// mod signed_message;
+// mod signed_object;
 #[cfg(test)]
 mod test;
 mod verifier;
@@ -38,7 +39,7 @@ pub use credential::{
 pub use encrypt::{DecryptError, EncryptError, EncryptedData, EncryptedObject, EncryptionKey};
 pub use keypair::{ExportedPublicKey, KeyPair};
 // pub use signed_object::{SignedObject, VerifiedObject};
-pub use signed_object::{SignedObject, VerifiedObject};
+// pub use signed_object::{SignedObject, VerifiedObject};
 pub use verifier::{
     KnownCertificateVerifier, Verifier, VerifyError, exact::ExactVerififier,
     one_of::OneOfVerififier,

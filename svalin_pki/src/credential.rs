@@ -3,7 +3,6 @@ use std::{fmt::Debug, sync::Arc};
 use anyhow::Result;
 
 use rcgen::{Issuer, PublicKeyData};
-use ring::signature::Ed25519KeyPair;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
@@ -12,7 +11,6 @@ use crate::{
     certificate::{CertificateType, UnverifiedCertificate},
     encrypt::{EncryptedObject, EncryptionKey},
     keypair::{DecodeKeypairError, ExportedPublicKey, SavedKeypair},
-    signed_message::CanSign,
 };
 
 #[derive(Debug)]
@@ -295,11 +293,5 @@ impl Credential {
 
     pub fn keypair(&self) -> &KeyPair {
         &self.data.keypair
-    }
-}
-
-impl CanSign for Credential {
-    fn borrow_keypair(&self) -> &Ed25519KeyPair {
-        self.keypair().signing_keypair()
     }
 }

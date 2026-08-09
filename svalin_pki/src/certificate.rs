@@ -16,8 +16,6 @@ use x509_parser::error::X509Error;
 use x509_parser::prelude::Validity;
 use x509_parser::{certificate::X509Certificate, oid_registry::asn1_rs::FromDer};
 
-use crate::signed_message::CanVerify;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CertificateType {
     Root,
@@ -484,12 +482,6 @@ impl PartialEq<Certificate> for RootCertificate {
 impl PartialEq<RootCertificate> for Certificate {
     fn eq(&self, other: &RootCertificate) -> bool {
         self.as_der() == other.as_der()
-    }
-}
-
-impl CanVerify for Certificate {
-    fn borrow_public_key(&self) -> &[u8] {
-        return self.0.public_key.as_ref();
     }
 }
 
