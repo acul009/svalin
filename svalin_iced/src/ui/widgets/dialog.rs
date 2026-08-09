@@ -83,8 +83,8 @@ impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Mes
                 background: Some(Background::Color(theme.palette().background.base.color)),
                 ..Default::default()
             })
-            .max_width(value.max_width)
-            .max_height(value.max_height),
+            .width(iced::Length::Shrink.max(value.max_width))
+            .height(iced::Length::Shrink.max(value.max_height)),
         )
         .style(|_| container::Style {
             background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.5))),

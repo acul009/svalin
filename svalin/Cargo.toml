@@ -28,7 +28,7 @@ clap = { workspace = true, features = ["derive", "unstable-doc"] }
 svalin_rpc.workspace = true
 svalin_sysctl.workspace = true
 svalin_pki.workspace = true
-totp-rs = { workspace = true, features = ["qr", "serde_support", "gen_secret", "zeroize"] }
+totp-rs = { workspace = true }
 tracing-subscriber.workspace = true
 test-log = { workspace = true, features = ["trace"] }
 futures.workspace = true

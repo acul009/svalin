@@ -74,7 +74,7 @@ impl Init {
         self,
         username: String,
         password: Vec<u8>,
-        totp_secret: totp_rs::TOTP,
+        totp_secret: totp_rs::Totp,
     ) -> Result<String> {
         let init_data = self
             .client
@@ -105,7 +105,11 @@ impl Init {
         };
 
         Ok(login
-            .login(username, password, totp_secret.generate_current()?)
+            .login(
+                username,
+                password,
+                totp_secret.generate_current().to_string(),
+            )
             .await?)
     }
 

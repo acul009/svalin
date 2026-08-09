@@ -13,14 +13,14 @@ use svalin_pki::{
     EncryptedCredential, EncryptedObject, SpkiHash, UnverifiedCertificate,
     UnverifiedCertificateChain, serde_paramsstring,
 };
-use totp_rs::TOTP;
+use totp_rs::Totp;
 
 #[derive(Serialize, Deserialize)]
 pub struct StoredUser {
     pub encrypted_credential: EncryptedCredential,
     // The parameters used to derive the credential key from the password
     pub credential_key_params: ArgonParams,
-    pub totp_secret: TOTP,
+    pub totp_secret: Totp,
     /// The username of whoever is registering
     pub username: Vec<u8>,
 
@@ -49,7 +49,7 @@ impl UserStore {
         username: Vec<u8>,
         encrypted_credential: EncryptedCredential,
         credential_key_params: ArgonParams,
-        totp_secret: TOTP,
+        totp_secret: Totp,
         secret_exponent: Scalar,
         params: ParamsString,
         verifier: RistrettoPoint,

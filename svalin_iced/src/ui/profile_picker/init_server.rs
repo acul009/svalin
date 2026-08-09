@@ -7,7 +7,7 @@ use iced::{
 };
 use svalin::client::{Client, Init};
 use tokio_util::sync::CancellationToken;
-use totp_rs::TOTP;
+use totp_rs::Totp;
 
 use crate::ui::{
     types::error_display_info::ErrorDisplayInfo,
@@ -47,7 +47,7 @@ enum State {
     Error(ErrorDisplayInfo<Arc<anyhow::Error>>),
     Loading(String),
     User,
-    Totp { totp: TOTP, qr: image::Handle },
+    Totp { totp: Totp, qr: image::Handle },
 }
 
 impl InitServer {
@@ -91,7 +91,7 @@ impl InitServer {
             }
             Message::CopyTOTP => {
                 if let State::Totp { totp, .. } = &self.state {
-                    Action::Run(iced::clipboard::write(totp.get_url()).discard())
+                    Action::Run(iced::clipboard::write(totp.to_url().unwrap_or_default()).discard())
                 } else {
                     Action::None
                 }
@@ -129,7 +129,7 @@ impl InitServer {
                                 Action::None
                             }
                             Ok(totp) => {
-                                let qr_code = image::Handle::from_bytes(totp.get_qr_png().unwrap());
+                                let qr_code = image::Handle::from_bytes(totp.to_qr_png().unwrap());
 
                                 self.state = State::Totp { totp, qr: qr_code };
                                 self.totp_input.clear();
@@ -139,22 +139,15 @@ impl InitServer {
                         }
                     }
                     State::Totp { totp, .. } => match totp.check_current(&self.totp_input) {
-                        Err(err) => {
+                        None => {
                             self.error(ErrorDisplayInfo::new(
-                                Arc::new(err.into()),
-                                t!("profile-picker.error.totp.verify"),
-                            ));
-                            return Action::None;
-                        }
-                        Ok(false) => {
-                            self.error(ErrorDisplayInfo::new(
-                                Arc::new(anyhow!("wrong totp")),
+                                Arc::new(anyhow!("TOTP mismatch")),
                                 t!("profile-picker.error.totp.verify"),
                             ));
                             return Action::None;
                         }
 
-                        Ok(true) => match self.init.take() {
+                        Some(_) => match self.init.take() {
                             None => {
                                 self.error(ErrorDisplayInfo::new(
                                     Arc::new(anyhow!("init already used")),
@@ -224,18 +217,18 @@ impl InitServer {
             State::User => form()
                 .title(t!("profile-picker.add"))
                 .control(
-                    text_input(&t!("generic.username"), &self.username)
+                    text_input(t!("generic.username"), &self.username)
                         .id("username")
                         .on_input(Message::Username),
                 )
                 .control(
-                    text_input(&t!("generic.password"), &self.password)
+                    text_input(t!("generic.password"), &self.password)
                         .secure(true)
                         .on_input(Message::Password),
                 )
                 .control(
                     text_input(
-                        &t!("profile-picker.input.confirm-password"),
+                        t!("profile-picker.input.confirm-password"),
                         &self.confirm_password,
                     )
                     .secure(true)
@@ -256,7 +249,7 @@ impl InitServer {
                 .control(image(qr))
                 .control(button(text(t!("profile-picker.copy-totp"))).on_press(Message::CopyTOTP))
                 .control(
-                    text_input(&t!("profile-picker.input.totp"), &self.totp_input)
+                    text_input(t!("profile-picker.input.totp"), &self.totp_input)
                         .id("totp")
                         .on_input(Message::Totp)
                         .on_submit(Message::Continue),
@@ -268,14 +261,11 @@ impl InitServer {
     }
 }
 
-fn new_totp(account_name: String) -> Result<totp_rs::TOTP> {
-    Ok(totp_rs::TOTP::new(
-        totp_rs::Algorithm::SHA1,
-        8,
-        1,
-        30,
-        totp_rs::Secret::generate_secret().to_bytes()?,
-        Some("Svalin".into()),
-        account_name,
-    )?)
+fn new_totp(account_name: String) -> Result<totp_rs::Totp> {
+    Ok(totp_rs::Builder::new()
+        .with_algorithm(totp_rs::Algorithm::SHA1)
+        .with_digits(8)
+        .with_skew(1)
+        .with_account_name(account_name)
+        .build()?)
 }

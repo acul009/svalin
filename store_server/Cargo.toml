@@ -12,7 +12,7 @@ svalin_pki.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 
-totp-rs = { workspace = true, features = ["serde_support", "zeroize"] }
+totp-rs = { workspace = true }
 aucpace = { workspace = true, features = ["alloc", "serde", "strong_aucpace"] }
 tracing.workspace = true
 tokio.workspace = true

@@ -34,7 +34,7 @@ iced_core = { git = "https://github.com/iced-rs/iced.git" }
 anyhow = "1.0.104"
 futures-util = "0.3.33"
 tokio.workspace = true
-totp-rs = { version = "5.7.2", features = ["qr", "gen_secret"] }
+totp-rs = { workspace = true }
 lyon_algorithms = "1.0.20"
 thiserror.workspace = true
 tokio-stream = { version = "0.1.19", features = ["full"] }

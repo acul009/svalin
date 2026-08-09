@@ -161,17 +161,17 @@ impl LoginDialog {
             State::LoginForm => form()
                 .title(t!("profile-picker.login"))
                 .control(
-                    text_input(&t!("generic.username"), &self.username)
+                    text_input(t!("generic.username"), &self.username)
                         .id("username")
                         .on_input(Message::Username),
                 )
                 .control(
-                    text_input(&t!("generic.password"), &self.password)
+                    text_input(t!("generic.password"), &self.password)
                         .secure(true)
                         .on_input(Message::Password),
                 )
                 .control(
-                    text_input(&t!("profile-picker.input.totp"), &self.current_totp)
+                    text_input(t!("profile-picker.input.totp"), &self.current_totp)
                         .id("totp")
                         .on_input(Message::Totp)
                         .on_submit(Message::Continue),

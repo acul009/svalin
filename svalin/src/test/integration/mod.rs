@@ -7,7 +7,7 @@ use test_log::test;
 use tokio::sync::oneshot;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
-use totp_rs::TOTP;
+use totp_rs::Totp;
 
 use crate::client::state::ClientStateUpdate;
 use crate::{agent, client::Client, server::Server};
@@ -51,7 +51,7 @@ async fn integration_tests() {
 
     let first_connect = Client::first_connect(host.clone()).await.unwrap();
 
-    let totp_secret = TOTP::default();
+    let totp_secret = Totp::default();
     let username = "admin".to_string();
     let password = "admin".to_string();
 
@@ -120,7 +120,7 @@ async fn integration_tests() {
                 .login(
                     username.clone(),
                     password.clone().into_bytes(),
-                    totp_secret.generate_current().unwrap(),
+                    totp_secret.generate_current().to_string(),
                 )
                 .await
                 .unwrap();

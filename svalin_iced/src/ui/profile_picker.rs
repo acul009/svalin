@@ -307,7 +307,7 @@ impl ProfilePicker {
             } => form()
                 .title(t!("profile-picker.title.unlock"))
                 .control(
-                    text_input(&t!("generic.password"), password)
+                    text_input(t!("generic.password"), password)
                         .id("password")
                         .secure(true)
                         .on_input(|input| Message::Input(Input::Password(input)))

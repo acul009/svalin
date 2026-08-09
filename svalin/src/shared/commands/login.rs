@@ -13,7 +13,9 @@ use svalin_pki::{
     serde_paramsstring,
 };
 use svalin_pki::{ArgonParams, EncryptionKey};
-use svalin_pki::{argon2::password_hash::ParamsString, curve25519_dalek::RistrettoPoint};
+use svalin_pki::{
+    argon2::password_hash::ParamsString, curve25519_dalek::ristretto::RistrettoPoint,
+};
 use svalin_rpc::{
     rpc::{
         command::{
@@ -259,7 +261,8 @@ impl TakeableCommandHandler for LoginHandler {
 
             let totp: String = session.read_object().await.context("Failed to read totp")?;
 
-            let totp_success = user.totp_secret.check_current(&totp)?;
+            // Todo: fix only allow using each step once
+            let totp_success = user.totp_secret.check_current(&totp).is_some();
 
             session
                 .write_object(&totp_success)

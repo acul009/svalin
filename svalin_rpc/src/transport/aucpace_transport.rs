@@ -1,5 +1,6 @@
 use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage};
 use serde::{Deserialize, Serialize, de};
+use sha2::digest::generic_array::GenericArray;
 use std::pin::Pin;
 use svalin_pki::{
     ArgonCost, EncryptionKey, ParamsStringParseError, Sha512,
@@ -10,10 +11,7 @@ use svalin_pki::{
             rand_core::{OsRng, RngCore},
         },
     },
-    curve25519_dalek::{
-        RistrettoPoint,
-        digest::{generic_array::GenericArray, typenum},
-    },
+    curve25519_dalek::{digest::typenum, ristretto::RistrettoPoint},
     serde_paramsstring, serde_saltstring,
 };
 use tokio::io::{AsyncRead, AsyncWrite};

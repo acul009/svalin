@@ -26,7 +26,7 @@ use svalin_rpc::rpc::{
 use svalin_server_store::UserStore;
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
-use totp_rs::TOTP;
+use totp_rs::Totp;
 
 pub struct ServerInitSuccess {
     pub credential: Credential,
@@ -38,7 +38,7 @@ pub struct InitRequest {
     server_cert: UnverifiedCertificate,
     encrypted_credential: EncryptedCredential,
     credential_key_params: ArgonParams,
-    totp_secret: TOTP,
+    totp_secret: Totp,
     /// The username of the user being added
     username: Vec<u8>,
 
@@ -169,12 +169,12 @@ pub struct Init {
     root: Credential,
     username: Vec<u8>,
     password: Vec<u8>,
-    totp: totp_rs::TOTP,
+    totp: totp_rs::Totp,
 }
 
 impl Init {
     pub fn new(
-        totp: totp_rs::TOTP,
+        totp: totp_rs::Totp,
         username: Vec<u8>,
         password: Vec<u8>,
     ) -> Result<Self, CreateCredentialsError> {
