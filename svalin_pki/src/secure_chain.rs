@@ -113,6 +113,9 @@ impl<State: ChainState> Chain<State> {
             if block.previous_block_hash != last.digest() {
                 return Err(ApplyBlockError::PreviousBlockHashMismatch);
             }
+            if block.time <= last.time {
+                return Err(ApplyBlockError::TimeMismatch);
+            }
         } else {
             if block.sequence != 0 {
                 return Err(ApplyBlockError::SequenceMismatch);
@@ -163,6 +166,8 @@ pub enum ApplyBlockError {
     SequenceMismatch,
     #[error("previous block hash mismatch")]
     PreviousBlockHashMismatch,
+    #[error("block time earlier than previous block")]
+    TimeMismatch,
     #[error("incorrect certificate given")]
     IncorrectCertificate,
     #[error("signature verification failed")]
