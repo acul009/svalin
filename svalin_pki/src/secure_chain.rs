@@ -16,14 +16,15 @@ impl BlockDigest {
 
 pub trait ChainState {
     type Transaction: Transaction + Serialize + DeserializeOwned + Clone;
+    type Error: std::error::Error;
 
     fn check(
         &self,
         signer: &SpkiHash,
         time: u64,
         transaction: &Self::Transaction,
-    ) -> Result<(), String>;
-    fn apply(&mut self, transaction: &Self::Transaction);
+    ) -> Result<(), Self::Error>;
+    fn apply(&mut self, signer: &SpkiHash, time: u64, transaction: &Self::Transaction);
     fn revert(&mut self, transaction: &Self::Transaction);
     fn digest(&self, digest: &mut impl Digest);
 }
@@ -39,18 +40,22 @@ pub struct Chain<State: ChainState> {
 }
 
 impl<State: ChainState> Chain<State> {
-    pub fn new(state: State) -> Self {
+    pub fn initialize(state: State) -> Self {
         Self {
             last_block: None,
             state,
         }
     }
 
+    pub fn state(&self) -> &State {
+        &self.state
+    }
+
     pub fn apply_and_package(
         &mut self,
         transaction: State::Transaction,
         credential: Credential,
-    ) -> Result<Block<State::Transaction>, CreateBlockError> {
+    ) -> Result<Block<State::Transaction>, CreateBlockError<State::Error>> {
         let timestamp = get_current_timestamp();
         if let Err(reason) = self.state.check(
             credential.certificate().spki_hash(),
@@ -60,7 +65,11 @@ impl<State: ChainState> Chain<State> {
             return Err(CreateBlockError::InvalidTransaction(reason));
         }
 
-        self.state.apply(&transaction);
+        self.state.apply(
+            credential.certificate().spki_hash(),
+            timestamp,
+            &transaction,
+        );
         let mut hasher = Sha512::new();
         self.state.digest(&mut hasher);
         let new_digest = StateDigest(hasher.finalize().into());
@@ -105,7 +114,7 @@ impl<State: ChainState> Chain<State> {
         &mut self,
         block: Block<State::Transaction>,
         certificate: &Certificate,
-    ) -> Result<(), ApplyBlockError> {
+    ) -> Result<(), ApplyBlockError<State::Error>> {
         if let Some(last) = &self.last_block {
             if block.sequence != last.sequence + 1 {
                 return Err(ApplyBlockError::SequenceMismatch);
@@ -143,7 +152,8 @@ impl<State: ChainState> Chain<State> {
             return Err(ApplyBlockError::InvalidTransaction(reason));
         }
 
-        self.state.apply(&block.transaction);
+        self.state
+            .apply(&block.signer, block.time, &block.transaction);
 
         let mut hasher = Sha512::new();
         self.state.digest(&mut hasher);
@@ -161,7 +171,7 @@ impl<State: ChainState> Chain<State> {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ApplyBlockError {
+pub enum ApplyBlockError<Inner> {
     #[error("block sequence mismatch")]
     SequenceMismatch,
     #[error("previous block hash mismatch")]
@@ -173,18 +183,18 @@ pub enum ApplyBlockError {
     #[error("signature verification failed")]
     SignatureVerificationFailed(ring::error::Unspecified),
     #[error("invalid transaction: {0}")]
-    InvalidTransaction(String),
+    InvalidTransaction(Inner),
     #[error("resulting state mismatch")]
     ResultingStateMismatch,
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum CreateBlockError {
+pub enum CreateBlockError<Inner> {
     #[error("invalid transaction: {0}")]
-    InvalidTransaction(String),
+    InvalidTransaction(Inner),
 }
 
-impl From<ring::error::Unspecified> for ApplyBlockError {
+impl<Inner> From<ring::error::Unspecified> for ApplyBlockError<Inner> {
     fn from(err: ring::error::Unspecified) -> Self {
         Self::SignatureVerificationFailed(err)
     }
@@ -208,12 +218,12 @@ impl<T: Transaction> Block<T> {
     }
 
     pub fn digest(&self) -> BlockDigest {
-        let mut hasher = Sha512::new();
-        hasher.update(self.sequence.to_le_bytes());
-        hasher.update(self.time.to_le_bytes());
-        hasher.update(self.previous_block_hash.0);
-        hasher.update(self.resulting_state.0);
-        hasher.update(self.signer.as_slice());
+        let mut hasher = Sha512::new()
+            .chain_update(self.sequence.to_le_bytes())
+            .chain_update(self.time.to_le_bytes())
+            .chain_update(self.previous_block_hash.0)
+            .chain_update(self.resulting_state.0)
+            .chain_update(self.signer.as_slice());
         self.transaction.digest(&mut hasher);
         BlockDigest(hasher.finalize().into())
     }

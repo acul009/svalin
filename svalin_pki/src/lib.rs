@@ -1,21 +1,18 @@
 #![forbid(unsafe_code)]
 mod argon;
+pub mod central_trust_store;
 mod certificate;
 mod certificate_chain;
 mod credential;
 mod encrypt;
 mod keypair;
 pub mod mls;
-pub mod secure_chain;
+mod secure_chain;
 pub mod serde_paramsstring;
 pub mod serde_saltstring;
-// mod signed_message;
-// mod signed_object;
 #[cfg(test)]
 mod test;
 mod verifier;
-
-// pub mod tbrhl;
 
 // Re-Exports
 pub use curve25519_dalek;
