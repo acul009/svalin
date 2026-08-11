@@ -7,27 +7,32 @@ use serde::{
 };
 
 use crate::{
-    Certificate, RootCertificate, SignatureVerificationError, SpkiHash, UnverifiedCertificate,
-    certificate,
-    secure_chain::{self, ApplyBlockError, Block, Chain, ChainState, CreateBlockError},
+    Certificate, Credential, RootCertificate, SignatureVerificationError, SpkiHash,
+    UnverifiedCertificate, certificate,
+    secure_chain::{self, ApplyBlockError, Chain, ChainState, CreateBlockError, UncheckedBlock},
 };
 
 pub struct TrustStore {
     chain: Chain<State>,
+    credential: Credential,
 }
 
 impl TrustStore {
-    pub fn initialize(root: RootCertificate) -> Self {
+    pub fn initialize(root: RootCertificate, credential: Credential) -> Self {
         let mut certificates = HashMap::new();
         certificates.insert(root.spki_hash().clone(), root.as_certificate().clone());
         let state = State { root, certificates };
 
         Self {
             chain: Chain::initialize(state),
+            credential,
         }
     }
 
-    pub fn try_apply(&mut self, update: Block<Transaction>) -> Result<(), ApplyBlockError<Error>> {
+    pub fn try_apply(
+        &mut self,
+        update: UncheckedBlock<Transaction>,
+    ) -> Result<(), ApplyBlockError<Error>> {
         let signer = self
             .chain
             .state()
@@ -43,9 +48,11 @@ impl TrustStore {
     pub fn add(
         &mut self,
         certificate: Certificate,
-    ) -> Result<Block<Transaction>, CreateBlockError<Error>> {
-        self.chain
-            .apply_and_package(Transaction::Add(certificate.to_unverified()))
+    ) -> Result<UncheckedBlock<Transaction>, CreateBlockError<Error>> {
+        self.chain.apply_and_package(
+            Transaction::Add(certificate.to_unverified()),
+            &self.credential,
+        )
     }
 }
 
