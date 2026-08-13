@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 mod argon;
-// pub mod central_trust_store;
+pub mod central_trust_store;
 mod certificate;
 mod certificate_chain;
 mod credential;

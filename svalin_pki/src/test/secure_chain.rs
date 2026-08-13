@@ -1,6 +1,11 @@
+use std::convert::Infallible;
+
 use serde::{Deserialize, Serialize};
 
-use crate::{Credential, secure_chain};
+use crate::{
+    Credential,
+    secure_chain::{self, Chain},
+};
 
 #[derive(Debug)]
 struct State {
@@ -8,26 +13,9 @@ struct State {
     allow_wrong_transaction: bool,
 }
 
-impl Serialize for State {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_u64(self.number)
-    }
-}
-
-impl<'de> Deserialize<'de> for State {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let number = u64::deserialize(deserializer)?;
-        Ok(Self {
-            number,
-            allow_wrong_transaction: false,
-        })
-    }
+#[derive(Serialize, Deserialize)]
+struct Exported {
+    number: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -53,6 +41,8 @@ impl secure_chain::ChainState for State {
     type Transaction = Transaction;
 
     type Error = Error;
+    type Exported = Exported;
+    type ImportError = Infallible;
 
     fn check(
         &self,
@@ -83,17 +73,19 @@ impl secure_chain::ChainState for State {
     fn digest(&self, digest: &mut impl sha2::Digest) {
         digest.update(self.number.to_le_bytes());
     }
-}
 
-#[test]
-fn test_teststate_serialization() {
-    let state = State {
-        number: 0,
-        allow_wrong_transaction: true,
-    };
-    let serialized = postcard::to_stdvec(&state).unwrap();
-    let deserialized: State = postcard::from_bytes(&serialized).unwrap();
-    assert_eq!(state.number, deserialized.number);
+    fn export(&self) -> Self::Exported {
+        Self::Exported {
+            number: self.number,
+        }
+    }
+
+    fn import(exported: Self::Exported) -> Result<Self, Self::ImportError> {
+        Ok(Self {
+            number: exported.number,
+            allow_wrong_transaction: false,
+        })
+    }
 }
 
 #[test]
@@ -112,7 +104,7 @@ fn test_simple_chain() {
         chain.apply(packaged);
     }
 
-    let serialized = postcard::to_stdvec(&chain).unwrap();
+    let exported = chain.export();
 
     let mut saved = Vec::new();
     for _ in 100..200 {
@@ -124,7 +116,7 @@ fn test_simple_chain() {
         chain.apply(packaged);
     }
 
-    let mut chain2: secure_chain::Chain<State> = postcard::from_bytes(&serialized).unwrap();
+    let mut chain2: secure_chain::Chain<State> = Chain::import(exported).unwrap();
 
     for packaged in saved.into_iter() {
         let checked = chain2.check(packaged, credential.certificate()).unwrap();

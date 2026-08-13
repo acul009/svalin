@@ -1,21 +1,29 @@
 use std::{collections::HashMap, fmt};
 
-use serde::{
-    Deserialize, Deserializer, Serialize, Serializer,
-    de::{self, SeqAccess, Visitor},
-    ser::SerializeStruct,
-};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     Certificate, Credential, RootCertificate, SignatureVerificationError, SpkiHash,
-    UnverifiedCertificate, certificate,
-    secure_chain::{self, ApplyBlockError, Chain, ChainState, CreateBlockError, UncheckedBlock},
+    UnverifiedCertificate, UseAsRootError, certificate,
+    secure_chain::{
+        self, Chain, ChainState, CheckBlockError, CheckedBlock, CreateBlockError, UncheckedBlock,
+    },
 };
 
 pub struct TrustStore {
     chain: Chain<State>,
     credential: Credential,
 }
+
+impl fmt::Debug for TrustStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TrustStore").finish()
+    }
+}
+
+#[derive(Serialize, Debug)]
+#[serde(transparent)]
+pub struct TrustStoreDigest(secure_chain::ChainDigest);
 
 impl TrustStore {
     pub fn initialize(root: RootCertificate, credential: Credential) -> Self {
@@ -29,31 +37,59 @@ impl TrustStore {
         }
     }
 
-    pub fn try_apply(
+    pub fn check(
         &mut self,
-        update: UncheckedBlock<Transaction>,
-    ) -> Result<(), ApplyBlockError<Error>> {
-        let signer = self
+        block: UncheckedBlock<Transaction>,
+    ) -> Result<CheckedBlock<Transaction>, CheckBlockError<Error>> {
+        let certificate = self
             .chain
             .state()
             .certificates
-            .get(update.signer())
-            .ok_or(ApplyBlockError::InvalidTransaction(Error::SignerNotKnown))?
+            .get(block.signer())
+            .ok_or(CheckBlockError::InvalidTransaction(Error::SignerNotKnown))?
             .clone();
-        self.chain.try_apply(update, &signer)?;
 
-        Ok(())
+        self.chain.check(block, &certificate)
+    }
+
+    pub fn apply(&mut self, block: CheckedBlock<Transaction>) {
+        self.chain.apply(block)
     }
 
     pub fn add(
         &mut self,
         certificate: Certificate,
-    ) -> Result<UncheckedBlock<Transaction>, CreateBlockError<Error>> {
-        self.chain.apply_and_package(
+    ) -> Result<CheckedBlock<Transaction>, CreateBlockError<Error>> {
+        self.chain.package(
             Transaction::Add(certificate.to_unverified()),
             &self.credential,
         )
     }
+
+    pub fn export(&self) -> Exported {
+        Exported {
+            chain: self.chain.export(),
+        }
+    }
+
+    pub fn import(
+        exported: Exported,
+        credential: Credential,
+    ) -> Result<Self, secure_chain::ImportError<ImportError>> {
+        Ok(Self {
+            chain: secure_chain::Chain::import(exported.chain)?,
+            credential,
+        })
+    }
+
+    pub fn get(&self, spki_hash: &SpkiHash) -> Option<&Certificate> {
+        self.chain.state().certificates.get(&spki_hash)
+    }
+}
+
+#[derive(Clone)]
+pub struct Exported {
+    chain: secure_chain::ExportedChain<State>,
 }
 
 struct State {
@@ -111,6 +147,8 @@ pub enum Error {
 impl ChainState for State {
     type Transaction = Transaction;
     type Error = Error;
+    type Exported = ExportedState;
+    type ImportError = ImportError;
 
     fn check(
         &self,
@@ -181,121 +219,68 @@ impl ChainState for State {
 
     fn digest(&self, digest: &mut impl sha2::Digest) {
         digest.update(self.root.as_der());
-        for certificate in self.certificates.values() {
+        let mut keys = self.certificates.keys().collect::<Vec<_>>();
+        keys.sort();
+        for key in keys {
+            let certificate = self
+                .certificates
+                .get(&key)
+                .expect("keys were already taken from map");
             digest.update(certificate.as_der());
         }
     }
-}
 
-impl Serialize for State {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("trust::state", 2)?;
-        state.serialize_field("root", &self.root.as_unverified())?;
-        state.serialize_field(
-            "certificates",
-            &self
+    fn export(&self) -> Self::Exported {
+        ExportedState {
+            root: self.root.clone().to_unverified(),
+            certificates: self
                 .certificates
-                .iter()
-                .map(|cert| cert.1.clone().to_unverified())
-                .collect::<Vec<_>>(),
-        )?;
-        state.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for State {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let state: Self = deserializer.deserialize_struct(
-            "trust::state",
-            &["root", "certificates"],
-            StateVisitor,
-        )?;
-
-        Ok(state)
-    }
-}
-
-struct StateVisitor;
-
-impl<'de> Visitor<'de> for StateVisitor {
-    type Value = State;
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("struct trust::state")
+                .values()
+                .map(|c| c.clone().to_unverified())
+                .collect(),
+        }
     }
 
-    fn visit_seq<A>(self, mut seq: A) -> Result<State, A::Error>
-    where
-        A: SeqAccess<'de>,
-    {
-        let root: UnverifiedCertificate = seq
-            .next_element()?
-            .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+    fn import(exported: Self::Exported) -> Result<Self, Self::ImportError> {
+        let root = exported.root.use_as_root()?;
+        let mut seen = HashMap::<&SpkiHash, bool>::new();
 
-        let certificates: Vec<UnverifiedCertificate> = seq
-            .next_element()?
-            .ok_or_else(|| de::Error::invalid_length(1, &self))?;
-
-        let mut state = State {
-            root: root
-                .use_as_root()
-                .expect("root certificate is not a root certificate"),
-            certificates: HashMap::new(),
-        };
-
-        for certificate in certificates {
-            state.certificates.insert(
-                certificate.spki_hash().clone(),
-                certificate.mark_as_trusted(),
-            );
+        for cert in &exported.certificates {
+            let issuer = cert.issuer();
+            seen.insert(cert.spki_hash(), true);
+            seen.entry(&issuer).or_insert(false);
         }
 
-        Ok(state)
+        let missing: Vec<_> = seen
+            .into_iter()
+            .filter(|(_, seen)| *seen == false)
+            .map(|(spki_hash, _)| spki_hash.clone())
+            .collect();
+
+        if !missing.is_empty() {
+            return Err(ImportError::MissingIssuers(missing));
+        }
+
+        let certificates = exported
+            .certificates
+            .into_iter()
+            .map(|cert| (cert.spki_hash().clone(), cert.mark_as_trusted()))
+            .collect();
+
+        Ok(Self { root, certificates })
     }
 }
 
-#[cfg(test)]
-mod test {
-    use sha2::{Digest, Sha512};
+#[derive(Clone, Serialize, Deserialize)]
+struct ExportedState {
+    root: UnverifiedCertificate,
+    certificates: Vec<UnverifiedCertificate>,
+}
 
-    use crate::{Credential, KeyPair, get_current_timestamp};
-
-    use super::*;
-
-    #[test]
-    fn test_serde() {
-        let root = Credential::generate_root().unwrap();
-        let keypair = KeyPair::generate();
-        let cert = root
-            .create_agent_certificate_for_key(&keypair.export_public_key())
-            .unwrap();
-        let mut state = State::initialize(
-            root.certificate()
-                .clone()
-                .to_unverified()
-                .use_as_root()
-                .unwrap(),
-        );
-        state.apply(
-            root.certificate().spki_hash(),
-            get_current_timestamp(),
-            &Transaction::Add(cert.to_unverified()),
-        );
-
-        let serialized = postcard::to_stdvec(&state).unwrap();
-        let deserialized: State = postcard::from_bytes(&serialized).unwrap();
-        let mut hasher1 = Sha512::new();
-        state.digest(&mut hasher1);
-        let hash1 = hasher1.finalize();
-        let mut hasher2 = Sha512::new();
-        deserialized.digest(&mut hasher2);
-        let hash2 = hasher2.finalize();
-
-        assert_eq!(hash1, hash2);
-    }
+#[derive(Debug, thiserror::Error)]
+pub enum ImportError {
+    #[error("root certificate error")]
+    RootError(#[from] UseAsRootError),
+    #[error("missing issuers: {0:?}")]
+    MissingIssuers(Vec<SpkiHash>),
 }

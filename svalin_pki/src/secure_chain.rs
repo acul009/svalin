@@ -1,28 +1,31 @@
-use std::marker::PhantomData;
-
-use rand::rand_core::block;
 use ring::signature::{ED25519, VerificationAlgorithm};
-use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 
 use crate::{Certificate, Credential, SpkiHash, get_current_timestamp};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ChainDigest(pub [u8; 64]);
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct StateDigest(pub [u8; 64]);
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct BlockDigest(pub [u8; 64]);
+struct InnerDigest([u8; 64]);
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ChainDigest(InnerDigest);
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+struct StateDigest(InnerDigest);
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+struct BlockDigest(InnerDigest);
 impl BlockDigest {
     fn empty() -> Self {
-        Self([0; 64])
+        Self(InnerDigest([0; 64]))
     }
 }
 
-pub trait ChainState: Serialize + DeserializeOwned {
+pub trait ChainState: Sized {
     type Transaction: Transaction + Serialize + DeserializeOwned + Clone;
     type Error: std::error::Error;
+    type Exported: Serialize + DeserializeOwned;
+    type ImportError: std::error::Error;
 
     fn check(
         &self,
@@ -32,11 +35,13 @@ pub trait ChainState: Serialize + DeserializeOwned {
     ) -> Result<(), Self::Error>;
     fn apply(&mut self, signer: &SpkiHash, time: u64, transaction: &Self::Transaction);
     fn revert(&mut self, transaction: &Self::Transaction);
-    fn digest(&self, digest: &mut impl Digest);
+    fn digest(&self, digest: &mut impl sha2::Digest);
+    fn export(&self) -> Self::Exported;
+    fn import(exported: Self::Exported) -> Result<Self, Self::ImportError>;
 }
 
 pub trait Transaction {
-    fn digest(&self, digest: &mut impl Digest);
+    fn digest(&self, digest: &mut impl sha2::Digest);
 }
 
 pub struct Chain<State: ChainState> {
@@ -77,7 +82,7 @@ impl<State: ChainState> Chain<State> {
         );
         let mut hasher = Sha512::new();
         self.state.digest(&mut hasher);
-        let new_digest = StateDigest(hasher.finalize().into());
+        let new_digest = hasher.finalize().into();
         self.state.revert(&transaction);
 
         let mut block = if let Some(last) = &self.last_block {
@@ -106,7 +111,7 @@ impl<State: ChainState> Chain<State> {
         let signature = credential
             .keypair()
             .signing_keypair()
-            .sign(&digest.0)
+            .sign(&digest.0.0)
             .as_ref()
             .to_vec();
         block.signature = signature;
@@ -139,6 +144,10 @@ impl<State: ChainState> Chain<State> {
             }
         }
 
+        if block.time > get_current_timestamp() {
+            return Err(CheckBlockError::TimeInFuture);
+        }
+
         if block.signer() != certificate.spki_hash() {
             return Err(CheckBlockError::IncorrectCertificate);
         }
@@ -146,7 +155,7 @@ impl<State: ChainState> Chain<State> {
         let digest = block.digest();
         ED25519.verify(
             certificate.public_key().into(),
-            digest.0.as_slice().into(),
+            digest.0.0.as_slice().into(),
             block.signature.as_slice().into(),
         )?;
 
@@ -162,7 +171,7 @@ impl<State: ChainState> Chain<State> {
 
         let mut hasher = Sha512::new();
         self.state.digest(&mut hasher);
-        let new_digest = StateDigest(hasher.finalize().into());
+        let new_digest = hasher.finalize().into();
         self.state.revert(&block.transaction);
 
         if block.resulting_state != new_digest {
@@ -178,7 +187,7 @@ impl<State: ChainState> Chain<State> {
 
         let mut hasher = Sha512::new();
         self.state.digest(&mut hasher);
-        let new_digest = StateDigest(hasher.finalize().into());
+        let new_digest = hasher.finalize().into();
 
         if block.0.resulting_state != new_digest {
             panic!("resulting state mismatch should have already been checked")
@@ -193,9 +202,58 @@ impl<State: ChainState> Chain<State> {
             .as_ref()
             .map(|block| block.0.digest())
             .unwrap_or_else(|| BlockDigest::empty());
-        let mut digest = Sha512::new().chain_update(block_digest.0);
+        let mut digest = Sha512::new().chain_update(block_digest.0.0);
         self.state.digest(&mut digest);
-        ChainDigest(digest.finalize().into())
+        digest.finalize().into()
+    }
+
+    pub fn export(&self) -> ExportedChain<State> {
+        ExportedChain {
+            state: self.state.export(),
+            last_block: self
+                .last_block
+                .as_ref()
+                .map(|block| block.as_unchecked().clone()),
+        }
+    }
+
+    pub fn import(exported: ExportedChain<State>) -> Result<Self, ImportError<State::ImportError>> {
+        let state = State::import(exported.state)?;
+        if let Some(last_block) = exported.last_block {
+            let mut digest = Sha512::new();
+            state.digest(&mut digest);
+            let digest = digest.finalize().into();
+            if last_block.resulting_state != digest {
+                return Err(ImportError::IncorrectStateDigest);
+            }
+            Ok(Self {
+                state,
+                last_block: Some(CheckedBlock(last_block)),
+            })
+        } else {
+            Ok(Self {
+                state,
+                last_block: None,
+            })
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ExportedChain<State: ChainState> {
+    state: State::Exported,
+    last_block: Option<UncheckedBlock<State::Transaction>>,
+}
+impl<State> Clone for ExportedChain<State>
+where
+    State: ChainState,
+    State::Exported: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            state: self.state.clone(),
+            last_block: self.last_block.clone(),
+        }
     }
 }
 
@@ -215,6 +273,8 @@ pub enum CheckBlockError<Inner> {
     InvalidTransaction(Inner),
     #[error("resulting state mismatch")]
     ResultingStateMismatch,
+    #[error("block time is in the future")]
+    TimeInFuture,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -227,6 +287,14 @@ impl<Inner> From<ring::error::Unspecified> for CheckBlockError<Inner> {
     fn from(err: ring::error::Unspecified) -> Self {
         Self::SignatureVerificationFailed(err)
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ImportError<Inner> {
+    #[error("import error: {0}")]
+    ImportError(#[from] Inner),
+    #[error("incorrect state digest")]
+    IncorrectStateDigest,
 }
 
 #[derive(Debug)]
@@ -255,22 +323,22 @@ impl<T: Transaction> UncheckedBlock<T> {
         &self.signer
     }
 
-    pub fn digest(&self) -> BlockDigest {
+    fn digest(&self) -> BlockDigest {
         let mut hasher = Sha512::new()
             .chain_update(self.sequence.to_le_bytes())
             .chain_update(self.time.to_le_bytes())
-            .chain_update(self.previous_block_hash.0)
-            .chain_update(self.resulting_state.0)
+            .chain_update(&self.previous_block_hash)
+            .chain_update(&self.resulting_state)
             .chain_update(self.signer.as_slice());
         self.transaction.digest(&mut hasher);
-        BlockDigest(hasher.finalize().into())
+        hasher.finalize().into()
     }
 }
 
-use serde::de::{DeserializeOwned, Error, Visitor};
+use serde::de::{DeserializeOwned, Error};
 use serde::{Deserializer, Serializer};
 
-impl Serialize for StateDigest {
+impl Serialize for InnerDigest {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -279,7 +347,7 @@ impl Serialize for StateDigest {
     }
 }
 
-impl<'de> Deserialize<'de> for StateDigest {
+impl<'de> Deserialize<'de> for InnerDigest {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -294,119 +362,45 @@ impl<'de> Deserialize<'de> for StateDigest {
     }
 }
 
-impl Serialize for BlockDigest {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_bytes(&self.0)
+impl<S> From<S> for BlockDigest
+where
+    S: Into<[u8; 64]>,
+{
+    fn from(s: S) -> Self {
+        Self(InnerDigest(s.into()))
     }
 }
 
-impl<'de> Deserialize<'de> for BlockDigest {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let bytes: &[u8] = Deserialize::deserialize(deserializer)?;
-
-        let bytes: [u8; 64] = bytes
-            .try_into()
-            .map_err(|_| D::Error::custom("expected 64 bytes"))?;
-
-        Ok(Self(bytes))
+impl<S> From<S> for StateDigest
+where
+    S: Into<[u8; 64]>,
+{
+    fn from(s: S) -> Self {
+        Self(InnerDigest(s.into()))
     }
 }
 
-impl Serialize for ChainDigest {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_bytes(&self.0)
+impl<S> From<S> for ChainDigest
+where
+    S: Into<[u8; 64]>,
+{
+    fn from(s: S) -> Self {
+        Self(InnerDigest(s.into()))
     }
 }
 
-impl<'de> Deserialize<'de> for ChainDigest {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let bytes: &[u8] = Deserialize::deserialize(deserializer)?;
-
-        let bytes: [u8; 64] = bytes
-            .try_into()
-            .map_err(|_| D::Error::custom("expected 64 bytes"))?;
-
-        Ok(Self(bytes))
+impl AsRef<[u8]> for BlockDigest {
+    fn as_ref(&self) -> &[u8] {
+        &self.0.0
     }
 }
-
-impl<State: ChainState> Serialize for Chain<State> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut ser = serializer.serialize_struct("Chain", 2)?;
-        ser.serialize_field(
-            "last_block",
-            &self.last_block.as_ref().map(|block| block.as_unchecked()),
-        )?;
-        ser.serialize_field("state", &self.state)?;
-        ser.end()
+impl AsRef<[u8]> for StateDigest {
+    fn as_ref(&self) -> &[u8] {
+        &self.0.0
     }
 }
-
-impl<'de, State: ChainState> Deserialize<'de> for Chain<State> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_struct(
-            "Chain",
-            &["last_block", "state"],
-            ChainVisitor::<State> {
-                _marker: PhantomData,
-            },
-        )
-    }
-}
-
-struct ChainVisitor<State: ChainState> {
-    _marker: PhantomData<State>,
-}
-
-impl<'de, State: ChainState> Visitor<'de> for ChainVisitor<State> {
-    type Value = Chain<State>;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("a chain")
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: serde::de::SeqAccess<'de>,
-    {
-        let Some(last_block) = seq.next_element::<Option<UncheckedBlock<State::Transaction>>>()?
-        else {
-            return Err(A::Error::custom("expected last_block option"));
-        };
-        let Some(state) = seq.next_element::<State>()? else {
-            return Err(A::Error::custom("expected state"));
-        };
-
-        if let Some(last_block) = &last_block {
-            let mut digest = Sha512::new();
-            state.digest(&mut digest);
-            let digest: [u8; 64] = digest.finalize().into();
-            if last_block.resulting_state.0 != digest {
-                return Err(A::Error::custom("state digest does not match last_block"));
-            }
-        }
-
-        Ok(Chain {
-            last_block: last_block.map(CheckedBlock),
-            state,
-        })
+impl AsRef<[u8]> for ChainDigest {
+    fn as_ref(&self) -> &[u8] {
+        &self.0.0
     }
 }
