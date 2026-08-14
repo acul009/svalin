@@ -1,8 +1,9 @@
 use std::fmt::Debug;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use svalin_pki::{DecodeCredentialsError, ExactVerififier, KnownCertificateVerifier};
+use svalin_pki::{DecodeCredentialsError, ExactVerififier, KnownCertificateVerifier, trust_store};
 use svalin_rpc::rpc::command::dispatcher::DispatcherError;
 use svalin_rpc::rpc::connection::ConnectionDispatchError;
 use svalin_rpc::rpc::session::SessionDispatchError;
@@ -90,6 +91,7 @@ impl Init {
         self.client.close(Duration::from_secs(1)).await?;
 
         tokio::time::sleep(INIT_SERVER_SHUTDOWN_COUNTDOWN).await;
+        let trust_store = Arc::new(RwLock::new(init_data.trust_store));
 
         let client = RpcClient::connect(
             &self.address,

@@ -1,6 +1,5 @@
 #![forbid(unsafe_code)]
 mod argon;
-pub mod central_trust_store;
 mod certificate;
 mod certificate_chain;
 mod credential;
@@ -12,6 +11,7 @@ pub mod serde_paramsstring;
 pub mod serde_saltstring;
 #[cfg(test)]
 mod test;
+pub mod trust_store;
 mod verifier;
 
 // Re-Exports
@@ -39,7 +39,7 @@ pub use keypair::{ExportedPublicKey, KeyPair};
 // pub use signed_object::{SignedObject, VerifiedObject};
 pub use verifier::{
     KnownCertificateVerifier, Verifier, VerifyError, exact::ExactVerififier,
-    one_of::OneOfVerififier,
+    one_of::OneOfVerififier, trust_store::TrustStoreVerifier,
 };
 
 // normal use statements

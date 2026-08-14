@@ -5,10 +5,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Certificate, Credential, RootCertificate, SignatureVerificationError, SpkiHash,
     UnverifiedCertificate, UseAsRootError, certificate,
-    secure_chain::{
-        self, Chain, ChainState, CheckBlockError, CheckedBlock, CreateBlockError, UncheckedBlock,
-    },
+    secure_chain::{self, Chain, ChainState, CheckedBlock, UncheckedBlock},
 };
+pub type CreateBlockError = secure_chain::CreateBlockError<Error>;
+pub type CheckBlockError = secure_chain::CheckBlockError<Error>;
 
 pub struct TrustStore {
     chain: Chain<State>,
@@ -40,7 +40,7 @@ impl TrustStore {
     pub fn check(
         &mut self,
         block: UncheckedBlock<Transaction>,
-    ) -> Result<CheckedBlock<Transaction>, CheckBlockError<Error>> {
+    ) -> Result<CheckedBlock<Transaction>, CheckBlockError> {
         let certificate = self
             .chain
             .state()
@@ -59,7 +59,7 @@ impl TrustStore {
     pub fn add(
         &mut self,
         certificate: Certificate,
-    ) -> Result<CheckedBlock<Transaction>, CreateBlockError<Error>> {
+    ) -> Result<CheckedBlock<Transaction>, CreateBlockError> {
         self.chain.package(
             Transaction::Add(certificate.to_unverified()),
             &self.credential,
@@ -85,9 +85,13 @@ impl TrustStore {
     pub fn get(&self, spki_hash: &SpkiHash) -> Option<&Certificate> {
         self.chain.state().certificates.get(&spki_hash)
     }
+
+    pub fn root(&self) -> &RootCertificate {
+        &self.chain.state().root
+    }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Exported {
     chain: secure_chain::ExportedChain<State>,
 }

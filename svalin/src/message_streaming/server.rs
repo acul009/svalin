@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use svalin_pki::{Certificate, mls::transport_types::MessageToServerTransport};
+use svalin_pki::{Certificate, TrustStoreVerifier, mls::transport_types::MessageToServerTransport};
 use svalin_server_store::{KeyPackageStore, MessageStore};
 
 use crate::verifier::local_verifier::LocalVerifier;
@@ -10,7 +10,7 @@ pub struct MlsMessageHandler {
     pub message_store: Arc<MessageStore>,
     pub key_package_store: Arc<KeyPackageStore>,
     pub mls_server: Arc<crate::server::MlsServer>,
-    pub verifier: LocalVerifier,
+    pub verifier: TrustStoreVerifier,
 }
 
 impl MlsMessageHandler {

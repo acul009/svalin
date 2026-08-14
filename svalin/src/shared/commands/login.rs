@@ -125,8 +125,8 @@ impl TakeableCommandHandler for LoginHandler {
 
             let (transport, _) = session.destructure();
 
-            let temp_credentials =
-                Credential::generate_root().context("Failed to generate temporary credentials")?;
+            let temp_credentials = Credential::generate_temporary()
+                .context("Failed to generate temporary credentials")?;
 
             let tls_transport =
                 TlsTransport::server(transport, SkipClientVerification::new(), &temp_credentials)
@@ -464,8 +464,8 @@ impl TakeableCommandDispatcher for Login {
             // ===== TLS Initialization =====
             let (transport, _) = session.destructure();
 
-            let credentials =
-                Credential::generate_root().map_err(LoginDispatcherError::TempCredentialError)?;
+            let credentials = Credential::generate_temporary()
+                .map_err(LoginDispatcherError::TempCredentialError)?;
 
             let tls_transport =
                 TlsTransport::client(transport, SkipServerVerification::new(), &credentials)

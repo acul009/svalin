@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use svalin_pki::TrustStoreVerifier;
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
     rpc::{
@@ -36,7 +37,7 @@ pub struct SvalinCommandBuilder {
     pub server_cert: svalin_pki::Certificate,
     pub store: ServerStore,
     pub mls: Arc<MlsServer>,
-    pub verifier: LocalVerifier,
+    pub verifier: TrustStoreVerifier,
 }
 
 impl RpcCommandBuilder for SvalinCommandBuilder {

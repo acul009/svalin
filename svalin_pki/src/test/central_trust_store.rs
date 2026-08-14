@@ -1,4 +1,4 @@
-use crate::{Credential, KeyPair, central_trust_store::TrustStore};
+use crate::{Credential, KeyPair, trust_store::TrustStore};
 
 #[test]
 fn test_trust_store() {

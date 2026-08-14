@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use crate::central_trust_store::TrustStore;
+use crate::trust_store::TrustStore;
 
 #[derive(Debug, Clone)]
 pub struct TrustStoreVerifier {

@@ -1,4 +1,8 @@
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 use anyhow::{Context, Result, anyhow};
 use command_builder::SvalinCommandBuilder;
@@ -7,7 +11,9 @@ use openmls_sqlx_storage::SqliteStorageProvider;
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Credential, EncryptedCredential, KnownCertificateVerifier, UnverifiedCertificate,
+    Credential, EncryptedCredential, KnownCertificateVerifier, RootCertificate, TrustStoreVerifier,
+    UnverifiedCertificate,
+    trust_store::{self, TrustStore},
 };
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},
@@ -42,7 +48,7 @@ pub mod command_builder;
 pub mod config_builder;
 pub mod local_key_retriever;
 
-pub type MlsServer = svalin_pki::mls::server::MlsServer<LocalKeyRetriever, LocalVerifier>;
+pub type MlsServer = svalin_pki::mls::server::MlsServer<LocalKeyRetriever, TrustStoreVerifier>;
 
 #[derive(Debug)]
 pub struct ServerConfig {
@@ -61,10 +67,15 @@ pub struct Server {
 }
 
 #[derive(Serialize, Deserialize)]
-struct BaseConfig {
-    root_cert: UnverifiedCertificate,
-    credentials: EncryptedCredential,
+struct SavedConfig {
+    credential: EncryptedCredential,
     key_source: KeySource,
+    pseudo_data_seed: Vec<u8>,
+}
+
+struct BaseConfig {
+    trust_store: Arc<RwLock<TrustStore>>,
+    credential: Credential,
     pseudo_data_seed: Vec<u8>,
 }
 
@@ -77,15 +88,35 @@ impl Server {
         Ok(Location::system_data_dir()?.push("server"))
     }
 
-    fn base_config_path() -> Result<Location> {
+    fn base_config_path() -> Result<Location, LocationError> {
         Ok(Self::data_dir()?.push("base_config.json"))
     }
 
-    async fn get_base_config() -> Result<Option<BaseConfig>> {
+    fn trust_store_path() -> Result<Location, LocationError> {
+        Ok(Self::data_dir()?.push("trust_store.json"))
+    }
+
+    async fn get_base_config() -> anyhow::Result<Option<BaseConfig>> {
         let location = Self::base_config_path()?.ensure_parent_exists().await?;
         if tokio::fs::try_exists(&location).await? {
             let config = tokio::fs::read(&location).await?;
-            Ok(Some(serde_json::from_slice(&config)?))
+            let config: SavedConfig = serde_json::from_slice(&config)?;
+            let credential = config
+                .key_source
+                .decrypt_credentials(config.credential)
+                .await?;
+
+            let trust_store = tokio::fs::read(Self::trust_store_path()?).await?;
+            let trust_store: trust_store::Exported = serde_json::from_slice(&trust_store)?;
+            let trust_store = TrustStore::import(trust_store, credential.clone())?;
+            let trust_store = Arc::new(RwLock::new(trust_store));
+
+            let config = BaseConfig {
+                credential,
+                trust_store,
+                pseudo_data_seed: config.pseudo_data_seed,
+            };
+            Ok(Some(config))
         } else {
             Ok(None)
         }
@@ -93,13 +124,22 @@ impl Server {
 
     async fn save_base_config(config: &BaseConfig) -> Result<()> {
         let location = Self::base_config_path()?;
-        let config = serde_json::to_vec_pretty(config)?;
+        let key_source = KeySource::generate_builtin()?;
+        let trust_store = config.trust_store.read().unwrap().export();
+        let config = SavedConfig {
+            credential: key_source.encrypt_credential(&config.credential).await?,
+            key_source,
+            pseudo_data_seed: config.pseudo_data_seed.clone(),
+        };
+        let config = serde_json::to_vec_pretty(&config)?;
         tokio::fs::write(&location, config).await?;
+        let trust_store = serde_json::to_vec_pretty(&trust_store)?;
+        tokio::fs::write(&Self::trust_store_path()?, trust_store).await?;
         Ok(())
     }
 
     async fn open_mls_server(
-        verifier: LocalVerifier,
+        verifier: TrustStoreVerifier,
         key_retriever: LocalKeyRetriever,
     ) -> Result<Arc<MlsServer>> {
         let location = Self::data_dir()?.push("mls-store.sqlite");
@@ -152,15 +192,10 @@ impl Server {
                     .take(32)
                     .collect();
 
-                let key_source = KeySource::generate_builtin()?;
-
                 let conf = BaseConfig {
-                    root_cert: init_success.root.to_unverified(),
-                    credentials: key_source
-                        .encrypt_credential(&init_success.credential)
-                        .await?,
+                    trust_store: Arc::new(RwLock::new(init_success.trust_store)),
+                    credential: init_success.credential,
                     pseudo_data_seed,
-                    key_source,
                 };
 
                 Self::save_base_config(&conf).await?;
@@ -169,12 +204,10 @@ impl Server {
             }
         };
 
-        let root = base_config.root_cert.use_as_root()?;
+        let trust_store = base_config.trust_store;
+        let root = trust_store.read().unwrap().root().clone();
 
-        let credentials = base_config
-            .key_source
-            .decrypt_credentials(base_config.credentials)
-            .await?;
+        let credentials = base_config.credential;
 
         let loader = ChainLoader::new(
             store.users.clone(),
@@ -182,7 +215,7 @@ impl Server {
             store.sessions.clone(),
         );
 
-        let verifier = LocalVerifier::new(root.clone(), loader.clone());
+        let verifier = TrustStoreVerifier::new(trust_store);
 
         let key_retriever = LocalKeyRetriever::new(
             root.clone(),
@@ -240,7 +273,7 @@ impl Server {
             .add(InitHandler::new(send, user_store))
             .add(PublicStatusHandler::new(PublicStatus::WaitingForInit));
 
-        let temp_credentials = Credential::generate_root()?;
+        let temp_credentials = Credential::generate_temporary()?;
 
         tracing::trace!("starting up init server");
         let rpc = RpcServer::build()

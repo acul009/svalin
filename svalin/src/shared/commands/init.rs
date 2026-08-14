@@ -10,7 +10,7 @@ use svalin_pki::{
     EncryptError, EncryptedCredential, ExportedPublicKey, KeyPair, RootCertificate, Sha512,
     UnverifiedCertificate, argon2::Argon2, serde_paramsstring,
 };
-use svalin_pki::{ArgonParams, EncryptedObject};
+use svalin_pki::{ArgonParams, EncryptedObject, UseAsRootError, trust_store};
 use svalin_pki::{
     argon2::password_hash::ParamsString,
     curve25519_dalek::{RistrettoPoint, Scalar},
@@ -30,7 +30,7 @@ use totp_rs::Totp;
 
 pub struct ServerInitSuccess {
     pub credential: Credential,
-    pub root: RootCertificate,
+    pub trust_store: trust_store::TrustStore,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -54,6 +54,7 @@ pub struct InitRequest {
 
     user_mls_store: ExportedMlsStore,
     persistent_data: EncryptedObject<persistent::State>,
+    trust_store: trust_store::Exported,
 }
 
 pub(crate) struct InitHandler {
@@ -92,12 +93,13 @@ impl CommandHandler for InitHandler {
         session.write_object(&public_key).await?;
 
         let init_request: InitRequest = session.read_object().await?;
-        let root = init_request
-            .encrypted_credential
-            .certificate()
-            .clone()
-            .use_as_root()?;
+
         let my_credential = keypair.upgrade(init_request.server_cert)?;
+        let trust_store =
+            trust_store::TrustStore::import(init_request.trust_store, my_credential.clone())?;
+        if trust_store.root().as_unverified() != init_request.encrypted_credential.certificate() {
+            return Err(anyhow!("root mismatch"));
+        }
 
         UserStore::add_root_user(
             &self.user_store,
@@ -127,7 +129,7 @@ impl CommandHandler for InitHandler {
 
         let _ = channel.send(ServerInitSuccess {
             credential: my_credential,
-            root,
+            trust_store,
         });
 
         Ok(())
@@ -140,6 +142,8 @@ impl CommandHandler for InitHandler {
 
 #[derive(Debug, thiserror::Error)]
 pub enum InitError {
+    #[error("certificate cannot be used as root: {0}")]
+    UseAsRootError(#[from] UseAsRootError),
     #[error("error reading request: {0}")]
     ReadRequestError(SessionReadError),
     #[error("error creating certificate for public key: {0}")]
@@ -158,11 +162,13 @@ pub enum InitError {
     Unspecified(#[from] anyhow::Error),
     #[error("server sent error status back")]
     ServerError,
+    #[error("error creating block: {0}")]
+    CreateBlockError(#[from] trust_store::CreateBlockError),
 }
 
 pub struct ClientInitSuccess {
     pub root_credential: Credential,
-    pub server_cert: Certificate,
+    pub trust_store: trust_store::TrustStore,
 }
 
 pub struct Init {
@@ -216,6 +222,16 @@ impl CommandDispatcher for Init {
             .create_server_certificate_for_key(&public_key)
             .map_err(InitError::CreateCertError)?;
 
+        // create trust store
+        let mut trust_store = trust_store::TrustStore::initialize(
+            self.root
+                .certificate()
+                .clone()
+                .to_unverified()
+                .use_as_root()?,
+            self.root.clone(),
+        );
+
         // create aucpace login info
 
         let mut pace_client = AuCPaceClient::<Sha512, Argon2, OsRng, NONCE_LENGTH>::new(OsRng);
@@ -255,6 +271,9 @@ impl CommandDispatcher for Init {
 
         let encrypted_credential = self.root.export(&key)?;
 
+        let block = trust_store.add(server_cert.clone())?;
+        trust_store.apply(block);
+
         let init_request = InitRequest {
             username: self.username.clone(),
             totp_secret: self.totp.clone(),
@@ -262,10 +281,11 @@ impl CommandDispatcher for Init {
             credential_key_params,
             params,
             secret_exponent,
-            server_cert: server_cert.clone().to_unverified(),
+            server_cert: server_cert.to_unverified(),
             verifier,
             user_mls_store,
             persistent_data,
+            trust_store: trust_store.export(),
         };
 
         session
@@ -287,7 +307,7 @@ impl CommandDispatcher for Init {
         match server_result {
             Ok(()) => Ok(ClientInitSuccess {
                 root_credential: self.root.clone(),
-                server_cert: server_cert,
+                trust_store,
             }),
             Err(_) => Err(InitError::ServerError),
         }
