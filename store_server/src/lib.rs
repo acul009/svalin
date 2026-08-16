@@ -1,10 +1,10 @@
-mod agent_store;
 mod key_package_store;
 mod message_store;
 mod session_store;
+mod trust_store_transaction_store;
 mod user_store;
 
-pub use agent_store::{AddAgentError, AgentStore, AgentUpdate};
+use crate::trust_store_transaction_store::TrustStoreTransactionStore;
 pub use key_package_store::KeyPackageStore;
 pub use message_store::{MessageStore, MessageStoreError};
 pub use session_store::{AddSessionError, SessionStore};
@@ -14,7 +14,7 @@ use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 use std::{fmt::Debug, path::Path, sync::Arc};
 
 pub struct ServerStore {
-    pub agents: Arc<AgentStore>,
+    pub trust_store_transactions: Arc<TrustStoreTransactionStore>,
     pub key_packages: Arc<KeyPackageStore>,
     pub messages: Arc<MessageStore>,
     pub sessions: Arc<SessionStore>,
@@ -33,7 +33,7 @@ impl ServerStore {
         sqlx::migrate!().run(&pool).await?;
 
         Ok(Self {
-            agents: AgentStore::open(pool.clone()),
+            trust_store_transactions: TrustStoreTransactionStore::open(pool.clone()).await?,
             key_packages: KeyPackageStore::open(pool.clone()),
             messages: MessageStore::open(pool.clone()),
             sessions: SessionStore::open(pool.clone()),

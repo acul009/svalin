@@ -1,10 +1,14 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::HashMap,
+    fmt,
+    sync::{Arc, RwLock},
+};
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
     Certificate, Credential, RootCertificate, SignatureVerificationError, SpkiHash,
-    UnverifiedCertificate, UseAsRootError, certificate,
+    TrustStoreVerifier, UnverifiedCertificate, UseAsRootError, certificate,
     secure_chain::{self, Chain, ChainState, CheckedBlock, UncheckedBlock},
 };
 pub type CreateBlockError = secure_chain::CreateBlockError<Error>;

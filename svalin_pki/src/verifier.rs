@@ -9,6 +9,7 @@ use crate::{
 pub mod exact;
 pub mod one_of;
 pub mod trust_store;
+pub mod type_limited;
 
 #[derive(Debug, Error)]
 pub enum VerifyError {

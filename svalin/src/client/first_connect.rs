@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use svalin_pki::{DecodeCredentialsError, ExactVerififier, KnownCertificateVerifier, trust_store};
+use svalin_pki::{DecodeCredentialsError, KnownCertificateVerifier, Limit, TrustStoreVerifier};
 use svalin_rpc::rpc::command::dispatcher::DispatcherError;
 use svalin_rpc::rpc::connection::ConnectionDispatchError;
 use svalin_rpc::rpc::session::SessionDispatchError;
@@ -13,10 +13,11 @@ use tokio_util::sync::CancellationToken;
 use tracing::instrument;
 
 use crate::server::INIT_SERVER_SHUTDOWN_COUNTDOWN;
-use crate::shared::commands::login::LoginDispatcherError;
-use crate::shared::commands::public_server_status::GetPutblicStatus;
-use crate::shared::commands::public_server_status::PublicStatus;
-use crate::shared::commands::{self, init};
+use crate::shared::commands::{
+    self, init,
+    login::LoginDispatcherError,
+    public_server_status::{GetPutblicStatus, PublicStatus},
+};
 
 use super::Client;
 
@@ -96,7 +97,9 @@ impl Init {
         let client = RpcClient::connect(
             &self.address,
             None,
-            ExactVerififier::new(init_data.server_cert).to_tls_verifier(),
+            TrustStoreVerifier::new(trust_store.clone())
+                .server_only()
+                .to_tls_verifier(),
             CancellationToken::new(),
         )
         .await?;

@@ -6,7 +6,13 @@
       {
         "name": "group_data",
         "ordinal": 0,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "openmls_group_data",
+            "name": "group_data"
+          }
+        }
       }
     ],
     "parameters": {

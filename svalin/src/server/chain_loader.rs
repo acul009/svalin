@@ -1,25 +1,29 @@
 use std::{fmt::Debug, sync::Arc};
 
-use svalin_pki::{CertificateChainBuilder, SpkiHash, UnverifiedCertificateChain};
+use svalin_pki::{
+    CertificateChainBuilder, SpkiHash, UnverifiedCertificateChain,
+    trust_store::{self, TrustStore},
+};
 use svalin_server_store::{AgentStore, SessionStore, UserStore};
+use tokio::sync::RwLock;
 
 #[derive(Debug, Clone)]
 pub struct ChainLoader {
+    trust_store: Arc<RwLock<TrustStore>>,
     user_store: Arc<UserStore>,
     session_store: Arc<SessionStore>,
-    agent_store: Arc<AgentStore>,
 }
 
 impl ChainLoader {
     pub fn new(
+        trust_store: Arc<RwLock<TrustStore>>,
         user_store: Arc<UserStore>,
-        agent_store: Arc<AgentStore>,
         session_store: Arc<SessionStore>,
     ) -> Self {
         Self {
+            trust_store,
             user_store,
             session_store,
-            agent_store,
         }
     }
 }

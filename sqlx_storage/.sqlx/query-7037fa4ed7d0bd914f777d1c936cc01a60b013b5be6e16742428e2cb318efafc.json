@@ -6,7 +6,13 @@
       {
         "name": "psk_bundle",
         "ordinal": 0,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "openmls_psk",
+            "name": "psk_bundle"
+          }
+        }
       }
     ],
     "parameters": {

@@ -6,7 +6,7 @@ mod credential;
 mod encrypt;
 mod keypair;
 pub mod mls;
-mod secure_chain;
+pub mod secure_chain;
 pub mod serde_paramsstring;
 pub mod serde_saltstring;
 #[cfg(test)]
@@ -39,7 +39,8 @@ pub use keypair::{ExportedPublicKey, KeyPair};
 // pub use signed_object::{SignedObject, VerifiedObject};
 pub use verifier::{
     KnownCertificateVerifier, Verifier, VerifyError, exact::ExactVerififier,
-    one_of::OneOfVerififier, trust_store::TrustStoreVerifier,
+    one_of::OneOfVerififier, trust_store::TrustStoreVerifier, type_limited::Limit,
+    type_limited::TypeLimitedVerifier,
 };
 
 // normal use statements

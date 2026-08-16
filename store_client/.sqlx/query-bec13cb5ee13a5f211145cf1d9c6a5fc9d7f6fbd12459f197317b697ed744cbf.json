@@ -6,12 +6,24 @@
       {
         "name": "spki_hash!",
         "ordinal": 0,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "system_reports",
+            "name": "spki_hash"
+          }
+        }
       },
       {
         "name": "report",
         "ordinal": 1,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "system_reports",
+            "name": "report"
+          }
+        }
       }
     ],
     "parameters": {

@@ -6,7 +6,13 @@
       {
         "name": "key_pair",
         "ordinal": 0,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "openmls_encryption_key",
+            "name": "key_pair"
+          }
+        }
       }
     ],
     "parameters": {

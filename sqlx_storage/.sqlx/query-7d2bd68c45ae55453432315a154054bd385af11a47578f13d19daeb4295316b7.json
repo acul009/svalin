@@ -6,7 +6,13 @@
       {
         "name": "key_package",
         "ordinal": 0,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "openmls_key_package",
+            "name": "key_package"
+          }
+        }
       }
     ],
     "parameters": {

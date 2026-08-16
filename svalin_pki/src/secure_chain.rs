@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use ring::signature::{ED25519, VerificationAlgorithm};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
@@ -306,6 +308,14 @@ impl<T> CheckedBlock<T> {
     }
 }
 
+impl<T> Deref for CheckedBlock<T> {
+    type Target = UncheckedBlock<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UncheckedBlock<T> {
     sequence: u64,
@@ -332,6 +342,10 @@ impl<T: Transaction> UncheckedBlock<T> {
             .chain_update(self.signer.as_slice());
         self.transaction.digest(&mut hasher);
         hasher.finalize().into()
+    }
+
+    pub fn sequence(&self) -> u64 {
+        self.sequence
     }
 }
 
