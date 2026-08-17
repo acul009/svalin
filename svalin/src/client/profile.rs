@@ -9,11 +9,13 @@ use serde::{Deserialize, Serialize};
 use svalin_client_store::ClientStore;
 use svalin_pki::{
     ArgonParams, Certificate, Credential, EncryptedCredential, ExactVerififier,
-    KnownCertificateVerifier, RootCertificate, UnverifiedCertificate, get_current_timestamp,
+    KnownCertificateVerifier, RootCertificate, TrustStoreVerifier, UnverifiedCertificate,
+    get_current_timestamp,
     mls::client::MlsClient,
     trust_store::{self, TrustStore},
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
+use tokio::sync::oneshot;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::error;
 
@@ -21,9 +23,11 @@ use crate::{
     client::tunnel_manager::TunnelManager,
     message_streaming::client::{ClientMessageDispatcher, ClientMessageReceiver},
     remote_key_retriever::RemoteKeyRetriever,
-    shared::commands::{get_user_credentials::GetUserCredential, update_user_mls::UpdateUserMls},
+    shared::commands::{
+        get_user_credentials::GetUserCredential, update_trust_store::UpdateTrustStore,
+        update_user_mls::UpdateUserMls,
+    },
     util::location::{Location, LocationError},
-    verifier::remote_verifier::RemoteVerifier,
 };
 
 use super::Client;
@@ -220,8 +224,28 @@ impl Client {
             .await?;
         let user_credential = user_credential.credential.decrypt(&key)?;
 
-        let remote_verifier =
-            RemoteVerifier::new(root_certificate.clone(), rpc.upstream_connection());
+        let connection = rpc.upstream_connection();
+        let trust_store2 = trust_store.clone();
+        let store = client_store.clone();
+        let (send_ready, trust_store_ready) = oneshot::channel();
+        let cancel2 = cancel.clone();
+        background_tasks.spawn(async move {
+            if let Err(err) = connection
+                .dispatch(UpdateTrustStore::new(
+                    trust_store2,
+                    store,
+                    send_ready,
+                    cancel2,
+                ))
+                .await
+            {
+                eprintln!("Error updating trust store: {}", err);
+            }
+        });
+
+        // Wait until trust store has been updated to the newest version.
+        trust_store_ready.await?;
+        let verifier = TrustStoreVerifier::new(trust_store.clone());
 
         // tracing::trace!("connected to server");
 
@@ -238,7 +262,7 @@ impl Client {
             device_credential.clone(),
             storage_provider.into(),
             key_retriever.clone(),
-            remote_verifier.clone(),
+            verifier.clone(),
         )?);
 
         let tunnel_manager = TunnelManager::new();
@@ -275,7 +299,7 @@ impl Client {
             root_certificate: root_certificate.clone(),
             user_credential,
             device_credential,
-            verifier: remote_verifier.clone(),
+            verifier: verifier.clone(),
             tunnel_manager,
             mls: mls.clone(),
             trust_store: trust_store,
@@ -293,7 +317,7 @@ impl Client {
         let state_handle = client.state_handle.clone();
         client.background_tasks.spawn(async move {
             tracing::trace!("starting user mls update task");
-            let verifier = remote_verifier;
+            let verifier = verifier;
             if let Err(err) = connection
                 .dispatch(UpdateUserMls {
                     key: key,
@@ -324,8 +348,7 @@ impl Client {
         let exported: trust_store::Exported = serde_json::from_slice(&exported)?;
 
         let mut trust_store = TrustStore::import(exported)?;
-        let since = trust_store.sequence() + 1;
-        let transactions = store.load_all_since(since).await?;
+        let transactions = store.load_all_after(trust_store.sequence()).await?;
 
         for block in transactions {
             let block = trust_store.check(block)?;

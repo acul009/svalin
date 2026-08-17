@@ -11,7 +11,7 @@ use futures::{FutureExt, select};
 use serde::{Deserialize, Serialize};
 use svalin_client_store::persistent;
 use svalin_pki::{
-    CertificateType, Credential, EncryptedObject, EncryptionKey, SpkiHash,
+    CertificateType, Credential, EncryptedObject, EncryptionKey, SpkiHash, TrustStoreVerifier,
     mls::{
         SvalinGroupId,
         client::MessageDataContent,
@@ -253,7 +253,7 @@ pub struct UpdateUserMls {
     pub key: EncryptionKey,
     pub user_credential: Credential,
     pub key_retriever: RemoteKeyRetriever,
-    pub verifier: RemoteVerifier,
+    pub verifier: TrustStoreVerifier,
     pub session_mls: Arc<MlsClient>,
     pub state_handle: ClientStateHandle,
     pub cancel: CancellationToken,

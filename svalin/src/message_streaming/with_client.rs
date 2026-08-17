@@ -46,8 +46,9 @@ impl MessageHandler {
             }
             MessageFromClient::TrustStore(block) => {
                 let block = self.trust_store.write().unwrap().check(block)?;
-                self.transaction_store.add(&block).await?;
-                // Todo: distribute the block
+                self.transaction_store
+                    .add_and_broadcast(block.clone())
+                    .await?;
                 self.trust_store.write().unwrap().apply(block);
 
                 Ok(false)

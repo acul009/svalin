@@ -100,7 +100,8 @@ impl<State: ChainState> Chain<State> {
         } else {
             UncheckedBlock {
                 time: timestamp,
-                sequence: 0,
+                // sequence needs to start at 1, because 0 is reserved for the no block state
+                sequence: 1,
                 previous_block_hash: BlockDigest::empty(),
                 resulting_state: new_digest,
                 signer: credential.certificate().spki_hash().clone(),
@@ -138,7 +139,7 @@ impl<State: ChainState> Chain<State> {
                 return Err(CheckBlockError::TimeToEarly(block.time, last.0.time));
             }
         } else {
-            if block.sequence != 0 {
+            if block.sequence != 1 {
                 return Err(CheckBlockError::SequenceMismatch);
             }
             if block.previous_block_hash != BlockDigest::empty() {
@@ -305,12 +306,16 @@ pub enum ImportError<Inner> {
     IncorrectStateDigest,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CheckedBlock<T>(UncheckedBlock<T>);
 
 impl<T> CheckedBlock<T> {
     pub fn as_unchecked(&self) -> &UncheckedBlock<T> {
         &self.0
+    }
+
+    pub fn to_unchecked(self) -> UncheckedBlock<T> {
+        self.0
     }
 }
 

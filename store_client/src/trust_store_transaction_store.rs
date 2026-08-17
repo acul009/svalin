@@ -58,13 +58,13 @@ impl TrustStoreTransactionStore {
         Ok(())
     }
 
-    pub async fn load_all_since(
+    pub async fn load_all_after(
         &self,
-        since: u64,
+        after: u64,
     ) -> Result<Vec<UncheckedBlock<trust_store::Transaction>>, LoadTransactionError> {
         let transactions = sqlx::query!(
-            "SELECT data FROM trust_store_transactions WHERE sequence >= ? ORDER BY sequence ASC",
-            since as i64
+            "SELECT data FROM trust_store_transactions WHERE sequence > ? ORDER BY sequence ASC",
+            after as i64
         )
         .fetch_all(&self.pool)
         .await?;

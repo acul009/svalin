@@ -9,4 +9,5 @@ pub mod realtime_status;
 pub mod request_system_report;
 pub mod terminal;
 pub mod update_agent;
+pub mod update_trust_store;
 pub mod update_user_mls;

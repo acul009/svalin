@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT data FROM trust_store_transactions WHERE sequence >= ? ORDER BY sequence ASC",
+  "query": "SELECT data FROM trust_store_transactions WHERE sequence > ? ORDER BY sequence ASC",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "5a8817325b4c97331c80c1b3c64e087ea27aaf6352ce4057c87f8b13c57f5855"
+  "hash": "fce9b91cd3ebb326626162f628125b72ce2d318202a4bf8bcb8a54c18ddf4411"
 }

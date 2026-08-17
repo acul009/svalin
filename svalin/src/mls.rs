@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use svalin_client_store::persistent::{SvalinMetaInfo, SvalinReport};
+use svalin_pki::TrustStoreVerifier;
 
 use crate::{
     remote_key_retriever::RemoteKeyRetriever,
@@ -17,6 +18,7 @@ impl svalin_pki::mls::transport_types::MessageTypes for MlsTypes {
 }
 
 pub type MlsClient =
-    svalin_pki::mls::client::MlsClient<MlsTypes, RemoteKeyRetriever, RemoteVerifier>;
-pub type MlsAgent = svalin_pki::mls::agent::MlsAgent<MlsTypes, RemoteKeyRetriever, RemoteVerifier>;
-pub type MlsServer = svalin_pki::mls::server::MlsServer<LocalKeyRetriever, LocalVerifier>;
+    svalin_pki::mls::client::MlsClient<MlsTypes, RemoteKeyRetriever, TrustStoreVerifier>;
+pub type MlsAgent =
+    svalin_pki::mls::agent::MlsAgent<MlsTypes, RemoteKeyRetriever, TrustStoreVerifier>;
+pub type MlsServer = svalin_pki::mls::server::MlsServer<LocalKeyRetriever, TrustStoreVerifier>;

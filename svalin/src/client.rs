@@ -48,7 +48,7 @@ pub struct Client {
     state_handle: ClientStateHandle,
     background_tasks: TaskTracker,
     cancel: CancellationToken,
-    verifier: RemoteVerifier,
+    verifier: TrustStoreVerifier,
 }
 
 impl Debug for Client {
