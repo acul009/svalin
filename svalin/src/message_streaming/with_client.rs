@@ -1,10 +1,11 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use svalin_pki::{
     Certificate, CertificateType, SpkiHash, mls::transport_types::MessageToMemberTransport,
+    trust_store::TrustStore,
 };
 use svalin_rpc::rpc::{
     command::handler::CommandHandler, peer::Peer, server::RpcServer, session::Session,
@@ -16,10 +17,24 @@ use tokio_util::sync::CancellationToken;
 use crate::message_streaming::{MessageFromClient, MessageToClient, server::MlsMessageHandler};
 
 pub struct MessageHandler {
-    pub mls_handler: Arc<MlsMessageHandler>,
+    mls_handler: Arc<MlsMessageHandler>,
+    transaction_store: Arc<svalin_server_store::TrustStoreTransactionStore>,
+    trust_store: Arc<RwLock<TrustStore>>,
 }
 
 impl MessageHandler {
+    pub fn new(
+        mls_handler: Arc<MlsMessageHandler>,
+        transaction_store: Arc<svalin_server_store::TrustStoreTransactionStore>,
+        trust_store: Arc<RwLock<TrustStore>>,
+    ) -> Self {
+        Self {
+            mls_handler,
+            transaction_store,
+            trust_store,
+        }
+    }
+
     async fn handle(
         &self,
         session: &Certificate,
@@ -28,6 +43,14 @@ impl MessageHandler {
         match message {
             MessageFromClient::Mls(mls) => {
                 self.mls_handler.handle(session, mls).await.map(|_| false)
+            }
+            MessageFromClient::TrustStore(block) => {
+                let block = self.trust_store.write().unwrap().check(block)?;
+                self.transaction_store.add(&block).await?;
+                // Todo: distribute the block
+                self.trust_store.write().unwrap().apply(block);
+
+                Ok(false)
             }
             MessageFromClient::Goodbye => Ok(true),
         }

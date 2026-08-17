@@ -107,8 +107,9 @@ impl Server {
                 .await?;
 
             let trust_store = tokio::fs::read(Self::trust_store_path()?).await?;
-            let trust_store: trust_store::Exported = serde_json::from_slice(&trust_store)?;
-            let trust_store = TrustStore::import(trust_store, credential.clone())?;
+            let trust_store: trust_store::Exported =
+                serde_json::from_slice(trust_store.as_slice())?;
+            let trust_store = TrustStore::import(trust_store)?;
             let trust_store = Arc::new(RwLock::new(trust_store));
 
             let config = BaseConfig {
@@ -209,18 +210,13 @@ impl Server {
 
         let credentials = base_config.credential;
 
-        let loader = ChainLoader::new(
-            store.users.clone(),
-            store.agents.clone(),
-            store.sessions.clone(),
-        );
+        let loader = ChainLoader::new(trust_store.clone(), store.sessions.clone());
 
-        let verifier = TrustStoreVerifier::new(trust_store);
+        let verifier = TrustStoreVerifier::new(trust_store.clone());
 
         let key_retriever = LocalKeyRetriever::new(
             root.clone(),
-            store.agents.clone(),
-            store.users.clone(),
+            trust_store.clone(),
             store.key_packages.clone(),
         );
 
@@ -229,7 +225,7 @@ impl Server {
         let tls_verifier = TlsOptionalWrapper::new(verifier.clone().to_tls_verifier());
 
         let command_builder = SvalinCommandBuilder {
-            verifier: verifier.clone(),
+            trust_store: trust_store.clone(),
             root_cert: root,
             server_cert: credentials.certificate().clone(),
             store,

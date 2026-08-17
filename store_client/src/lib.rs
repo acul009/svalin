@@ -1,14 +1,16 @@
 use futures::StreamExt;
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
-use std::{fmt::Debug, path::Path};
+use std::{fmt::Debug, path::Path, sync::Arc};
 use svalin_pki::SpkiHash;
 
-use crate::persistent::Message;
+use crate::{persistent::Message, trust_store_transaction_store::TrustStoreTransactionStore};
 
 pub mod persistent;
+pub mod trust_store_transaction_store;
 
 pub struct ClientStore {
     pool: SqlitePool,
+    transaction_store: TrustStoreTransactionStore,
 }
 
 impl ClientStore {
@@ -24,7 +26,10 @@ impl ClientStore {
             .await
             .map_err(sqlx::Error::from)?;
 
-        Ok(Self { pool })
+        Ok(Self {
+            transaction_store: TrustStoreTransactionStore::open(pool.clone()).await?,
+            pool,
+        })
     }
 
     pub async fn update(&self, message: &persistent::Message) -> Result<(), Error> {
@@ -105,6 +110,10 @@ impl ClientStore {
         }
 
         Ok(state)
+    }
+
+    pub fn transaction_store(&self) -> &TrustStoreTransactionStore {
+        &self.transaction_store
     }
 
     pub fn close_handle(&self) -> CloseHandle {

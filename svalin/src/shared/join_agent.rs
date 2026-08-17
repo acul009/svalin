@@ -15,7 +15,7 @@ use self::{accept_handler::JoinAcceptHandler, request_handler::JoinRequestHandle
 
 pub mod accept_handler;
 pub mod request_handler;
-pub mod upload_agent;
+// pub mod upload_agent;
 
 #[derive(Debug)]
 pub struct AgentInitPayload {

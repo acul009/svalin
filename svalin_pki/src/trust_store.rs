@@ -7,16 +7,16 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Certificate, Credential, RootCertificate, SignatureVerificationError, SpkiHash,
-    TrustStoreVerifier, UnverifiedCertificate, UseAsRootError, certificate,
-    secure_chain::{self, Chain, ChainState, CheckedBlock, UncheckedBlock},
+    AddCertificateError, Certificate, CertificateChainBuilder, Credential, RootCertificate,
+    SignatureVerificationError, SpkiHash, TrustStoreVerifier, UnverifiedCertificate,
+    UnverifiedCertificateChain, UseAsRootError, certificate,
+    secure_chain::{self, Chain, ChainDigest, ChainState, CheckedBlock, UncheckedBlock},
 };
 pub type CreateBlockError = secure_chain::CreateBlockError<Error>;
 pub type CheckBlockError = secure_chain::CheckBlockError<Error>;
 
 pub struct TrustStore {
     chain: Chain<State>,
-    credential: Credential,
 }
 
 impl fmt::Debug for TrustStore {
@@ -30,14 +30,13 @@ impl fmt::Debug for TrustStore {
 pub struct TrustStoreDigest(secure_chain::ChainDigest);
 
 impl TrustStore {
-    pub fn initialize(root: RootCertificate, credential: Credential) -> Self {
+    pub fn initialize(root: RootCertificate) -> Self {
         let mut certificates = HashMap::new();
         certificates.insert(root.spki_hash().clone(), root.as_certificate().clone());
         let state = State { root, certificates };
 
         Self {
             chain: Chain::initialize(state),
-            credential,
         }
     }
 
@@ -63,11 +62,10 @@ impl TrustStore {
     pub fn add(
         &mut self,
         certificate: Certificate,
+        credential: &Credential,
     ) -> Result<CheckedBlock<Transaction>, CreateBlockError> {
-        self.chain.package(
-            Transaction::Add(certificate.to_unverified()),
-            &self.credential,
-        )
+        self.chain
+            .package(Transaction::Add(certificate.to_unverified()), credential)
     }
 
     pub fn export(&self) -> Exported {
@@ -76,13 +74,9 @@ impl TrustStore {
         }
     }
 
-    pub fn import(
-        exported: Exported,
-        credential: Credential,
-    ) -> Result<Self, secure_chain::ImportError<ImportError>> {
+    pub fn import(exported: Exported) -> Result<Self, secure_chain::ImportError<ImportError>> {
         Ok(Self {
             chain: secure_chain::Chain::import(exported.chain)?,
-            credential,
         })
     }
 
@@ -92,6 +86,31 @@ impl TrustStore {
 
     pub fn root(&self) -> &RootCertificate {
         &self.chain.state().root
+    }
+
+    pub fn complete_certificate_chain(
+        &self,
+        mut cert_chain: CertificateChainBuilder,
+    ) -> Result<UnverifiedCertificateChain, CompleteCertChainError> {
+        while let Some(issuer_spki) = cert_chain.requested_issuer() {
+            let Some(issuer) = self.get(&issuer_spki) else {
+                return Err(CompleteCertChainError::NotFound(issuer_spki.clone()));
+            };
+
+            cert_chain.push_parent(issuer.clone().to_unverified())?;
+        }
+
+        Ok(cert_chain
+            .finish()
+            .expect("already checked if the chain is finished"))
+    }
+
+    pub fn sequence(&self) -> u64 {
+        self.chain.sequence()
+    }
+
+    pub fn digest(&self) -> ChainDigest {
+        self.chain.digest()
     }
 }
 
@@ -291,4 +310,12 @@ pub enum ImportError {
     RootError(#[from] UseAsRootError),
     #[error("missing issuers: {0:?}")]
     MissingIssuers(Vec<SpkiHash>),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CompleteCertChainError {
+    #[error("issuer with spki hash {0} not found")]
+    NotFound(SpkiHash),
+    #[error("error adding cert to chain: {0}")]
+    AddCertificateError(#[from] AddCertificateError),
 }

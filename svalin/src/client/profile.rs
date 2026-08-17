@@ -1,6 +1,9 @@
-use std::sync::Arc;
+use std::{
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
 use svalin_client_store::ClientStore;
@@ -8,6 +11,7 @@ use svalin_pki::{
     ArgonParams, Certificate, Credential, EncryptedCredential, ExactVerififier,
     KnownCertificateVerifier, RootCertificate, UnverifiedCertificate, get_current_timestamp,
     mls::client::MlsClient,
+    trust_store::{self, TrustStore},
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
@@ -181,6 +185,18 @@ impl Client {
             .upstream_certificate
             .verify_signature(&root_certificate, get_current_timestamp())?;
 
+        let client_store = Arc::new(ClientStore::open(client_db_path).await?);
+        // Starting Background Tasks
+        let background_tasks = TaskTracker::new();
+        let trust_store = Self::load_trust_store(
+            profile_key,
+            client_store.transaction_store(),
+            cancel.clone(),
+            &background_tasks,
+        )
+        .await
+        .context("Failed to load trust store")?;
+
         // tracing::trace!("creating verifier");
         let verifier = ExactVerififier::new(upstream_certificate.clone()).to_tls_verifier();
 
@@ -229,9 +245,6 @@ impl Client {
 
         let (dispatcher_handle, message_dispatcher) = ClientMessageDispatcher::new();
 
-        // Starting Background Tasks
-        let background_tasks = TaskTracker::new();
-
         let connection = rpc.upstream_connection();
         background_tasks.spawn(async move {
             if let Err(err) = connection.dispatch(message_dispatcher).await {
@@ -239,14 +252,12 @@ impl Client {
             }
         });
 
-        let client_store = Arc::new(ClientStore::open(client_db_path).await?);
-
         // Initialize the client message receiver
         let (message_receiver, client_state_handle) = ClientMessageReceiver::initialize(
             dispatcher_handle.clone(),
             mls.clone(),
             cancel.clone(),
-            client_store,
+            client_store.clone(),
         )
         .await?;
         // and start it
@@ -267,6 +278,8 @@ impl Client {
             verifier: remote_verifier.clone(),
             tunnel_manager,
             mls: mls.clone(),
+            trust_store: trust_store,
+            store: client_store,
             message_sender: dispatcher_handle.clone(),
             state_handle: client_state_handle,
             background_tasks,
@@ -298,5 +311,63 @@ impl Client {
         });
 
         Ok(client)
+    }
+
+    async fn load_trust_store(
+        profile_key: &str,
+        store: &svalin_client_store::trust_store_transaction_store::TrustStoreTransactionStore,
+        cancel: CancellationToken,
+        task_tracker: &TaskTracker,
+    ) -> anyhow::Result<Arc<RwLock<TrustStore>>> {
+        let location = Self::profile_dir(profile_key).await?;
+        let exported = tokio::fs::read(&location).await?;
+        let exported: trust_store::Exported = serde_json::from_slice(&exported)?;
+
+        let mut trust_store = TrustStore::import(exported)?;
+        let since = trust_store.sequence() + 1;
+        let transactions = store.load_all_since(since).await?;
+
+        for block in transactions {
+            let block = trust_store.check(block)?;
+            trust_store.apply(block);
+        }
+
+        let exported = trust_store.export();
+        let exported = serde_json::to_vec_pretty(&exported)?;
+        tokio::fs::write(&location, exported).await?;
+
+        let trust_store = Arc::new(RwLock::new(trust_store));
+        let trust_store_2 = trust_store.clone();
+
+        task_tracker.spawn(async move {
+            let trust_store = trust_store_2;
+            let mut last_digest = trust_store.read().unwrap().digest();
+            loop {
+                tokio::select! {
+                    _ = tokio::time::sleep(Duration::from_secs(300)) => {
+                        let exported = {
+                            let guard = trust_store.read().unwrap();
+                            if guard.digest() == last_digest {
+                                continue;
+                            }
+                            last_digest = guard.digest();
+                            guard.export()
+                        };
+                        let Ok(exported) = serde_json::to_vec_pretty(&exported) else {
+                            eprintln!("Failed to serialize trust store");
+                            continue;
+                        };
+                        if let Err(e) = tokio::fs::write(&location, exported).await {
+                            eprintln!("Failed to write trust store: {}", e);
+                        }
+                    }
+                    _ = cancel.cancelled() => {
+                        break;
+                    }
+                }
+            }
+        });
+
+        Ok(trust_store)
     }
 }

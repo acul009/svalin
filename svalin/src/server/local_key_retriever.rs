@@ -1,30 +1,28 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use anyhow::anyhow;
 use svalin_pki::{
     CertificateChainBuilder, RootCertificate, get_current_timestamp,
     mls::{SvalinGroupId, key_retriever::KeyRetriever},
+    trust_store::TrustStore,
 };
-use svalin_server_store::{AgentStore, KeyPackageStore, UserStore};
+use svalin_server_store::KeyPackageStore;
 
 pub struct LocalKeyRetriever {
     root: RootCertificate,
-    agent_store: Arc<AgentStore>,
-    user_store: Arc<UserStore>,
+    trust_store: Arc<RwLock<TrustStore>>,
     key_package_store: Arc<KeyPackageStore>,
 }
 
 impl LocalKeyRetriever {
     pub fn new(
         root: RootCertificate,
-        agent_store: Arc<AgentStore>,
-        user_store: Arc<UserStore>,
+        trust_store: Arc<RwLock<TrustStore>>,
         key_package_store: Arc<KeyPackageStore>,
     ) -> Self {
         Self {
             root,
-            agent_store,
-            user_store,
+            trust_store,
             key_package_store,
         }
     }
@@ -39,16 +37,16 @@ impl KeyRetriever for LocalKeyRetriever {
     ) -> Result<Vec<svalin_pki::SpkiHash>, Self::Error> {
         match id {
             SvalinGroupId::DeviceGroup(spki_hash) => {
-                let agent = self
-                    .agent_store
-                    .get_agent(&spki_hash)
-                    .await?
-                    .ok_or_else(|| anyhow!("agent not found"))?;
-                let chain = CertificateChainBuilder::new(agent);
+                let trust_store = self.trust_store.read().unwrap();
+                let agent = trust_store
+                    .get(&spki_hash)
+                    .ok_or_else(|| anyhow!("agent not found"))?
+                    .clone();
+                let chain = CertificateChainBuilder::new(agent.to_unverified());
 
                 let timestamp = get_current_timestamp();
 
-                let chain = self.user_store.complete_certificate_chain(chain).await?;
+                let chain = trust_store.complete_certificate_chain(chain)?;
                 let chain = chain.verify(&self.root, timestamp)?;
 
                 let required_members = chain.iter().map(|cert| cert.spki_hash().clone()).collect();
@@ -56,16 +54,16 @@ impl KeyRetriever for LocalKeyRetriever {
                 Ok(required_members)
             }
             SvalinGroupId::DeviceMetaGroup(spki_hash) => {
-                let agent = self
-                    .agent_store
-                    .get_agent(&spki_hash)
-                    .await?
-                    .ok_or_else(|| anyhow!("agent not found"))?;
-                let chain = CertificateChainBuilder::new(agent);
+                let trust_store = self.trust_store.read().unwrap();
+                let agent = trust_store
+                    .get(&spki_hash)
+                    .ok_or_else(|| anyhow!("agent not found"))?
+                    .clone();
+                let chain = CertificateChainBuilder::new(agent.to_unverified());
 
                 let timestamp = get_current_timestamp();
 
-                let chain = self.user_store.complete_certificate_chain(chain).await?;
+                let chain = trust_store.complete_certificate_chain(chain)?;
                 let chain = chain.verify(&self.root, timestamp)?;
 
                 let required_members = chain

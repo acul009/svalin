@@ -9,9 +9,8 @@ use svalin_pki::argon2::password_hash::ParamsString;
 use svalin_pki::curve25519_dalek::{self, RistrettoPoint, Scalar};
 use svalin_pki::mls::provider::ExportedMlsStore;
 use svalin_pki::{
-    AddCertificateError, ArgonParams, CertificateChainBuilder, CertificateType,
-    EncryptedCredential, EncryptedObject, SpkiHash, UnverifiedCertificate,
-    UnverifiedCertificateChain, serde_paramsstring,
+    ArgonParams, CertificateType, EncryptedCredential, EncryptedObject, SpkiHash,
+    UnverifiedCertificate, serde_paramsstring,
 };
 use totp_rs::Totp;
 
@@ -126,23 +125,6 @@ impl UserStore {
         }
     }
 
-    pub async fn complete_certificate_chain(
-        &self,
-        mut cert_chain: CertificateChainBuilder,
-    ) -> Result<UnverifiedCertificateChain, CompleteCertChainError> {
-        while let Some(issuer_spki) = cert_chain.requested_issuer() {
-            let Some(issuer) = self.get_cert_by_spki_hash(&issuer_spki).await? else {
-                return Err(CompleteCertChainError::NotFound(issuer_spki.clone()));
-            };
-
-            cert_chain.push_parent(issuer)?;
-        }
-
-        Ok(cert_chain
-            .finish()
-            .expect("already checked if the chain is finished"))
-    }
-
     pub async fn get_cert_by_spki_hash(
         &self,
         spki_hash: &SpkiHash,
@@ -191,16 +173,6 @@ impl UserStore {
 
         Ok(())
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum CompleteCertChainError {
-    #[error("error loading by spki_hash: {0}")]
-    GetError(#[from] GetBySpkiHashError),
-    #[error("issuer with spki hash {0} not found")]
-    NotFound(SpkiHash),
-    #[error("error adding cert to chain: {0}")]
-    AddCertificateError(#[from] AddCertificateError),
 }
 
 #[derive(Debug, thiserror::Error)]

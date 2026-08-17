@@ -95,8 +95,7 @@ impl CommandHandler for InitHandler {
         let init_request: InitRequest = session.read_object().await?;
 
         let my_credential = keypair.upgrade(init_request.server_cert)?;
-        let trust_store =
-            trust_store::TrustStore::import(init_request.trust_store, my_credential.clone())?;
+        let trust_store = trust_store::TrustStore::import(init_request.trust_store)?;
         if trust_store.root().as_unverified() != init_request.encrypted_credential.certificate() {
             return Err(anyhow!("root mismatch"));
         }
@@ -229,7 +228,6 @@ impl CommandDispatcher for Init {
                 .clone()
                 .to_unverified()
                 .use_as_root()?,
-            self.root.clone(),
         );
 
         // create aucpace login info
@@ -271,7 +269,7 @@ impl CommandDispatcher for Init {
 
         let encrypted_credential = self.root.export(&key)?;
 
-        let block = trust_store.add(server_cert.clone())?;
+        let block = trust_store.add(server_cert.clone(), &self.root)?;
         trust_store.apply(block);
 
         let init_request = InitRequest {

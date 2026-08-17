@@ -1,28 +1,24 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{
+    fmt::Debug,
+    sync::{Arc, RwLock},
+};
 
 use svalin_pki::{
     CertificateChainBuilder, SpkiHash, UnverifiedCertificateChain,
     trust_store::{self, TrustStore},
 };
-use svalin_server_store::{AgentStore, SessionStore, UserStore};
-use tokio::sync::RwLock;
+use svalin_server_store::{SessionStore, UserStore};
 
 #[derive(Debug, Clone)]
 pub struct ChainLoader {
     trust_store: Arc<RwLock<TrustStore>>,
-    user_store: Arc<UserStore>,
     session_store: Arc<SessionStore>,
 }
 
 impl ChainLoader {
-    pub fn new(
-        trust_store: Arc<RwLock<TrustStore>>,
-        user_store: Arc<UserStore>,
-        session_store: Arc<SessionStore>,
-    ) -> Self {
+    pub fn new(trust_store: Arc<RwLock<TrustStore>>, session_store: Arc<SessionStore>) -> Self {
         Self {
             trust_store,
-            user_store,
             session_store,
         }
     }
@@ -33,14 +29,13 @@ impl ChainLoader {
         &self,
         request: &SpkiHash,
     ) -> Result<Option<UnverifiedCertificateChain>, anyhow::Error> {
-        let certificate = match self.session_store.get_session(request).await? {
+        let certificate = self.session_store.get_session(request).await?;
+        let trust_store = self.trust_store.read().unwrap();
+        let certificate = match certificate {
             Some(session) => Some(session),
-            None => match self.agent_store.get_agent(request).await? {
-                Some(agent) => Some(agent),
-                None => match self.user_store.get_user(request).await? {
-                    Some(user) => Some(user.encrypted_credential.take_certificate()),
-                    None => None,
-                },
+            None => match trust_store.get(request) {
+                Some(cert) => Some(cert.clone().to_unverified()),
+                None => None,
             },
         };
 
@@ -50,10 +45,7 @@ impl ChainLoader {
 
         let cert_chain = CertificateChainBuilder::new(certificate);
 
-        let cert_chain = self
-            .user_store
-            .complete_certificate_chain(cert_chain)
-            .await?;
+        let cert_chain = trust_store.complete_certificate_chain(cert_chain)?;
 
         Ok(Some(cert_chain))
     }

@@ -4,11 +4,11 @@ mod session_store;
 mod trust_store_transaction_store;
 mod user_store;
 
-use crate::trust_store_transaction_store::TrustStoreTransactionStore;
 pub use key_package_store::KeyPackageStore;
 pub use message_store::{MessageStore, MessageStoreError};
 pub use session_store::{AddSessionError, SessionStore};
-pub use user_store::{CompleteCertChainError, GetBySpkiHashError, UserStore};
+pub use trust_store_transaction_store::{TransactionStoreError, TrustStoreTransactionStore};
+pub use user_store::{GetBySpkiHashError, UserStore};
 
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 use std::{fmt::Debug, path::Path, sync::Arc};

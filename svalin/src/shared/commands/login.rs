@@ -1,3 +1,4 @@
+use std::sync::RwLock;
 use std::{str, sync::Arc};
 
 use anyhow::{Context, Result, anyhow};
@@ -5,6 +6,7 @@ use async_trait::async_trait;
 use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage};
 use serde::{Deserialize, Serialize};
 use svalin_pki::argon2::password_hash::rand_core::OsRng;
+use svalin_pki::trust_store::TrustStore;
 use svalin_pki::{
     ArgonCost, Certificate, CertificateChainBuilder, CreateCredentialsError, Credential,
     DecodeCredentialsError, DecryptError, EncryptError, EncryptedCredential,
@@ -54,6 +56,7 @@ impl From<&PermissionPrecursor<LoginHandler>> for Permission {
 }
 
 pub struct LoginHandler {
+    trust_store: Arc<RwLock<TrustStore>>,
     user_store: Arc<UserStore>,
     session_store: Arc<SessionStore>,
     root_cert: RootCertificate,
@@ -62,12 +65,14 @@ pub struct LoginHandler {
 
 impl LoginHandler {
     pub fn new(
+        trust_store: Arc<RwLock<TrustStore>>,
         user_store: Arc<UserStore>,
         session_store: Arc<SessionStore>,
         root_cert: RootCertificate,
         server_cert: Certificate,
     ) -> Self {
         Self {
+            trust_store,
             user_store,
             session_store,
             root_cert,
@@ -304,11 +309,13 @@ impl TakeableCommandHandler for LoginHandler {
                 return Err(anyhow!(err));
             }
 
-            let session_chain = match self
-                .user_store
-                .complete_certificate_chain(chain_builder)
-                .await
-            {
+            let session_chain = self
+                .trust_store
+                .read()
+                .unwrap()
+                .complete_certificate_chain(chain_builder);
+
+            let session_chain = match session_chain {
                 Ok(chain) => chain,
                 Err(err) => {
                     let _send_result = session.write_object(&Result::<(), ()>::Err(())).await;

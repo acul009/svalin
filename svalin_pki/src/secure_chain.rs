@@ -239,6 +239,12 @@ impl<State: ChainState> Chain<State> {
             })
         }
     }
+
+    pub(crate) fn sequence(&self) -> u64 {
+        self.last_block
+            .as_ref()
+            .map_or_else(|| 0, |block| block.sequence())
+    }
 }
 
 #[derive(Serialize, Deserialize)]

@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
-use svalin_pki::TrustStoreVerifier;
+use svalin_pki::{TrustStoreVerifier, trust_store::TrustStore};
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
     rpc::{
@@ -18,18 +18,15 @@ use crate::{
     },
     permissions::default_permission_handler::DefaultPermissionHandler,
     server::{MlsServer, chain_loader::ChainLoader},
-    shared::{
-        commands::{
-            get_key_packages::GetKeyPackagesHandler,
-            get_user_credentials::GetUserCredentialHandler,
-            load_certificate_chain::LoadCertificateChainHandler,
-            login::LoginHandler,
-            public_server_status::{PublicStatus, PublicStatusHandler},
-            update_user_mls::UpdateUserMlsHandler,
-        },
-        join_agent::upload_agent::UploadAgentHandler,
+    shared::commands::{
+        get_key_packages::GetKeyPackagesHandler,
+        get_user_credentials::GetUserCredentialHandler,
+        load_certificate_chain::LoadCertificateChainHandler,
+        login::LoginHandler,
+        public_server_status::{PublicStatus, PublicStatusHandler},
+        update_user_mls::UpdateUserMlsHandler,
     },
-    verifier::local_verifier::LocalVerifier,
+    verifier::{self, local_verifier::LocalVerifier},
 };
 
 pub struct SvalinCommandBuilder {
@@ -37,13 +34,15 @@ pub struct SvalinCommandBuilder {
     pub server_cert: svalin_pki::Certificate,
     pub store: ServerStore,
     pub mls: Arc<MlsServer>,
-    pub verifier: TrustStoreVerifier,
+    pub trust_store: Arc<RwLock<TrustStore>>,
 }
 
 impl RpcCommandBuilder for SvalinCommandBuilder {
     type PH = DefaultPermissionHandler;
 
     async fn build(self, server: &Arc<RpcServer>) -> anyhow::Result<HandlerCollection<Self::PH>> {
+        let verifier = TrustStoreVerifier::new(self.trust_store.clone());
+
         let permission_handler: DefaultPermissionHandler =
             DefaultPermissionHandler::new(self.root_cert.clone());
 
@@ -59,13 +58,17 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             key_package_store: self.store.key_packages.clone(),
             message_store: self.store.messages.clone(),
             mls_server: self.mls.clone(),
-            verifier: self.verifier.clone(),
+            verifier: verifier.clone(),
         });
 
         let agent_message_handler = with_agent::MessageHandler {
             mls_handler: mls_handler.clone(),
         };
-        let client_message_handler = with_client::MessageHandler { mls_handler };
+        let client_message_handler = with_client::MessageHandler::new(
+            mls_handler,
+            self.store.trust_store_transactions.clone(),
+            self.trust_store.clone(),
+        );
 
         commands
             .chain()
@@ -73,6 +76,7 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             .add(PingHandler)
             .add(PublicStatusHandler::new(PublicStatus::Ready))
             .add(LoginHandler::new(
+                self.trust_store.clone(),
                 self.store.users.clone(),
                 self.store.sessions.clone(),
                 self.root_cert.clone(),
@@ -82,26 +86,12 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 store: self.store.users.clone(),
             })
             .add(LoadCertificateChainHandler::new(ChainLoader::new(
-                self.store.users.clone(),
-                self.store.agents.clone(),
+                self.trust_store,
                 self.store.sessions.clone(),
             )))
             .add(join_manager.create_request_handler())
             .add(join_manager.create_accept_handler())
             .add(ForwardHandler::new(server.clone()))
-            .add(UploadAgentHandler::new(
-                self.store.agents.clone(),
-                self.store.users.clone(),
-                self.root_cert.clone(),
-            )?)
-            // .add(AgentListHandler::new(
-            //     self.store.agents.clone(),
-            //     server.clone(),
-            // ))
-            // .add(UploadKeyPackagesHandler {
-            //     key_package_store: self.store.key_packages.clone(),
-            //     mls_server: self.mls.clone(),
-            // })
             .add(GetKeyPackagesHandler {
                 key_package_store: self.store.key_packages.clone(),
             })

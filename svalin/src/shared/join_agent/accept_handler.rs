@@ -23,7 +23,7 @@ use svalin_rpc::{
 use tokio::{io::copy_bidirectional, select, sync::oneshot};
 use tokio_util::sync::CancellationToken;
 
-use crate::{client::Client, shared::join_agent::upload_agent::UploadAgentCommandError};
+use crate::client::{Client, add_agent::AddToTrustStoreError};
 
 use super::ServerJoinManager;
 
@@ -113,8 +113,8 @@ pub enum AcceptJoinError {
     AucPaceError(#[from] AucPaceClientError),
     #[error("error creating device group: {0}")]
     CreateDeviceGroupError(CreateSvalinGroupError<anyhow::Error>),
-    #[error("error uploading agent data to server: {0}")]
-    UploadToServerError(#[from] ConnectionDispatchError<UploadAgentCommandError>),
+    #[error("error adding agent to trust store: {0}")]
+    AddToTrustStoreError(#[from] AddToTrustStoreError),
 }
 
 pub struct AcceptJoin<'a> {
@@ -233,11 +233,11 @@ async fn handle_agent_enroll(
     //     .await
     //     .map_err(AcceptJoinError::CreateDeviceGroupError)?;
 
-    let upload_result = client.upload_agent(&agent_cert).await;
+    let trust_result = client.add_cert_to_trust_store(agent_cert.clone()).await;
 
     // tracing::trace!("upload finished, sending confirmation to agent");
 
-    match upload_result {
+    match trust_result {
         Ok(_) => session_e2e.write_object::<Result<(), ()>>(&Ok(())).await?,
         Err(e) => {
             let _ = session_e2e.write_object::<Result<(), ()>>(&Err(())).await;

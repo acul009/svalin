@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use anyhow::{Result, anyhow};
@@ -14,6 +14,7 @@ mod profile;
 pub mod state;
 
 pub use first_connect::*;
+use svalin_pki::trust_store::TrustStore;
 use svalin_pki::{Certificate, Credential, RootCertificate, SpkiHash};
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
@@ -39,6 +40,8 @@ pub struct Client {
     root_certificate: RootCertificate,
     user_credential: Credential,
     device_credential: Credential,
+    trust_store: Arc<RwLock<TrustStore>>,
+    store: Arc<svalin_client_store::ClientStore>,
     mls: Arc<MlsClient>,
     tunnel_manager: TunnelManager,
     message_sender: ClientMessageDispatcherHandle,

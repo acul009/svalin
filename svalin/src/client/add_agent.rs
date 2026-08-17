@@ -1,13 +1,12 @@
-use crate::shared::join_agent::{
-    accept_handler::AcceptJoin,
-    upload_agent::{UploadAgent, UploadAgentCommandError},
-};
+use crate::{message_streaming::MessageFromClient, shared::join_agent::accept_handler::AcceptJoin};
 
 use super::Client;
 
-use anyhow::Result;
-use svalin_pki::Certificate;
-use svalin_rpc::rpc::connection::{Connection, ConnectionDispatchError};
+use anyhow::{Result, anyhow};
+use serde::{Deserialize, Serialize};
+use svalin_client_store::trust_store_transaction_store::TransactionStoreError;
+use svalin_pki::{Certificate, secure_chain::CreateBlockError, trust_store};
+use svalin_rpc::rpc::connection::Connection;
 use tokio::sync::oneshot;
 
 impl Client {
@@ -29,14 +28,31 @@ impl Client {
         Ok(certificate)
     }
 
-    pub(crate) async fn upload_agent(
+    pub(crate) async fn add_cert_to_trust_store(
         &self,
-        device: &Certificate,
-    ) -> Result<(), ConnectionDispatchError<UploadAgentCommandError>> {
-        let connection = self.rpc.upstream_connection();
-
-        connection.dispatch(UploadAgent::new(device)).await?;
-
+        cert: Certificate,
+    ) -> Result<(), AddToTrustStoreError> {
+        let block = self
+            .trust_store
+            .write()
+            .unwrap()
+            .add(cert, &self.user_credential)?;
+        self.message_sender
+            .send_with_feedback(MessageFromClient::TrustStore(block.as_unchecked().clone()))
+            .await
+            .map_err(|_| AddToTrustStoreError::UploadToServerError)?;
+        self.store.transaction_store().add(&block).await?;
+        self.trust_store.write().unwrap().apply(block);
         Ok(())
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AddToTrustStoreError {
+    #[error("error creating block: {0}")]
+    CreateBlockError(#[from] trust_store::CreateBlockError),
+    #[error("error while sending block to server")]
+    UploadToServerError,
+    #[error("error saving transaction")]
+    TransactionStoreError(#[from] TransactionStoreError),
 }

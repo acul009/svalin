@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use svalin_pki::{
     SpkiHash,
     mls::transport_types::{MessageToMemberTransport, MessageToServerTransport},
+    secure_chain::UncheckedBlock,
+    trust_store,
 };
 
 pub mod agent;
@@ -35,5 +37,6 @@ pub enum MessageToClient {
 #[derive(Serialize, Deserialize)]
 pub enum MessageFromClient {
     Mls(MessageToServerTransport),
+    TrustStore(UncheckedBlock<trust_store::Transaction>),
     Goodbye,
 }
