@@ -128,7 +128,8 @@ impl WaitForConfirm {
         &self.confirm_code
     }
 
-    pub async fn wait_for_confirm(self, cancel: CancellationToken) -> Result<()> {
+    pub async fn wait_for_confirm(self, _cancel: CancellationToken) -> Result<()> {
+        // TODO: handle cancellation
         let init_data = self.success_channel.await?;
 
         super::init_with(init_data)

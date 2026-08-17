@@ -1,6 +1,6 @@
 use futures::StreamExt;
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
-use std::{fmt::Debug, path::Path, sync::Arc};
+use std::{fmt::Debug, path::Path};
 use svalin_pki::SpkiHash;
 
 use crate::{persistent::Message, trust_store_transaction_store::TrustStoreTransactionStore};

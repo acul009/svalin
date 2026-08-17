@@ -11,8 +11,7 @@ use openmls_sqlx_storage::SqliteStorageProvider;
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Credential, EncryptedCredential, KnownCertificateVerifier, RootCertificate, TrustStoreVerifier,
-    UnverifiedCertificate,
+    Credential, EncryptedCredential, KnownCertificateVerifier, TrustStoreVerifier,
     trust_store::{self, TrustStore},
 };
 use svalin_rpc::{
@@ -29,7 +28,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::error;
 
 use crate::{
-    server::{chain_loader::ChainLoader, local_key_retriever::LocalKeyRetriever},
+    server::local_key_retriever::LocalKeyRetriever,
     shared::commands::{
         init::{InitHandler, ServerInitSuccess},
         public_server_status::{PublicStatus, PublicStatusHandler},
@@ -38,7 +37,7 @@ use crate::{
         key_storage::KeySource,
         location::{Location, LocationError},
     },
-    verifier::{local_verifier::LocalVerifier, tls_optional_wrapper::TlsOptionalWrapper},
+    verifier::tls_optional_wrapper::TlsOptionalWrapper,
 };
 
 use svalin_rpc::rpc::server::RpcServer;
@@ -209,8 +208,6 @@ impl Server {
         let root = trust_store.read().unwrap().root().clone();
 
         let credentials = base_config.credential;
-
-        let loader = ChainLoader::new(trust_store.clone(), store.sessions.clone());
 
         let verifier = TrustStoreVerifier::new(trust_store.clone());
 

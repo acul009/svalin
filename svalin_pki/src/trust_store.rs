@@ -1,15 +1,11 @@
-use std::{
-    collections::HashMap,
-    fmt,
-    sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, fmt};
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
     AddCertificateError, Certificate, CertificateChainBuilder, Credential, RootCertificate,
-    SignatureVerificationError, SpkiHash, TrustStoreVerifier, UnverifiedCertificate,
-    UnverifiedCertificateChain, UseAsRootError, certificate,
+    SignatureVerificationError, SpkiHash, UnverifiedCertificate, UnverifiedCertificateChain,
+    UseAsRootError,
     secure_chain::{self, Chain, ChainDigest, ChainState, CheckedBlock, UncheckedBlock},
 };
 pub type CreateBlockError = secure_chain::CreateBlockError<Error>;

@@ -4,10 +4,9 @@ use std::{
 };
 
 use svalin_pki::{
-    CertificateChainBuilder, SpkiHash, UnverifiedCertificateChain,
-    trust_store::{self, TrustStore},
+    CertificateChainBuilder, SpkiHash, UnverifiedCertificateChain, trust_store::TrustStore,
 };
-use svalin_server_store::{SessionStore, UserStore};
+use svalin_server_store::SessionStore;
 
 #[derive(Debug, Clone)]
 pub struct ChainLoader {

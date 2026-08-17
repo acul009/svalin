@@ -7,8 +7,8 @@ use svalin_pki::argon2::password_hash::rand_core::OsRng;
 use svalin_pki::mls::provider::{ExportedMlsStore, SvalinStorage};
 use svalin_pki::{
     ArgonCost, Certificate, CreateCertificateError, CreateCredentialsError, Credential,
-    EncryptError, EncryptedCredential, ExportedPublicKey, KeyPair, RootCertificate, Sha512,
-    UnverifiedCertificate, argon2::Argon2, serde_paramsstring,
+    EncryptError, EncryptedCredential, ExportedPublicKey, KeyPair, Sha512, UnverifiedCertificate,
+    argon2::Argon2, serde_paramsstring,
 };
 use svalin_pki::{ArgonParams, EncryptedObject, UseAsRootError, trust_store};
 use svalin_pki::{

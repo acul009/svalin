@@ -4,8 +4,6 @@ use anyhow::anyhow;
 use svalin_pki::{Certificate, TrustStoreVerifier, mls::transport_types::MessageToServerTransport};
 use svalin_server_store::{KeyPackageStore, MessageStore};
 
-use crate::verifier::local_verifier::LocalVerifier;
-
 pub struct MlsMessageHandler {
     pub message_store: Arc<MessageStore>,
     pub key_package_store: Arc<KeyPackageStore>,

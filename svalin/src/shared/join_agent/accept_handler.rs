@@ -10,7 +10,6 @@ use svalin_rpc::{
             dispatcher::{DispatcherError, TakeableCommandDispatcher},
             handler::CommandHandler,
         },
-        connection::ConnectionDispatchError,
         peer::Peer,
         session::{Session, SessionReadError, SessionWriteError},
     },

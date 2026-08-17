@@ -26,7 +26,6 @@ use crate::{
         public_server_status::{PublicStatus, PublicStatusHandler},
         update_user_mls::UpdateUserMlsHandler,
     },
-    verifier::{self, local_verifier::LocalVerifier},
 };
 
 pub struct SvalinCommandBuilder {
