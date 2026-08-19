@@ -121,6 +121,10 @@ impl Location {
     pub fn as_path(&self) -> &Path {
         &self.path
     }
+
+    pub fn to_pathbuf(self) -> PathBuf {
+        self.path
+    }
 }
 
 impl Display for Location {

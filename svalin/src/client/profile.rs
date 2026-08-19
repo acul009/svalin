@@ -1,7 +1,4 @@
-use std::{
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
@@ -10,9 +7,7 @@ use svalin_client_store::ClientStore;
 use svalin_pki::{
     ArgonParams, Certificate, Credential, EncryptedCredential, ExactVerififier,
     KnownCertificateVerifier, RootCertificate, TrustStoreVerifier, UnverifiedCertificate,
-    get_current_timestamp,
-    mls::client::MlsClient,
-    trust_store::{self, TrustStore},
+    get_current_timestamp, mls::client::MlsClient,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use tokio::sync::oneshot;
@@ -182,6 +177,11 @@ impl Client {
 
         let mls_db_path = profile.profile_dir().await?.push("mls-store.sqlite");
         let client_db_path = profile.profile_dir().await?.push("client-store.sqlite");
+        let trust_store_path = profile
+            .profile_dir()
+            .await?
+            .push("trust_store.json")
+            .to_pathbuf();
         // tracing::trace!("unlocking profile");
         let device_credential = profile.device_credential.decrypt(&key)?;
         let root_certificate = profile.root_certificate.use_as_root()?;
@@ -192,8 +192,8 @@ impl Client {
         let client_store = Arc::new(ClientStore::open(client_db_path).await?);
         // Starting Background Tasks
         let background_tasks = TaskTracker::new();
-        let trust_store = Self::load_trust_store(
-            profile_key,
+        let trust_store = crate::util::trust_store::load_trust_store(
+            trust_store_path,
             client_store.transaction_store(),
             cancel.clone(),
             &background_tasks,
@@ -335,62 +335,5 @@ impl Client {
         });
 
         Ok(client)
-    }
-
-    async fn load_trust_store(
-        profile_key: &str,
-        store: &svalin_client_store::trust_store_transaction_store::TrustStoreTransactionStore,
-        cancel: CancellationToken,
-        task_tracker: &TaskTracker,
-    ) -> anyhow::Result<Arc<RwLock<TrustStore>>> {
-        let location = Self::profile_dir(profile_key).await?;
-        let exported = tokio::fs::read(&location).await?;
-        let exported: trust_store::Exported = serde_json::from_slice(&exported)?;
-
-        let mut trust_store = TrustStore::import(exported)?;
-        let transactions = store.load_all_after(trust_store.sequence()).await?;
-
-        for block in transactions {
-            let block = trust_store.check(block)?;
-            trust_store.apply(block);
-        }
-
-        let exported = trust_store.export();
-        let exported = serde_json::to_vec_pretty(&exported)?;
-        tokio::fs::write(&location, exported).await?;
-
-        let trust_store = Arc::new(RwLock::new(trust_store));
-        let trust_store_2 = trust_store.clone();
-
-        task_tracker.spawn(async move {
-            let trust_store = trust_store_2;
-            let mut last_digest = trust_store.read().unwrap().digest();
-            loop {
-                tokio::select! {
-                    _ = tokio::time::sleep(Duration::from_secs(300)) => {
-                        let exported = {
-                            let guard = trust_store.read().unwrap();
-                            if guard.digest() == last_digest {
-                                continue;
-                            }
-                            last_digest = guard.digest();
-                            guard.export()
-                        };
-                        let Ok(exported) = serde_json::to_vec_pretty(&exported) else {
-                            eprintln!("Failed to serialize trust store");
-                            continue;
-                        };
-                        if let Err(e) = tokio::fs::write(&location, exported).await {
-                            eprintln!("Failed to write trust store: {}", e);
-                        }
-                    }
-                    _ = cancel.cancelled() => {
-                        break;
-                    }
-                }
-            }
-        });
-
-        Ok(trust_store)
     }
 }
