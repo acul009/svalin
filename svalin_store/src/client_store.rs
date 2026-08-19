@@ -1,33 +1,24 @@
 use futures::StreamExt;
-use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
-use std::{fmt::Debug, path::Path};
+use sqlx::SqlitePool;
+use std::{fmt::Debug, path::Path, sync::Arc};
 use svalin_pki::SpkiHash;
 
-use crate::{persistent::Message, trust_store_transaction_store::TrustStoreTransactionStore};
+use crate::{close_handle::CloseHandle, trust_store_transaction_store::TrustStoreTransactionStore};
+use persistent::Message;
 
 pub mod persistent;
-pub mod trust_store_transaction_store;
 
 pub struct ClientStore {
     pool: SqlitePool,
-    transaction_store: TrustStoreTransactionStore,
+    transaction_store: Arc<TrustStoreTransactionStore>,
 }
 
 impl ClientStore {
     pub async fn open(filename: impl AsRef<Path>) -> Result<Self, Error> {
-        let options = SqliteConnectOptions::new()
-            .create_if_missing(true)
-            .filename(filename)
-            .optimize_on_close(true, None);
-
-        let pool = SqlitePool::connect_with(options).await?;
-        sqlx::migrate!()
-            .run(&pool)
-            .await
-            .map_err(sqlx::Error::from)?;
+        let pool = super::open_database(filename).await?;
 
         Ok(Self {
-            transaction_store: TrustStoreTransactionStore::open(pool.clone()).await?,
+            transaction_store: Arc::new(TrustStoreTransactionStore::open(pool.clone()).await?),
             pool,
         })
     }
@@ -112,26 +103,12 @@ impl ClientStore {
         Ok(state)
     }
 
-    pub fn transaction_store(&self) -> &TrustStoreTransactionStore {
+    pub fn transaction_store(&self) -> &Arc<TrustStoreTransactionStore> {
         &self.transaction_store
     }
 
     pub fn close_handle(&self) -> CloseHandle {
         CloseHandle(self.pool.clone())
-    }
-}
-
-pub struct CloseHandle(SqlitePool);
-
-impl Debug for CloseHandle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CloseHandle").finish()
-    }
-}
-
-impl CloseHandle {
-    pub async fn close(&self) {
-        self.0.close().await
     }
 }
 

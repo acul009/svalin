@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use svalin_pki::{Certificate, CertificateType, SpkiHash};
 use svalin_rpc::rpc::{command::handler::CommandHandler, peer::Peer, session::Session};
-use svalin_server_store::MessageStore;
+use svalin_store::server_store::MessageStore;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 

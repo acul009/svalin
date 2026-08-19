@@ -1,6 +1,6 @@
 use iced::widget::{button, column, row, space, text, text_editor, text_input};
-use svalin_client_store::persistent::SvalinMetaInfo;
 use svalin_pki::get_current_timestamp;
+use svalin_store::client_store::persistent::SvalinMetaInfo;
 
 use crate::{bootstrap, ui::widgets::card};
 

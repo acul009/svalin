@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use svalin_pki::{Certificate, TrustStoreVerifier, mls::transport_types::MessageToServerTransport};
-use svalin_server_store::{KeyPackageStore, MessageStore};
+use svalin_store::server_store::{KeyPackageStore, MessageStore};
 
 pub struct MlsMessageHandler {
     pub message_store: Arc<MessageStore>,

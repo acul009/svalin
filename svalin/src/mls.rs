@@ -1,11 +1,9 @@
 use serde::{Deserialize, Serialize};
-use svalin_client_store::persistent::{SvalinMetaInfo, SvalinReport};
 use svalin_pki::TrustStoreVerifier;
+use svalin_store::client_store::persistent::{SvalinMetaInfo, SvalinReport};
 
 use crate::{
-    remote_key_retriever::RemoteKeyRetriever,
-    server::local_key_retriever::LocalKeyRetriever,
-    verifier::{local_verifier::LocalVerifier, remote_verifier::RemoteVerifier},
+    remote_key_retriever::RemoteKeyRetriever, server::local_key_retriever::LocalKeyRetriever,
 };
 
 #[derive(Serialize, Deserialize)]

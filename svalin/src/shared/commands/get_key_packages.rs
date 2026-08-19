@@ -9,7 +9,7 @@ use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::{Session, SessionReadError},
 };
-use svalin_server_store::KeyPackageStore;
+use svalin_store::server_store::KeyPackageStore;
 use tokio_util::sync::CancellationToken;
 
 pub struct GetKeyPackages(pub Vec<SpkiHash>);

@@ -8,7 +8,7 @@ use svalin_rpc::{
         server::{RpcServer, config_builder::RpcCommandBuilder},
     },
 };
-use svalin_server_store::ServerStore;
+use svalin_store::server_store::ServerStore;
 
 use crate::{
     message_streaming::{

@@ -35,7 +35,7 @@ use svalin_rpc::{
     },
     verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
 };
-use svalin_server_store::{SessionStore, UserStore};
+use svalin_store::server_store::{SessionStore, UserStore};
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 

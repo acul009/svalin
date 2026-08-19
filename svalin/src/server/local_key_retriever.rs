@@ -6,7 +6,7 @@ use svalin_pki::{
     mls::{SvalinGroupId, key_retriever::KeyRetriever},
     trust_store::TrustStore,
 };
-use svalin_server_store::KeyPackageStore;
+use svalin_store::server_store::KeyPackageStore;
 
 pub struct LocalKeyRetriever {
     root: RootCertificate,

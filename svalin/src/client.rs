@@ -19,6 +19,7 @@ use svalin_pki::{Certificate, Credential, RootCertificate, SpkiHash, TrustStoreV
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
+use svalin_store::client_store::ClientStore;
 use tokio::sync::broadcast;
 use tokio::time::error::Elapsed;
 use tokio::time::timeout;
@@ -31,7 +32,6 @@ use crate::client::state::{ClientState, ClientStateUpdate};
 use crate::message_streaming::MessageFromClient;
 use crate::message_streaming::client::{ClientMessageDispatcherHandle, ClientStateHandle};
 use crate::mls::MlsClient;
-use crate::verifier::remote_verifier::RemoteVerifier;
 
 pub struct Client {
     rpc: RpcClient,
@@ -41,7 +41,7 @@ pub struct Client {
     user_credential: Credential,
     device_credential: Credential,
     trust_store: Arc<RwLock<TrustStore>>,
-    store: Arc<svalin_client_store::ClientStore>,
+    store: Arc<ClientStore>,
     mls: Arc<MlsClient>,
     tunnel_manager: TunnelManager,
     message_sender: ClientMessageDispatcherHandle,

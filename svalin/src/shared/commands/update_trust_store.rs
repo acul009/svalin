@@ -3,7 +3,6 @@ use std::sync::{Arc, RwLock};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_client_store::ClientStore;
 use svalin_pki::{
     secure_chain::{ChainDigest, UncheckedBlock},
     trust_store::{self, TrustStore},
@@ -12,6 +11,7 @@ use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::Session,
 };
+use svalin_store::{server_store, trust_store_transaction_store::TrustStoreTransactionStore};
 use tokio::{select, sync::oneshot};
 use tokio_util::sync::CancellationToken;
 
@@ -24,7 +24,7 @@ pub enum TrustStoreUpdate {
 
 pub struct UpdateTrustStore {
     trust_store: Arc<RwLock<TrustStore>>,
-    store: Arc<ClientStore>,
+    store: Arc<TrustStoreTransactionStore>,
     sequence: u64,
     ready: oneshot::Sender<()>,
     cancel: CancellationToken,
@@ -33,7 +33,7 @@ pub struct UpdateTrustStore {
 impl UpdateTrustStore {
     pub fn new(
         trust_store: Arc<RwLock<TrustStore>>,
-        store: Arc<ClientStore>,
+        store: Arc<TrustStoreTransactionStore>,
         ready: oneshot::Sender<()>,
         cancel: CancellationToken,
     ) -> Self {
@@ -71,7 +71,7 @@ impl CommandDispatcher for UpdateTrustStore {
                 TrustStoreUpdate::Transaction(unchecked_block) => {
                     apply_block(
                         Arc::into_inner(unchecked_block).expect("arc has not been clones yet"),
-                        &self.store.transaction_store(),
+                        &self.store,
                         &self.trust_store,
                     )
                     .await?;
@@ -103,7 +103,7 @@ impl CommandDispatcher for UpdateTrustStore {
                         TrustStoreUpdate::Transaction(unchecked_block) => {
                             apply_block(
                                 Arc::into_inner(unchecked_block).expect("arc has not been clones yet"),
-                                &self.store.transaction_store(),
+                                &self.store,
                                 &self.trust_store,
                             )
                             .await?;
@@ -120,7 +120,7 @@ impl CommandDispatcher for UpdateTrustStore {
 
 async fn apply_block(
     block: UncheckedBlock<trust_store::Transaction>,
-    store: &svalin_client_store::trust_store_transaction_store::TrustStoreTransactionStore,
+    store: &TrustStoreTransactionStore,
     trust_store: &RwLock<TrustStore>,
 ) -> anyhow::Result<()> {
     let block = {
@@ -140,13 +140,13 @@ async fn apply_block(
 
 pub struct UpdateTrustStoreHandler {
     trust_store: Arc<RwLock<TrustStore>>,
-    store: Arc<svalin_server_store::TrustStoreTransactionStore>,
+    store: Arc<server_store::TrustStoreTransactionStore>,
 }
 
 impl UpdateTrustStoreHandler {
     pub fn new(
         trust_store: Arc<RwLock<TrustStore>>,
-        store: Arc<svalin_server_store::TrustStoreTransactionStore>,
+        store: Arc<server_store::TrustStoreTransactionStore>,
     ) -> Self {
         Self { trust_store, store }
     }

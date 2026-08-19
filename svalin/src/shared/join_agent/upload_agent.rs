@@ -14,7 +14,9 @@ use svalin_rpc::rpc::{
     },
     session::{Session, SessionReadError, SessionWriteError},
 };
-use svalin_server_store::{AgentStore, CompleteCertChainError, MessageStoreError, UserStore};
+use svalin_store::server_store::{
+    AgentStore, CompleteCertChainError, MessageStoreError, UserStore,
+};
 use tokio_util::sync::CancellationToken;
 
 use crate::permissions::Permission;

@@ -9,7 +9,6 @@ use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use futures::{FutureExt, select};
 use serde::{Deserialize, Serialize};
-use svalin_client_store::persistent;
 use svalin_pki::{
     CertificateType, Credential, EncryptedObject, EncryptionKey, SpkiHash, TrustStoreVerifier,
     mls::{
@@ -21,7 +20,8 @@ use svalin_pki::{
     },
 };
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
-use svalin_server_store::{KeyPackageStore, MessageStore, UserStore};
+use svalin_store::client_store::persistent;
+use svalin_store::server_store::{KeyPackageStore, MessageStore, UserStore};
 use tokio::{
     sync::mpsc,
     time::{Instant, sleep_until},
@@ -32,7 +32,6 @@ use uuid::Uuid;
 use crate::{
     client::state::ClientStateUpdate, message_streaming::client::ClientStateHandle, mls::MlsClient,
     remote_key_retriever::RemoteKeyRetriever, server::MlsServer,
-    verifier::remote_verifier::RemoteVerifier,
 };
 
 pub struct UpdateUserMlsHandler {

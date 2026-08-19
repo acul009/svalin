@@ -28,6 +28,7 @@ clap = { workspace = true, features = ["derive", "unstable-doc"] }
 svalin_rpc.workspace = true
 svalin_sysctl.workspace = true
 svalin_pki.workspace = true
+svalin_store.workspace = true
 totp-rs = { workspace = true }
 tracing-subscriber.workspace = true
 test-log = { workspace = true, features = ["trace"] }
@@ -38,8 +39,6 @@ reqwest = { workspace = true, features = ["json", "rustls", "stream"] }
 zeroize = { workspace = true, features = ["derive"] }
 dashmap.workspace = true
 openmls_sqlx_storage.workspace = true
-svalin_server_store.workspace = true
-svalin_client_store.workspace = true
 windows-registry = "0.6.1"
 windows-service = "0.8.1"
 

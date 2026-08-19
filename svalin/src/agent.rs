@@ -4,8 +4,8 @@ use anyhow::{Context, Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    EncryptedCredential, ExactVerififier, KnownCertificateVerifier, UnverifiedCertificate,
-    get_current_timestamp, mls::provider::PostcardCodec,
+    EncryptedCredential, ExactVerififier, KnownCertificateVerifier, TrustStoreVerifier,
+    UnverifiedCertificate, get_current_timestamp, mls::provider::PostcardCodec,
 };
 use svalin_rpc::{
     commands::{deauthenticate::DeauthenticateHandler, e2e::E2EHandler, ping::PingHandler},
@@ -15,6 +15,7 @@ use svalin_rpc::{
         connection::{Connection, ServeableConnectionBase},
     },
 };
+use svalin_store::agent_store::AgentStore;
 use tokio::sync::Notify;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::instrument;
@@ -25,7 +26,6 @@ mod mls;
 
 pub use init::init;
 
-use crate::shared::commands::{terminal::RemoteTerminalHandler, update_agent::UpdateAgentHandler};
 use crate::shared::join_agent::AgentInitPayload;
 use crate::util::key_storage::KeySource;
 use crate::util::location::{Location, LocationError};
@@ -45,6 +45,10 @@ use crate::{
     permissions::default_permission_handler::DefaultPermissionHandler,
 };
 use crate::{mls::MlsAgent, remote_key_retriever::RemoteKeyRetriever};
+use crate::{
+    shared::commands::{terminal::RemoteTerminalHandler, update_agent::UpdateAgentHandler},
+    util::trust_store::update_trust_store,
+};
 
 #[instrument]
 pub async fn run(cancel: CancellationToken) -> Result<()> {
@@ -88,12 +92,31 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
 
     tracing::trace!("connection to server established");
 
+    let tasks = TaskTracker::new();
+
+    let agent_store = AgentStore::open(data_dir()?.push("agent-store.sqlite")).await?;
+    let trust_store = crate::util::trust_store::load(
+        data_dir()?.push("trust_store.json").to_path_buf(),
+        agent_store.transaction_store().as_ref(),
+        cancel.clone(),
+        &tasks,
+    )
+    .await?;
+    update_trust_store(
+        trust_store.clone(),
+        agent_store.transaction_store().clone(),
+        rpc.upstream_connection(),
+        cancel.clone(),
+        &tasks,
+    )
+    .await?;
+
     let storage_provider = open_mls_store().await?;
 
     let key_retriever =
         RemoteKeyRetriever::new(rpc.upstream_connection(), root_certificate.clone());
 
-    let verifier = RemoteVerifier::new(root_certificate.clone(), rpc.upstream_connection());
+    let verifier = TrustStoreVerifier::new(trust_store);
 
     let mls = Arc::new(
         MlsAgent::new(
@@ -142,7 +165,6 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
         .add(DeauthenticateHandler::new(public_commands));
 
     tracing::trace!("Starting agent background tasks");
-    let tasks = TaskTracker::new();
 
     let (messager_handle, message_dispatcher) = AgentMessageDispatcher::new();
 

@@ -3,13 +3,13 @@ use std::sync::Arc;
 use anyhow::{Context, Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
-use svalin_client_store::ClientStore;
 use svalin_pki::{
     ArgonParams, Certificate, Credential, EncryptedCredential, ExactVerififier,
     KnownCertificateVerifier, RootCertificate, TrustStoreVerifier, UnverifiedCertificate,
     get_current_timestamp, mls::client::MlsClient,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
+use svalin_store::client_store::ClientStore;
 use tokio::sync::oneshot;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::error;
@@ -22,7 +22,10 @@ use crate::{
         get_user_credentials::GetUserCredential, update_trust_store::UpdateTrustStore,
         update_user_mls::UpdateUserMls,
     },
-    util::location::{Location, LocationError},
+    util::{
+        location::{Location, LocationError},
+        trust_store::update_trust_store,
+    },
 };
 
 use super::Client;
@@ -192,9 +195,9 @@ impl Client {
         let client_store = Arc::new(ClientStore::open(client_db_path).await?);
         // Starting Background Tasks
         let background_tasks = TaskTracker::new();
-        let trust_store = crate::util::trust_store::load_trust_store(
+        let trust_store = crate::util::trust_store::load(
             trust_store_path,
-            client_store.transaction_store(),
+            client_store.transaction_store().as_ref(),
             cancel.clone(),
             &background_tasks,
         )
@@ -224,27 +227,15 @@ impl Client {
             .await?;
         let user_credential = user_credential.credential.decrypt(&key)?;
 
-        let connection = rpc.upstream_connection();
-        let trust_store2 = trust_store.clone();
-        let store = client_store.clone();
-        let (send_ready, trust_store_ready) = oneshot::channel();
-        let cancel2 = cancel.clone();
-        background_tasks.spawn(async move {
-            if let Err(err) = connection
-                .dispatch(UpdateTrustStore::new(
-                    trust_store2,
-                    store,
-                    send_ready,
-                    cancel2,
-                ))
-                .await
-            {
-                eprintln!("Error updating trust store: {}", err);
-            }
-        });
+        update_trust_store(
+            trust_store.clone(),
+            client_store.transaction_store().clone(),
+            rpc.upstream_connection(),
+            cancel.clone(),
+            &background_tasks,
+        )
+        .await?;
 
-        // Wait until trust store has been updated to the newest version.
-        trust_store_ready.await?;
         let verifier = TrustStoreVerifier::new(trust_store.clone());
 
         // tracing::trace!("connected to server");

@@ -5,11 +5,11 @@ edition = "2024"
 
 [dependencies]
 
-svalin = { path = "../svalin" }
-svalin_client_store = { path = "../store_client" }
-svalin_pki = { path = "../svalin_pki" }
-svalin_rpc = { path = "../svalin_rpc" }
-svalin_sysctl = { path = "../svalin_sysctl" }
+svalin.workspace = true
+svalin_pki.workspace = true
+svalin_rpc.workspace = true
+svalin_sysctl.workspace = true
+svalin_store.workspace = true
 
 # frozen_term = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git"}
 # async_pty = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git" }

@@ -8,7 +8,11 @@ use svalin_pki::{
     secure_chain::UncheckedBlock,
     trust_store::{self, TrustStore},
 };
+use svalin_rpc::rpc::connection::Connection;
+use tokio::sync::oneshot;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
+
+use crate::shared::commands::update_trust_store::UpdateTrustStore;
 
 trait Store {
     fn load_all_after(
@@ -17,7 +21,7 @@ trait Store {
     ) -> impl Future<Output = anyhow::Result<Vec<UncheckedBlock<trust_store::Transaction>>>>;
 }
 
-impl Store for svalin_client_store::trust_store_transaction_store::TrustStoreTransactionStore {
+impl Store for svalin_store::trust_store_transaction_store::TrustStoreTransactionStore {
     async fn load_all_after(
         &self,
         after: u64,
@@ -26,7 +30,7 @@ impl Store for svalin_client_store::trust_store_transaction_store::TrustStoreTra
     }
 }
 
-impl Store for svalin_server_store::TrustStoreTransactionStore {
+impl Store for svalin_store::server_store::TrustStoreTransactionStore {
     async fn load_all_after(
         &self,
         after: u64,
@@ -35,10 +39,9 @@ impl Store for svalin_server_store::TrustStoreTransactionStore {
     }
 }
 
-pub async fn load_trust_store(
+pub async fn load(
     file_location: PathBuf,
     store: &impl Store,
-    // store: &svalin_client_store::trust_store_transaction_store::TrustStoreTransactionStore,
     cancel: CancellationToken,
     task_tracker: &TaskTracker,
 ) -> anyhow::Result<Arc<RwLock<TrustStore>>> {
@@ -79,8 +82,12 @@ pub async fn load_trust_store(
                         eprintln!("Failed to serialize trust store");
                         continue;
                     };
-                    if let Err(e) = tokio::fs::write(&file_location, exported).await {
+                    let temp_file = file_location.with_extension("tmp");
+                    if let Err(e) = tokio::fs::write(&temp_file, exported).await {
                         eprintln!("Failed to write trust store: {}", e);
+                    }
+                    if let Err(e) = tokio::fs::rename(&temp_file, &file_location).await {
+                        eprintln!("Failed to rename trust store: {}", e);
                     }
                 }
                 _ = cancel.cancelled() => {
@@ -91,4 +98,30 @@ pub async fn load_trust_store(
     });
 
     Ok(trust_store)
+}
+
+/// This function uses the given connection to download updates for the Trust Store.
+/// It will return once all current updates have been downloaded and applied,
+/// but it will continue to download and apply updates in a background task.
+pub async fn update_trust_store(
+    trust_store: Arc<RwLock<TrustStore>>,
+    store: Arc<svalin_store::trust_store_transaction_store::TrustStoreTransactionStore>,
+    connection: impl Connection + 'static,
+    cancel: CancellationToken,
+    task_tracker: &TaskTracker,
+) -> anyhow::Result<()> {
+    let (send, recv) = oneshot::channel();
+
+    task_tracker.spawn(async move {
+        if let Err(err) = connection
+            .dispatch(UpdateTrustStore::new(trust_store, store, send, cancel))
+            .await
+        {
+            eprintln!("Error updating trust store: {}", err);
+        }
+    });
+
+    recv.await?;
+
+    Ok(())
 }

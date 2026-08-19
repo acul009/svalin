@@ -10,8 +10,10 @@ pub use session_store::{AddSessionError, SessionStore};
 pub use trust_store_transaction_store::{TransactionStoreError, TrustStoreTransactionStore};
 pub use user_store::{GetBySpkiHashError, UserStore};
 
-use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
-use std::{fmt::Debug, path::Path, sync::Arc};
+use sqlx::SqlitePool;
+use std::{path::Path, sync::Arc};
+
+use crate::close_handle::CloseHandle;
 
 pub struct ServerStore {
     pub trust_store_transactions: Arc<TrustStoreTransactionStore>,
@@ -24,13 +26,7 @@ pub struct ServerStore {
 
 impl ServerStore {
     pub async fn open(filename: impl AsRef<Path>) -> Result<Self, sqlx::Error> {
-        let options = SqliteConnectOptions::new()
-            .create_if_missing(true)
-            .filename(filename)
-            .optimize_on_close(true, None);
-
-        let pool = SqlitePool::connect_with(options).await?;
-        sqlx::migrate!().run(&pool).await?;
+        let pool = super::open_database(filename).await?;
 
         Ok(Self {
             trust_store_transactions: TrustStoreTransactionStore::open(pool.clone()).await?,
@@ -44,19 +40,5 @@ impl ServerStore {
 
     pub fn close_handle(&self) -> CloseHandle {
         CloseHandle(self.pool.clone())
-    }
-}
-
-pub struct CloseHandle(SqlitePool);
-
-impl Debug for CloseHandle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CloseHandle").finish()
-    }
-}
-
-impl CloseHandle {
-    pub async fn close(&self) {
-        self.0.close().await
     }
 }

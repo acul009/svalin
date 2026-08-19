@@ -19,7 +19,7 @@ use svalin_rpc::{
     rpc::{command::handler::HandlerCollection, server::Socket},
     verifiers::skip_verify::SkipClientVerification,
 };
-use svalin_server_store::{ServerStore, UserStore};
+use svalin_store::server_store::{ServerStore, UserStore};
 use tokio::{
     sync::oneshot,
     time::{error::Elapsed, timeout},
@@ -61,7 +61,7 @@ pub const INIT_SERVER_SHUTDOWN_COUNTDOWN: Duration = Duration::from_secs(1);
 pub struct Server {
     rpc: Arc<RpcServer>,
     config: ServerConfig,
-    store_close_handle: svalin_server_store::CloseHandle,
+    store_close_handle: svalin_store::CloseHandle,
     tasks: TaskTracker,
 }
 

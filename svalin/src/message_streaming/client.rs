@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
-use svalin_client_store::{ClientStore, persistent};
 use svalin_pki::mls::client::MessageDataContent;
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
+use svalin_store::client_store::{ClientStore, persistent};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 

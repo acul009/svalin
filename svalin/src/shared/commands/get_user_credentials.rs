@@ -8,7 +8,7 @@ use svalin_rpc::rpc::{
     peer::Peer,
     session::Session,
 };
-use svalin_server_store::UserStore;
+use svalin_store::server_store::UserStore;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Serialize, Deserialize)]

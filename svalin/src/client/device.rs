@@ -1,11 +1,11 @@
 use anyhow::anyhow;
 use std::time::Duration;
-use svalin_client_store::persistent::{self, SvalinMetaInfo};
 use svalin_pki::{SpkiHash, Verifier, get_current_timestamp};
 use svalin_rpc::{
     commands::{forward::ForwardConnection, ping::Ping},
     rpc::connection::{Connection, direct_connection::DirectConnection},
 };
+use svalin_store::client_store::persistent::{self, SvalinMetaInfo};
 
 use crate::{
     client::state::ClientStateUpdate,

@@ -1,15 +1,20 @@
 [package]
-name = "svalin_client_store"
+name = "svalin_store"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
+postcard.workspace = true
+serde.workspace = true
 sqlx.workspace = true
 svalin_pki.workspace = true
 thiserror.workspace = true
+uuid.workspace = true
 svalin_sysctl.workspace = true
-postcard.workspace = true
 futures.workspace = true
-serde.workspace = true
 tracing.workspace = true
+
+totp-rs = { workspace = true }
+aucpace = { workspace = true, features = ["alloc", "serde", "strong_aucpace"] }
+tokio.workspace = true

@@ -1,10 +1,10 @@
 use std::{fmt::Debug, sync::Arc};
 
+use crate::client_store::persistent;
 use anyhow::{Result, anyhow};
 use aucpace::StrongDatabase;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use svalin_client_store::persistent;
 use svalin_pki::argon2::password_hash::ParamsString;
 use svalin_pki::curve25519_dalek::{self, RistrettoPoint, Scalar};
 use svalin_pki::mls::provider::ExportedMlsStore;

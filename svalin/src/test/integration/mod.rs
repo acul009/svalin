@@ -1,8 +1,8 @@
 use std::{panic, process, time::Duration};
 
 use std::net::ToSocketAddrs;
-use svalin_client_store::persistent::{self, SvalinMetaInfo};
 use svalin_pki::get_current_timestamp;
+use svalin_store::client_store::persistent::{self, SvalinMetaInfo};
 use test_log::test;
 use tokio::sync::oneshot;
 use tokio::time::timeout;

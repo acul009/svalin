@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use svalin_client_store::persistent::{self};
 use svalin_pki::SpkiHash;
+use svalin_store::client_store::persistent::{self};
 
 #[derive(Clone, Debug)]
 pub struct ClientState {

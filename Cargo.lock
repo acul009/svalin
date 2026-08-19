@@ -6517,10 +6517,9 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "svalin_client_store",
  "svalin_pki",
  "svalin_rpc",
- "svalin_server_store",
+ "svalin_store",
  "svalin_sysctl",
  "test-log",
  "thiserror 2.0.20",
@@ -6534,21 +6533,6 @@ dependencies = [
  "windows-registry",
  "windows-service",
  "zeroize",
-]
-
-[[package]]
-name = "svalin_client_store"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "futures",
- "postcard",
- "serde",
- "sqlx",
- "svalin_pki",
- "svalin_sysctl",
- "thiserror 2.0.20",
- "tracing",
 ]
 
 [[package]]
@@ -6566,9 +6550,9 @@ dependencies = [
  "lyon_algorithms",
  "rust-i18n",
  "svalin",
- "svalin_client_store",
  "svalin_pki",
  "svalin_rpc",
+ "svalin_store",
  "svalin_sysctl",
  "thiserror 2.0.20",
  "tokio",
@@ -6628,7 +6612,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "svalin_server_store"
+name = "svalin_store"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -6637,8 +6621,8 @@ dependencies = [
  "postcard",
  "serde",
  "sqlx",
- "svalin_client_store",
  "svalin_pki",
+ "svalin_sysctl",
  "thiserror 2.0.20",
  "tokio",
  "totp-rs",

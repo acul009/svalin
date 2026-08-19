@@ -10,7 +10,7 @@ use svalin_pki::{
 use svalin_rpc::rpc::{
     command::handler::CommandHandler, peer::Peer, server::RpcServer, session::Session,
 };
-use svalin_server_store::MessageStore;
+use svalin_store::server_store::{self, MessageStore};
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
@@ -18,14 +18,14 @@ use crate::message_streaming::{MessageFromClient, MessageToClient, server::MlsMe
 
 pub struct MessageHandler {
     mls_handler: Arc<MlsMessageHandler>,
-    transaction_store: Arc<svalin_server_store::TrustStoreTransactionStore>,
+    transaction_store: Arc<server_store::TrustStoreTransactionStore>,
     trust_store: Arc<RwLock<TrustStore>>,
 }
 
 impl MessageHandler {
     pub fn new(
         mls_handler: Arc<MlsMessageHandler>,
-        transaction_store: Arc<svalin_server_store::TrustStoreTransactionStore>,
+        transaction_store: Arc<server_store::TrustStoreTransactionStore>,
         trust_store: Arc<RwLock<TrustStore>>,
     ) -> Self {
         Self {

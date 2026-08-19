@@ -3,9 +3,9 @@ use crate::{message_streaming::MessageFromClient, shared::join_agent::accept_han
 use super::Client;
 
 use anyhow::Result;
-use svalin_client_store::trust_store_transaction_store::TransactionStoreError;
 use svalin_pki::{Certificate, trust_store};
 use svalin_rpc::rpc::connection::Connection;
+use svalin_store::trust_store_transaction_store::TransactionStoreError;
 use tokio::sync::oneshot;
 
 impl Client {

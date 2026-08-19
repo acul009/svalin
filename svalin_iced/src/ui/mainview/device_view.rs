@@ -6,8 +6,8 @@ use iced::{
     widget::{self, center, column, container, row, rule, scrollable, space, text},
 };
 use svalin::client::{Client, state::ClientState};
-use svalin_client_store::persistent::{SvalinMetaInfo, SvalinReport};
 use svalin_pki::SpkiHash;
+use svalin_store::client_store::persistent::{SvalinMetaInfo, SvalinReport};
 
 use crate::{
     Element, bootstrap,
