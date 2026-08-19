@@ -29,7 +29,6 @@ pub use init::init;
 use crate::shared::join_agent::AgentInitPayload;
 use crate::util::key_storage::KeySource;
 use crate::util::location::{Location, LocationError};
-use crate::verifier::remote_verifier::RemoteVerifier;
 use crate::{
     client::tunnel_manager::tcp::handler::TcpForwardHandler,
     message_streaming::agent::AgentMessageDispatcher,
@@ -123,7 +122,7 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
             credentials.clone(),
             storage_provider,
             key_retriever,
-            verifier,
+            verifier.clone(),
         )
         .await?,
     );
@@ -147,9 +146,6 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
         });
 
     let public_commands = HandlerCollection::new(permission_handler.clone());
-
-    let verifier =
-        RemoteVerifier::new(root_certificate.clone(), rpc.upstream_connection()).session_only();
 
     public_commands.chain().await.add(E2EHandler::new(
         credentials.clone(),
