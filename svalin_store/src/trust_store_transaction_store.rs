@@ -4,11 +4,12 @@ use svalin_pki::{
     secure_chain::{CheckedBlock, UncheckedBlock},
     trust_store,
 };
+use tokio::sync::Mutex;
 
 #[derive(Debug)]
 pub struct TrustStoreTransactionStore {
     pool: sqlx::SqlitePool,
-    current_sequence: AtomicU64,
+    current_sequence: tokio::sync::Mutex<u64>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -34,7 +35,7 @@ impl TrustStoreTransactionStore {
 
         Ok(Self {
             pool,
-            current_sequence: AtomicU64::new(current_sequence as u64),
+            current_sequence: Mutex::new(current_sequence as u64),
         })
     }
 
@@ -42,11 +43,11 @@ impl TrustStoreTransactionStore {
         &self,
         transaction: &CheckedBlock<trust_store::Transaction>,
     ) -> Result<(), TransactionStoreError> {
-        let expected_sequence = self.current_sequence.load(Ordering::Relaxed) + 1;
-        if transaction.sequence() > expected_sequence {
+        let mut current_sequence = self.current_sequence.lock().await;
+        if transaction.sequence() > *current_sequence + 1 {
             return Err(TransactionStoreError::SequenceMismatch);
         }
-        if transaction.sequence() < expected_sequence {
+        if transaction.sequence() <= *current_sequence {
             let data: Vec<u8> = sqlx::query_scalar!(
                 "SELECT data FROM trust_store_transactions WHERE sequence = ?",
                 transaction.sequence() as i64
@@ -66,8 +67,7 @@ impl TrustStoreTransactionStore {
         )
         .execute(&self.pool)
         .await?;
-        self.current_sequence
-            .store(transaction.sequence(), Ordering::Relaxed);
+        *current_sequence = transaction.sequence();
         Ok(())
     }
 
