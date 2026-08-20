@@ -70,6 +70,10 @@ impl Client {
         &self.upstream_certificate
     }
 
+    pub(crate) fn trust_store(&self) -> &Arc<RwLock<TrustStore>> {
+        &self.trust_store
+    }
+
     pub async fn subscribe_state(
         &self,
     ) -> Result<(ClientState, broadcast::Receiver<ClientStateUpdate>), anyhow::Error> {

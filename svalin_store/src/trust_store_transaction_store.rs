@@ -1,5 +1,3 @@
-use std::sync::atomic::{AtomicU64, Ordering};
-
 use svalin_pki::{
     secure_chain::{CheckedBlock, UncheckedBlock},
     trust_store,

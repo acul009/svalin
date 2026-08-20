@@ -217,6 +217,8 @@ async fn handle_agent_enroll(
     session_e2e
         .write_object(client.upstream_certificate().as_unverified())
         .await?;
+    let exported = client.trust_store().read().unwrap().export();
+    session_e2e.write_object(&exported).await?;
 
     // tracing::trace!("creating mls group for agent");
 

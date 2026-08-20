@@ -26,8 +26,8 @@ mod mls;
 
 pub use init::init;
 
-use crate::util::key_storage::KeySource;
 use crate::util::location::{Location, LocationError};
+use crate::util::{key_storage::KeySource, trust_store::save_trust_store};
 use crate::{
     client::tunnel_manager::tcp::handler::TcpForwardHandler,
     message_streaming::agent::AgentMessageDispatcher,
@@ -95,7 +95,7 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
 
     let agent_store = AgentStore::open(data_dir()?.push("agent-store.sqlite")).await?;
     let trust_store = load_trust_store(
-        data_dir()?.push("trust_store.json").to_path_buf(),
+        trust_store_path()?.to_path_buf(),
         agent_store.transaction_store().as_ref(),
         cancel.clone(),
         &tasks,
@@ -240,6 +240,8 @@ pub async fn init_with(data: AgentInitPayload) -> Result<()> {
 
     save_config(&config).await?;
 
+    save_trust_store(trust_store_path()?.as_path(), &data.trust_store).await?;
+
     Ok(())
 }
 
@@ -253,6 +255,10 @@ pub fn temp_dir() -> Result<Location, LocationError> {
 
 fn config_path() -> Result<Location, LocationError> {
     Ok(data_dir()?.push("config.json"))
+}
+
+fn trust_store_path() -> Result<Location, LocationError> {
+    Ok(data_dir()?.push("trust-store.json"))
 }
 
 async fn get_config() -> Result<Option<AgentConfig>> {

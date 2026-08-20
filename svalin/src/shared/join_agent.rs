@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
-use svalin_pki::{Certificate, Credential, RootCertificate};
+use svalin_pki::{Certificate, Credential, RootCertificate, trust_store};
 use svalin_rpc::rpc::{command::handler::PermissionPrecursor, session::Session};
 use tokio::task::AbortHandle;
 use tracing::field::debug;
@@ -23,6 +23,7 @@ pub struct AgentInitPayload {
     pub credentials: Credential,
     pub root: RootCertificate,
     pub upstream: Certificate,
+    pub trust_store: trust_store::Exported,
 }
 
 #[derive(Clone)]

@@ -7,6 +7,7 @@ use svalin_pki::{
     CreateCredentialsError, DeriveKeyError, KeyPair, SignatureVerificationError,
     UnverifiedCertificate, UseAsRootError, get_current_timestamp,
     mls::processor::CreateKeyPackageError,
+    trust_store::{self, TrustStore},
 };
 use svalin_rpc::{
     rpc::{
@@ -126,6 +127,10 @@ pub enum RequestJoinError {
     AucPaceError(#[source] AucPaceServerError),
     #[error("initializing client reported error when adding the agent to the server")]
     UploadToServerError,
+    #[error("error reading trust_store: {0}")]
+    ReadTrustStoreError(#[source] SessionReadError),
+    #[error("error importing trust_store: {0}")]
+    ImportTrustStoreError(#[source] trust_store::ImportError),
 }
 
 pub struct RequestJoin {
@@ -209,6 +214,13 @@ impl TakeableCommandDispatcher for RequestJoin {
             let upstream = upstream
                 .verify_signature(&root, get_current_timestamp())
                 .map_err(RequestJoinError::VerifyUpstreamCertError)?;
+            let trust_store: trust_store::Exported = session
+                .read_object()
+                .await
+                .map_err(RequestJoinError::ReadTrustStoreError)?;
+
+            let _import_test = TrustStore::import(trust_store.clone())
+                .map_err(RequestJoinError::ImportTrustStoreError)?;
 
             // tracing::trace!("received all neccessary data to initialize agent, creating key package");
 
@@ -243,6 +255,7 @@ impl TakeableCommandDispatcher for RequestJoin {
                 address: self.address,
                 root,
                 upstream,
+                trust_store,
             })
         } else {
             Err(DispatcherError::NoneSession)
