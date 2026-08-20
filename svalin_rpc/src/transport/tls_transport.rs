@@ -7,8 +7,7 @@ use anyhow::Result;
 use quinn::rustls::pki_types::InvalidDnsNameError;
 use svalin_pki::{
     Certificate, CertificateParseError, CreateCredentialsError, Credential, DecryptError,
-    EncryptError, EncryptedObject, EncryptionKey, ExactVerififier, KnownCertificateVerifier,
-    UnverifiedCertificate,
+    EncryptError, EncryptedObject, EncryptionKey, ExactVerififier, UnverifiedCertificate, Verifier,
 };
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_rustls::{TlsAcceptor, TlsStream};

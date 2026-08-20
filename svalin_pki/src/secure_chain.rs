@@ -339,6 +339,12 @@ pub struct UncheckedBlock<T> {
     signature: Vec<u8>,
 }
 
+impl<T: Transaction> PartialEq for UncheckedBlock<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.digest() == other.digest() && self.signature == other.signature
+    }
+}
+
 impl<T: Transaction> UncheckedBlock<T> {
     pub fn signer(&self) -> &SpkiHash {
         &self.signer
@@ -377,7 +383,7 @@ impl<'de> Deserialize<'de> for InnerDigest {
     where
         D: Deserializer<'de>,
     {
-        let bytes: &[u8] = Deserialize::deserialize(deserializer)?;
+        let bytes: Vec<u8> = Deserialize::deserialize(deserializer)?;
 
         let bytes: [u8; 64] = bytes
             .try_into()

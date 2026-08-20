@@ -133,7 +133,7 @@ async fn integration_tests() {
 
     let client = Client::open_profile(
         &profile_name,
-        "admin".as_bytes().to_owned(),
+        password.clone().into_bytes(),
         client_cancel.clone(),
     )
     .await

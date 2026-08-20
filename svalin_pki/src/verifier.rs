@@ -45,17 +45,13 @@ pub enum VerifyError {
     InternalError(#[from] anyhow::Error),
 }
 
-pub trait Verifier: Send + Sync + Debug + 'static {
+pub trait Verifier: Send + Sync + Debug + 'static + Sized {
     fn verify_spki_hash(
         &self,
         spki_hash: &SpkiHash,
         time: u64,
     ) -> impl Future<Output = Result<Certificate, VerifyError>> + Send;
-}
 
-impl<T: Verifier> KnownCertificateVerifier for T {}
-
-pub trait KnownCertificateVerifier: Verifier + Sized + 'static {
     fn verify_known_certificate(
         &self,
         cert: &UnverifiedCertificate,
@@ -97,9 +93,7 @@ pub mod rustls_feat {
     };
     use tokio::task::block_in_place;
 
-    use crate::{certificate::UnverifiedCertificate, verifier::VerifyError};
-
-    use super::KnownCertificateVerifier;
+    use crate::{Verifier, certificate::UnverifiedCertificate, verifier::VerifyError};
 
     #[derive(Debug)]
     pub struct RustlsVerifier<T> {
@@ -116,7 +110,7 @@ pub mod rustls_feat {
 
     impl<T> RustlsVerifier<T>
     where
-        T: Debug + KnownCertificateVerifier + 'static,
+        T: Debug + Verifier + 'static,
     {
         fn verify_cert(
             &self,
@@ -159,7 +153,7 @@ pub mod rustls_feat {
 
     impl<T> rustls::client::danger::ServerCertVerifier for RustlsVerifier<T>
     where
-        T: Debug + KnownCertificateVerifier + 'static,
+        T: Debug + Verifier + 'static,
     {
         fn verify_server_cert(
             &self,
@@ -207,7 +201,7 @@ pub mod rustls_feat {
 
     impl<T> rustls::server::danger::ClientCertVerifier for RustlsVerifier<T>
     where
-        T: Debug + KnownCertificateVerifier + 'static,
+        T: Debug + Verifier + 'static,
     {
         fn root_hint_subjects(&self) -> &[rustls::DistinguishedName] {
             &[]

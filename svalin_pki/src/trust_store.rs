@@ -1,4 +1,7 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::HashMap,
+    fmt::{self, Debug},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -27,9 +30,7 @@ pub struct TrustStoreDigest(secure_chain::ChainDigest);
 
 impl TrustStore {
     pub fn initialize(root: RootCertificate) -> Self {
-        let mut certificates = HashMap::new();
-        certificates.insert(root.spki_hash().clone(), root.as_certificate().clone());
-        let state = State { root, certificates };
+        let state = State::initialize(root);
 
         Self {
             chain: Chain::initialize(state),
@@ -70,7 +71,7 @@ impl TrustStore {
         }
     }
 
-    pub fn import(exported: Exported) -> Result<Self, secure_chain::ImportError<ImportError>> {
+    pub fn import(exported: Exported) -> Result<Self, ImportError> {
         Ok(Self {
             chain: secure_chain::Chain::import(exported.chain)?,
         })
@@ -115,13 +116,19 @@ pub struct Exported {
     chain: secure_chain::ExportedChain<State>,
 }
 
+impl Debug for Exported {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("trust_store::Exported").finish()
+    }
+}
+
 struct State {
     root: RootCertificate,
     certificates: HashMap<SpkiHash, Certificate>,
 }
 
 impl State {
-    pub fn initialize(root: RootCertificate) -> Self {
+    fn initialize(root: RootCertificate) -> Self {
         let mut certificates = HashMap::new();
         certificates.insert(root.spki_hash().clone(), root.clone().to_certificate());
         Self { root, certificates }
@@ -171,7 +178,7 @@ impl ChainState for State {
     type Transaction = Transaction;
     type Error = Error;
     type Exported = ExportedState;
-    type ImportError = ImportError;
+    type ImportError = InnerImportError;
 
     fn check(
         &self,
@@ -281,7 +288,7 @@ impl ChainState for State {
             .collect();
 
         if !missing.is_empty() {
-            return Err(ImportError::MissingIssuers(missing));
+            return Err(InnerImportError::MissingIssuers(missing));
         }
 
         let certificates = exported
@@ -301,7 +308,11 @@ struct ExportedState {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ImportError {
+#[error(transparent)]
+pub struct ImportError(#[from] secure_chain::ImportError<InnerImportError>);
+
+#[derive(Debug, thiserror::Error)]
+enum InnerImportError {
     #[error("root certificate error")]
     RootError(#[from] UseAsRootError),
     #[error("missing issuers: {0:?}")]

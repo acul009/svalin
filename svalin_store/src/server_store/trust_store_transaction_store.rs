@@ -23,8 +23,8 @@ pub struct TrustStoreTransactionStore {
 pub enum TransactionStoreError {
     #[error("SQLx error: {0}")]
     SqlxError(#[from] sqlx::Error),
-    #[error("Sequence mismatch")]
-    SequenceMismatch,
+    #[error("Sequence mismatch: expected {expected}, got {actual}")]
+    SequenceMismatch { expected: u64, actual: u64 },
     #[error("Postcard error: {0}")]
     PostcardError(#[from] postcard::Error),
     #[error("Broadcast error")]
@@ -40,7 +40,7 @@ impl TrustStoreTransactionStore {
         )
         .fetch_one(&pool)
         .await?
-        .unwrap_or(0);
+        .unwrap_or(1);
 
         Ok(Arc::new(Self {
             pool,
@@ -54,7 +54,10 @@ impl TrustStoreTransactionStore {
         transaction: CheckedBlock<trust_store::Transaction>,
     ) -> Result<(), TransactionStoreError> {
         if transaction.sequence() != self.current_sequence.load(Ordering::Relaxed) + 1 {
-            return Err(TransactionStoreError::SequenceMismatch);
+            return Err(TransactionStoreError::SequenceMismatch {
+                expected: self.current_sequence.load(Ordering::Relaxed) + 1,
+                actual: transaction.sequence(),
+            });
         }
         let data = postcard::to_stdvec(&transaction.as_unchecked())?;
         sqlx::query!(

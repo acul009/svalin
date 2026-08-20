@@ -6,7 +6,8 @@ use async_trait::async_trait;
 use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage};
 use serde::{Deserialize, Serialize};
 use svalin_pki::argon2::password_hash::rand_core::OsRng;
-use svalin_pki::trust_store::TrustStore;
+use svalin_pki::secure_chain::ChainDigest;
+use svalin_pki::trust_store::{self, TrustStore};
 use svalin_pki::{
     ArgonCost, Certificate, CertificateChainBuilder, CreateCredentialsError, Credential,
     DecodeCredentialsError, DecryptError, EncryptError, EncryptedCredential,
@@ -14,7 +15,7 @@ use svalin_pki::{
     UnverifiedCertificate, UseAsRootError, argon2::Argon2, get_current_timestamp,
     serde_paramsstring,
 };
-use svalin_pki::{ArgonParams, EncryptionKey};
+use svalin_pki::{ArgonParams, EncryptedObject, EncryptionKey};
 use svalin_pki::{
     argon2::password_hash::ParamsString, curve25519_dalek::ristretto::RistrettoPoint,
 };
@@ -47,6 +48,8 @@ pub struct LoginApproval {
     pub credential_key_params: ArgonParams,
     pub root_cert: UnverifiedCertificate,
     pub server_cert: UnverifiedCertificate,
+    pub trust_store: trust_store::Exported,
+    pub trust_store_digest: EncryptedObject<ChainDigest>,
 }
 
 impl From<&PermissionPrecursor<LoginHandler>> for Permission {
@@ -283,6 +286,8 @@ impl TakeableCommandHandler for LoginHandler {
                 credential_key_params: user.credential_key_params,
                 root_cert: self.root_cert.clone().to_unverified(),
                 server_cert: self.server_cert.clone().to_unverified(),
+                trust_store: user.trust_store,
+                trust_store_digest: user.trust_store_digest,
             };
             let user_cert = success.encrypted_user_credentials.certificate();
 
@@ -427,12 +432,17 @@ pub enum LoginDispatcherError {
     VerifyUpstreamCertError(#[source] SignatureVerificationError),
     #[error("error deriving encryption key: {0}")]
     DeriveEncryptionKeyError(anyhow::Error),
+    #[error("error importing trust store: {0}")]
+    TrustStoreImport(trust_store::ImportError),
+    #[error("trust store digest mismatch - server provided incorrect or tampered trust store")]
+    TrustStoreDigestMismatch,
 }
 
 pub struct LoginSuccess {
     pub device_credential: Credential,
     pub root_cert: RootCertificate,
     pub server_cert: Certificate,
+    pub trust_store: TrustStore,
 }
 
 impl TakeableCommandDispatcher for Login {
@@ -697,10 +707,23 @@ impl TakeableCommandDispatcher for Login {
                 .verify_signature(&root_cert, get_current_timestamp())
                 .map_err(LoginDispatcherError::VerifyUpstreamCertError)?;
 
+            let trust_store = TrustStore::import(success.trust_store)
+                .map_err(LoginDispatcherError::TrustStoreImport)?;
+
+            let digest = success
+                .trust_store_digest
+                .decrypt(&key)
+                .map_err(LoginDispatcherError::DecryptError)?;
+
+            if trust_store.digest() != digest {
+                return Err(LoginDispatcherError::TrustStoreDigestMismatch.into());
+            }
+
             Ok(LoginSuccess {
                 root_cert,
                 server_cert,
                 device_credential,
+                trust_store,
             })
         } else {
             Err(DispatcherError::NoneSession)

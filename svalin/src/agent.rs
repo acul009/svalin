@@ -4,8 +4,8 @@ use anyhow::{Context, Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    EncryptedCredential, ExactVerififier, KnownCertificateVerifier, TrustStoreVerifier,
-    UnverifiedCertificate, get_current_timestamp, mls::provider::PostcardCodec,
+    EncryptedCredential, ExactVerififier, TrustStoreVerifier, UnverifiedCertificate, Verifier,
+    get_current_timestamp, mls::provider::PostcardCodec,
 };
 use svalin_rpc::{
     commands::{deauthenticate::DeauthenticateHandler, e2e::E2EHandler, ping::PingHandler},
@@ -26,7 +26,6 @@ mod mls;
 
 pub use init::init;
 
-use crate::shared::join_agent::AgentInitPayload;
 use crate::util::key_storage::KeySource;
 use crate::util::location::{Location, LocationError};
 use crate::{
@@ -48,6 +47,7 @@ use crate::{
     shared::commands::{terminal::RemoteTerminalHandler, update_agent::UpdateAgentHandler},
     util::trust_store::update_trust_store,
 };
+use crate::{shared::join_agent::AgentInitPayload, util::trust_store::load_trust_store};
 
 #[instrument]
 pub async fn run(cancel: CancellationToken) -> Result<()> {
@@ -94,7 +94,7 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
     let tasks = TaskTracker::new();
 
     let agent_store = AgentStore::open(data_dir()?.push("agent-store.sqlite")).await?;
-    let trust_store = crate::util::trust_store::load(
+    let trust_store = load_trust_store(
         data_dir()?.push("trust_store.json").to_path_buf(),
         agent_store.transaction_store().as_ref(),
         cancel.clone(),

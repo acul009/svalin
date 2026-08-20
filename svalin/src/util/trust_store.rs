@@ -1,20 +1,21 @@
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, RwLock},
     time::Duration,
 };
 
+use anyhow::Context;
 use svalin_pki::{
     secure_chain::UncheckedBlock,
     trust_store::{self, TrustStore},
 };
 use svalin_rpc::rpc::connection::Connection;
-use tokio::sync::oneshot;
+use tokio::{io::AsyncWriteExt, sync::oneshot};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use crate::shared::commands::update_trust_store::UpdateTrustStore;
 
-trait Store {
+pub trait Store {
     fn load_all_after(
         &self,
         after: u64,
@@ -39,17 +40,23 @@ impl Store for svalin_store::server_store::TrustStoreTransactionStore {
     }
 }
 
-pub async fn load(
+pub async fn load_trust_store(
     file_location: PathBuf,
     store: &impl Store,
     cancel: CancellationToken,
     task_tracker: &TaskTracker,
 ) -> anyhow::Result<Arc<RwLock<TrustStore>>> {
-    let exported = tokio::fs::read(&file_location).await?;
-    let exported: trust_store::Exported = serde_json::from_slice(&exported)?;
+    let exported = tokio::fs::read(&file_location)
+        .await
+        .context("failed to read trust store file")?;
+    let exported: trust_store::Exported =
+        serde_json::from_slice(&exported).context("failed to deserialize trust store")?;
 
-    let mut trust_store = TrustStore::import(exported)?;
-    let transactions = store.load_all_after(trust_store.sequence()).await?;
+    let mut trust_store = TrustStore::import(exported).context("failed to import trust store")?;
+    let transactions = store
+        .load_all_after(trust_store.sequence())
+        .await
+        .context("failed to load trust store transactions")?;
 
     for block in transactions {
         let block = trust_store.check(block)?;
@@ -78,16 +85,8 @@ pub async fn load(
                         last_digest = guard.digest();
                         guard.export()
                     };
-                    let Ok(exported) = serde_json::to_vec_pretty(&exported) else {
-                        eprintln!("Failed to serialize trust store");
-                        continue;
-                    };
-                    let temp_file = file_location.with_extension("tmp");
-                    if let Err(e) = tokio::fs::write(&temp_file, exported).await {
-                        eprintln!("Failed to write trust store: {}", e);
-                    }
-                    if let Err(e) = tokio::fs::rename(&temp_file, &file_location).await {
-                        eprintln!("Failed to rename trust store: {}", e);
+                    if let Err(err)  = save_trust_store(&file_location, &exported).await {
+                        eprintln!("error during scheduled trust store save: {err}")
                     }
                 }
                 _ = cancel.cancelled() => {
@@ -122,6 +121,29 @@ pub async fn update_trust_store(
     });
 
     recv.await?;
+
+    Ok(())
+}
+
+pub async fn save_trust_store(
+    file_location: &Path,
+    trust_store: &trust_store::Exported,
+) -> anyhow::Result<()> {
+    let exported = serde_json::to_vec_pretty(&trust_store)?;
+
+    let temp_file = file_location.with_extension("tmp");
+    let mut file = tokio::fs::File::options()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&temp_file)
+        .await?;
+
+    file.write_all(&exported).await?;
+    file.flush().await?;
+    file.sync_all().await?;
+
+    tokio::fs::rename(&temp_file, &file_location).await?;
 
     Ok(())
 }

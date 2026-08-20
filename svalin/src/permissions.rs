@@ -15,7 +15,7 @@ use crate::{
         load_certificate_chain::LoadCertificateChainHandler,
         public_server_status::PublicStatusHandler,
         request_system_report::RequestSystemReportHandler, update_agent::UpdateAgentHandler,
-        update_user_mls::UpdateUserMlsHandler,
+        update_trust_store::UpdateTrustStoreHandler, update_user_mls::UpdateUserMlsHandler,
     },
 };
 
@@ -125,5 +125,11 @@ impl From<&PermissionPrecursor<RequestSystemReportHandler>> for Permission {
 impl From<&PermissionPrecursor<UpdateAgentHandler>> for Permission {
     fn from(_value: &PermissionPrecursor<UpdateAgentHandler>) -> Self {
         Permission::SessionOnly
+    }
+}
+
+impl From<&PermissionPrecursor<UpdateTrustStoreHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<UpdateTrustStoreHandler>) -> Self {
+        Permission::AuthenticatedOnly
     }
 }

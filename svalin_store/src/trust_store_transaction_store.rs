@@ -30,7 +30,7 @@ impl TrustStoreTransactionStore {
         )
         .fetch_one(&pool)
         .await?
-        .unwrap_or(0);
+        .unwrap_or(1);
 
         Ok(Self {
             pool,
@@ -42,8 +42,21 @@ impl TrustStoreTransactionStore {
         &self,
         transaction: &CheckedBlock<trust_store::Transaction>,
     ) -> Result<(), TransactionStoreError> {
-        if transaction.sequence() != self.current_sequence.load(Ordering::Relaxed) + 1 {
+        let expected_sequence = self.current_sequence.load(Ordering::Relaxed) + 1;
+        if transaction.sequence() > expected_sequence {
             return Err(TransactionStoreError::SequenceMismatch);
+        }
+        if transaction.sequence() < expected_sequence {
+            let data: Vec<u8> = sqlx::query_scalar!(
+                "SELECT data FROM trust_store_transactions WHERE sequence = ?",
+                transaction.sequence() as i64
+            )
+            .fetch_one(&self.pool)
+            .await?;
+            let block: UncheckedBlock<trust_store::Transaction> = postcard::from_bytes(&data)?;
+            if &block == transaction.as_unchecked() {
+                return Ok(());
+            }
         }
         let data = postcard::to_stdvec(&transaction.as_unchecked())?;
         sqlx::query!(

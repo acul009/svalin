@@ -5,6 +5,7 @@ use aucpace::{AuCPaceClient, ClientMessage};
 use serde::{Deserialize, Serialize};
 use svalin_pki::argon2::password_hash::rand_core::OsRng;
 use svalin_pki::mls::provider::{ExportedMlsStore, SvalinStorage};
+use svalin_pki::secure_chain::ChainDigest;
 use svalin_pki::{
     ArgonCost, Certificate, CreateCertificateError, CreateCredentialsError, Credential,
     EncryptError, EncryptedCredential, ExportedPublicKey, KeyPair, Sha512, UnverifiedCertificate,
@@ -55,6 +56,7 @@ pub struct InitRequest {
     user_mls_store: ExportedMlsStore,
     persistent_data: EncryptedObject<persistent::State>,
     trust_store: trust_store::Exported,
+    trust_store_digest: EncryptedObject<ChainDigest>,
 }
 
 pub(crate) struct InitHandler {
@@ -95,7 +97,7 @@ impl CommandHandler for InitHandler {
         let init_request: InitRequest = session.read_object().await?;
 
         let my_credential = keypair.upgrade(init_request.server_cert)?;
-        let trust_store = trust_store::TrustStore::import(init_request.trust_store)?;
+        let trust_store = trust_store::TrustStore::import(init_request.trust_store.clone())?;
         if trust_store.root().as_unverified() != init_request.encrypted_credential.certificate() {
             return Err(anyhow!("root mismatch"));
         }
@@ -111,6 +113,8 @@ impl CommandHandler for InitHandler {
             init_request.verifier,
             init_request.user_mls_store,
             init_request.persistent_data,
+            init_request.trust_store,
+            init_request.trust_store_digest,
         )
         .await?;
 
@@ -272,6 +276,8 @@ impl CommandDispatcher for Init {
         let block = trust_store.add(server_cert.clone(), &self.root)?;
         trust_store.apply(block);
 
+        let trust_store_digest = EncryptedObject::encrypt(&trust_store.digest(), &key)?;
+
         let init_request = InitRequest {
             username: self.username.clone(),
             totp_secret: self.totp.clone(),
@@ -284,6 +290,7 @@ impl CommandDispatcher for Init {
             user_mls_store,
             persistent_data,
             trust_store: trust_store.export(),
+            trust_store_digest,
         };
 
         session

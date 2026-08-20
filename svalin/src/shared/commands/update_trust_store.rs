@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
@@ -69,12 +69,14 @@ impl CommandDispatcher for UpdateTrustStore {
             let update: TrustStoreUpdate = session.read_object().await?;
             match update {
                 TrustStoreUpdate::Transaction(unchecked_block) => {
+                    tracing::trace!("received block from server {:?}", &unchecked_block);
                     apply_block(
                         Arc::into_inner(unchecked_block).expect("arc has not been clones yet"),
                         &self.store,
                         &self.trust_store,
                     )
-                    .await?;
+                    .await
+                    .context("error applying old block from server")?;
                 }
                 TrustStoreUpdate::UpToDate(server_digest) => {
                     if server_digest != self.trust_store.read().unwrap().digest() {
@@ -89,6 +91,7 @@ impl CommandDispatcher for UpdateTrustStore {
         }
 
         let _ = self.ready.send(());
+        tracing::debug!("trust store is up to date");
 
         let mut update_fut = session.read_object::<TrustStoreUpdate>();
 
@@ -101,12 +104,13 @@ impl CommandDispatcher for UpdateTrustStore {
                     let update = update?;
                     match update {
                         TrustStoreUpdate::Transaction(unchecked_block) => {
+                            tracing::trace!("received block from server {:?}", &unchecked_block);
                             apply_block(
                                 Arc::into_inner(unchecked_block).expect("arc has not been clones yet"),
                                 &self.store,
                                 &self.trust_store,
                             )
-                            .await?;
+                            .await.context("error applying live block from server")?;
                         },
                         TrustStoreUpdate::UpToDate(_) => return Err(anyhow!("server already sent up to date info")),
                         TrustStoreUpdate::Close => return Ok(()),

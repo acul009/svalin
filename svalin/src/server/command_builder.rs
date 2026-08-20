@@ -24,6 +24,7 @@ use crate::{
         load_certificate_chain::LoadCertificateChainHandler,
         login::LoginHandler,
         public_server_status::{PublicStatus, PublicStatusHandler},
+        update_trust_store::UpdateTrustStoreHandler,
         update_user_mls::UpdateUserMlsHandler,
     },
 };
@@ -85,7 +86,7 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
                 store: self.store.users.clone(),
             })
             .add(LoadCertificateChainHandler::new(ChainLoader::new(
-                self.trust_store,
+                self.trust_store.clone(),
                 self.store.sessions.clone(),
             )))
             .add(join_manager.create_request_handler())
@@ -106,7 +107,11 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             .add(agent_message_handler)
             .add(client_message_handler)
             .add(agent_sender)
-            .add(client_sender);
+            .add(client_sender)
+            .add(UpdateTrustStoreHandler::new(
+                self.trust_store,
+                self.store.trust_store_transactions.clone(),
+            ));
 
         Ok(commands)
     }

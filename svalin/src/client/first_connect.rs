@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use svalin_pki::{DecodeCredentialsError, KnownCertificateVerifier, Limit, TrustStoreVerifier};
+use svalin_pki::{DecodeCredentialsError, Limit, TrustStoreVerifier, Verifier};
 use svalin_rpc::rpc::command::dispatcher::DispatcherError;
 use svalin_rpc::rpc::connection::ConnectionDispatchError;
 use svalin_rpc::rpc::session::SessionDispatchError;
@@ -181,6 +181,7 @@ impl Login {
             login_data.root_cert,
             login_data.device_credential,
             password,
+            &login_data.trust_store,
         )
         .await
         .context("failed to save profile")?;

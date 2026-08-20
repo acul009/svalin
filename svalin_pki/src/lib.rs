@@ -38,9 +38,8 @@ pub use keypair::{ExportedPublicKey, KeyPair};
 // pub use signed_object::{SignedObject, VerifiedObject};
 // pub use signed_object::{SignedObject, VerifiedObject};
 pub use verifier::{
-    KnownCertificateVerifier, Verifier, VerifyError, exact::ExactVerififier,
-    one_of::OneOfVerififier, trust_store::TrustStoreVerifier, type_limited::Limit,
-    type_limited::TypeLimitedVerifier,
+    Verifier, VerifyError, exact::ExactVerififier, one_of::OneOfVerififier,
+    trust_store::TrustStoreVerifier, type_limited::Limit, type_limited::TypeLimitedVerifier,
 };
 
 // normal use statements

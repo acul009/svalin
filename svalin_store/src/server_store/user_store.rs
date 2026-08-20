@@ -8,9 +8,10 @@ use sqlx::SqlitePool;
 use svalin_pki::argon2::password_hash::ParamsString;
 use svalin_pki::curve25519_dalek::{self, RistrettoPoint, Scalar};
 use svalin_pki::mls::provider::ExportedMlsStore;
+use svalin_pki::secure_chain::ChainDigest;
 use svalin_pki::{
     ArgonParams, CertificateType, EncryptedCredential, EncryptedObject, SpkiHash,
-    UnverifiedCertificate, serde_paramsstring,
+    UnverifiedCertificate, serde_paramsstring, trust_store,
 };
 use totp_rs::Totp;
 
@@ -35,6 +36,8 @@ pub struct StoredUser {
 
     pub mls_store: ExportedMlsStore,
     pub persistent_data: EncryptedObject<persistent::State>,
+    pub trust_store: trust_store::Exported,
+    pub trust_store_digest: EncryptedObject<ChainDigest>,
 }
 
 #[derive(Debug)]
@@ -54,6 +57,8 @@ impl UserStore {
         verifier: RistrettoPoint,
         mls_store: ExportedMlsStore,
         persistent_data: EncryptedObject<persistent::State>,
+        trust_store: trust_store::Exported,
+        trust_store_digest: EncryptedObject<ChainDigest>,
     ) -> Result<()> {
         let count: u64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
             .fetch_one(&self.pool)
@@ -77,6 +82,8 @@ impl UserStore {
             verifier,
             mls_store,
             persistent_data,
+            trust_store,
+            trust_store_digest,
         };
 
         let cert = user.encrypted_credential.certificate();

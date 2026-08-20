@@ -11,7 +11,7 @@ use openmls_sqlx_storage::SqliteStorageProvider;
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    Credential, EncryptedCredential, KnownCertificateVerifier, TrustStoreVerifier,
+    Credential, EncryptedCredential, TrustStoreVerifier, Verifier,
     trust_store::{self, TrustStore},
 };
 use svalin_rpc::{
@@ -36,6 +36,7 @@ use crate::{
     util::{
         key_storage::KeySource,
         location::{Location, LocationError},
+        trust_store::save_trust_store,
     },
     verifier::tls_optional_wrapper::TlsOptionalWrapper,
 };
@@ -133,8 +134,7 @@ impl Server {
         };
         let config = serde_json::to_vec_pretty(&config)?;
         tokio::fs::write(&location, config).await?;
-        let trust_store = serde_json::to_vec_pretty(&trust_store)?;
-        tokio::fs::write(&Self::trust_store_path()?, trust_store).await?;
+        save_trust_store(&Self::trust_store_path()?, &trust_store).await?;
         Ok(())
     }
 

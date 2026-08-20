@@ -4,13 +4,12 @@ use anyhow::{Context, Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
-    ArgonParams, Certificate, Credential, EncryptedCredential, ExactVerififier,
-    KnownCertificateVerifier, RootCertificate, TrustStoreVerifier, UnverifiedCertificate,
-    get_current_timestamp, mls::client::MlsClient,
+    ArgonParams, Certificate, Credential, EncryptedCredential, ExactVerififier, RootCertificate,
+    TrustStoreVerifier, UnverifiedCertificate, Verifier, get_current_timestamp,
+    mls::client::MlsClient, trust_store::TrustStore,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_store::client_store::ClientStore;
-use tokio::sync::oneshot;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::error;
 
@@ -18,13 +17,10 @@ use crate::{
     client::tunnel_manager::TunnelManager,
     message_streaming::client::{ClientMessageDispatcher, ClientMessageReceiver},
     remote_key_retriever::RemoteKeyRetriever,
-    shared::commands::{
-        get_user_credentials::GetUserCredential, update_trust_store::UpdateTrustStore,
-        update_user_mls::UpdateUserMls,
-    },
+    shared::commands::{get_user_credentials::GetUserCredential, update_user_mls::UpdateUserMls},
     util::{
         location::{Location, LocationError},
-        trust_store::update_trust_store,
+        trust_store::{load_trust_store, save_trust_store, update_trust_store},
     },
 };
 
@@ -66,6 +62,10 @@ impl Profile {
     pub async fn profile_dir(&self) -> Result<Location> {
         Client::profile_dir(&self.name()).await
     }
+
+    pub async fn trust_store_path(&self) -> Result<Location> {
+        Ok(self.profile_dir().await?.push("trust_store.json"))
+    }
 }
 
 impl Client {
@@ -83,7 +83,13 @@ impl Client {
     pub async fn list_profiles() -> Result<Vec<String>> {
         let location = Self::data_dir().await?;
 
-        let mut folders = tokio::fs::read_dir(&location).await?;
+        let mut folders = match tokio::fs::read_dir(&location).await {
+            Ok(folders) => folders,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(Vec::new());
+            }
+            Err(e) => return Err(e.into()),
+        };
 
         let mut profiles = Vec::new();
 
@@ -103,11 +109,13 @@ impl Client {
         root_certificate: RootCertificate,
         device_credentials: Credential,
         password: Vec<u8>,
+        trust_store: &TrustStore,
     ) -> Result<String> {
         let local_credential_params = ArgonParams::strong();
         let key = local_credential_params
             .derive_encryption_key(password)
-            .await?;
+            .await
+            .context("failed to derive encryption key")?;
         let encrypted_device_credential = device_credentials.export(&key)?;
 
         let profile = Profile::new(
@@ -121,11 +129,20 @@ impl Client {
 
         let profile_name = profile.name();
 
-        if Self::list_profiles().await?.contains(&profile_name) {
+        if Self::list_profiles()
+            .await
+            .context("failed to list profiles")?
+            .contains(&profile_name)
+        {
             return Err(anyhow!("profile already exists"));
         }
 
-        Self::save_profile(&profile).await?;
+        Self::save_profile(&profile)
+            .await
+            .context("failed to save profile to disk")?;
+
+        let trust_store_path = profile.trust_store_path().await?;
+        save_trust_store(&trust_store_path, &trust_store.export()).await?;
 
         Ok(profile_name)
     }
@@ -180,11 +197,7 @@ impl Client {
 
         let mls_db_path = profile.profile_dir().await?.push("mls-store.sqlite");
         let client_db_path = profile.profile_dir().await?.push("client-store.sqlite");
-        let trust_store_path = profile
-            .profile_dir()
-            .await?
-            .push("trust_store.json")
-            .to_pathbuf();
+        let trust_store_path = profile.trust_store_path().await?.to_pathbuf();
         // tracing::trace!("unlocking profile");
         let device_credential = profile.device_credential.decrypt(&key)?;
         let root_certificate = profile.root_certificate.use_as_root()?;
@@ -195,7 +208,7 @@ impl Client {
         let client_store = Arc::new(ClientStore::open(client_db_path).await?);
         // Starting Background Tasks
         let background_tasks = TaskTracker::new();
-        let trust_store = crate::util::trust_store::load(
+        let trust_store = load_trust_store(
             trust_store_path,
             client_store.transaction_store().as_ref(),
             cancel.clone(),

@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use crate::trust_store::TrustStore;
+use crate::{CertificateType, trust_store::TrustStore};
 
 #[derive(Debug, Clone)]
 pub struct TrustStoreVerifier {
@@ -26,5 +26,32 @@ impl super::Verifier for TrustStoreVerifier {
         cert.check_validity_at(time)?;
 
         Ok(cert.clone())
+    }
+
+    async fn verify_known_certificate(
+        &self,
+        cert: &crate::UnverifiedCertificate,
+        time: u64,
+    ) -> Result<crate::Certificate, super::VerifyError> {
+        match cert.certificate_type() {
+            CertificateType::Temporary => Err(super::VerifyError::IncorrectCertificateType),
+            CertificateType::Root
+            | CertificateType::Agent
+            | CertificateType::Server
+            | CertificateType::User => {
+                let correct_cert = self.verify_spki_hash(cert.spki_hash(), time).await?;
+                if correct_cert == *cert {
+                    Ok(correct_cert)
+                } else {
+                    Err(super::VerifyError::IncorrectCertificateType)
+                }
+            }
+            CertificateType::UserSession => {
+                let issuer = self.verify_spki_hash(cert.issuer(), time).await?;
+                let cert = cert.clone().verify_signature(&issuer, time)?;
+                // TODO: Session revocation
+                Ok(cert)
+            }
+        }
     }
 }
