@@ -380,38 +380,38 @@ impl CommandDispatcher for UpdateUserMls {
                     timeout_duration = Duration::from_secs(60);
 
                     // Here we check if we want to add our session to any needed groups
-                    for (device, _) in persistent_data.devices() {
-                        let group = SvalinGroupId::DeviceGroup(device.clone());
-                        if !client
-                            .is_member(&group, self.session_mls.me().clone())
-                            .await?
-                        {
-                            let key_package = self.session_mls.create_key_package().await?;
-                            let message = client.add_member(&group, key_package).await?;
-                            messages.push(message);
-                        }
+                    // for (device, _) in persistent_data.devices() {
+                    //     let group = SvalinGroupId::DeviceGroup(device.clone());
+                    //     if !client
+                    //         .is_member(&group, self.session_mls.me().clone())
+                    //         .await?
+                    //     {
+                    //         let key_package = self.session_mls.create_key_package().await?;
+                    //         let message = client.add_member(&group, key_package).await?;
+                    //         messages.push(message);
+                    //     }
 
-                        if let Some(message) = client
-                            .create_meta_group_if_missing(device.clone())
-                            .await
-                            .map_err(|err| anyhow!(err))?
-                        {
-                            tracing::trace!("new meta group: {message:?}");
-                            messages.push(message);
-                        }
-                        let meta_group = SvalinGroupId::DeviceMetaGroup(device.clone());
-                        if !client
-                            .is_member(&meta_group, self.session_mls.me().clone())
-                            .await?
-                        {
-                            tracing::trace!("adding client to meta group");
-                            let key_package = self.session_mls.create_key_package().await?;
-                            let message = client.add_member(&meta_group, key_package).await?;
-                            messages.push(message);
-                        } else {
-                            tracing::trace!("already in meta group");
-                        }
-                    }
+                    //     if let Some(message) = client
+                    //         .create_meta_group_if_missing(device.clone())
+                    //         .await
+                    //         .map_err(|err| anyhow!(err))?
+                    //     {
+                    //         tracing::trace!("new meta group: {message:?}");
+                    //         messages.push(message);
+                    //     }
+                    //     let meta_group = SvalinGroupId::DeviceMetaGroup(device.clone());
+                    //     if !client
+                    //         .is_member(&meta_group, self.session_mls.me().clone())
+                    //         .await?
+                    //     {
+                    //         tracing::trace!("adding client to meta group");
+                    //         let key_package = self.session_mls.create_key_package().await?;
+                    //         let message = client.add_member(&meta_group, key_package).await?;
+                    //         messages.push(message);
+                    //     } else {
+                    //         tracing::trace!("already in meta group");
+                    //     }
+                    // }
 
                     send_update = !aknowledge.is_empty() || !messages.is_empty();
                 }
