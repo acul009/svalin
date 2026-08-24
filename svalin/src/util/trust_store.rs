@@ -90,6 +90,10 @@ pub async fn load_trust_store(
                     }
                 }
                 _ = cancel.cancelled() => {
+                    let exported = trust_store.read().unwrap().export();
+                    if let Err(err)  = save_trust_store(&file_location, &exported).await {
+                        eprintln!("error during scheduled trust store save: {err}")
+                    }
                     break;
                 }
             }
