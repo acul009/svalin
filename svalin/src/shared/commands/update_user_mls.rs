@@ -306,10 +306,9 @@ impl CommandDispatcher for UpdateUserMls {
             let mut aknowledge = Vec::new();
             let mut messages = Vec::new();
             let mut key_packages = Vec::new();
-            let mut should_yield = false;
             let mut timeout_duration = Duration::from_secs(3);
 
-            while !should_yield {
+            loop {
                 let Some(update) = self
                     .cancel
                     .run_until_cancelled(tokio::time::timeout(
@@ -454,7 +453,6 @@ struct SavedState {
 enum Update {
     Message(Uuid, Arc<MessageToMemberTransport>),
     KeyPackageCount(u64),
-    UpToDate,
     Goodbye,
 }
 
