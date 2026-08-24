@@ -109,6 +109,10 @@ impl TrustStore {
     pub fn digest(&self) -> ChainDigest {
         self.chain.digest()
     }
+
+    pub fn enable_real_time_ratchet(&mut self) {
+        self.chain.enable_real_time_ratchet();
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]

@@ -46,8 +46,38 @@ pub trait Transaction {
     fn digest(&self, digest: &mut impl sha2::Digest);
 }
 
+pub enum TimeRatchetMode {
+    MinAge(u64),
+    RealTime,
+}
+
+const MAX_REALTIME_OFFSET_SECONDS: u64 = 10;
+
+impl TimeRatchetMode {
+    fn is_allowed(&self, time: u64) -> bool {
+        match self {
+            TimeRatchetMode::MinAge(age) => time >= *age,
+            TimeRatchetMode::RealTime => {
+                time >= get_current_timestamp() - MAX_REALTIME_OFFSET_SECONDS
+            }
+        }
+    }
+
+    fn now() -> Self {
+        TimeRatchetMode::MinAge(get_current_timestamp())
+    }
+
+    fn to_timestamp(&self) -> u64 {
+        match self {
+            TimeRatchetMode::MinAge(age) => *age,
+            TimeRatchetMode::RealTime => get_current_timestamp() - MAX_REALTIME_OFFSET_SECONDS,
+        }
+    }
+}
+
 pub struct Chain<State: ChainState> {
     last_block: Option<CheckedBlock<State::Transaction>>,
+    time_ratchet: TimeRatchetMode,
     state: State,
 }
 
@@ -55,6 +85,7 @@ impl<State: ChainState> Chain<State> {
     pub fn initialize(state: State) -> Self {
         Self {
             last_block: None,
+            time_ratchet: TimeRatchetMode::now(),
             state,
         }
     }
@@ -150,6 +181,9 @@ impl<State: ChainState> Chain<State> {
         if block.time > get_current_timestamp() {
             return Err(CheckBlockError::TimeInFuture);
         }
+        if !self.time_ratchet.is_allowed(block.time) {
+            return Err(CheckBlockError::TooOld);
+        }
 
         if block.signer() != certificate.spki_hash() {
             return Err(CheckBlockError::IncorrectCertificate);
@@ -217,6 +251,7 @@ impl<State: ChainState> Chain<State> {
                 .last_block
                 .as_ref()
                 .map(|block| block.as_unchecked().clone()),
+            time_ratchet: self.time_ratchet.to_timestamp(),
         }
     }
 
@@ -231,20 +266,26 @@ impl<State: ChainState> Chain<State> {
             }
             Ok(Self {
                 state,
+                time_ratchet: TimeRatchetMode::MinAge(exported.time_ratchet),
                 last_block: Some(CheckedBlock(last_block)),
             })
         } else {
             Ok(Self {
                 state,
+                time_ratchet: TimeRatchetMode::MinAge(exported.time_ratchet),
                 last_block: None,
             })
         }
     }
 
-    pub(crate) fn sequence(&self) -> u64 {
+    pub fn sequence(&self) -> u64 {
         self.last_block
             .as_ref()
             .map_or_else(|| 0, |block| block.sequence())
+    }
+
+    pub fn enable_real_time_ratchet(&mut self) {
+        self.time_ratchet = TimeRatchetMode::RealTime;
     }
 }
 
@@ -252,6 +293,7 @@ impl<State: ChainState> Chain<State> {
 pub struct ExportedChain<State: ChainState> {
     state: State::Exported,
     last_block: Option<UncheckedBlock<State::Transaction>>,
+    time_ratchet: u64,
 }
 impl<State> Clone for ExportedChain<State>
 where
@@ -262,6 +304,7 @@ where
         Self {
             state: self.state.clone(),
             last_block: self.last_block.clone(),
+            time_ratchet: self.time_ratchet,
         }
     }
 }
@@ -284,6 +327,8 @@ pub enum CheckBlockError<Inner> {
     ResultingStateMismatch,
     #[error("block time is in the future")]
     TimeInFuture,
+    #[error("block to old for time ratchet")]
+    TooOld,
 }
 
 #[derive(Debug, thiserror::Error)]
