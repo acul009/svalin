@@ -79,9 +79,11 @@ impl CommandDispatcher for UpdateTrustStore {
                     .context("error applying old block from server")?;
                 }
                 TrustStoreUpdate::UpToDate(server_digest) => {
-                    if server_digest != self.trust_store.read().unwrap().digest() {
+                    let mut trust_store = self.trust_store.write().unwrap();
+                    if server_digest != trust_store.digest() {
                         return Err(anyhow!("server sent wrong digest"));
                     }
+                    trust_store.enable_real_time_ratchet();
                     break;
                 }
                 TrustStoreUpdate::Close => {

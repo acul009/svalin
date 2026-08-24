@@ -1,8 +1,4 @@
-use std::{
-    net::SocketAddr,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result, anyhow};
 use command_builder::SvalinCommandBuilder;
@@ -10,10 +6,7 @@ use config_builder::ServerConfigBuilder;
 use openmls_sqlx_storage::SqliteStorageProvider;
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
-use svalin_pki::{
-    Credential, EncryptedCredential, TrustStoreVerifier, Verifier,
-    trust_store::{self, TrustStore},
-};
+use svalin_pki::{Credential, EncryptedCredential, TrustStoreVerifier, Verifier};
 use svalin_rpc::{
     permissions::{DummyPermission, anonymous_permission_handler::AnonymousPermissionHandler},
     rpc::{command::handler::HandlerCollection, server::Socket},
@@ -34,9 +27,9 @@ use crate::{
         public_server_status::{PublicStatus, PublicStatusHandler},
     },
     util::{
+        self,
         key_storage::KeySource,
         location::{Location, LocationError},
-        trust_store::save_trust_store,
     },
     verifier::tls_optional_wrapper::TlsOptionalWrapper,
 };
@@ -74,7 +67,6 @@ struct SavedConfig {
 }
 
 struct BaseConfig {
-    trust_store: Arc<RwLock<TrustStore>>,
     credential: Credential,
     pseudo_data_seed: Vec<u8>,
 }
@@ -106,15 +98,8 @@ impl Server {
                 .decrypt_credentials(config.credential)
                 .await?;
 
-            let trust_store = tokio::fs::read(Self::trust_store_path()?).await?;
-            let trust_store: trust_store::Exported =
-                serde_json::from_slice(trust_store.as_slice())?;
-            let trust_store = TrustStore::import(trust_store)?;
-            let trust_store = Arc::new(RwLock::new(trust_store));
-
             let config = BaseConfig {
                 credential,
-                trust_store,
                 pseudo_data_seed: config.pseudo_data_seed,
             };
             Ok(Some(config))
@@ -126,7 +111,6 @@ impl Server {
     async fn save_base_config(config: &BaseConfig) -> Result<()> {
         let location = Self::base_config_path()?;
         let key_source = KeySource::generate_builtin()?;
-        let trust_store = config.trust_store.read().unwrap().export();
         let config = SavedConfig {
             credential: key_source.encrypt_credential(&config.credential).await?,
             key_source,
@@ -134,7 +118,6 @@ impl Server {
         };
         let config = serde_json::to_vec_pretty(&config)?;
         tokio::fs::write(&location, config).await?;
-        save_trust_store(&Self::trust_store_path()?, &trust_store).await?;
         Ok(())
     }
 
@@ -162,6 +145,8 @@ impl Server {
         let store = ServerStore::open(&db_path)
             .await
             .context("error opending server store")?;
+
+        let tasks = TaskTracker::new();
 
         // tracing::trace!("creating socket");
 
@@ -193,18 +178,30 @@ impl Server {
                     .collect();
 
                 let conf = BaseConfig {
-                    trust_store: Arc::new(RwLock::new(init_success.trust_store)),
                     credential: init_success.credential,
                     pseudo_data_seed,
                 };
 
                 Self::save_base_config(&conf).await?;
+                util::trust_store::save_trust_store(
+                    &Self::trust_store_path()?,
+                    &init_success.trust_store.export(),
+                )
+                .await?;
 
                 conf
             }
         };
 
-        let trust_store = base_config.trust_store;
+        let trust_store = util::trust_store::load_trust_store(
+            Self::trust_store_path()?.to_pathbuf(),
+            store.trust_store_transactions.as_ref(),
+            config.cancelation_token.clone(),
+            &tasks,
+        )
+        .await?;
+        trust_store.write().unwrap().enable_real_time_ratchet();
+
         let root = trust_store.read().unwrap().root().clone();
 
         let credentials = base_config.credential;
@@ -228,8 +225,6 @@ impl Server {
             store,
             mls: mls.clone(),
         };
-
-        let tasks = TaskTracker::new();
 
         let store_close_handle = command_builder.store.close_handle();
 
