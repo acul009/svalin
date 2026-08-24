@@ -362,10 +362,6 @@ impl CommandDispatcher for UpdateUserMls {
                                 key_package_count += 1;
                             }
                         }
-                        Update::YieldRequest => {
-                            send_update = true;
-                            should_yield = true;
-                        }
                         Update::Goodbye => {
                             return Ok(());
                         }
@@ -458,7 +454,7 @@ struct SavedState {
 enum Update {
     Message(Uuid, Arc<MessageToMemberTransport>),
     KeyPackageCount(u64),
-    YieldRequest,
+    UpToDate,
     Goodbye,
 }
 

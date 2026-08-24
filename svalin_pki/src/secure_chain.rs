@@ -53,7 +53,7 @@ pub trait Transaction {
     fn digest(&self, digest: &mut impl sha2::Digest);
 }
 
-pub enum TimeRatchetMode {
+enum TimeRatchetMode {
     MinAge(u64),
     RealTime,
 }
