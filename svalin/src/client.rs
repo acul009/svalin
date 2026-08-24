@@ -31,7 +31,6 @@ use crate::client::device::DeviceHandle;
 use crate::client::state::{ClientState, ClientStateUpdate};
 use crate::message_streaming::MessageFromClient;
 use crate::message_streaming::client::{ClientMessageDispatcherHandle, ClientStateHandle};
-use crate::mls::MlsClient;
 
 pub struct Client {
     rpc: RpcClient,
@@ -42,7 +41,6 @@ pub struct Client {
     device_credential: Credential,
     trust_store: Arc<RwLock<TrustStore>>,
     store: Arc<ClientStore>,
-    mls: Arc<MlsClient>,
     tunnel_manager: TunnelManager,
     message_sender: ClientMessageDispatcherHandle,
     state_handle: ClientStateHandle,

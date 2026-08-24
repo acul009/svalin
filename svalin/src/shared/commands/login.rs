@@ -680,7 +680,7 @@ impl TakeableCommandDispatcher for Login {
                 .map_err(LoginDispatcherError::DecodeCredentialsError)?;
 
             let device_credential = user_credential
-                .create_user_device_credential()
+                .create_user_session_credential()
                 .map_err(LoginDispatcherError::CreateSessionError)?;
 
             session

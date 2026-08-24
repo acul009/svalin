@@ -10,7 +10,7 @@ use svalin_pki::{
     trust_store::{self, TrustStore},
 };
 use svalin_rpc::rpc::connection::Connection;
-use tokio::{io::AsyncWriteExt, sync::oneshot};
+use tokio::sync::oneshot;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use crate::shared::commands::update_trust_store::UpdateTrustStore;
@@ -135,19 +135,7 @@ pub async fn save_trust_store(
 ) -> anyhow::Result<()> {
     let exported = serde_json::to_vec_pretty(&trust_store)?;
 
-    let temp_file = file_location.with_extension("tmp");
-    let mut file = tokio::fs::File::options()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&temp_file)
-        .await?;
-
-    file.write_all(&exported).await?;
-    file.flush().await?;
-    file.sync_all().await?;
-
-    tokio::fs::rename(&temp_file, &file_location).await?;
+    super::files::override_atomic(file_location, &exported).await?;
 
     Ok(())
 }

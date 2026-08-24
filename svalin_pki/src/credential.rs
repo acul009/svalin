@@ -263,7 +263,7 @@ impl Credential {
             .mark_as_trusted())
     }
 
-    pub fn create_user_device_credential(&self) -> Result<Self, CreateCredentialsError> {
+    pub fn create_user_session_credential(&self) -> Result<Self, CreateCredentialsError> {
         let keypair = KeyPair::generate();
 
         let certificate = self.create_certificate_for_key(

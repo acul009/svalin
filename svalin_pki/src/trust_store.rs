@@ -6,9 +6,9 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AddCertificateError, Certificate, CertificateChainBuilder, Credential, RootCertificate,
-    SignatureVerificationError, SpkiHash, UnverifiedCertificate, UnverifiedCertificateChain,
-    UseAsRootError,
+    AddCertificateError, Certificate, CertificateChain, CertificateChainBuilder, Credential,
+    RootCertificate, SignatureVerificationError, SpkiHash, UnverifiedCertificate,
+    UnverifiedCertificateChain, UseAsRootError, VerifyChainError, get_current_timestamp,
     secure_chain::{self, Chain, ChainDigest, ChainState, CheckedBlock, UncheckedBlock},
 };
 pub type CreateBlockError = secure_chain::CreateBlockError<Error>;
@@ -100,6 +100,20 @@ impl TrustStore {
         Ok(cert_chain
             .finish()
             .expect("already checked if the chain is finished"))
+    }
+
+    pub fn get_certificate_chain(
+        &self,
+        spki_hash: &SpkiHash,
+    ) -> Result<CertificateChain, LoadCertChainError> {
+        let Some(cert) = self.get(spki_hash).cloned() else {
+            return Err(LoadCertChainError::UnknownCertificate);
+        };
+        let builder = CertificateChainBuilder::new(cert.to_unverified());
+        let chain = self.complete_certificate_chain(builder)?;
+        let chain = chain.verify(self.root(), get_current_timestamp())?;
+
+        Ok(chain)
     }
 
     pub fn sequence(&self) -> u64 {
@@ -329,4 +343,25 @@ pub enum CompleteCertChainError {
     NotFound(SpkiHash),
     #[error("error adding cert to chain: {0}")]
     AddCertificateError(#[from] AddCertificateError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum LoadCertChainError {
+    #[error("unknown certificate")]
+    UnknownCertificate,
+    #[error("issuer with spki hash {0} not found")]
+    NotFound(SpkiHash),
+    #[error("error adding cert to chain: {0}")]
+    AddCertificateError(#[from] AddCertificateError),
+    #[error("error verifying chain: {0}")]
+    VerifyError(#[from] VerifyChainError),
+}
+
+impl From<CompleteCertChainError> for LoadCertChainError {
+    fn from(err: CompleteCertChainError) -> Self {
+        match err {
+            CompleteCertChainError::NotFound(spki_hash) => Self::NotFound(spki_hash),
+            CompleteCertChainError::AddCertificateError(err) => Self::AddCertificateError(err),
+        }
+    }
 }

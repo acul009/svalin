@@ -4,7 +4,6 @@ use crate::SpkiHash;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SvalinGroupId {
-    GlobalGroup,
     DeviceGroup(SpkiHash),
     DeviceMetaGroup(SpkiHash),
 }
@@ -24,7 +23,6 @@ impl SvalinGroupId {
                 bytes.extend_from_slice(hex.as_bytes());
                 bytes
             }
-            SvalinGroupId::GlobalGroup => b"global".to_vec(),
         };
 
         GroupId::from_slice(&bytes)
@@ -53,7 +51,6 @@ impl SvalinGroupId {
                     .map_err(|_| ParseGroupIdError::WrongSliceLength)?;
                 Ok(Self::DeviceMetaGroup(spki_hash))
             }
-            b"global" => Ok(Self::GlobalGroup),
             _ => Err(ParseGroupIdError::UnknownGroupType),
         }
     }

@@ -9,8 +9,15 @@ use crate::{Certificate, Credential, SpkiHash, get_current_timestamp};
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct InnerDigest([u8; 64]);
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct ChainDigest(InnerDigest);
+pub struct ChainDigest {
+    digest: InnerDigest,
+    sequence: u64,
+}
+impl ChainDigest {
+    pub fn sequence(&self) -> u64 {
+        self.sequence
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 struct StateDigest(InnerDigest);
@@ -241,7 +248,10 @@ impl<State: ChainState> Chain<State> {
             .unwrap_or_else(|| BlockDigest::empty());
         let mut digest = Sha512::new().chain_update(block_digest.0.0);
         self.state.digest(&mut digest);
-        digest.finalize().into()
+        ChainDigest {
+            digest: digest.finalize().into(),
+            sequence: self.sequence(),
+        }
     }
 
     pub fn export(&self) -> ExportedChain<State> {
@@ -456,12 +466,12 @@ where
     }
 }
 
-impl<S> From<S> for ChainDigest
+impl<S> From<S> for InnerDigest
 where
     S: Into<[u8; 64]>,
 {
     fn from(s: S) -> Self {
-        Self(InnerDigest(s.into()))
+        Self(s.into())
     }
 }
 
@@ -475,8 +485,8 @@ impl AsRef<[u8]> for StateDigest {
         &self.0.0
     }
 }
-impl AsRef<[u8]> for ChainDigest {
-    fn as_ref(&self) -> &[u8] {
-        &self.0.0
-    }
-}
+// impl AsRef<[u8]> for ChainDigest {
+//     fn as_ref(&self) -> &[u8] {
+//         &self.0.0
+//     }
+// }

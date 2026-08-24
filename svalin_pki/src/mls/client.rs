@@ -187,7 +187,6 @@ where
                     return Err(HandleWelcomeError::IncorrectCertificateType);
                 }
             }
-            SvalinGroupId::GlobalGroup => {}
         }
 
         let required_members = self

@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use anyhow::{Context, anyhow};
-use svalin_pki::mls::client::MessageDataContent;
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
-use svalin_store::client_store::{ClientStore, persistent};
+use svalin_store::client_store::ClientStore;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
@@ -13,7 +11,6 @@ use crate::{
         MessageFromClient, MessageToClient,
         with_client::{MessageHandler, MessageSender},
     },
-    mls::MlsClient,
 };
 
 #[derive(Clone)]
@@ -93,7 +90,7 @@ impl CommandDispatcher for ClientMessageDispatcher {
 
 pub struct ClientMessageReceiver {
     _to_server: ClientMessageDispatcherHandle,
-    mls: Arc<MlsClient>,
+    // mls: Arc<MlsClient>,
     cancel: CancellationToken,
     update_sender: mpsc::Sender<ClientStateRequest>,
 }
@@ -101,7 +98,7 @@ pub struct ClientMessageReceiver {
 impl ClientMessageReceiver {
     pub async fn initialize(
         sender: ClientMessageDispatcherHandle,
-        mls: Arc<MlsClient>,
+        // mls: Arc<MlsClient>,
         cancel: CancellationToken,
         store: Arc<ClientStore>,
     ) -> Result<(Self, ClientStateHandle), anyhow::Error> {
@@ -109,7 +106,7 @@ impl ClientMessageReceiver {
 
         let me = Self {
             _to_server: sender,
-            mls,
+            // mls,
             cancel,
             update_sender: state_handle.channel.clone(),
         };
@@ -168,30 +165,32 @@ impl CommandDispatcher for ClientMessageReceiver {
 impl ClientMessageReceiver {
     async fn handle(&self, message: MessageToClient) -> Result<bool, anyhow::Error> {
         match message {
-            MessageToClient::Mls(message) => {
-                tracing::trace!("client received message: {:?}", message);
-                let message = self
-                    .mls
-                    .handle_message(&message)
-                    .await
-                    .map_err(|err| anyhow!("{}", err))
-                    .context("error handling mls message")?;
+            MessageToClient::Mls(_message) => {
+                // Session MLS logic is currently disabled
 
-                match message.content {
-                    MessageDataContent::Internal => {}
-                    MessageDataContent::Report(spki_hash, report) => {
-                        self.update_client_state(ClientStateUpdate::Persistent(
-                            persistent::Message::UpdateSystemReport(spki_hash, report),
-                        ))
-                        .await;
-                    }
-                    MessageDataContent::MetaInfo(spki_hash, meta_info) => {
-                        self.update_client_state(ClientStateUpdate::Persistent(
-                            persistent::Message::UpdateMetaInfo(spki_hash, meta_info),
-                        ))
-                        .await;
-                    }
-                }
+                // tracing::trace!("client received message: {:?}", message);
+                // let message = self
+                //     .mls
+                //     .handle_message(&message)
+                //     .await
+                //     .map_err(|err| anyhow!("{}", err))
+                //     .context("error handling mls message")?;
+
+                // match message.content {
+                //     MessageDataContent::Internal => {}
+                //     MessageDataContent::Report(spki_hash, report) => {
+                //         self.update_client_state(ClientStateUpdate::Persistent(
+                //             persistent::Message::UpdateSystemReport(spki_hash, report),
+                //         ))
+                //         .await;
+                //     }
+                //     MessageDataContent::MetaInfo(spki_hash, meta_info) => {
+                //         self.update_client_state(ClientStateUpdate::Persistent(
+                //             persistent::Message::UpdateMetaInfo(spki_hash, meta_info),
+                //         ))
+                //         .await;
+                //     }
+                // }
             }
             MessageToClient::AgentOnlineStatus(spki_hash, online) => {
                 self.update_client_state(ClientStateUpdate::AgentOnlineStatus(spki_hash, online))

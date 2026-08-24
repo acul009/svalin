@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow};
-use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
     ArgonParams, Certificate, Credential, EncryptedCredential, ExactVerififier, RootCertificate,
     TrustStoreVerifier, UnverifiedCertificate, Verifier, get_current_timestamp,
-    mls::client::MlsClient, trust_store::TrustStore,
+    trust_store::TrustStore,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_store::client_store::ClientStore;
@@ -195,7 +194,7 @@ impl Client {
             .derive_encryption_key(password.clone())
             .await?;
 
-        let mls_db_path = profile.profile_dir().await?.push("mls-store.sqlite");
+        // let mls_db_path = profile.profile_dir().await?.push("mls-store.sqlite");
         let client_db_path = profile.profile_dir().await?.push("client-store.sqlite");
         let trust_store_path = profile.trust_store_path().await?.to_pathbuf();
         // tracing::trace!("unlocking profile");
@@ -254,20 +253,19 @@ impl Client {
         // tracing::trace!("connected to server");
 
         // tracing::trace!("opening sqlite database: {}", db_path.display());
-        let url = mls_db_path
-            .as_path()
-            .to_str()
-            .ok_or_else(|| anyhow!("db_path was not valid UTF-8"))?;
-        let storage_provider = SqliteStorageProvider::open(&url).await?;
-        let key_retriever =
-            RemoteKeyRetriever::new(rpc.upstream_connection(), root_certificate.clone());
+        // let url = mls_db_path
+        //     .as_path()
+        //     .to_str()
+        //     .ok_or_else(|| anyhow!("db_path was not valid UTF-8"))?;
+        // let storage_provider = SqliteStorageProvider::open(&url).await?;
+        let key_retriever = RemoteKeyRetriever::new(rpc.upstream_connection(), trust_store.clone());
 
-        let mls = Arc::new(MlsClient::new(
-            device_credential.clone(),
-            storage_provider.into(),
-            key_retriever.clone(),
-            verifier.clone(),
-        )?);
+        // let mls = Arc::new(MlsClient::new(
+        //     device_credential.clone(),
+        //     storage_provider.into(),
+        //     key_retriever.clone(),
+        //     verifier.clone(),
+        // )?);
 
         let tunnel_manager = TunnelManager::new();
 
@@ -283,7 +281,7 @@ impl Client {
         // Initialize the client message receiver
         let (message_receiver, client_state_handle) = ClientMessageReceiver::initialize(
             dispatcher_handle.clone(),
-            mls.clone(),
+            // mls.clone(),
             cancel.clone(),
             client_store.clone(),
         )
@@ -305,7 +303,6 @@ impl Client {
             device_credential,
             verifier: verifier.clone(),
             tunnel_manager,
-            mls: mls.clone(),
             trust_store: trust_store,
             store: client_store,
             message_sender: dispatcher_handle.clone(),
@@ -317,7 +314,6 @@ impl Client {
         let connection = client.rpc.upstream_connection();
         let cancel = client.cancel.clone();
         let user_credential = client.user_credential.clone();
-        let session_mls = mls.clone();
         let state_handle = client.state_handle.clone();
         client.background_tasks.spawn(async move {
             tracing::trace!("starting user mls update task");
@@ -328,7 +324,6 @@ impl Client {
                     key_retriever: key_retriever,
                     user_credential: user_credential,
                     verifier: verifier,
-                    session_mls: session_mls,
                     cancel,
                     state_handle,
                 })

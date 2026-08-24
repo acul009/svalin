@@ -1,21 +1,24 @@
+use std::sync::{Arc, RwLock};
+
 use svalin_pki::{
-    RootCertificate, get_current_timestamp,
     mls::{SvalinGroupId, key_retriever::KeyRetriever},
+    trust_store::TrustStore,
 };
 use svalin_rpc::rpc::connection::{Connection, direct_connection::DirectConnection};
 
-use crate::shared::commands::{
-    get_key_packages::GetKeyPackages, load_certificate_chain::ChainRequest,
-};
+use crate::shared::commands::get_key_packages::GetKeyPackages;
 
 #[derive(Clone)]
 pub struct RemoteKeyRetriever {
     connection: DirectConnection,
-    root: RootCertificate,
+    trust_store: Arc<RwLock<TrustStore>>,
 }
 impl RemoteKeyRetriever {
-    pub(crate) fn new(connection: DirectConnection, root: RootCertificate) -> Self {
-        Self { connection, root }
+    pub(crate) fn new(connection: DirectConnection, trust_store: Arc<RwLock<TrustStore>>) -> Self {
+        Self {
+            connection,
+            trust_store,
+        }
     }
 }
 
@@ -29,24 +32,21 @@ impl KeyRetriever for RemoteKeyRetriever {
         match id {
             SvalinGroupId::DeviceGroup(spki_hash) => {
                 let chain = self
-                    .connection
-                    .dispatch(ChainRequest(spki_hash.clone()))
-                    .await?;
+                    .trust_store
+                    .read()
+                    .unwrap()
+                    .get_certificate_chain(spki_hash)?;
 
-                let timestamp = get_current_timestamp();
-                let chain = chain.verify(&self.root, timestamp)?;
                 let required_members = chain.iter().map(|cert| cert.spki_hash().clone()).collect();
 
                 Ok(required_members)
             }
             SvalinGroupId::DeviceMetaGroup(spki_hash) => {
                 let chain = self
-                    .connection
-                    .dispatch(ChainRequest(spki_hash.clone()))
-                    .await?;
-
-                let timestamp = get_current_timestamp();
-                let chain = chain.verify(&self.root, timestamp)?;
+                    .trust_store
+                    .read()
+                    .unwrap()
+                    .get_certificate_chain(spki_hash)?;
                 let required_members = chain
                     .iter()
                     // Skip the device itself
@@ -62,7 +62,6 @@ impl KeyRetriever for RemoteKeyRetriever {
 
                 Ok(required_members)
             }
-            SvalinGroupId::GlobalGroup => Ok(vec![self.root.spki_hash().clone()]),
         }
     }
 

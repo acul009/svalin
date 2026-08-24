@@ -112,8 +112,7 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
 
     let storage_provider = open_mls_store().await?;
 
-    let key_retriever =
-        RemoteKeyRetriever::new(rpc.upstream_connection(), root_certificate.clone());
+    let key_retriever = RemoteKeyRetriever::new(rpc.upstream_connection(), trust_store.clone());
 
     let verifier = TrustStoreVerifier::new(trust_store);
 

@@ -323,7 +323,7 @@ async fn test_device_group() {
     let user_credential = Credential::generate_root().unwrap();
     verifier.push(user_credential.certificate().clone());
 
-    let client_credential = user_credential.create_user_device_credential().unwrap();
+    let client_credential = user_credential.create_user_session_credential().unwrap();
     verifier.push(client_credential.certificate().clone());
 
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();

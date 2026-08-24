@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use svalin_pki::{
     CertificateType, Credential, EncryptedObject, EncryptionKey, SpkiHash, TrustStoreVerifier,
     mls::{
-        SvalinGroupId,
         client::MessageDataContent,
         key_package::UnverifiedKeyPackage,
         provider::{ExportedMlsStore, SvalinStorage},
@@ -253,7 +252,6 @@ pub struct UpdateUserMls {
     pub user_credential: Credential,
     pub key_retriever: RemoteKeyRetriever,
     pub verifier: TrustStoreVerifier,
-    pub session_mls: Arc<MlsClient>,
     pub state_handle: ClientStateHandle,
     pub cancel: CancellationToken,
 }
