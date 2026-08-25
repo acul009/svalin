@@ -131,7 +131,7 @@ impl CommandHandler for UpdateUserMlsHandler {
                 response = session.read_object::<ToServer>().fuse() => {
                     // Todo: make the object reader / chunk reader cancel save with an internal buffer
                     let response = response?;
-                    tracing::trace!("user mls initiative: {response:?}");
+                    // tracing::trace!("user mls initiative: {response:?}");
 
                     if let ToServer::Goodbye = &response {
                         break;
@@ -307,6 +307,7 @@ impl CommandDispatcher for UpdateUserMls {
             let mut messages = Vec::new();
             let mut key_packages = Vec::new();
             let mut timeout_duration = Duration::from_secs(3);
+            let mut persistent_update = false;
 
             loop {
                 let Some(update) = self
@@ -337,14 +338,18 @@ impl CommandDispatcher for UpdateUserMls {
 
                             match handled.content {
                                 MessageDataContent::Report(spki_hash, report) => {
+                                    tracing::trace!("received device report");
                                     persistent_data.update(
                                         persistent::Message::UpdateSystemReport(spki_hash, report),
                                     );
+                                    persistent_update = true;
                                 }
                                 MessageDataContent::MetaInfo(spki_hash, meta_info) => {
+                                    tracing::trace!("received device metainfo");
                                     persistent_data.update(persistent::Message::UpdateMetaInfo(
                                         spki_hash, meta_info,
                                     ));
+                                    persistent_update = true;
                                 }
                                 MessageDataContent::Internal => {}
                             }
@@ -411,9 +416,6 @@ impl CommandDispatcher for UpdateUserMls {
 
                 if send_update {
                     tracing::trace!("sending user mls update");
-                    // We likely just found a group which contains data we don't have yet.
-                    // So it's a good idea to send that update to the session's state
-                    let update_session_state = !messages.is_empty();
 
                     let mls_store = export_handle.export(&self.key)?;
                     let state_update = ToServer::StateUpdate {
@@ -430,7 +432,8 @@ impl CommandDispatcher for UpdateUserMls {
                         tracing::error!("server warned about error in user mls update");
                     }
 
-                    if update_session_state {
+                    if persistent_update {
+                        tracing::trace!("sending received update to state handle");
                         self.state_handle
                             .update(ClientStateUpdate::Persistent(
                                 persistent::Message::UpdateFromMainState(persistent_data.clone()),

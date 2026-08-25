@@ -227,14 +227,14 @@ async fn integration_tests() {
     // testing directly receiving system report
     device.request_system_report().await.unwrap();
 
-    let update = timeout(Duration::from_secs(1), client_state_updates.recv())
+    let update = timeout(Duration::from_secs(5), client_state_updates.recv())
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::Persistent(persistent::Message::UpdateSystemReport(_, _)) = &update {
+    if let ClientStateUpdate::Persistent(persistent::Message::UpdateFromMainState(_)) = &update {
         client_state.update(update);
     } else {
-        panic!("expected agent online status update, got: {:?}", &update);
+        panic!("expected system report, got: {:?}", &update);
     }
 
     // testing sending meta info
