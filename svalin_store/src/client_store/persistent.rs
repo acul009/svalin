@@ -19,7 +19,6 @@ pub struct State {
 pub enum Message {
     UpdateSystemReport(SpkiHash, SvalinReport),
     UpdateMetaInfo(SpkiHash, SvalinMetaInfo),
-    UpdateFromMainState(State),
 }
 
 impl State {
@@ -36,22 +35,6 @@ impl State {
             }
             Message::UpdateMetaInfo(spki_hash, meta_info) => {
                 self.get_device_entry(spki_hash).meta_info = Some(meta_info)
-            }
-            Message::UpdateFromMainState(state) => {
-                for (spki_hash, other_device) in state.devices {
-                    let device = self.get_device_entry(spki_hash);
-                    let current_report = device
-                        .report()
-                        .map(|r| r.system_report.generated_at)
-                        .unwrap_or(0);
-                    let other_report = other_device
-                        .report()
-                        .map(|r| r.system_report.generated_at)
-                        .unwrap_or(0);
-                    if current_report < other_report {
-                        device.report = other_device.report;
-                    }
-                }
             }
         }
     }

@@ -307,7 +307,6 @@ impl CommandDispatcher for UpdateUserMls {
             let mut messages = Vec::new();
             let mut key_packages = Vec::new();
             let mut timeout_duration = Duration::from_secs(3);
-            let mut persistent_update = false;
 
             loop {
                 let Some(update) = self
@@ -339,17 +338,17 @@ impl CommandDispatcher for UpdateUserMls {
                             match handled.content {
                                 MessageDataContent::Report(spki_hash, report) => {
                                     tracing::trace!("received device report");
-                                    persistent_data.update(
-                                        persistent::Message::UpdateSystemReport(spki_hash, report),
-                                    );
-                                    persistent_update = true;
+                                    let message =
+                                        persistent::Message::UpdateSystemReport(spki_hash, report);
+                                    persistent_data.update(message.clone());
+                                    self.state_handle.update(message.into()).await;
                                 }
                                 MessageDataContent::MetaInfo(spki_hash, meta_info) => {
                                     tracing::trace!("received device metainfo");
-                                    persistent_data.update(persistent::Message::UpdateMetaInfo(
-                                        spki_hash, meta_info,
-                                    ));
-                                    persistent_update = true;
+                                    let message =
+                                        persistent::Message::UpdateMetaInfo(spki_hash, meta_info);
+                                    persistent_data.update(message.clone());
+                                    self.state_handle.update(message.into()).await;
                                 }
                                 MessageDataContent::Internal => {}
                             }
@@ -430,15 +429,6 @@ impl CommandDispatcher for UpdateUserMls {
                     session.write_object(&state_update).await?;
                     if session.read_object::<Result<(), ()>>().await.is_err() {
                         tracing::error!("server warned about error in user mls update");
-                    }
-
-                    if persistent_update {
-                        tracing::trace!("sending received update to state handle");
-                        self.state_handle
-                            .update(ClientStateUpdate::Persistent(
-                                persistent::Message::UpdateFromMainState(persistent_data.clone()),
-                            ))
-                            .await?;
                     }
                 }
             }

@@ -15,6 +15,12 @@ pub enum ClientStateUpdate {
     AgentOnlineStatus(SpkiHash, bool),
 }
 
+impl From<persistent::Message> for ClientStateUpdate {
+    fn from(msg: persistent::Message) -> Self {
+        Self::Persistent(msg)
+    }
+}
+
 impl ClientState {
     pub fn empty() -> Self {
         Self::new(persistent::State::empty())
