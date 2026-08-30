@@ -4,11 +4,17 @@ use crate::transport::session_transport::SessionTransport;
 
 pub struct ChunkTransport {
     transport: Box<dyn SessionTransport>,
+    read_chunk: Option<usize>,
+    read_buffer: Vec<u8>,
 }
 
 impl ChunkTransport {
     pub fn new(transport: Box<dyn SessionTransport>) -> Self {
-        Self { transport }
+        Self {
+            transport,
+            read_chunk: None,
+            read_buffer: Vec::new(),
+        }
     }
 
     pub async fn write_chunk(&mut self, chunk: &[u8]) -> Result<(), ChunkWriterError> {
@@ -28,36 +34,54 @@ impl ChunkTransport {
     }
 
     pub async fn read_chunk(&mut self) -> Result<Vec<u8>, ChunkReaderError> {
-        let short_len = self
-            .transport
-            .read_u8()
-            .await
-            .map_err(|err| ChunkReaderError::LengthReadError(err))?;
-
-        // println!("read short len: {}", short_len);
-
-        let len = match ChunkLength::try_from_byte(short_len) {
-            Some(len) => len,
+        let read_chunk = match self.read_chunk {
             None => {
-                let mut size = [short_len, 0, 0, 0];
-                self.transport
-                    .read_exact(&mut size[1..])
+                // Todo: fix non cancel safe read
+                let short_len = self
+                    .transport
+                    .read_u8()
                     .await
                     .map_err(|err| ChunkReaderError::LengthReadError(err))?;
-                ChunkLength::from_4bytes(size)
+
+                // println!("read short len: {}", short_len);
+
+                let len = match ChunkLength::try_from_byte(short_len) {
+                    Some(len) => len,
+                    None => {
+                        let mut size = [short_len, 0, 0, 0];
+                        self.transport
+                            .read_exact(&mut size[1..])
+                            .await
+                            .map_err(|err| ChunkReaderError::LengthReadError(err))?;
+                        ChunkLength::from_4bytes(size)
+                    }
+                };
+
+                let len = len.to_usize();
+                self.read_chunk = Some(len);
+                len
             }
+            Some(len) => len,
         };
 
-        let mut chunk = vec![0; len.to_usize()];
+        while self.read_buffer.len() < read_chunk {
+            let read = self
+                .transport
+                .read_buf(&mut self.read_buffer)
+                .await
+                .map_err(|err| ChunkReaderError::BodyReadError(err))?;
+            if read == 0 {
+                return Err(ChunkReaderError::UnexpectedEndOfStream);
+            }
+        }
 
-        self.transport
-            .read_exact(&mut chunk)
-            .await
-            .map_err(|err| ChunkReaderError::BodyReadError(err))?;
+        let mut new_buffer = self.read_buffer.split_off(read_chunk);
+        std::mem::swap(&mut new_buffer, &mut self.read_buffer);
+        self.read_chunk = None;
 
         // tracing::trace!("read chunk: {:x?}", &chunk);
 
-        Ok(chunk)
+        Ok(new_buffer)
     }
 
     pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
@@ -81,6 +105,8 @@ pub enum ChunkReaderError {
     ExtendedLengthReadError(std::io::Error),
     #[error("Failed to read chunk body: {0}")]
     BodyReadError(std::io::Error),
+    #[error("Unexpected end of stream")]
+    UnexpectedEndOfStream,
 }
 
 #[derive(Debug, thiserror::Error)]

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
-use svalin_store::client_store::ClientStore;
+use svalin_store::client_store::{ClientStore, persistent};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
@@ -271,5 +271,12 @@ impl ClientStateHandle {
             .await?;
 
         Ok(())
+    }
+
+    pub async fn persistent_update(
+        &self,
+        update: persistent::Message,
+    ) -> Result<(), anyhow::Error> {
+        self.update(ClientStateUpdate::Persistent(update)).await
     }
 }

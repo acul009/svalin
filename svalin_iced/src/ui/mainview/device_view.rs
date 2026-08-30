@@ -58,7 +58,7 @@ impl State {
         client_state: &'a ClientState,
         client: &Arc<Client>,
     ) -> Action {
-        let Some(persistent) = client_state.persistent().get(&self.spki_hash) else {
+        let Some(persistent) = client_state.persistent().devices().get(&self.spki_hash) else {
             if let Message::Back = message {
                 return Action::Back;
             } else {
@@ -111,7 +111,7 @@ impl State {
     }
 
     pub fn view<'a>(&'a self, client_state: &'a ClientState) -> Element<'a, Message> {
-        let Some(persistent) = client_state.persistent().get(&self.spki_hash) else {
+        let Some(persistent) = client_state.persistent().devices().get(&self.spki_hash) else {
             return center("Device not yet available").into();
         };
 
@@ -138,7 +138,7 @@ impl State {
     }
 
     pub fn header<'a>(&'a self, client_state: &'a ClientState) -> Element<'a, Message> {
-        let Some(persistent) = client_state.persistent().get(&self.spki_hash) else {
+        let Some(persistent) = client_state.persistent().devices().get(&self.spki_hash) else {
             return header(widget::space()).on_back(Message::Back).into();
         };
 

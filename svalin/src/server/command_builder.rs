@@ -24,8 +24,8 @@ use crate::{
         load_certificate_chain::LoadCertificateChainHandler,
         login::LoginHandler,
         public_server_status::{PublicStatus, PublicStatusHandler},
+        update_mls::UpdateMlsHandler,
         update_trust_store::UpdateTrustStoreHandler,
-        update_user_mls::UpdateUserMlsHandler,
     },
 };
 
@@ -95,7 +95,7 @@ impl RpcCommandBuilder for SvalinCommandBuilder {
             .add(GetKeyPackagesHandler {
                 key_package_store: self.store.key_packages.clone(),
             })
-            .add(UpdateUserMlsHandler::new(
+            .add(UpdateMlsHandler::new(
                 self.store.users.clone(),
                 self.store.messages.clone(),
                 self.store.key_packages.clone(),

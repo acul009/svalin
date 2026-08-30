@@ -8,7 +8,7 @@ use svalin_rpc::{
 use svalin_store::client_store::persistent::SvalinMetaInfo;
 
 use crate::shared::commands::{
-    request_system_report::RequestSystemReport, update_agent::UpdateAgent,
+    request_system_report::RequestSystemReport, update_agent::UpdateAgent, update_mls::MlsUpdate,
 };
 
 pub struct DeviceHandle<'a>(&'a super::Client, SpkiHash);
@@ -31,20 +31,14 @@ impl<'a> DeviceHandle<'a> {
             .map_err(|err| anyhow!("{}", err))?)
     }
 
-    pub async fn update_metainfo(&self, _metainfo: SvalinMetaInfo) -> anyhow::Result<()> {
-        todo!();
-        // self.0
-        //     .mls
-        //     .send_meta_info(self.1.clone(), metainfo.clone())
-        //     .await?;
-        // self.0
-        //     .state_handle
-        //     .update(ClientStateUpdate::Persistent(
-        //         persistent::Message::UpdateMetaInfo(self.1.clone(), metainfo),
-        //     ))
-        //     .await?;
+    pub async fn update_metainfo(&self, metainfo: SvalinMetaInfo) -> anyhow::Result<()> {
+        self.0
+            .mls_update_sender
+            .send(MlsUpdate::UpdateMetaInfo(self.1.clone(), metainfo))
+            .await
+            .map_err(|_| anyhow!("error sending metainfo through channel"))?;
 
-        // Ok(())
+        Ok(())
     }
 
     pub async fn update_agent(&self, url: String) -> anyhow::Result<()> {

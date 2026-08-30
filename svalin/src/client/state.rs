@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use svalin_pki::SpkiHash;
 use svalin_store::client_store::persistent::{self};
@@ -50,7 +50,7 @@ impl ClientState {
         self.agents_online.contains(spki_hash)
     }
 
-    pub fn persistent(&self) -> &HashMap<SpkiHash, persistent::DeviceState> {
-        &self.persistent.devices()
+    pub fn persistent(&self) -> &persistent::State {
+        &self.persistent
     }
 }

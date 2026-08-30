@@ -20,7 +20,7 @@ use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
 use svalin_store::client_store::ClientStore;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 use tokio::time::error::Elapsed;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
@@ -31,6 +31,7 @@ use crate::client::device::DeviceHandle;
 use crate::client::state::{ClientState, ClientStateUpdate};
 use crate::message_streaming::MessageFromClient;
 use crate::message_streaming::client::{ClientMessageDispatcherHandle, ClientStateHandle};
+use crate::shared::commands::update_mls::MlsUpdate;
 
 pub struct Client {
     rpc: RpcClient,
@@ -47,6 +48,7 @@ pub struct Client {
     background_tasks: TaskTracker,
     cancel: CancellationToken,
     verifier: TrustStoreVerifier,
+    mls_update_sender: mpsc::Sender<MlsUpdate>,
 }
 
 impl Debug for Client {

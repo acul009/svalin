@@ -55,57 +55,51 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
             .align_bottom(Length::Fill)
             .align_right(Length::Fill)
             .padding(30),
-            column(
-                device_list
-                    .state
-                    .persistent()
-                    .iter()
-                    .map(|(spki_hash, persistent)| {
-                        let color = if device_list.state.agent_online(spki_hash) {
-                            Color::from_rgb8(0, 255, 0)
-                        } else {
-                            Color::from_rgb8(255, 0, 0)
-                        };
+            column(device_list.state.persistent().devices().iter().map(
+                |(spki_hash, persistent)| {
+                    let color = if device_list.state.agent_online(spki_hash) {
+                        Color::from_rgb8(0, 255, 0)
+                    } else {
+                        Color::from_rgb8(255, 0, 0)
+                    };
 
-                        button(
-                            row![
-                                match persistent.os() {
-                                    OSFamily::Windows => bootstrap::windows(),
-                                    OSFamily::Linux => bootstrap::tux(),
-                                    OSFamily::Unknown => bootstrap::laptop(),
-                                }
-                                .size(16)
-                                .color(color),
-                                text(persistent.name()),
-                                text(
-                                    persistent
-                                        .report()
-                                        .map(|report| {
-                                            DateTime::from_timestamp_secs(
-                                                report.system_report.generated_at as i64,
-                                            )
-                                        })
-                                        .flatten()
-                                        .map(|datetime| {
-                                            datetime
-                                                .naive_local()
-                                                .format("%Y-%m-%d %H:%M:%S")
-                                                .to_string()
-                                        })
-                                        .unwrap_or_else(|| "Unknown".to_string())
-                                )
-                            ]
-                            .spacing(20)
-                            .padding(10)
-                            .width(Length::Fill),
-                        )
-                        .on_press_maybe(
-                            device_list.on_select.as_ref().map(|f| f(spki_hash.clone())),
-                        )
-                        .style(button::subtle)
-                        .into()
-                    }),
-            )
+                    button(
+                        row![
+                            match persistent.os() {
+                                OSFamily::Windows => bootstrap::windows(),
+                                OSFamily::Linux => bootstrap::tux(),
+                                OSFamily::Unknown => bootstrap::laptop(),
+                            }
+                            .size(16)
+                            .color(color),
+                            text(persistent.name()),
+                            text(
+                                persistent
+                                    .report()
+                                    .map(|report| {
+                                        DateTime::from_timestamp_secs(
+                                            report.system_report.generated_at as i64,
+                                        )
+                                    })
+                                    .flatten()
+                                    .map(|datetime| {
+                                        datetime
+                                            .naive_local()
+                                            .format("%Y-%m-%d %H:%M:%S")
+                                            .to_string()
+                                    })
+                                    .unwrap_or_else(|| "Unknown".to_string())
+                            )
+                        ]
+                        .spacing(20)
+                        .padding(10)
+                        .width(Length::Fill),
+                    )
+                    .on_press_maybe(device_list.on_select.as_ref().map(|f| f(spki_hash.clone())))
+                    .style(button::subtle)
+                    .into()
+                }
+            ),)
         ]
         .into()
     }

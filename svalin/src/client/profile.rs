@@ -9,6 +9,7 @@ use svalin_pki::{
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_store::client_store::ClientStore;
+use tokio::sync::mpsc;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::error;
 
@@ -16,7 +17,7 @@ use crate::{
     client::tunnel_manager::TunnelManager,
     message_streaming::client::{ClientMessageDispatcher, ClientMessageReceiver},
     remote_key_retriever::RemoteKeyRetriever,
-    shared::commands::{get_user_credentials::GetUserCredential, update_user_mls::UpdateUserMls},
+    shared::commands::{get_user_credentials::GetUserCredential, update_mls::UpdateMls},
     util::{
         location::{Location, LocationError},
         trust_store::{load_trust_store, save_trust_store, update_trust_store},
@@ -294,6 +295,30 @@ impl Client {
             }
         });
 
+        let connection = rpc.upstream_connection();
+        let cancel2 = cancel.clone();
+        let user_credential2 = user_credential.clone();
+        let state_handle = client_state_handle.clone();
+        let verifier2 = verifier.clone();
+        let (mls_update_sender, mls_updates) = mpsc::channel(10);
+        background_tasks.spawn(async move {
+            tracing::trace!("starting user mls update task");
+            if let Err(err) = connection
+                .dispatch(UpdateMls {
+                    mls_updates,
+                    key_retriever: key_retriever,
+                    user_credential: user_credential2,
+                    encryption_key: key,
+                    verifier: verifier2,
+                    client_state: state_handle,
+                    cancel: cancel2,
+                })
+                .await
+            {
+                tracing::error!("failed to update user mls: {}", err);
+            }
+        });
+
         let client = Arc::new(Self {
             rpc,
             _upstream_address: profile.upstream_address,
@@ -305,32 +330,11 @@ impl Client {
             tunnel_manager,
             trust_store: trust_store,
             store: client_store,
+            mls_update_sender,
             message_sender: dispatcher_handle.clone(),
             state_handle: client_state_handle,
             background_tasks,
             cancel,
-        });
-
-        let connection = client.rpc.upstream_connection();
-        let cancel = client.cancel.clone();
-        let user_credential = client.user_credential.clone();
-        let state_handle = client.state_handle.clone();
-        client.background_tasks.spawn(async move {
-            tracing::trace!("starting user mls update task");
-            let verifier = verifier;
-            if let Err(err) = connection
-                .dispatch(UpdateUserMls {
-                    key: key,
-                    key_retriever: key_retriever,
-                    user_credential: user_credential,
-                    verifier: verifier,
-                    cancel,
-                    state_handle,
-                })
-                .await
-            {
-                tracing::error!("failed to update user mls: {}", err);
-            }
         });
 
         Ok(client)

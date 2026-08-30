@@ -210,17 +210,24 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::Persistent(persistent::Message::UpdateFromMainState(_)) = &update {
+    if let ClientStateUpdate::Persistent(persistent::Message::UpdateMetaInfo(_, _)) = &update {
         client_state.update(update);
     } else {
         panic!("expected update from main status update, got {:?}", &update);
     }
 
-    let system_report = client_state.persistent().iter().next().unwrap();
+    let system_report = client_state.persistent().devices().iter().next().unwrap();
     tracing::trace!("client persistent data: {:#?}", system_report);
 
     // testing device handle
-    let agent_spki_hash = client_state.persistent().iter().next().unwrap().0.clone();
+    let agent_spki_hash = client_state
+        .persistent()
+        .devices()
+        .iter()
+        .next()
+        .unwrap()
+        .0
+        .clone();
     let device = client.device(agent_spki_hash.clone());
     device.ping().await.unwrap();
 
@@ -231,7 +238,7 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::Persistent(persistent::Message::UpdateFromMainState(_)) = &update {
+    if let ClientStateUpdate::Persistent(persistent::Message::UpdateSystemReport(_, _)) = &update {
         client_state.update(update);
     } else {
         panic!("expected system report, got: {:?}", &update);
@@ -261,6 +268,7 @@ async fn integration_tests() {
     assert_eq!(
         client_state
             .persistent()
+            .devices()
             .get(&agent_spki_hash)
             .unwrap()
             .meta_info()
