@@ -37,18 +37,18 @@ impl Client {
 
         let conn = client.upstream_connection();
 
-        // tracing::trace!("requesting public status");
+        tracing::trace!("requesting public status");
 
         let server_status = conn.dispatch(GetPutblicStatus).await?;
 
-        // tracing::trace!("public status: {server_status:?}");
+        tracing::trace!("public status: {server_status:?}");
 
         let first_connect = match server_status {
             PublicStatus::WaitingForInit => FirstConnect::Init(Init { client, address }),
             PublicStatus::Ready => FirstConnect::Login(Login { client, address }),
         };
 
-        // tracing::trace!("returning from first connect");
+        tracing::trace!("returning from first connect");
 
         Ok(first_connect)
     }
@@ -78,6 +78,7 @@ impl Init {
         password: Vec<u8>,
         totp_secret: totp_rs::Totp,
     ) -> Result<String> {
+        tracing::trace!("starting init");
         let init_data = self
             .client
             .upstream_connection()
@@ -90,6 +91,7 @@ impl Init {
             .context("failed to initialize server certificate")?;
 
         self.client.close(Duration::from_secs(1)).await?;
+        tracing::trace!("init done, starting first login");
 
         tokio::time::sleep(INIT_SERVER_SHUTDOWN_COUNTDOWN).await;
         let trust_store = Arc::new(RwLock::new(init_data.trust_store));

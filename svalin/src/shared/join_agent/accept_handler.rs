@@ -195,19 +195,21 @@ async fn handle_agent_enroll(
     client: &Client,
 ) -> Result<Certificate, AcceptJoinError> {
     let mut session_e2e = Session::new(Box::new(transport), Peer::Anonymous);
+    tracing::trace!("created encrypted session with agent");
+
     // At this point we have a secure channel to the agent.
     // The first order of business is creating a certificate for the agent
     // and providing the agent with the root and upstream certificates.
 
     let public_key: ExportedPublicKey = session_e2e.read_object().await?;
-    // tracing::trace!("received public key: {:?}", public_key);
+    tracing::trace!("received public key: {:?}", public_key);
 
     // Creating certificate for agent
     let agent_cert = client
         .user_credential()
         .create_agent_certificate_for_key(&public_key)?;
 
-    // tracing::trace!("created agent certificate, sending to agent");
+    tracing::trace!("created agent certificate, sending to agent");
 
     // Sending all 3 required certificates to the agent
     session_e2e.write_object(agent_cert.as_unverified()).await?;
@@ -234,9 +236,11 @@ async fn handle_agent_enroll(
     //     .await
     //     .map_err(AcceptJoinError::CreateDeviceGroupError)?;
 
+    tracing::trace!("adding agent to trust store");
+
     let trust_result = client.add_cert_to_trust_store(agent_cert.clone()).await;
 
-    // tracing::trace!("upload finished, sending confirmation to agent");
+    tracing::trace!("upload finished, sending confirmation to agent");
 
     match trust_result {
         Ok(_) => session_e2e.write_object::<Result<(), ()>>(&Ok(())).await?,

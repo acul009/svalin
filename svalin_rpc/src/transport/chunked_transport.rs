@@ -1,19 +1,19 @@
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadBuf};
 
 use crate::transport::session_transport::SessionTransport;
 
 pub struct ChunkTransport {
     transport: Box<dyn SessionTransport>,
-    read_chunk: Option<usize>,
     read_buffer: Vec<u8>,
+    read_buffer_size: usize,
 }
 
 impl ChunkTransport {
     pub fn new(transport: Box<dyn SessionTransport>) -> Self {
         Self {
             transport,
-            read_chunk: None,
-            read_buffer: Vec::new(),
+            read_buffer: vec![0; 1024],
+            read_buffer_size: 0,
         }
     }
 
@@ -34,54 +34,73 @@ impl ChunkTransport {
     }
 
     pub async fn read_chunk(&mut self) -> Result<Vec<u8>, ChunkReaderError> {
-        let read_chunk = match self.read_chunk {
-            None => {
-                // Todo: fix non cancel safe read
+        tracing::trace!("entering read_chunk");
+        let read_chunk = {
+            if self.read_buffer_size == 0 {
                 let short_len = self
                     .transport
                     .read_u8()
                     .await
                     .map_err(|err| ChunkReaderError::LengthReadError(err))?;
+                self.read_buffer[0] = short_len;
+                self.read_buffer_size += 1;
+            }
 
-                // println!("read short len: {}", short_len);
-
-                let len = match ChunkLength::try_from_byte(short_len) {
-                    Some(len) => len,
-                    None => {
-                        let mut size = [short_len, 0, 0, 0];
-                        self.transport
-                            .read_exact(&mut size[1..])
+            let len = match ChunkLength::try_from_byte(self.read_buffer[0]) {
+                Some(len) => len,
+                None => {
+                    while self.read_buffer_size < 4 {
+                        tracing::trace!("reading {}th byte", self.read_buffer.len());
+                        let short_len = self
+                            .transport
+                            .read_u8()
                             .await
                             .map_err(|err| ChunkReaderError::LengthReadError(err))?;
-                        ChunkLength::from_4bytes(size)
+                        self.read_buffer[self.read_buffer_size] = short_len;
+                        self.read_buffer_size += 1;
                     }
-                };
+                    let size: &[u8; 4] = self
+                        .read_buffer
+                        .first_chunk()
+                        .expect("already ensured the correct size");
+                    ChunkLength::from_4bytes(size.clone())
+                }
+            };
 
-                let len = len.to_usize();
-                self.read_chunk = Some(len);
-                len
-            }
-            Some(len) => len,
+            len
         };
 
-        while self.read_buffer.len() < read_chunk {
+        let header_len = read_chunk.byte_len();
+        let payload_len = read_chunk.to_usize();
+        let total_len = header_len + payload_len;
+
+        while self.read_buffer.len() < total_len {
+            self.read_buffer.push(0);
+        }
+
+        while self.read_buffer_size < total_len {
             let read = self
                 .transport
-                .read_buf(&mut self.read_buffer)
+                .read(&mut self.read_buffer[self.read_buffer_size..total_len])
                 .await
                 .map_err(|err| ChunkReaderError::BodyReadError(err))?;
+            tracing::trace!("read {} bytes", read);
+            self.read_buffer_size += read;
+            tracing::trace!(
+                "bytes in buffer: {} of {}",
+                self.read_buffer_size,
+                total_len
+            );
             if read == 0 {
                 return Err(ChunkReaderError::UnexpectedEndOfStream);
             }
         }
 
-        let mut new_buffer = self.read_buffer.split_off(read_chunk);
-        std::mem::swap(&mut new_buffer, &mut self.read_buffer);
-        self.read_chunk = None;
+        let chunk = self.read_buffer[header_len..total_len].to_vec();
+        self.read_buffer_size = 0;
 
-        // tracing::trace!("read chunk: {:x?}", &chunk);
-
-        Ok(new_buffer)
+        tracing::trace!("exiting read_chunk");
+        Ok(chunk)
     }
 
     pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {
@@ -169,6 +188,13 @@ impl ChunkLength {
                 b[0] &= 0b0111_1111;
                 u32::from_be_bytes(b) as usize
             }
+        }
+    }
+
+    fn byte_len(&self) -> usize {
+        match self {
+            Self::Byte(_) => 1,
+            Self::U32(_) => 4,
         }
     }
 }

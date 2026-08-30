@@ -228,6 +228,7 @@ where
 
         let pake_server = pake_server.receive_client_pubkey(client_key.0)?;
         let client_authenticator: Authenticator = session.read_object().await?;
+        tracing::trace!("Received client authenticator");
 
         let client_auth_result = pake_server.receive_client_authenticator(client_authenticator.0);
 
@@ -237,12 +238,14 @@ where
                 session
                     .write_object::<Result<_, ()>>(&Ok(server_authenticator))
                     .await?;
+                tracing::trace!("Sent server authenticator");
                 key_to_array(key)
             }
             Err(err) => {
                 session
                     .write_object::<Result<Authenticator, ()>>(&Err(()))
                     .await?;
+                tracing::trace!("Sent authentication failure");
 
                 return Err(AucPaceServerError::AuthenticationFailed(err));
             }
@@ -255,6 +258,7 @@ where
         let transport = transport.into_any().downcast::<T>().unwrap();
 
         let tls_transport = TlsTransport::server_preshared(*transport, &key).await?;
+        tracing::trace!("TLS tunnel created");
 
         Ok(Self { tls_transport })
     }

@@ -128,7 +128,7 @@ async fn aucpace_test() {
         process::exit(1);
     }));
 
-    println!("starting tls test");
+    tracing::trace!("starting aucpace test");
 
     let address = "127.0.0.1:1236";
     let credentials = Credential::generate_root().unwrap();
@@ -169,6 +169,7 @@ async fn aucpace_test() {
     let connection = client.upstream_connection();
 
     connection.dispatch(AucPaceTest).await.unwrap();
+    tracing::trace!("successfully dispatched");
 
     server.close(Duration::from_secs(1)).await.unwrap();
 }

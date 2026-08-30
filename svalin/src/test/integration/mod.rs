@@ -37,6 +37,7 @@ async fn integration_tests() {
     let (send_server, recv_server) = oneshot::channel();
 
     tokio::spawn(async move {
+        tracing::trace!("starting server");
         let server = Server::build()
             .addr(addr)
             .cancel(cancel)
@@ -44,31 +45,28 @@ async fn integration_tests() {
             .await
             .unwrap();
 
-        tracing::trace!("server started");
-
         send_server.send(server).unwrap();
     });
 
+    tracing::trace!("running first connect");
     let first_connect = Client::first_connect(host.clone()).await.unwrap();
 
     let totp_secret = Totp::default();
     let username = "admin".to_string();
     let password = "admin".to_string();
 
-    match first_connect {
+    tracing::trace!("running init on first connect");
+    let profile_name = match first_connect {
         crate::client::FirstConnect::Login(_) => unreachable!(),
-        crate::client::FirstConnect::Init(init) => {
-            init.init(
+        crate::client::FirstConnect::Init(init) => init
+            .init(
                 username.clone(),
                 password.clone().into_bytes(),
                 totp_secret.clone(),
             )
             .await
-            .unwrap();
-        }
+            .unwrap(),
     };
-
-    let profile_name = format!("admin@{host}");
 
     // delete to test login
     Client::remove_profile(&profile_name).await.unwrap();

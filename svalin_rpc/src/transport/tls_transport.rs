@@ -148,6 +148,7 @@ where
     ) -> Result<Self, TlsServerError> {
         let (credentials, certificate) =
             Self::exchange_temp_credentials(&mut base_transport, preshared).await?;
+        tracing::trace!("TLS: exchanged temp credentials");
 
         let verifier = ExactVerififier::new(certificate);
 
