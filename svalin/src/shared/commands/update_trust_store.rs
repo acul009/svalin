@@ -100,6 +100,7 @@ impl CommandDispatcher for UpdateTrustStore {
         loop {
             select! {
                 _ = self.cancel.cancelled() => {
+                    session.write_object(&()).await?;
                     return Ok(())
                 }
                 update = update_fut => {
@@ -192,8 +193,12 @@ impl CommandHandler for UpdateTrustStoreHandler {
             select! {
                 _ = cancel.cancelled() => {
                     session.write_object(&TrustStoreUpdate::Close).await?;
-                    return Ok(());
+                    break;
                 }
+                result = session.read_object::<()>() => {
+                    result?;
+                    break;
+                },
                 block = receiver.recv() => {
                     match block {
                         Ok(block) => {
@@ -207,5 +212,7 @@ impl CommandHandler for UpdateTrustStoreHandler {
                 }
             }
         }
+
+        Ok(())
     }
 }

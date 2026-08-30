@@ -208,10 +208,10 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::Persistent(persistent::Message::UpdateMetaInfo(_, _)) = &update {
+    if let ClientStateUpdate::Persistent(persistent::Message::UpdateSystemReport(_, _)) = &update {
         client_state.update(update);
     } else {
-        panic!("expected update from main status update, got {:?}", &update);
+        panic!("expected system report, got: {:?}", &update);
     }
 
     let system_report = client_state.persistent().devices().iter().next().unwrap();

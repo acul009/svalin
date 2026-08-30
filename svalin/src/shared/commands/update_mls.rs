@@ -25,7 +25,11 @@ use svalin_store::{
     client_store::persistent::{self, SvalinMetaInfo},
     server_store::{KeyPackageStore, MessageStore, UserStore},
 };
-use tokio::{select, sync::mpsc};
+use tokio::{
+    select,
+    sync::{mpsc, oneshot},
+    time::Instant,
+};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -44,6 +48,7 @@ pub struct UpdateMls {
     pub verifier: TrustStoreVerifier,
     pub client_state: ClientStateHandle,
     pub cancel: CancellationToken,
+    pub up_to_date: oneshot::Sender<()>,
 }
 
 pub enum MlsUpdate {
@@ -137,6 +142,12 @@ impl CommandDispatcher for UpdateMls {
             aknowledged.push(uuid);
         }
 
+        let mut key_packages = Vec::new();
+        while key_packages.len() as u64 + saved.key_package_count < WANTED_KEY_PACKAGES {
+            let key_package = mls.create_key_package().await?;
+            key_packages.push(key_package.to_unverified());
+        }
+
         let (snapshot, _) = self.client_state.subscribe().await?;
         let persistent_data =
             EncryptedObject::encrypt(snapshot.persistent(), &self.encryption_key)?;
@@ -144,11 +155,13 @@ impl CommandDispatcher for UpdateMls {
         let update = ToServer::StateUpdate {
             mls_store: export_handle.export(&self.encryption_key)?,
             persistent_data,
-            key_packages: Vec::new(),
+            key_packages,
             aknowledged,
             messages: Vec::new(),
         };
         session.write_object(&update).await?;
+
+        let _ = self.up_to_date.send(());
 
         // Now in live mode
         let mut messages = Vec::new();
@@ -295,6 +308,7 @@ impl CommandHandler for UpdateMlsHandler {
         let saved_state = SavedState {
             mls_store: user_data.mls_store,
             persistent_data: user_data.persistent_data,
+            key_package_count: self.key_package_store.count_key_packages(&user).await?,
         };
         session.write_object(&saved_state).await?;
 
@@ -309,7 +323,10 @@ impl CommandHandler for UpdateMlsHandler {
         session.write_object(&OldUpdate::UpToDate).await?;
         // Switch to live updates
 
-        let mut key_package_interval = tokio::time::interval(Duration::from_secs(30));
+        let mut key_package_interval = tokio::time::interval_at(
+            Instant::now() + Duration::from_secs(30),
+            Duration::from_secs(30),
+        );
         key_package_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
         loop {
@@ -363,6 +380,7 @@ impl CommandHandler for UpdateMlsHandler {
 struct SavedState {
     mls_store: ExportedMlsStore,
     persistent_data: EncryptedObject<persistent::State>,
+    key_package_count: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

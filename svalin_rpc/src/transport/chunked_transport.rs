@@ -50,7 +50,7 @@ impl ChunkTransport {
                 Some(len) => len,
                 None => {
                     while self.read_buffer_size < 4 {
-                        tracing::trace!("reading {}th byte", self.read_buffer.len());
+                        tracing::trace!("reading {}th byte", self.read_buffer_size);
                         let short_len = self
                             .transport
                             .read_u8()

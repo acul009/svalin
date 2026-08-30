@@ -9,7 +9,7 @@ use svalin_pki::{
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_store::client_store::ClientStore;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::error;
 
@@ -301,6 +301,7 @@ impl Client {
         let state_handle = client_state_handle.clone();
         let verifier2 = verifier.clone();
         let (mls_update_sender, mls_updates) = mpsc::channel(10);
+        let (up_to_date_send, up_to_date_recv) = oneshot::channel();
         background_tasks.spawn(async move {
             tracing::trace!("starting user mls update task");
             if let Err(err) = connection
@@ -312,12 +313,15 @@ impl Client {
                     verifier: verifier2,
                     client_state: state_handle,
                     cancel: cancel2,
+                    up_to_date: up_to_date_send,
                 })
                 .await
             {
                 tracing::error!("failed to update user mls: {}", err);
             }
         });
+
+        up_to_date_recv.await?;
 
         let client = Arc::new(Self {
             rpc,

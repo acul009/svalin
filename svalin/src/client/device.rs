@@ -5,7 +5,7 @@ use svalin_rpc::{
     commands::{forward::ForwardConnection, ping::Ping},
     rpc::connection::{Connection, direct_connection::DirectConnection},
 };
-use svalin_store::client_store::persistent::SvalinMetaInfo;
+use svalin_store::client_store::persistent::{Message::UpdateMetaInfo, SvalinMetaInfo};
 
 use crate::shared::commands::{
     request_system_report::RequestSystemReport, update_agent::UpdateAgent, update_mls::MlsUpdate,
@@ -34,9 +34,14 @@ impl<'a> DeviceHandle<'a> {
     pub async fn update_metainfo(&self, metainfo: SvalinMetaInfo) -> anyhow::Result<()> {
         self.0
             .mls_update_sender
-            .send(MlsUpdate::UpdateMetaInfo(self.1.clone(), metainfo))
+            .send(MlsUpdate::UpdateMetaInfo(self.1.clone(), metainfo.clone()))
             .await
             .map_err(|_| anyhow!("error sending metainfo through channel"))?;
+
+        self.0
+            .state_handle
+            .persistent_update(UpdateMetaInfo(self.1.clone(), metainfo))
+            .await?;
 
         Ok(())
     }
