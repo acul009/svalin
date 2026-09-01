@@ -41,6 +41,9 @@ enum AgentAction {
         /// Run the agent as a windows service
         service: bool,
     },
+    /// Run the as windows update service
+    #[cfg(target_os = "windows")]
+    UpdateService,
     /// Install the agent with default settings
     Install,
     /// Uninstall the agent and delete all data
@@ -53,9 +56,19 @@ enum AgentAction {
 define_windows_service!(ffi_service_agent, service_agent);
 
 #[cfg(target_os = "windows")]
+define_windows_service!(ffi_service_update_agent, service_update_agent);
+
+#[cfg(target_os = "windows")]
 fn service_agent(_arguments: Vec<std::ffi::OsString>) {
     if let Err(err) = run_service_agent() {
         tracing::error!("Error running service agent: {:#?}", err);
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn service_update_agent(_arguments: Vec<std::ffi::OsString>) {
+    if let Err(err) = run_service_update_agent() {
+        tracing::error!("Error running service update agent: {:#?}", err);
     }
 }
 
@@ -135,6 +148,82 @@ fn run_service_agent() -> anyhow::Result<()> {
     run_result
 }
 
+#[cfg(target_os = "windows")]
+fn run_service_update_agent() -> anyhow::Result<()> {
+    use windows_service::{
+        service::{
+            ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
+            ServiceType,
+        },
+        service_control_handler::{self, ServiceControlHandlerResult, ServiceStatusHandle},
+    };
+    const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
+
+    let cancel = CancellationToken::new();
+    let cancel2 = cancel.clone();
+    let status_handle_arc = Arc::new(Mutex::new(None::<ServiceStatusHandle>));
+    let status_handle_arc2 = status_handle_arc.clone();
+
+    let event_handler = move |control_event: ServiceControl| -> ServiceControlHandlerResult {
+        use windows_service::service::ServiceControl;
+        match control_event {
+            ServiceControl::Stop => {
+                cancel2.cancel();
+
+                {
+                    let _ = status_handle_arc2
+                        .lock()
+                        .unwrap()
+                        .unwrap()
+                        .set_service_status(ServiceStatus {
+                            service_type: SERVICE_TYPE,
+                            current_state: ServiceState::StopPending,
+                            controls_accepted: ServiceControlAccept::empty(),
+                            exit_code: ServiceExitCode::Win32(0),
+                            checkpoint: 0,
+                            wait_hint: Duration::from_secs(20),
+                            process_id: None,
+                        });
+                }
+
+                ServiceControlHandlerResult::NoError
+            }
+            _ => ServiceControlHandlerResult::NotImplemented,
+        }
+    };
+
+    let status_handle =
+        service_control_handler::register(installer::WINDOWS_UPDATE_SERVICE_NAME, event_handler)?;
+    {
+        let mut slot = status_handle_arc.lock().unwrap();
+        *slot = Some(status_handle.clone());
+    }
+
+    status_handle.set_service_status(ServiceStatus {
+        service_type: SERVICE_TYPE,
+        current_state: ServiceState::Running,
+        controls_accepted: ServiceControlAccept::STOP,
+        exit_code: ServiceExitCode::Win32(0),
+        checkpoint: 0,
+        wait_hint: Duration::default(),
+        process_id: None,
+    })?;
+
+    let run_result = run_async(run_update_agent(cancel));
+
+    let _ = status_handle.set_service_status(ServiceStatus {
+        service_type: SERVICE_TYPE,
+        current_state: ServiceState::Stopped,
+        controls_accepted: ServiceControlAccept::empty(),
+        exit_code: ServiceExitCode::Win32(0),
+        checkpoint: 0,
+        wait_hint: Duration::default(),
+        process_id: None,
+    });
+
+    run_result
+}
+
 fn main() {
     tracing_subscriber::fmt::init();
 
@@ -157,6 +246,16 @@ fn main() {
                 }
                 #[cfg(not(target_os = "windows"))]
                 run_async(run_agent(CancellationToken::new())).unwrap()
+            }
+            #[cfg(target_os = "windows")]
+            AgentAction::UpdateService => {
+                use windows_service::service_dispatcher;
+
+                service_dispatcher::start(
+                    installer::WINDOWS_UPDATE_SERVICE_NAME,
+                    ffi_service_update_agent,
+                )
+                .unwrap();
             }
             AgentAction::Install => run_async(installer::install_agent()).unwrap(),
             AgentAction::Uninstall => run_async(installer::uninstall_agent()).unwrap(),
@@ -253,5 +352,13 @@ async fn run_agent(cancel: CancellationToken) -> anyhow::Result<()> {
     });
 
     agent::run(cancel).await?;
+    Ok(())
+}
+
+async fn run_update_agent(cancel: CancellationToken) -> anyhow::Result<()> {
+    
+    
+        installer::cleanup_old_installations().await?;
+    todo!();
     Ok(())
 }

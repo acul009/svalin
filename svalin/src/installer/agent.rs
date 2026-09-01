@@ -14,6 +14,12 @@ use tokio::{
 
 #[cfg(target_os = "windows")]
 pub const WINDOWS_SERVICE_NAME: &str = "svalin-agent";
+#[cfg(target_os = "windows")]
+pub const WINDOWS_SERVICE_DISPLAY_NAME: &str = "Svalin Agent";
+#[cfg(target_os = "windows")]
+pub const WINDOWS_UPDATE_SERVICE_NAME: &str = "svalin-update-agent";
+#[cfg(target_os = "windows")]
+pub const WINDOWS_UPDATE_SERVICE_DISPLAY_NAME: &str = "Svalin Agent Updater";
 
 pub mod update;
 
@@ -43,15 +49,47 @@ pub async fn install_agent() -> anyhow::Result<()> {
     println!("Copied successfully");
 
     #[cfg(windows)]
-    create_installation_entry(&install_to).await?;
-    #[cfg(windows)]
-    println!("registered application");
+    {
+        create_installation_entry(&install_to).await?;
+        println!("registered application");
+        create_windows_service(
+            WINDOWS_UPDATE_SERVICE_NAME,
+            &install_to,
+            WINDOWS_UPDATE_SERVICE_DISPLAY_NAME,
+            StartType::Demand,
+            "agent update-service",
+        )
+        .await?;
+        start_windows_service(WINDOWS_UPDATE_SERVICE_NAME).await?;
+        println!("created update service");
+    }
 
     // This has to be the last thing done, as it might restart the service, which would also abort this installer.
-    create_service(&install_to).await?;
-    println!("created service");
+    #[cfg(not(windows))]
+    {
+        create_linux_service(&install_to).await?;
+        println!("created service");
+    }
 
     println!("Installation complete");
+    Ok(())
+}
+
+#[cfg(windows)]
+pub async fn update_from_update_service() -> anyhow::Result<()> {
+    let current_location = env::current_exe()?;
+    create_windows_service(
+        WINDOWS_SERVICE_NAME,
+        &current_location,
+        WINDOWS_SERVICE_DISPLAY_NAME,
+        StartType::Demand,
+        "agent run --service",
+    )
+    .await?;
+    stop_windows_service(WINDOWS_SERVICE_NAME).await?;
+    cleanup_old_installations().await?;
+    // TODO: only start again if it was already running
+    start_windows_service(WINDOWS_SERVICE_NAME).await?;
     Ok(())
 }
 
@@ -88,21 +126,18 @@ pub async fn uninstall_agent() -> anyhow::Result<()> {
         {
             tokio::fs::remove_dir_all(get_base_install_location()).await?;
         }
+        remove_service().await?;
     }
 
     #[cfg(windows)]
     {
         todo!("Defer deletion of data and install dir");
         println!("Defered deletion of agent data until next restart.");
-    }
+        remove_installation_entry().await?;
 
-    #[cfg(target_os = "windows")]
-    remove_installation_entry().await?;
+        remove_windows_service(WINDOWS_SERVICE_NAME).await?;
+        remove_windows_service(WINDOWS_UPDATE_SERVICE_NAME).await?;
 
-    remove_service().await?;
-
-    #[cfg(windows)]
-    {
         todo!(
             "Self deleting isn't implemented yet, due to the difficulty in windows. You can manually delete the \"svalin-agent\" folder in your Program files as well as the \"svalin\" folder in your ProgramData"
         );
@@ -139,9 +174,31 @@ fn get_base_install_location() -> Location {
 }
 
 #[cfg(target_os = "windows")]
-async fn create_service(executable: &Location) -> anyhow::Result<()> {
+enum StartType {
+    Demand,
+    Auto,
+}
+
+#[cfg(target_os = "windows")]
+impl std::fmt::Display for StartType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StartType::Demand => write!(f, "demand"),
+            StartType::Auto => write!(f, "auto"),
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+async fn create_windows_service(
+    service_name: &str,
+    executable: &Location,
+    display_name: &str,
+    start_type: StartType,
+    arg_string: &str,
+) -> anyhow::Result<()> {
     let mut command = Command::new("sc.exe");
-    command.arg("query").arg(WINDOWS_SERVICE_NAME);
+    command.arg("query").arg(service_name);
     let output = command.output().await?;
 
     // Check if the service already exists
@@ -149,39 +206,20 @@ async fn create_service(executable: &Location) -> anyhow::Result<()> {
         let mut command = Command::new("sc.exe");
         command
             .arg("config")
-            .arg(WINDOWS_SERVICE_NAME)
+            .arg(service_name)
             .arg("binPath=")
-            .arg(bin_path_arg(executable));
-
-        // Only restart if already running
-        let out_string = String::from_utf8_lossy(&output.stdout);
-        if out_string.contains("RUNNING") {
-            let mut command = Command::new("powershell.exe");
-            command
-                .arg("-NoProfile")
-                .arg("-NonInteractive")
-                .arg("-Command")
-                .arg(format!("Restart-Service -Name {}", WINDOWS_SERVICE_NAME));
-
-            match command.status().await?.code() {
-                Some(0) => Ok(()),
-                Some(code) => Err(anyhow!("Failed to restart service, exit code: {code}")),
-                None => Err(anyhow!("Failed to restart service")),
-            }
-        } else {
-            Ok(())
-        }
+            .arg(bin_path_arg(executable, arg_string));
     } else {
         let mut command = Command::new("sc.exe");
         command
             .arg("create")
-            .arg(WINDOWS_SERVICE_NAME)
+            .arg(service_name)
             .arg("binPath=")
-            .arg(bin_path_arg(executable))
+            .arg(bin_path_arg(executable, arg_string))
             .arg("start=")
-            .arg("demand")
+            .arg(start_type.to_string())
             .arg("DisplayName=")
-            .arg("Svalin Agent");
+            .arg(display_name);
 
         match command.status().await?.code() {
             Some(0) => Ok(()),
@@ -192,15 +230,44 @@ async fn create_service(executable: &Location) -> anyhow::Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-fn bin_path_arg(executable: &Location) -> String {
-    format!(
-        "\"{}\" agent run --service",
-        executable.display().to_string()
-    )
+fn start_windows_service(service_name: &str) -> anyhow::Result<()> {
+    let mut command = Command::new("powershell.exe");
+    command
+        .arg("-NoProfile")
+        .arg("-NonInteractive")
+        .arg("-Command")
+        .arg(format!("Start-Service -Name {}", service_name));
+
+    match command.status().await?.code() {
+        Some(0) => Ok(()),
+        Some(code) => Err(anyhow!("Failed to start service, exit code: {code}")),
+        None => Err(anyhow!("Failed to start service")),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn stop_windows_service(service_name: &str) -> anyhow::Result<()> {
+    let mut command = Command::new("powershell.exe");
+    command
+        .arg("-NoProfile")
+        .arg("-NonInteractive")
+        .arg("-Command")
+        .arg(format!("Stop-Service -Name {}", service_name));
+
+    match command.status().await?.code() {
+        Some(0) => Ok(()),
+        Some(code) => Err(anyhow!("Failed to stop service, exit code: {code}")),
+        None => Err(anyhow!("Failed to stop service")),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn bin_path_arg(executable: &Location, arg_string: &str) -> String {
+    format!("\"{}\" {}", executable.display().to_string(), arg_string)
 }
 
 #[cfg(target_os = "linux")]
-async fn create_service(executable: &Location) -> anyhow::Result<()> {
+async fn create_linux_service(executable: &Location) -> anyhow::Result<()> {
     if !systemd_available().await {
         anyhow::bail!(
             "systemd is not available - automated service install not yet supported for your init system"
@@ -210,9 +277,9 @@ async fn create_service(executable: &Location) -> anyhow::Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-async fn remove_service() -> anyhow::Result<()> {
+async fn remove_windows_service(service: &str) -> anyhow::Result<()> {
     let mut command = Command::new("sc.exe");
-    command.arg("delete").arg(WINDOWS_SERVICE_NAME);
+    command.arg("delete").arg(service);
 
     match command.status().await?.code() {
         Some(0) => Ok(()),
