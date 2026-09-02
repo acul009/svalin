@@ -15,6 +15,12 @@
 >
 > If you have questions or suggestions, you're also welcome to create an issue :)
 
+> [!Info]
+> This readme hasn't been properly updated in a while.
+>
+> I'll bring it up to date once I'm gearing up to get the first testers, which is probably going to be a while still.
+
+
 ## What is this ?
 
 This is my Repository for developing a production ready Svalin.
@@ -170,16 +176,6 @@ Enter the confirm code along with the device name in the client and click confir
 > [!Note]
 > The confirm code is derived from the TLS session and is meant to prevent someone from impersonating the agent.
 
-## Contributing
-
-At the moment there is not an official way to contribute yet.
-If you want to help you can create an issue so we can coordinate our efforts.
-
-## Extending
-
-Currently Svalin isn't really ready to be extended.
-If you have a project or some functionality in mind, please create an issue describing what you would like to do.
-Then we can work on exposing the svalin API to fit your needs.
 
 # Architecture
 
@@ -230,62 +226,11 @@ The underlying RPC system doesn't know or care about the encryption.
 
 This crate contains the code for certificate generation and encryption.
 
-### TBRHL (Transaction Based Rolling Hash Ledger)
-
-> [!Note]
-> I am not a cryptography expert, you might even say I'm the opposite.
->
-> This is the best I can currently come up with.
-> I'm happy for any feedback or potentially better frameworks.
-
-This primitive (yet to be completed) is planned to be the base for svalin's integrity system.
-
-It's a log of transactions where each transaction contains the hash of the last one and is then signed by the entity creating the transaction.
-Once available on more than one device, the log cannot be modified locally without leaving a trace as each device checks the plausability of each transaction.
-
-So basically a cryptographic append-only-log
-
-The simplest example is the transaction log which contains information about who may access an agent.
-By comparing the hash of the latest transactions between an agent and a server, a client may detect malicous manipulation.
-Every device working with this log will verify it's integrity and plausability by itself, making manipulation extremely difficult.
-
-Each Transaction contains the following data:
-
-- incremental transaction id
-- Timestamp
-- Hash of previous transaction
-- Fingerprint of certificate used to sign
-- data
-
-For this to work, the log must conform to these standarts:
-
-- [ ] Each transaction is signed
-- [ ] Transactions are synchronized (easy with only one server)
-- [ ] Transactions are serializeable
-
-There are some challenges left though:
-
-- [ ] How are old transactions treated when a certificate used to sign them runs out?
-- [ ] How are old transactions treated when a certificate used to sign them gets revoked?
-- [ ] When should an entity other than agent and server get access? Becauses that might leak the certificates.
-
-One thing I'm still not clear about is how to distribute the certificates.
-I could just put them all in a large THRBL together with revocations and distribute them that way.
-The problem is, that this would leak all active and old certificates.
-
-### crate svalin_macros
-
-You'll find svalins macros here
-
 ### crate svalin_sysctl
 
 This crate contains code used by the agent for monitoring and managing a system.
 
 You might be interested in this crate if you want to build something similar to svalin or maybe a local UI for managing certain system settings.
-
-# Todo
-
-[See notes/todos.md](notes/todos.md)
 
 ## Svalin Network Architecture
 
