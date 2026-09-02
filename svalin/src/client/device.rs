@@ -1,11 +1,12 @@
 use anyhow::anyhow;
-use std::time::Duration;
+use std::{path::PathBuf, time::Duration};
 use svalin_pki::{SpkiHash, Verifier, get_current_timestamp};
 use svalin_rpc::{
     commands::{forward::ForwardConnection, ping::Ping},
     rpc::connection::{Connection, direct_connection::DirectConnection},
 };
 use svalin_store::client_store::persistent::{Message::UpdateMetaInfo, SvalinMetaInfo};
+use tokio::sync::mpsc;
 
 use crate::shared::commands::{
     request_system_report::RequestSystemReport, update_agent::UpdateAgent, update_mls::MlsUpdate,
@@ -46,10 +47,14 @@ impl<'a> DeviceHandle<'a> {
         Ok(())
     }
 
-    pub async fn update_agent(&self, url: String) -> anyhow::Result<()> {
+    pub async fn update_agent(
+        &self,
+        file: PathBuf,
+        progress: mpsc::Sender<f32>,
+    ) -> anyhow::Result<()> {
         self.connection()
             .await?
-            .dispatch(UpdateAgent(url))
+            .dispatch(UpdateAgent { file, progress })
             .await
             .map_err(|err| anyhow!("{err}"))?;
 

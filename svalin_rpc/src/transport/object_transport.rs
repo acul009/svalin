@@ -32,6 +32,10 @@ impl ObjectTransport {
         Ok(())
     }
 
+    pub async fn write_chunk(&mut self, chunk: &[u8]) -> Result<(), ObjectWriterError> {
+        Ok(self.transport.write_chunk(chunk).await?)
+    }
+
     pub async fn read_object<U: DeserializeOwned>(&mut self) -> Result<U, ObjectReaderError> {
         #[cfg(test)]
         {
@@ -49,6 +53,10 @@ impl ObjectTransport {
         let object: U = postcard::from_bytes(&chunk)?;
 
         Ok(object)
+    }
+
+    pub async fn read_chunk(&mut self) -> Result<Vec<u8>, ObjectReaderError> {
+        Ok(self.transport.read_chunk().await?)
     }
 
     pub async fn shutdown(&mut self) -> Result<(), std::io::Error> {

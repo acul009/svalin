@@ -1,21 +1,19 @@
 use std::process::Stdio;
 
 use anyhow::Context;
-use futures::StreamExt;
-use tokio::{fs, io::AsyncWriteExt};
+use tokio::{
+    fs,
+    io::{AsyncWriteExt, DuplexStream},
+};
 
 use crate::{
     agent,
     util::location::{Location, LocationError},
 };
 
-pub async fn update_agent(url: &str) -> anyhow::Result<()> {
-    let res = reqwest::get(url)
-        .await
-        .context("could not fetch new file, probably url error")?
-        .error_for_status()
-        .context("download server returned error")?;
-    let mut download_stream = res.bytes_stream();
+pub struct PreparedUpdate(Location);
+
+pub async fn prepare_update_agent(mut source: DuplexStream) -> anyhow::Result<PreparedUpdate> {
     let temp_path = get_update_temp_path()
         .context("error fetching temp path")?
         .ensure_parent_exists()
@@ -37,13 +35,9 @@ pub async fn update_agent(url: &str) -> anyhow::Result<()> {
         .await
         .context("could not create file to download into")?;
 
-    while let Some(chunk) = download_stream.next().await {
-        let chunk = chunk.context("error while downloading")?;
-        installer
-            .write_all(&chunk)
-            .await
-            .context("error while writing to file")?;
-    }
+    tokio::io::copy(&mut source, &mut installer)
+        .await
+        .context("error while writing to file")?;
 
     installer
         .flush()
@@ -53,9 +47,12 @@ pub async fn update_agent(url: &str) -> anyhow::Result<()> {
         .sync_all()
         .await
         .context("error while syncing file")?;
-    drop(installer);
 
-    let mut command = tokio::process::Command::new(temp_path.as_path().as_os_str());
+    Ok(PreparedUpdate(temp_path))
+}
+
+pub async fn update_agent(update: &PreparedUpdate) -> anyhow::Result<()> {
+    let mut command = tokio::process::Command::new(update.0.as_path().as_os_str());
     let output = command
         .arg("agent")
         .arg("install")

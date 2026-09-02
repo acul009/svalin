@@ -158,12 +158,20 @@ impl Session {
         Ok(self.transport.read_object().await?)
     }
 
+    pub async fn read_chunk(&mut self) -> Result<Vec<u8>, SessionReadError> {
+        Ok(self.transport.read_chunk().await?)
+    }
+
     pub async fn write_object<W: Serialize>(
         &mut self,
         object: &W,
     ) -> Result<(), SessionWriteError> {
         // tracing::trace!("Writing: {}", std::any::type_name::<W>());
         Ok(self.transport.write_object(object).await?)
+    }
+
+    pub async fn write_chunk(&mut self, chunk: &[u8]) -> Result<(), SessionWriteError> {
+        Ok(self.transport.write_chunk(chunk).await?)
     }
 
     pub(crate) async fn shutdown(mut self) {

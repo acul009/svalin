@@ -8,7 +8,6 @@ use widgets::scaffold;
 
 use crate::{Element, ui::widgets::loading};
 
-pub mod components;
 mod mainview;
 mod profile_picker;
 pub mod types;

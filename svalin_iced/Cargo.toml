@@ -43,9 +43,10 @@ futures = "0.3.33"
 uuid = "1.24.0"
 rust-i18n = "4.2.1"
 tracing.workspace = true
-iced_fonts = { git = "https://github.com/Redhawk18/iced_fonts.git", branch = "master" }
+iced_fonts = { git = "https://git.redhawkcodes.dev/redhawk18/iced_fonts.git", branch = "master" }
 chrono = "0.4.45"
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+rfd = "0.17.2"
 
 [build-dependencies]
 iced_fontello = {git = "https://github.com/hecrj/iced_fontello.git"}

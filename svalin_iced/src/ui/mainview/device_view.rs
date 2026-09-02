@@ -87,23 +87,8 @@ impl State {
                 )
             }
             Message::Update(message) => {
-                match self.update.update(message) {
-                    update::Action::StartAgentUpdate(update_url) => {
-                        let client = client.clone();
-                        let spki_hash = self.spki_hash.clone();
-
-                        Action::Run(
-                            Task::future(async move {
-                                if let Err(err) =
-                                    client.device(spki_hash).update_agent(update_url).await
-                                {
-                                    // TODO: Show error to user
-                                    tracing::error!(?err, "Failed to update device");
-                                }
-                            })
-                            .discard(),
-                        )
-                    }
+                match self.update.update(message, &client, &self.spki_hash) {
+                    update::Action::Run(task) => Action::Run(task.map(Message::Update)),
                     update::Action::None => Action::None,
                 }
             }

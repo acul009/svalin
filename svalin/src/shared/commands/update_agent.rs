@@ -1,10 +1,16 @@
-use anyhow::Context;
+use std::{os::unix::fs::MetadataExt, path::PathBuf};
+
+use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::Session,
 };
-use tokio::select;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    select,
+    sync::{mpsc, oneshot},
+};
 use tokio_util::sync::CancellationToken;
 
 pub struct UpdateAgentHandler {
@@ -21,7 +27,7 @@ impl UpdateAgentHandler {
 
 #[async_trait]
 impl CommandHandler for UpdateAgentHandler {
-    type Request = String;
+    type Request = ();
 
     fn key() -> String {
         "update-agent".into()
@@ -30,7 +36,7 @@ impl CommandHandler for UpdateAgentHandler {
     async fn handle(
         &self,
         session: &mut Session,
-        request: Self::Request,
+        _request: Self::Request,
         cancel: CancellationToken,
     ) -> anyhow::Result<()> {
         let Ok(_guard) = self.mutex.try_lock() else {
@@ -39,8 +45,28 @@ impl CommandHandler for UpdateAgentHandler {
             return Ok(());
         };
 
+        let (mut send, recv) = tokio::io::duplex(1024 * 4);
+        let (result_send, prepared) = oneshot::channel();
+        tokio::spawn(async move {
+            let result = crate::installer::prepare_update_agent(recv).await;
+            let _ = result_send.send(result);
+        });
+
+        loop {
+            let chunk = session.read_chunk().await?;
+            session.write_object::<Result<(), String>>(&Ok(())).await?;
+            if chunk.is_empty() {
+                send.flush().await?;
+                send.shutdown().await?;
+                break;
+            }
+            send.write_all(&chunk).await?;
+        }
+
+        let prepared = prepared.await??;
+
         select! {
-            update_result = crate::installer::update_agent(&request) => {
+            update_result = crate::installer::update_agent(&prepared) => {
                 let update_result = update_result.context("error while executing update");
                 let send_result: Result<(), String> = match &update_result {
                     Ok(_) => Ok(()),
@@ -58,26 +84,49 @@ impl CommandHandler for UpdateAgentHandler {
     }
 }
 
-pub struct UpdateAgent(pub String);
+pub struct UpdateAgent {
+    pub file: PathBuf,
+    pub progress: mpsc::Sender<f32>,
+}
 
 impl CommandDispatcher for UpdateAgent {
     type Output = ();
 
     type Error = anyhow::Error;
 
-    type Request = String;
+    type Request = ();
 
     fn key() -> String {
         UpdateAgentHandler::key()
     }
 
     fn get_request(&self) -> &Self::Request {
-        &self.0
+        &()
     }
 
     async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {
-        let result = session.read_object::<Result<(), String>>().await?;
+        let mut source = tokio::fs::File::open(&self.file).await?;
+        let size = source.metadata().await?.size() as f32;
 
-        result.map_err(|e| anyhow::anyhow!(e))
+        let mut progress = 0.0;
+        loop {
+            let mut buffer = Box::new([0u8; 1024 * 64]);
+            let read = source.read(buffer.as_mut()).await?;
+            session.write_chunk(&buffer.as_slice()[..read]).await?;
+            if let Err(err) = session.read_object::<Result<(), String>>().await? {
+                return Err(anyhow!("peer update error: {}", err));
+            }
+            progress += read as f32;
+            self.progress.send(progress / size).await?;
+            if read == 0 {
+                break;
+            }
+        }
+
+        if let Err(err) = session.read_object::<Result<(), String>>().await? {
+            return Err(anyhow!("peer update error: {}", err));
+        }
+
+        Ok(())
     }
 }
