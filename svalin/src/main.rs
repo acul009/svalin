@@ -4,10 +4,14 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
-use svalin::{agent, installer, server::Server};
+use svalin::{agent, installer, server::Server, util::location::Location};
 
 use tokio::runtime;
 use tokio_util::sync::CancellationToken;
+use tracing_appender::{
+    non_blocking::WorkerGuard,
+    rolling::{RollingFileAppender, Rotation},
+};
 use tracing_subscriber;
 #[cfg(target_os = "windows")]
 use windows_service::define_windows_service;
@@ -17,6 +21,23 @@ use windows_service::define_windows_service;
 pub struct App {
     #[clap(subcommand)]
     command: Command,
+}
+
+impl App {
+    pub fn file_logger_role(&self) -> Option<&'static str> {
+        match &self.command {
+            Command::Agent { action } => match action {
+                AgentAction::Run { .. } => Some("agent"),
+                #[cfg(target_os = "windows")]
+                AgentAction::UpdateService => Some("update-service"),
+                AgentAction::Install => None,
+                AgentAction::Uninstall => None,
+                AgentAction::Init { .. } => None,
+            },
+            Command::Server { .. } => None,
+            Command::Version => None,
+        }
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -224,10 +245,30 @@ fn run_service_update_agent() -> anyhow::Result<()> {
     run_result
 }
 
-fn main() {
-    tracing_subscriber::fmt::init();
+async fn log_to_dir(role: &str) -> WorkerGuard {
+    use tracing_subscriber::fmt::writer::MakeWriterExt;
 
+    let log_location = Location::system_log_dir()
+        .expect("Couldn't get log dir")
+        .push(role)
+        .ensure_parent_exists()
+        .await
+        .expect("Couldn't create log dir");
+    let appender = RollingFileAppender::new(Rotation::HOURLY, &log_location, "log");
+    let (appender, guard) = tracing_appender::non_blocking(appender);
+    let writer = std::io::stdout.and(appender);
+    tracing_subscriber::fmt().with_writer(writer).init();
+    guard
+}
+
+fn main() {
     let app = App::parse();
+    let _guard = if let Some(role) = app.file_logger_role() {
+        Some(log_to_dir(role))
+    } else {
+        None
+    };
+
     match app.command {
         Command::Server { address } => run_async(start_server(address)).unwrap(),
         Command::Agent { action } => match action {
@@ -355,10 +396,8 @@ async fn run_agent(cancel: CancellationToken) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "windows")]
 async fn run_update_agent(cancel: CancellationToken) -> anyhow::Result<()> {
-    
-    
-        installer::cleanup_old_installations().await?;
-    todo!();
+    installer::update_from_update_service().await?;
     Ok(())
 }

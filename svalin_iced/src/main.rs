@@ -21,7 +21,7 @@ type Theme = iced::Theme;
 type Element<'a, Message> = iced::Element<'a, Message, crate::Theme>;
 
 fn main() {
-    svalin::tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt::init();
 
     iced::daemon(UI::start, UI::update, UI::view)
         .title(UI::title)

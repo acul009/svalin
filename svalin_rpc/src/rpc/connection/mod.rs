@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
-use tracing::error;
+use tracing::{error, trace};
 
 use crate::permissions::PermissionHandler;
 use crate::rpc::{command::handler::HandlerCollection, session::Session};
@@ -50,7 +50,7 @@ pub mod direct_connection;
 
 #[async_trait]
 pub trait ServeableConnectionBase: Connection {
-    async fn accept_raw_session(&self) -> Result<Box<dyn SessionTransport>>;
+    async fn accept_raw_session(&self) -> anyhow::Result<Box<dyn SessionTransport>>;
 
     async fn close(&self);
 }
@@ -118,8 +118,17 @@ where
                                 }
                             });
                         },
-                        Err(e) => {
-                            error!("error accepting session: {}", e);
+                        Err(err) => {
+                            if let Some(err) = err.downcast_ref::<quinn::ConnectionError>() {
+                                if let quinn::ConnectionError::ApplicationClosed(frame) = err {
+                                    if frame.error_code.into_inner() == 0 {
+                                        trace!("connection closed gracefully");
+                                        break;
+                                    }
+                                }
+                            }
+                            // TODO: ignore graceful shutdown
+                            error!("error accepting session: {}", err);
                             break;
                         }
                     }

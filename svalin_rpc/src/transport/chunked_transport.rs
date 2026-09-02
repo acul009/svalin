@@ -1,4 +1,4 @@
-use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadBuf};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::transport::session_transport::SessionTransport;
 
@@ -34,7 +34,7 @@ impl ChunkTransport {
     }
 
     pub async fn read_chunk(&mut self) -> Result<Vec<u8>, ChunkReaderError> {
-        tracing::trace!("entering read_chunk");
+        // tracing::trace!("entering read_chunk");
         let read_chunk = {
             if self.read_buffer_size == 0 {
                 let short_len = self
@@ -50,7 +50,7 @@ impl ChunkTransport {
                 Some(len) => len,
                 None => {
                     while self.read_buffer_size < 4 {
-                        tracing::trace!("reading {}th byte", self.read_buffer_size);
+                        // tracing::trace!("reading {}th byte", self.read_buffer_size);
                         let short_len = self
                             .transport
                             .read_u8()
@@ -84,13 +84,13 @@ impl ChunkTransport {
                 .read(&mut self.read_buffer[self.read_buffer_size..total_len])
                 .await
                 .map_err(|err| ChunkReaderError::BodyReadError(err))?;
-            tracing::trace!("read {} bytes", read);
+            // tracing::trace!("read {} bytes", read);
             self.read_buffer_size += read;
-            tracing::trace!(
-                "bytes in buffer: {} of {}",
-                self.read_buffer_size,
-                total_len
-            );
+            // tracing::trace!(
+            //     "bytes in buffer: {} of {}",
+            //     self.read_buffer_size,
+            //     total_len
+            // );
             if read == 0 {
                 return Err(ChunkReaderError::UnexpectedEndOfStream);
             }
@@ -99,7 +99,7 @@ impl ChunkTransport {
         let chunk = self.read_buffer[header_len..total_len].to_vec();
         self.read_buffer_size = 0;
 
-        tracing::trace!("exiting read_chunk");
+        // tracing::trace!("exiting read_chunk");
         Ok(chunk)
     }
 

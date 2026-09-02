@@ -94,6 +94,11 @@ impl Location {
         }
     }
 
+    pub fn system_log_dir() -> Result<Self, LocationError> {
+        let log_dir = Self::new(std::env::temp_dir()).push("svalin").push("logs");
+        Ok(log_dir)
+    }
+
     pub fn system_temp_dir() -> Result<Self, LocationError> {
         let temp_dir = Self::new(std::env::temp_dir()).push("svalin");
         Ok(temp_dir)
@@ -109,6 +114,16 @@ impl Location {
         let parent_exists = tokio::fs::try_exists(&parent).await.unwrap_or(false);
         if !parent_exists {
             tokio::fs::create_dir_all(&parent).await?;
+        }
+
+        Ok(self)
+    }
+
+    pub async fn ensure_parent_exists_blocking(self) -> Result<Self, LocationError> {
+        let parent = self.parent().unwrap();
+        let parent_exists = std::fs::exists(&parent).unwrap_or(false);
+        if !parent_exists {
+            std::fs::create_dir_all(&parent)?;
         }
 
         Ok(self)

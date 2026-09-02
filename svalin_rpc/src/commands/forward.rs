@@ -65,12 +65,10 @@ impl CommandHandler for ForwardHandler {
                     let transport1 = session.borrow_transport();
                     let transport2 = forward_session.borrow_transport();
 
-                    if let Some(result) = cancel
+                    // Todo: check if this might return potentially interesting errors
+                    let _ = cancel
                         .run_until_cancelled(tokio::io::copy_bidirectional(transport1, transport2))
-                        .await
-                    {
-                        result?;
-                    }
+                        .await;
 
                     let _ = transport1.shutdown().await;
                     let _ = transport2.shutdown().await;

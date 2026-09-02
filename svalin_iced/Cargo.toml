@@ -45,6 +45,7 @@ rust-i18n = "4.2.1"
 tracing.workspace = true
 iced_fonts = { git = "https://github.com/Redhawk18/iced_fonts.git", branch = "master" }
 chrono = "0.4.45"
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [build-dependencies]
 iced_fontello = {git = "https://github.com/hecrj/iced_fontello.git"}
