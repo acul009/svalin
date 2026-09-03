@@ -111,7 +111,7 @@ impl DeviceView {
                 self.tunnel_opener.view().map(Message::TunnelOpener),
                 self.update_installer.view().map(Message::UpdateInstaller),
             ]
-            .height(Length::Shrink),
+            .height(Length::Fit),
         )
         .into()
     }

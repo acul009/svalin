@@ -51,7 +51,7 @@ impl Location {
 
             #[cfg(target_os = "linux")]
             {
-                Ok(Self::new("/var/lib/svalin/agent"))
+                Ok(Self::new("/var/lib/svalin"))
             }
         }
     }
