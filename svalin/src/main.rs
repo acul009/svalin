@@ -266,6 +266,7 @@ fn main() {
     let _guard = if let Some(role) = app.file_logger_role() {
         Some(log_to_dir(role))
     } else {
+        tracing_subscriber::fmt::init();
         None
     };
 
