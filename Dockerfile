@@ -13,7 +13,7 @@ WORKDIR /var/lib/svalin/server
 
 COPY --from=builder /build/target/release/svalin /usr/local/bin/svalin
 
-EXPOSE 55411
+EXPOSE 55411/udp
 
 ENTRYPOINT ["/usr/local/bin/svalin"]
 CMD ["server", "0.0.0.0:55411"]
