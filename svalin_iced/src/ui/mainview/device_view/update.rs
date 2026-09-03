@@ -139,7 +139,8 @@ impl State {
                     self.file_path
                         .as_ref()
                         .map(|path| text!("{}", path.display()))
-                ],
+                ]
+                .spacing(10),
                 button("Update").on_press_maybe(
                     if self.file_path.is_some() && !self.status.is_updating() {
                         Some(Message::StartAgentUpdate)
@@ -168,6 +169,7 @@ impl State {
             ]
             .spacing(10),
         )
+        .title("Agent Update")
         .into()
     }
 }
