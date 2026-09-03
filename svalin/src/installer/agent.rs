@@ -333,7 +333,7 @@ WantedBy=multi-user.target
 #[cfg(target_os = "linux")]
 async fn create_systemd_service(executable: &Location) -> anyhow::Result<()> {
     let service_file_contents =
-        SYSTEMD_SERVICE_TEMPLATE.replace("{}", &format!("{} agent", executable));
+        SYSTEMD_SERVICE_TEMPLATE.replace("{}", &format!("{} agent run", executable));
     let mut service_file = File::create(SYSTEMD_SERVICE_LOCATION).await?;
     service_file
         .write_all(service_file_contents.as_bytes())
