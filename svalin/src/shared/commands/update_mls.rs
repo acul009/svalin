@@ -31,6 +31,7 @@ use tokio::{
     time::Instant,
 };
 use tokio_util::sync::CancellationToken;
+use tracing::trace;
 use uuid::Uuid;
 
 use crate::{
@@ -83,37 +84,44 @@ impl CommandDispatcher for UpdateMls {
         let (snapshot, _) = self.client_state.subscribe().await?;
         let snapshot = snapshot.persistent().devices();
 
+        trace!(
+            "received server state with {} devices",
+            saved_persistent.devices().len()
+        );
         // Update data from that saved on server
         for (device, state) in saved_persistent.devices() {
-            if let Some(my_device) = snapshot.get(device) {
-                if let Some(saved_meta) = state.meta_info() {
-                    let mut update_meta = true;
+            trace!("found device in server state: {device}");
+            if let Some(saved_meta) = state.meta_info() {
+                let mut update_meta = true;
+                if let Some(my_device) = snapshot.get(device) {
                     if let Some(my_meta) = my_device.meta_info() {
                         update_meta = saved_meta.updated_at > my_meta.updated_at;
                     }
-                    if update_meta {
-                        self.client_state
-                            .persistent_update(persistent::Message::UpdateMetaInfo(
-                                device.clone(),
-                                saved_meta.clone(),
-                            ))
-                            .await?;
-                    }
                 }
-                if let Some(saved_report) = state.report() {
-                    let mut update_report = true;
+                if update_meta {
+                    self.client_state
+                        .persistent_update(persistent::Message::UpdateMetaInfo(
+                            device.clone(),
+                            saved_meta.clone(),
+                        ))
+                        .await?;
+                }
+            }
+            if let Some(saved_report) = state.report() {
+                let mut update_report = true;
+                if let Some(my_device) = snapshot.get(device) {
                     if let Some(my_report) = my_device.report() {
                         update_report = saved_report.system_report.generated_at
                             > my_report.system_report.generated_at;
                     }
-                    if update_report {
-                        self.client_state
-                            .persistent_update(persistent::Message::UpdateSystemReport(
-                                device.clone(),
-                                saved_report.clone(),
-                            ))
-                            .await?;
-                    }
+                }
+                if update_report {
+                    self.client_state
+                        .persistent_update(persistent::Message::UpdateSystemReport(
+                            device.clone(),
+                            saved_report.clone(),
+                        ))
+                        .await?;
                 }
             }
         }
@@ -178,6 +186,7 @@ impl CommandDispatcher for UpdateMls {
                 }
                 _ = tokio::time::sleep(Duration::from_secs(3)), if timeout => {
                     let (snapshot, _) = self.client_state.subscribe().await?;
+                    trace!("uploading state with {} devices", snapshot.persistent().devices().len());
                     let persistent_data =
                         EncryptedObject::encrypt(snapshot.persistent(), &self.encryption_key)?;
 
