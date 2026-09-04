@@ -256,7 +256,7 @@ fn log_to_dir(role: &str) -> WorkerGuard {
         .expect("Couldn't create log dir");
     let appender = RollingFileAppender::new(Rotation::HOURLY, &log_location, "log");
     let (appender, guard) = tracing_appender::non_blocking(appender);
-    let writer = std::io::stdout.and(appender);
+    let writer = appender.and(std::io::stdout);
     tracing_subscriber::fmt().with_writer(writer).init();
     guard
 }
@@ -405,9 +405,13 @@ async fn run_agent(cancel: CancellationToken) -> anyhow::Result<()> {
                 "agent encountered error, retrying after timeout\nError message:\n{:#}",
                 err
             );
-            cancel
+            if cancel
                 .run_until_cancelled(tokio::time::sleep(Duration::from_secs(60)))
-                .await;
+                .await
+                .is_some()
+            {
+                tracing::info!("restarting agent now!");
+            }
         }
     }
     Ok(())
