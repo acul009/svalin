@@ -95,8 +95,10 @@ impl Location {
     }
 
     pub fn system_log_dir() -> Result<Self, LocationError> {
-        let log_dir = Self::new(std::env::temp_dir()).push("svalin").push("logs");
-        Ok(log_dir)
+        #[cfg(target_os = "linux")]
+        return Ok(Self::new("/var/log").push("svalin"));
+        #[cfg(target_os = "windows")]
+        return Ok(Self::new(std::env::temp_dir()).push("svalin-logs"));
     }
 
     pub fn system_temp_dir() -> Result<Self, LocationError> {

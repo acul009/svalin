@@ -3,6 +3,7 @@ use std::{
     time::Duration,
 };
 
+use anyhow::Context;
 use clap::{Parser, Subcommand};
 use svalin::{agent, installer, server::Server, util::location::Location};
 
@@ -388,11 +389,27 @@ async fn run_agent(cancel: CancellationToken) -> anyhow::Result<()> {
     tokio::spawn(async move {
         // Wait for shutdown signal
         tokio::signal::ctrl_c().await.unwrap();
+        tracing::info!("received shutdown signal\nshutting down...");
 
         cancel2.cancel();
     });
 
-    agent::run(cancel).await?;
+    tracing::info!("starting agent!");
+    while !cancel.is_cancelled() {
+        tracing::trace!("calling agent::run");
+        if let Err(err) = agent::run(cancel.clone())
+            .await
+            .context("error in agent::run")
+        {
+            tracing::error!(
+                "agent encountered error, retrying after timeout\nError message:\n{:#}",
+                err
+            );
+            cancel
+                .run_until_cancelled(tokio::time::sleep(Duration::from_secs(60)))
+                .await;
+        }
+    }
     Ok(())
 }
 

@@ -50,7 +50,7 @@ use crate::{shared::join_agent::AgentInitPayload, util::trust_store::load_trust_
 
 #[instrument]
 pub async fn run(cancel: CancellationToken) -> Result<()> {
-    cleanup_on_start().await?;
+    cleanup_on_start().await.context("error cleaning up")?;
 
     tracing::trace!("opening agent configuration");
 
@@ -68,7 +68,10 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
         .context("error decrypting credentials")?;
 
     // tracing::trace!("building upstream verifier");
-    let root_certificate = config.root_certificate.use_as_root()?;
+    let root_certificate = config
+        .root_certificate
+        .use_as_root()
+        .context("error establishing root")?;
 
     let upstream_certificate = config
         .upstream_certificate
@@ -99,7 +102,8 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
         cancel.clone(),
         &tasks,
     )
-    .await?;
+    .await
+    .context("error loading trust store")?;
     update_trust_store(
         trust_store.clone(),
         agent_store.transaction_store().clone(),
@@ -107,9 +111,10 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
         cancel.clone(),
         &tasks,
     )
-    .await?;
+    .await
+    .context("error updating trust store")?;
 
-    let storage_provider = open_mls_store().await?;
+    let storage_provider = open_mls_store().await.context("error opening mls store")?;
 
     let key_retriever = RemoteKeyRetriever::new(rpc.upstream_connection(), trust_store.clone());
 
@@ -122,7 +127,8 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
             key_retriever,
             verifier.clone(),
         )
-        .await?,
+        .await
+        .context("error creating mls agent")?,
     );
 
     let permission_handler = DefaultPermissionHandler::new(root_certificate.clone());
@@ -216,7 +222,9 @@ async fn cleanup_on_start() -> anyhow::Result<()> {
         tokio::fs::remove_dir_all(&temp_dir).await?;
     }
 
-    installer::cleanup_old_installations().await?;
+    if let Err(err) = installer::cleanup_old_installations().await {
+        tracing::error!("unable to cleanup old installations:\n{err:#}");
+    }
 
     Ok(())
 }
