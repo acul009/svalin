@@ -77,6 +77,10 @@ impl SystemReport {
                 total_space: disk.total_space(),
                 available_space: disk.available_space(),
             })
+            // ignore docker overlays
+            .filter(|disk| {
+                !disk.mount_point.starts_with("/var/lib/docker") && disk.file_system != "overlay"
+            })
             .collect::<Vec<_>>();
         disks.sort_by_cached_key(|disk| disk.mount_point.clone());
 
