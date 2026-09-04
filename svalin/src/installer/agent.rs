@@ -77,12 +77,12 @@ pub async fn install_agent() -> anyhow::Result<()> {
 
 #[cfg(windows)]
 pub async fn update_from_update_service() -> anyhow::Result<()> {
-    let current_location = env::current_exe()?;
+    let current_location = Location::new(env::current_exe()?);
     create_windows_service(
         WINDOWS_SERVICE_NAME,
         &current_location,
         WINDOWS_SERVICE_DISPLAY_NAME,
-        StartType::Demand,
+        StartType::Auto,
         "agent run --service",
     )
     .await?;
@@ -130,6 +130,7 @@ pub async fn uninstall_agent() -> anyhow::Result<()> {
     }
 
     #[cfg(windows)]
+    #[allow(unreachable_code)]
     {
         todo!("Defer deletion of data and install dir");
         println!("Defered deletion of agent data until next restart.");
@@ -209,6 +210,12 @@ async fn create_windows_service(
             .arg(service_name)
             .arg("binPath=")
             .arg(bin_path_arg(executable, arg_string));
+
+        match command.status().await?.code() {
+            Some(0) => Ok(()),
+            Some(code) => Err(anyhow!("Failed to edit service, exit code: {code}")),
+            None => Err(anyhow!("Failed to edit service")),
+        }
     } else {
         let mut command = Command::new("sc.exe");
         command
@@ -230,7 +237,7 @@ async fn create_windows_service(
 }
 
 #[cfg(target_os = "windows")]
-fn start_windows_service(service_name: &str) -> anyhow::Result<()> {
+async fn start_windows_service(service_name: &str) -> anyhow::Result<()> {
     let mut command = Command::new("powershell.exe");
     command
         .arg("-NoProfile")
@@ -246,7 +253,7 @@ fn start_windows_service(service_name: &str) -> anyhow::Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-fn stop_windows_service(service_name: &str) -> anyhow::Result<()> {
+async fn stop_windows_service(service_name: &str) -> anyhow::Result<()> {
     let mut command = Command::new("powershell.exe");
     command
         .arg("-NoProfile")

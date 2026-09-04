@@ -1,4 +1,4 @@
-use std::{os::unix::fs::MetadataExt, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
@@ -106,7 +106,17 @@ impl CommandDispatcher for UpdateAgent {
 
     async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {
         let mut source = tokio::fs::File::open(&self.file).await?;
-        let size = source.metadata().await?.size() as f32;
+        #[cfg(target_os = "linux")]
+        let size = {
+            use std::os::unix::fs::MetadataExt;
+            source.metadata().await?.size() as f32
+        };
+        #[cfg(target_os = "windows")]
+        let size = {
+            use std::os::windows::fs::MetadataExt;
+
+            source.metadata().await?.file_size() as f32
+        };
 
         let mut progress = 0.0;
         loop {

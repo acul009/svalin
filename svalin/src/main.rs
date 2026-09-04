@@ -245,14 +245,13 @@ fn run_service_update_agent() -> anyhow::Result<()> {
     run_result
 }
 
-async fn log_to_dir(role: &str) -> WorkerGuard {
+fn log_to_dir(role: &str) -> WorkerGuard {
     use tracing_subscriber::fmt::writer::MakeWriterExt;
 
     let log_location = Location::system_log_dir()
         .expect("Couldn't get log dir")
         .push(role)
-        .ensure_parent_exists()
-        .await
+        .ensure_parent_exists_blocking()
         .expect("Couldn't create log dir");
     let appender = RollingFileAppender::new(Rotation::HOURLY, &log_location, "log");
     let (appender, guard) = tracing_appender::non_blocking(appender);
@@ -398,7 +397,7 @@ async fn run_agent(cancel: CancellationToken) -> anyhow::Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-async fn run_update_agent(cancel: CancellationToken) -> anyhow::Result<()> {
+async fn run_update_agent(_cancel: CancellationToken) -> anyhow::Result<()> {
     installer::update_from_update_service().await?;
     Ok(())
 }

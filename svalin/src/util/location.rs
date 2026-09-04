@@ -119,7 +119,7 @@ impl Location {
         Ok(self)
     }
 
-    pub async fn ensure_parent_exists_blocking(self) -> Result<Self, LocationError> {
+    pub fn ensure_parent_exists_blocking(self) -> Result<Self, LocationError> {
         let parent = self.parent().unwrap();
         let parent_exists = std::fs::exists(&parent).unwrap_or(false);
         if !parent_exists {
