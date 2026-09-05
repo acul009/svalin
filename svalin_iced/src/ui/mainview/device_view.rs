@@ -3,7 +3,7 @@ use std::sync::Arc;
 use iced::{
     Length, Task,
     alignment::Vertical,
-    widget::{self, center, column, row, rule, scrollable, space, stack, text},
+    widget::{self, button, center, column, row, rule, scrollable, space, stack, text},
 };
 use svalin::client::{Client, state::ClientState};
 use svalin_pki::SpkiHash;
@@ -22,6 +22,7 @@ mod update;
 #[derive(Debug, Clone)]
 pub enum Message {
     Back,
+    OpenTerminal,
     MetaDisplay(meta_display::Message),
     Update(update::Message),
 }
@@ -29,6 +30,7 @@ pub enum Message {
 pub enum Action {
     None,
     Back,
+    OpenTerminal(SpkiHash),
     Run(Task<Message>),
 }
 
@@ -94,6 +96,7 @@ impl State {
                     update::Action::None => Action::None,
                 }
             }
+            Message::OpenTerminal => Action::OpenTerminal(self.spki_hash.clone()),
         }
     }
 
@@ -140,7 +143,11 @@ impl State {
 }
 
 fn agent_actions() -> Element<'static, Message> {
-    card("TODO").title("Agent Actions").into()
+    card(row![
+        button(bootstrap::terminal().center().size(40)).on_press(Message::OpenTerminal)
+    ])
+    .title("Agent Actions")
+    .into()
 }
 
 fn device_report(svalin_report: &SvalinReport) -> Element<'_, Message> {

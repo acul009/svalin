@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
+use async_pty::TerminalInput;
 use iced::{
-    Subscription, Task,
+    Task,
     widget::{center, text},
     window,
 };
-use svalin::client::device::Device;
 use terminal::TerminalWindow;
+use tokio::sync::mpsc;
 
 use crate::Element;
 
@@ -32,10 +33,14 @@ impl WindowHelper {
         }
     }
 
-    pub fn add_terminal(&mut self, device: Device) -> Task<Message> {
+    pub fn add_terminal(
+        &mut self,
+        send: mpsc::Sender<TerminalInput>,
+        recv: mpsc::Receiver<Vec<u8>>,
+    ) -> Task<Message> {
         let (window_id, task1) = Self::new_window();
 
-        let (terminal, task2) = TerminalWindow::start(device);
+        let (terminal, task2) = TerminalWindow::start(send, recv);
 
         self.windows
             .insert(window_id, WindowContent::Terminal(terminal));
@@ -57,7 +62,7 @@ impl WindowHelper {
         (id, task.discard())
     }
 
-    pub fn view(&self, id: window::Id) -> Element<Message> {
+    pub fn view(&self, id: window::Id) -> Element<'_, Message> {
         if let Some(window) = self.windows.get(&id) {
             window
                 .view()
@@ -106,32 +111,28 @@ pub enum WindowMessage {
 
 pub enum WindowContent {
     Terminal(terminal::TerminalWindow),
-    Todo,
 }
 
 impl WindowContent {
-    fn view(&self) -> Element<WindowMessage> {
+    fn view(&self) -> Element<'_, WindowMessage> {
         match self {
             Self::Terminal(terminal) => terminal.view().map(WindowMessage::Terminal),
-            Self::Todo => todo!(),
         }
     }
 
     fn update(&mut self, message: WindowMessage) -> Task<WindowMessage> {
         match message {
-            WindowMessage::Terminal(message) => {
-                if let Self::Terminal(terminal) = self {
-                    return terminal.update(message).map(WindowMessage::Terminal);
+            WindowMessage::Terminal(message) => match self {
+                WindowContent::Terminal(terminal) => {
+                    terminal.update(message).map(WindowMessage::Terminal)
                 }
-                Task::none()
-            }
+            },
         }
     }
 
     pub fn title(&self) -> String {
         match self {
             Self::Terminal(terminal) => terminal.title(),
-            Self::Todo => "Todo".to_string(),
         }
     }
 }

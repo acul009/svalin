@@ -212,7 +212,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -223,7 +223,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -500,13 +500,13 @@ checksum = "82f6aeea286b8eb4dd3431a1be1b59d290ace00f5bfd8e2a159bc2a05e2c1667"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
 ]
 
 [[package]]
 name = "async_pty"
 version = "0.1.0"
-source = "git+https://github.com/Rahn-IT/frostbyte_terminal.git#99a51039315becb4bf2cd44370babc34e7ab4995"
+source = "git+https://github.com/Rahn-IT/frostbyte_terminal.git#67726c040d18af94a50ca9632d78624518aef128"
 dependencies = [
  "anyhow",
  "portable-pty",
@@ -853,7 +853,7 @@ checksum = "fc0e56a716f1e132ff6bf4bdac1c944a3fcdc1cae65f70a4a2a1ac3b401d2d1f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -923,9 +923,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.4.4"
+version = "1.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ad534f4357a5264cce5019c989cf66a4f0dc4e0d1b1d15f8aacec0ff7360273"
+checksum = "005ec2760ca554fae18df7a11195552ec576cd665632a881bc011d5bb2fd4d80"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -1054,7 +1054,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -1306,18 +1306,18 @@ checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
 name = "crossbeam-channel"
-version = "0.5.16"
+version = "0.5.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d85363c37faeca707aef026efa9f3b34d077bce547e48f770770625c6013679e"
+checksum = "98b0cc327b5bc766e7fda9c9260cc0fa81b43a8e240440422dff70788e3f9ef1"
 dependencies = [
  "crossbeam-utils",
 ]
 
 [[package]]
 name = "crossbeam-deque"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5181e0de7b61eb03a81e347d6dd8797bae9da5146707b51077e2d71a54ec0ceb"
+checksum = "622f3fc73690be383c7214310406f28a90e6edeadc3cea882f9d71e495b9711a"
 dependencies = [
  "crossbeam-epoch",
  "crossbeam-utils",
@@ -1325,27 +1325,27 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-epoch"
-version = "0.9.20"
+version = "0.9.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d6914041f254d6e9176c01941b21115dcfb7089e55135a35411081bd106ef3f"
+checksum = "dc74980687109a3b14c72fd458107bf0baa1da1a1a805e178d15501ba9b86d9d"
 dependencies = [
  "crossbeam-utils",
 ]
 
 [[package]]
 name = "crossbeam-queue"
-version = "0.3.13"
+version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "803d13fb3b09d88be9f4dbc29062c66b19bf7170867ceb746d2a8689bf6c7a26"
+checksum = "03e8bd762f7479489c70ed6c768ddca99d7296857de437a68dcb2a94365b3fae"
 dependencies = [
  "crossbeam-utils",
 ]
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.8.22"
+version = "0.8.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61803da095bee82a81bb1a452ecc25d3b2f1416d1897eb86430c6159ef717c17"
+checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
 name = "crunchy"
@@ -1583,7 +1583,7 @@ checksum = "c6232dd377dcc64799954cbd3a9bb882e9cdc1308ccd87b1c098f1fb2eaf82a8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -1814,7 +1814,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1963,7 +1963,7 @@ dependencies = [
 [[package]]
 name = "filedescriptor"
 version = "0.8.3"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "libc",
  "thiserror 1.0.69",
@@ -1972,9 +1972,9 @@ dependencies = [
 
 [[package]]
 name = "find-msvc-tools"
-version = "0.1.11"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d45db016d36b838f563236e9193d0ee6ce38f3f68b6c94e914b4929c96bbb890"
+checksum = "3e0f1c7c3a72c66fd80abe965175f7523475c0489a87d3ff9d6e8c87d87a9d2d"
 
 [[package]]
 name = "finl_unicode"
@@ -2098,7 +2098,7 @@ checksum = "ea5190182e6915eb873ddbc16e23b711b6eb1f9c00a0d0a3a91b5f6228475225"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -2119,7 +2119,7 @@ dependencies = [
 [[package]]
 name = "frozen_term"
 version = "0.8.2"
-source = "git+https://github.com/Rahn-IT/frostbyte_terminal.git#99a51039315becb4bf2cd44370babc34e7ab4995"
+source = "git+https://github.com/Rahn-IT/frostbyte_terminal.git#67726c040d18af94a50ca9632d78624518aef128"
 dependencies = [
  "iced",
  "termwiz",
@@ -2216,7 +2216,7 @@ checksum = "9fb9654ba8355388abeb8dcb4fc62f511300867002afc858860463bdd9fe0c44"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -2882,7 +2882,7 @@ dependencies = [
 [[package]]
 name = "iced"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "iced_core",
  "iced_debug",
@@ -2899,7 +2899,7 @@ dependencies = [
 [[package]]
 name = "iced_beacon"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "bincode 1.3.3",
  "futures",
@@ -2914,7 +2914,7 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "bitflags 2.13.1",
  "bytes",
@@ -2934,7 +2934,7 @@ dependencies = [
 [[package]]
 name = "iced_debug"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "cargo-hot-protocol",
  "iced_beacon",
@@ -2946,7 +2946,7 @@ dependencies = [
 [[package]]
 name = "iced_devtools"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "iced_debug",
  "iced_program",
@@ -2990,7 +2990,7 @@ dependencies = [
 [[package]]
 name = "iced_futures"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "futures",
  "iced_core",
@@ -3004,7 +3004,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "bitflags 2.13.1",
  "bytemuck",
@@ -3024,7 +3024,7 @@ dependencies = [
 [[package]]
 name = "iced_program"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "iced_graphics",
  "iced_runtime",
@@ -3033,7 +3033,7 @@ dependencies = [
 [[package]]
 name = "iced_renderer"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "iced_graphics",
  "iced_tiny_skia",
@@ -3045,7 +3045,7 @@ dependencies = [
 [[package]]
 name = "iced_runtime"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "bytes",
  "iced_core",
@@ -3057,7 +3057,7 @@ dependencies = [
 [[package]]
 name = "iced_tiny_skia"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "bytemuck",
  "cosmic-text",
@@ -3073,7 +3073,7 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "bitflags 2.13.1",
  "bytemuck",
@@ -3092,7 +3092,7 @@ dependencies = [
 [[package]]
 name = "iced_widget"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "iced_renderer",
  "iced_runtime",
@@ -3106,7 +3106,7 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f8127c84dddf0b9e32c5e7dbb822911652f72665"
+source = "git+https://github.com/iced-rs/iced.git#c67aecf735a32abf1117c98d6accb72b2f698d6e"
 dependencies = [
  "arboard",
  "iced_debug",
@@ -3285,9 +3285,9 @@ checksum = "6e44b0a4eaa4c82f441d50a963f2d5f05a787240aeee097597033e72accfd22f"
 
 [[package]]
 name = "indexmap"
-version = "2.14.1"
+version = "2.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07aa2048142242915a31d35844fb311e0e53fcca590c3a0a40dcf1b841fa09eb"
+checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.1",
@@ -3763,7 +3763,7 @@ dependencies = [
  "bitflags 2.13.1",
  "libc",
  "plain",
- "redox_syscall 0.9.3",
+ "redox_syscall 0.9.4",
 ]
 
 [[package]]
@@ -4237,7 +4237,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4869,7 +4869,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5240,9 +5240,9 @@ checksum = "05c8b63e8d9609db387f0324918f81d68fe27748f084ef092fb35954d0539a85"
 
 [[package]]
 name = "portable-atomic-util"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2a106d1259c23fac8e543272398ae0e3c0b8d33c88ed73d0cc71b0f1d902618"
+checksum = "10ab3eb7f3becc3a1cbc4f2c6f20267996cfc1a6467a873763411b136a122715"
 dependencies = [
  "portable-atomic",
 ]
@@ -5511,7 +5511,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5802,9 +5802,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d678d17679829e73d371e96880897e98fee2ded7acc0a50bdf8af2affa4b2fe5"
+checksum = "737970939a87c6fa31e7acad13307bccbb017a073b695b6089a2c484f929e20e"
 dependencies = [
  "bitflags 2.13.1",
 ]
@@ -6052,7 +6052,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6110,7 +6110,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6319,7 +6319,7 @@ checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -6343,7 +6343,7 @@ checksum = "8d3b1629de253c70a0508c3899572da79ca359fdab27c7920ff00406df418906"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -6607,7 +6607,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7109,9 +7109,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6275cddf4610d1775e6d1fe9469b2e77d0f39fd98fb7450901b821e0c53649f"
+checksum = "12df2e0110f65b775f769bb17ef989067a1d931b2eb822bd4346631eeada89f9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7194,7 +7194,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7213,7 +7213,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix 1.1.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7240,7 +7240,7 @@ dependencies = [
 [[package]]
 name = "termwiz"
 version = "0.24.0"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "anyhow",
  "bitflags 2.13.1",
@@ -7349,7 +7349,7 @@ checksum = "bc04cd3e1236dd4a98afca4569f2deb3f120e5422a4023be2cb683f8486292af"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -7456,9 +7456,9 @@ dependencies = [
 
 [[package]]
 name = "tinyvec"
-version = "1.12.0"
+version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb4ebadaa0af04fab11ae01eb5f9fdb5f9c5b875506e210e71c07873528baa7f"
+checksum = "4cf0ded5c4e56918d8f8a339e1bb67d038d3bc6d144ac407904015ba2e4cde9b"
 dependencies = [
  "tinyvec_macros",
 ]
@@ -7516,14 +7516,14 @@ checksum = "78773a2a397f451582ce068015985c33193cf6dea8b74d2a639fe457b2f07b0e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
 ]
 
 [[package]]
 name = "tokio-rustls"
-version = "0.26.4"
+version = "0.26.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1729aa945f29d91ba541258c8df89027d5792d85a8841fb65e8bf0f4ede4ef61"
+checksum = "b0c85f2c3ef0b1cd58b36682f4b17aaa995f0e5db534d85692b4903abce21f67"
 dependencies = [
  "rustls",
  "tokio",
@@ -7859,7 +7859,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8015,7 +8015,7 @@ checksum = "051eb1abcf10076295e815102942cc58f9d5e3b4560e46e53c21e8ff6f3af7b1"
 [[package]]
 name = "vtparse"
 version = "0.7.0"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "utf8parse",
 ]
@@ -8287,7 +8287,7 @@ checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
 [[package]]
 name = "wezterm-bidi"
 version = "0.2.3"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "log",
  "wezterm-dynamic",
@@ -8296,7 +8296,7 @@ dependencies = [
 [[package]]
 name = "wezterm-blob-leases"
 version = "0.1.1"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "getrandom 0.3.4",
  "sha2 0.10.9",
@@ -8307,7 +8307,7 @@ dependencies = [
 [[package]]
 name = "wezterm-cell"
 version = "0.1.0"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "finl_unicode",
  "image",
@@ -8326,7 +8326,7 @@ dependencies = [
 [[package]]
 name = "wezterm-char-props"
 version = "0.1.3"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "phf",
  "serde",
@@ -8336,7 +8336,7 @@ dependencies = [
 [[package]]
 name = "wezterm-color-types"
 version = "0.3.0"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "csscolorparser",
  "deltae",
@@ -8348,7 +8348,7 @@ dependencies = [
 [[package]]
 name = "wezterm-dynamic"
 version = "0.2.1"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "log",
  "ordered-float 4.6.0",
@@ -8360,7 +8360,7 @@ dependencies = [
 [[package]]
 name = "wezterm-dynamic-derive"
 version = "0.1.1"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8370,7 +8370,7 @@ dependencies = [
 [[package]]
 name = "wezterm-escape-parser"
 version = "0.1.0"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "base64 0.22.1",
  "bitflags 2.13.1",
@@ -8396,7 +8396,7 @@ dependencies = [
 [[package]]
 name = "wezterm-input-types"
 version = "0.1.0"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "bitflags 1.3.2",
  "euclid",
@@ -8407,7 +8407,7 @@ dependencies = [
 [[package]]
 name = "wezterm-surface"
 version = "0.1.0"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "bitflags 2.13.1",
  "fancy-regex",
@@ -8428,7 +8428,7 @@ dependencies = [
 [[package]]
 name = "wezterm-term"
 version = "0.1.0"
-source = "git+https://github.com/wez/wezterm.git#092dcf70d8bfb0e8b22a047b9f4b6451a8cf04dc"
+source = "git+https://github.com/wez/wezterm.git#b99b1ca2cc0a77e97600410726cdf5e3750bd89b"
 dependencies = [
  "anyhow",
  "bitflags 1.3.2",
@@ -8658,7 +8658,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -9254,7 +9254,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
  "zbus_names",
  "zvariant",
  "zvariant_utils",
@@ -9378,7 +9378,7 @@ checksum = "34df6fc39dbd26ddc9c10e6a2984476e13acce22e64e4487636ef494369225da"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -9443,18 +9443,18 @@ dependencies = [
 
 [[package]]
 name = "zstd-safe"
-version = "7.2.4"
+version = "7.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f49c4d5f0abb602a93fb8736af2a4f4dd9512e36f7f570d66e65ff867ed3b9d"
+checksum = "64d80649ab6db9d9f6f9c80a40becd948eda4714a0a5ac8c4d157a32231c7882"
 dependencies = [
  "zstd-sys",
 ]
 
 [[package]]
 name = "zstd-sys"
-version = "2.0.16+zstd.1.5.7"
+version = "2.1.0+zstd.1.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e19ebc2adc8f83e43039e79776e3fda8ca919132d68a1fed6a5faca2683748"
+checksum = "0ef0a8027ec3ee71300ab3bcbcd0393f434aa72b91ca6d635a39941deae8eea0"
 dependencies = [
  "cc",
  "pkg-config",
@@ -9508,7 +9508,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn 3.0.4",
+ "syn 3.0.5",
  "zvariant_utils",
 ]
 
@@ -9521,6 +9521,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
- "syn 3.0.4",
+ "syn 3.0.5",
  "winnow 1.0.4",
 ]

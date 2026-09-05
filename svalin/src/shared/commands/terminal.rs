@@ -106,7 +106,7 @@ impl TakeableCommandHandler for RemoteTerminalHandler {
 pub struct RemoteTerminalDispatcher {
     pub initial_size: TerminalSize,
     pub input: mpsc::Receiver<TerminalInput>,
-    pub output: mpsc::Sender<Result<Vec<u8>, ()>>,
+    pub output: mpsc::Sender<Vec<u8>>,
     pub cancel: CancellationToken,
 }
 
@@ -144,7 +144,7 @@ impl CommandDispatcher for RemoteTerminalDispatcher {
                 output = session.read_object::<Option<Vec<u8>>>() => {
                     match output {
                         Ok(Some(chunk)) => {
-                            if let Err(err) = self.output.send(Ok(chunk)).await {
+                            if let Err(err) = self.output.send(chunk).await {
                                 tracing::error!("{err}");
                             }
                         },

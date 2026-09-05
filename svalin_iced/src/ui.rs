@@ -1,10 +1,10 @@
-use std::mem;
+use std::{mem, sync::Arc};
 
 use iced::{Subscription, Task, keyboard, window};
 use mainview::MainView;
 use profile_picker::ProfilePicker;
 use widgets::scaffold;
-// use window_helper::WindowHelper;
+use window_helper::WindowHelper;
 
 use crate::{Element, ui::widgets::loading};
 
@@ -12,7 +12,7 @@ mod mainview;
 mod profile_picker;
 pub mod types;
 pub mod widgets;
-// mod window_helper;
+mod window_helper;
 
 pub enum Screen {
     ProfilePicker(ProfilePicker),
@@ -26,14 +26,14 @@ pub enum Message {
     Tab,
     ProfilePicker(profile_picker::Message),
     MainView(mainview::Message),
-    // WindowHelper(window_helper::Message),
+    WindowHelper(window_helper::Message),
     WindowCloseRequest(window::Id),
 }
 
 pub struct UI {
     screen: Screen,
     main_window_id: window::Id,
-    // window_helper: WindowHelper,
+    window_helper: WindowHelper,
 }
 
 impl UI {
@@ -51,7 +51,7 @@ impl UI {
             Self {
                 screen: Screen::ProfilePicker(screen),
                 main_window_id: id,
-                // window_helper: WindowHelper::new(),
+                window_helper: WindowHelper::new(),
             },
             task,
         )
@@ -74,8 +74,8 @@ impl UI {
                     // Todo: proper shutdown
                     iced::exit()
                 } else {
-                    // self.window_helper.close_window(&id);
-                    Task::none()
+                    self.window_helper.close_window(&id);
+                    window::close(id)
                 }
             }
             Message::ProfilePicker(message) => match &mut self.screen {
@@ -103,18 +103,20 @@ impl UI {
                     match action {
                         mainview::Action::None => Task::none(),
                         mainview::Action::Run(task) => task.map(Message::MainView),
-                        // mainview::Action::OpenTerminal(device) => self
-                        //     .window_helper
-                        //     .add_terminal(device)
-                        //     .map(Message::WindowHelper),
+                        mainview::Action::OpenTerminal(arc) => {
+                            let (send, recv) = Arc::into_inner(arc).unwrap();
+                            self.window_helper
+                                .add_terminal(send, recv)
+                                .map(Message::WindowHelper)
+                        }
                     }
                 }
                 _ => Task::none(),
             },
-            // Message::WindowHelper(message) => self
-            //     .window_helper
-            //     .update(message)
-            //     .map(Message::WindowHelper),
+            Message::WindowHelper(message) => self
+                .window_helper
+                .update(message)
+                .map(Message::WindowHelper),
         }
     }
 
@@ -122,8 +124,7 @@ impl UI {
         if window_id == self.main_window_id {
             t!("app-title").to_string()
         } else {
-            "TODO".to_string()
-            // self.window_helper.title(window_id)
+            self.window_helper.title(window_id)
         }
     }
 
@@ -160,10 +161,9 @@ impl UI {
                 .context_maybe(context)
                 .into()
         } else {
-            "Todo".into()
-            // self.window_helper
-            //     .view(window_id)
-            //     .map(Message::WindowHelper)
+            self.window_helper
+                .view(window_id)
+                .map(Message::WindowHelper)
         }
     }
 

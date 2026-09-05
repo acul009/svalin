@@ -27,12 +27,23 @@ pub enum Message {
     SelectDevice(SpkiHash),
     AddDevice(add_device::Message),
     DeviceView(device_view::Message),
+    OpenTerminal(
+        Arc<(
+            tokio::sync::mpsc::Sender<async_pty::TerminalInput>,
+            tokio::sync::mpsc::Receiver<Vec<u8>>,
+        )>,
+    ),
 }
 
 pub enum Action {
     None,
     Run(Task<Message>),
-    // OpenTerminal(Device),
+    OpenTerminal(
+        Arc<(
+            tokio::sync::mpsc::Sender<async_pty::TerminalInput>,
+            tokio::sync::mpsc::Receiver<Vec<u8>>,
+        )>,
+    ),
 }
 
 enum Screen {
@@ -144,9 +155,19 @@ impl MainView {
                         self.screen = Screen::DeviceList;
                         Action::None
                     }
+                    device_view::Action::OpenTerminal(spki_hash) => {
+                        let client = self.client.clone();
+                        Action::Run(Task::future(async move {
+                            // TODO: Handle error
+                            Message::OpenTerminal(Arc::new(
+                                client.device(spki_hash).open_terminal().await.unwrap(),
+                            ))
+                        }))
+                    }
                     device_view::Action::Run(task) => Action::Run(task.map(Message::DeviceView)),
                 }
             }
+            Message::OpenTerminal(arc) => Action::OpenTerminal(arc),
         }
     }
 

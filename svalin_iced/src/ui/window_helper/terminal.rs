@@ -1,10 +1,9 @@
-use async_pty::{TerminalInput, TerminalSize};
+use async_pty::TerminalInput;
 use iced::{
     Task,
+    task::sipper,
     widget::{center, stack, text},
 };
-use sipper::sipper;
-use svalin::client::device::Device;
 
 use tokio::sync::mpsc;
 
@@ -32,21 +31,19 @@ pub struct TerminalWindow {
 }
 
 impl TerminalWindow {
-    pub fn start(device: Device) -> (Self, Task<Message>) {
+    pub fn start(
+        send: mpsc::Sender<TerminalInput>,
+        recv: mpsc::Receiver<Vec<u8>>,
+    ) -> (Self, Task<Message>) {
         let (term_display, terminal_emulator_task) = frozen_term::Terminal::new();
-
-        let (send, recv) = device.open_terminal(TerminalSize { rows: 25, cols: 80 });
 
         let read_task = Task::stream(sipper(move |mut sender| async move {
             let mut recv = recv;
             while let Some(output) = recv.recv().await {
-                match output {
-                    Ok(output) => sender.send(Message::Output(output)).await,
-                    Err(_) => sender.send(Message::Unavailable).await,
-                }
+                sender.send(Message::Output(output)).await;
             }
 
-            sender.send(Message::Closed).await;
+            Message::Closed
         }));
 
         let task = Task::batch([terminal_emulator_task.map(Message::Terminal), read_task]);
@@ -100,7 +97,7 @@ impl TerminalWindow {
         }
     }
 
-    pub fn view(&self) -> Element<Message> {
+    pub fn view(&self) -> Element<'_, Message> {
         match &self.state {
             State::Pending => loading(t!("terminal.connecting")).into(),
             State::Unavailable => center(text(t!("terminal.unavailable"))).into(),

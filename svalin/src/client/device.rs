@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use async_pty::{TerminalInput, TerminalSize};
 use std::{path::PathBuf, time::Duration};
 use svalin_pki::{SpkiHash, Verifier, get_current_timestamp};
 use svalin_rpc::{
@@ -9,7 +10,8 @@ use svalin_store::client_store::persistent::{Message::UpdateMetaInfo, SvalinMeta
 use tokio::sync::mpsc;
 
 use crate::shared::commands::{
-    request_system_report::RequestSystemReport, update_agent::UpdateAgent, update_mls::MlsUpdate,
+    request_system_report::RequestSystemReport, terminal::RemoteTerminalDispatcher,
+    update_agent::UpdateAgent, update_mls::MlsUpdate,
 };
 
 pub struct DeviceHandle<'a>(&'a super::Client, SpkiHash);
@@ -75,6 +77,26 @@ impl<'a> DeviceHandle<'a> {
         );
 
         Ok(connection)
+    }
+
+    pub async fn open_terminal(
+        &self,
+    ) -> anyhow::Result<(mpsc::Sender<TerminalInput>, mpsc::Receiver<Vec<u8>>)> {
+        let (input_send, input_recv) = mpsc::channel(100);
+        let (output_send, output_recv) = mpsc::channel(100);
+        let dispatcher = RemoteTerminalDispatcher {
+            cancel: self.0.cancel.clone(),
+            input: input_recv,
+            output: output_send,
+            initial_size: TerminalSize { cols: 80, rows: 25 },
+        };
+        let connection = self.connection().await?;
+        self.0.background_tasks.spawn(async move {
+            if let Err(err) = connection.dispatch(dispatcher).await {
+                tracing::error!("Terminal dispatcher failed: {err:#}");
+            }
+        });
+        Ok((input_send, output_recv))
     }
 }
 
