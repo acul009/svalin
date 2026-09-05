@@ -15,7 +15,7 @@ pub struct Location {
 pub enum LocationError {
     #[error("io error: {0}")]
     IoError(#[from] std::io::Error),
-    #[error("Neither XDG_CONFIG_HOME nor HOME environment variables are set.")]
+    #[error("Neither XDG_DATA_HOME nor HOME environment variables are set.")]
     NoHomeSet,
     #[error("PROGRAMDATA environment variable is not set.")]
     NoProgramDataSet,
@@ -74,13 +74,13 @@ impl Location {
 
             #[cfg(target_os = "linux")]
             {
-                match std::env::var_os("XDG_CONFIG_HOME") {
-                    Some(xdg_config_home) => {
-                        let config_dir = PathBuf::from(xdg_config_home);
+                match std::env::var_os("XDG_DATA_HOME") {
+                    Some(xdg_data_home) => {
+                        let config_dir = PathBuf::from(xdg_data_home);
                         Ok(Self::new(config_dir).push("svalin"))
                     }
                     None => {
-                        // If XDG_CONFIG_HOME is not set, use the default ~/.config directory
+                        // If XDG_DATA_HOME is not set, use the default ~/.config directory
                         match std::env::var_os("HOME") {
                             Some(home_dir) => {
                                 let config_dir = PathBuf::from(home_dir);
