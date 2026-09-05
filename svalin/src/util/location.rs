@@ -84,7 +84,10 @@ impl Location {
                         match std::env::var_os("HOME") {
                             Some(home_dir) => {
                                 let config_dir = PathBuf::from(home_dir);
-                                Ok(Self::new(config_dir).push(".config").push("svalin"))
+                                Ok(Self::new(config_dir)
+                                    .push(".local")
+                                    .push("share")
+                                    .push("svalin"))
                             }
                             None => Err(LocationError::NoHomeSet),
                         }

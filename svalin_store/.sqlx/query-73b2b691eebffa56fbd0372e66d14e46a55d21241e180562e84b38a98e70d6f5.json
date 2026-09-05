@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO meta_info (spki_hash, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(spki_hash) DO UPDATE SET data = ?, updated_at = ? where updated_at < ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "73b2b691eebffa56fbd0372e66d14e46a55d21241e180562e84b38a98e70d6f5"
+}

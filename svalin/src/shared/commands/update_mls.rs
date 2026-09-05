@@ -176,6 +176,8 @@ impl CommandDispatcher for UpdateMls {
         let mut key_packages = Vec::new();
         let mut aknowledged = Vec::new();
 
+        let mut mls_channel_open = true;
+
         loop {
             let timeout =
                 !messages.is_empty() || !key_packages.is_empty() || !aknowledged.is_empty();
@@ -199,8 +201,9 @@ impl CommandDispatcher for UpdateMls {
                     };
                     session.write_object(&update).await?;
                 }
-                update = self.mls_updates.recv(), if self.mls_updates.is_closed() => {
+                update = self.mls_updates.recv(), if mls_channel_open => {
                     let Some(update) = update else {
+                        mls_channel_open = false;
                         continue;
                     };
                     match update {

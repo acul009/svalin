@@ -30,7 +30,7 @@ impl ClientStore {
                 let spki_hash = spki_hash.as_slice();
                 let generated_at = system_report.system_report.generated_at as i64;
 
-                sqlx::query!("INSERT INTO system_reports (spki_hash, report, generated_at) VALUES (?, ?, ?) ON CONFLICT(spki_hash) DO UPDATE SET report = ? where generated_at < ?", spki_hash, report, generated_at, report, generated_at)
+                sqlx::query!("INSERT INTO system_reports (spki_hash, report, generated_at) VALUES (?, ?, ?) ON CONFLICT(spki_hash) DO UPDATE SET report = ?, generated_at = ? where generated_at < ?", spki_hash, report, generated_at, report, generated_at, generated_at)
                     .execute(&self.pool)
                     .await?;
             }
@@ -39,7 +39,7 @@ impl ClientStore {
                 let spki_hash = spki_hash.as_slice();
                 let updated_at = meta_info.updated_at as i64;
 
-                sqlx::query!("INSERT INTO meta_info (spki_hash, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(spki_hash) DO UPDATE SET data = ? where updated_at < ?", spki_hash, info, updated_at, info, updated_at)
+                sqlx::query!("INSERT INTO meta_info (spki_hash, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(spki_hash) DO UPDATE SET data = ?, updated_at = ? where updated_at < ?", spki_hash, info, updated_at, info, updated_at, updated_at)
                     .execute(&self.pool)
                     .await?;
             }

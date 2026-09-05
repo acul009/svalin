@@ -12,7 +12,7 @@ use svalin_sysctl::sytem_report::Disk;
 
 use crate::{
     Element, bootstrap,
-    ui::widgets::{card, device_icon, header},
+    ui::widgets::{card, device_icon, header, os_icon},
     util::human_i_bytes,
 };
 
@@ -160,7 +160,8 @@ fn device_report(svalin_report: &SvalinReport) -> Element<'_, Message> {
             row![
                 "OS Family:",
                 space::horizontal(),
-                text!("{}", report.os_family)
+                os_icon(&report.os_family).size(16),
+                text!(" {}", report.os_family)
             ],
             row![
                 "OS:",

@@ -31,10 +31,25 @@ impl State {
     pub fn update(&mut self, msg: Message) {
         match msg {
             Message::UpdateSystemReport(spki_hash, system_report) => {
-                self.get_device_entry(spki_hash).report = Some(system_report)
+                let entry = self.get_device_entry(spki_hash);
+                if let Some(report) = &entry.report {
+                    if system_report.system_report.generated_at <= report.system_report.generated_at
+                    {
+                        return;
+                    }
+                }
+
+                entry.report = Some(system_report);
             }
             Message::UpdateMetaInfo(spki_hash, meta_info) => {
-                self.get_device_entry(spki_hash).meta_info = Some(meta_info)
+                let entry = self.get_device_entry(spki_hash);
+                if let Some(meta) = &entry.meta_info {
+                    if meta_info.updated_at <= meta.updated_at {
+                        return;
+                    }
+                }
+
+                entry.meta_info = Some(meta_info);
             }
         }
     }
