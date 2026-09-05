@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use svalin::{agent, installer, server::Server, util::location::Location};
+use svalin::{DEFAULT_AGENT_PROFILE, agent, installer, server::Server, util::location::Location};
 
 use tokio::runtime;
 use tokio_util::sync::CancellationToken;
@@ -301,7 +301,9 @@ fn main() {
             }
             AgentAction::Install => run_async(installer::install_agent()).unwrap(),
             AgentAction::Uninstall => run_async(installer::uninstall_agent()).unwrap(),
-            AgentAction::Init { address } => run_async(init_agent(address)).unwrap(),
+            AgentAction::Init { address } => {
+                run_async(init_agent(address, DEFAULT_AGENT_PROFILE)).unwrap()
+            }
         },
         Command::Version => {
             println!("Commit: {}", svalin::commit())
@@ -363,7 +365,7 @@ async fn start_server(address: String) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn init_agent(address: String) -> anyhow::Result<()> {
+async fn init_agent(address: String, profile: &str) -> anyhow::Result<()> {
     let mut welcome_message = "-".repeat(40);
     welcome_message.push_str("Svalin Agent");
     welcome_message.push_str("-".repeat(40).as_str());
@@ -371,15 +373,15 @@ async fn init_agent(address: String) -> anyhow::Result<()> {
 
     println!("connecting to {address}...");
 
-    let waiting_for_init = agent::init(address).await?;
+    // TODO: allow cancelling of wait_for_init
+    let _cancel = CancellationToken::new();
 
-    let cancel = CancellationToken::new();
+    let waiting_for_init = agent::init(address, profile).await?;
 
     println!("Successfully requested to join server.");
     println!("Join-Code: {}", waiting_for_init.join_code());
-    let waiting_for_confirm = waiting_for_init.wait_for_init().await?;
-    println!("Confirm-Code: {}", waiting_for_confirm.confirm_code());
-    waiting_for_confirm.wait_for_confirm(cancel).await?;
+    println!("Confirm-Code: {}", waiting_for_init.confirm_code());
+    waiting_for_init.wait_for_init(profile).await?;
     println!("initialisation complete!");
     Ok(())
 }
@@ -397,7 +399,7 @@ async fn run_agent(cancel: CancellationToken) -> anyhow::Result<()> {
     tracing::info!("starting agent!");
     while !cancel.is_cancelled() {
         tracing::trace!("calling agent::run");
-        if let Err(err) = agent::run(cancel.clone())
+        if let Err(err) = agent::run(cancel.clone(), DEFAULT_AGENT_PROFILE)
             .await
             .context("error in agent::run")
         {

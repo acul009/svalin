@@ -19,7 +19,7 @@ use svalin_rpc::{
         tls_transport::TlsClientError,
     },
 };
-use tokio::{io::copy_bidirectional, select, sync::oneshot};
+use tokio::{io::copy_bidirectional, select};
 use tokio_util::sync::CancellationToken;
 
 use crate::client::{Client, add_agent::AddToTrustStoreError};
@@ -118,7 +118,7 @@ pub enum AcceptJoinError {
 
 pub struct AcceptJoin<'a> {
     pub join_code: String,
-    pub confirm_code: oneshot::Sender<oneshot::Sender<String>>,
+    pub confirm_code: String,
     pub client: &'a Client,
 }
 
@@ -158,26 +158,11 @@ impl<'a> TakeableCommandDispatcher for AcceptJoin<'a> {
                 return Err(AcceptJoinError::AgentNotFound.into());
             }
 
-            // At this point the agent generates a random confirm code and displays it.
-            // Our application should inform the user that a client was reached successfully and
-            // that they should now input the confirm code.
-            // The user can obtain the code either themselves or get someone else to read it to them over the phone.
-            // That also means the code only a few digits long.
-
-            let (confirm_send, confirm_recv) = oneshot::channel();
-
-            let result = self.confirm_code.send(confirm_send);
-            if result.is_err() {
-                return Err(AcceptJoinError::Aborted.into());
-            }
-
-            let confirm_code = confirm_recv.await.map_err(|_| AcceptJoinError::Aborted)?;
-
-            // Now that we have the confirmation code, we can open an encrypted tunnel using
+            // Now , we can open an encrypted tunnel using
             // AucPace to ensure security even with this relatively insecure short code.
 
             let (transport, _) = session.destructure();
-            let transport = AucPaceTransport::client(transport, confirm_code.into_bytes())
+            let transport = AucPaceTransport::client(transport, self.confirm_code.into_bytes())
                 .await
                 .map_err(AcceptJoinError::AucPaceError)?;
 

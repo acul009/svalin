@@ -114,11 +114,11 @@ pub async fn cleanup_old_installations() -> anyhow::Result<()> {
 pub async fn uninstall_agent() -> anyhow::Result<()> {
     #[cfg(not(windows))]
     {
-        if tokio::fs::try_exists(agent::data_dir()?)
+        if tokio::fs::try_exists(agent::data_dir(crate::DEFAULT_AGENT_PROFILE)?)
             .await
             .unwrap_or(false)
         {
-            tokio::fs::remove_dir_all(agent::data_dir()?).await?;
+            tokio::fs::remove_dir_all(agent::data_dir(crate::DEFAULT_AGENT_PROFILE)?).await?;
         }
         if tokio::fs::try_exists(get_base_install_location())
             .await

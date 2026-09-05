@@ -1,13 +1,11 @@
 use std::sync::Arc;
 
-use anyhow::anyhow;
 use iced::{
     Task,
     widget::{button, operation, text_input},
 };
 use svalin::client::Client;
 use svalin_pki::{Certificate, SpkiHash};
-use tokio::sync::oneshot;
 
 use crate::{
     Element,
@@ -22,24 +20,19 @@ pub enum Message {
     ConnectToDevice,
     Cancel,
     Done(Certificate),
-    WaitForConfirm(Arc<oneshot::Sender<String>>),
     Error(Arc<anyhow::Error>),
-    SwitchToConfirm,
-    Confirm,
 }
 
 pub enum Screen {
     Loading(String),
     Error(Arc<anyhow::Error>),
-    JoinCode,
-    Confirm,
+    Input,
 }
 
 pub struct AddDevice {
     screen: Screen,
     join_code: String,
     confirm_code: String,
-    confirm_sender: Option<oneshot::Sender<String>>,
     _handle: Option<iced::task::Handle>,
 }
 
@@ -54,10 +47,9 @@ impl AddDevice {
     pub fn new() -> (Self, Task<Message>) {
         (
             Self {
-                screen: Screen::JoinCode,
+                screen: Screen::Input,
                 join_code: String::new(),
                 confirm_code: String::new(),
-                confirm_sender: None,
                 _handle: None,
             },
             operation::focus("join_code"),
@@ -83,18 +75,16 @@ impl AddDevice {
                 Action::None
             }
             Message::ConnectToDevice => {
-                let Screen::JoinCode = &self.screen else {
+                let Screen::Input = &self.screen else {
                     return Action::None;
                 };
 
                 let client = client.clone();
-
-                let (send, recv) = oneshot::channel();
                 let join_code = self.join_code.clone();
-                tracing::trace!("sending join code: {join_code:?}");
+                let confirm_code = self.confirm_code.clone();
 
                 let (add_task, handle) = Task::future(async move {
-                    match client.add_agent_with_code(join_code, send).await {
+                    match client.add_agent_with_code(join_code, confirm_code).await {
                         Ok(certificate) => Message::Done(certificate),
                         Err(err) => Message::Error(Arc::new(err)),
                     }
@@ -105,39 +95,7 @@ impl AddDevice {
 
                 self.screen = Screen::Loading("Connecting via join code...".into());
 
-                Action::Run(Task::batch([
-                    add_task,
-                    Task::perform(recv, |res| match res {
-                        Ok(confirm) => Message::WaitForConfirm(Arc::new(confirm)),
-                        Err(err) => Message::Error(Arc::new(anyhow!("error adding agent: {err}"))),
-                    }),
-                ]))
-            }
-            Message::WaitForConfirm(confirm) => {
-                let confirm = Arc::into_inner(confirm).unwrap();
-                self.confirm_sender = Some(confirm);
-                self.screen = Screen::Confirm;
-                Action::Run(operation::focus("device_name"))
-            }
-            Message::SwitchToConfirm => {
-                self.screen = Screen::Confirm;
-                Action::Run(operation::focus("confirm_code"))
-            }
-            Message::Confirm => {
-                let Screen::Confirm = &self.screen else {
-                    return Action::None;
-                };
-
-                let Some(confirm_sender) = self.confirm_sender.take() else {
-                    return Action::None;
-                };
-                if let Err(_) = confirm_sender.send(self.confirm_code.clone()) {
-                    self.screen = Screen::Error(Arc::new(anyhow!("ran into timeout")));
-                } else {
-                    self.screen = Screen::Loading("Adding device...".into());
-                }
-
-                Action::None
+                Action::Run(add_task)
             }
             Message::Done(certificate) => Action::Done(certificate.spki_hash().clone()),
         }
@@ -147,25 +105,20 @@ impl AddDevice {
         match &self.screen {
             Screen::Error(err) => error_display(err).on_close(Message::Cancel).into(),
             Screen::Loading(message) => loading(message).into(),
-            Screen::JoinCode => dialog()
+            Screen::Input => dialog()
                 .control(
                     text_input("Join Code", &self.join_code)
                         .on_input(Message::JoinCode)
-                        .on_submit(Message::ConnectToDevice)
                         .id("join_code"),
                 )
-                .button(button("Cancel").on_press(Message::Cancel))
-                .button(button("Continue").on_press(Message::ConnectToDevice))
-                .into(),
-            Screen::Confirm => dialog()
                 .control(
                     text_input("Confirm Code", &self.confirm_code)
                         .id("confirm_code")
                         .on_input(Message::ConfirmCode)
-                        .on_submit(Message::Confirm),
+                        .on_submit(Message::ConnectToDevice),
                 )
                 .button(button("Cancel").on_press(Message::Cancel))
-                .button(button("Continue").on_press(Message::Confirm))
+                .button(button("Continue").on_press(Message::ConnectToDevice))
                 .into(),
         }
     }

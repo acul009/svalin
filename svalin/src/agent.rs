@@ -49,12 +49,12 @@ use crate::{
 use crate::{shared::join_agent::AgentInitPayload, util::trust_store::load_trust_store};
 
 #[instrument]
-pub async fn run(cancel: CancellationToken) -> Result<()> {
+pub async fn run(cancel: CancellationToken, profile: &str) -> Result<()> {
     cleanup_on_start().await.context("error cleaning up")?;
 
     tracing::trace!("opening agent configuration");
 
-    let config = get_config()
+    let config = get_config(profile)
         .await
         .context("error loading config")?
         .ok_or_else(|| anyhow!("agent is not yet initialized"))?;
@@ -95,9 +95,9 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
 
     let tasks = TaskTracker::new();
 
-    let agent_store = AgentStore::open(data_dir()?.push("agent-store.sqlite")).await?;
+    let agent_store = AgentStore::open(data_dir(profile)?.push("agent-store.sqlite")).await?;
     let trust_store = load_trust_store(
-        trust_store_path()?.to_path_buf(),
+        trust_store_path(profile)?.to_path_buf(),
         agent_store.transaction_store().as_ref(),
         cancel.clone(),
         &tasks,
@@ -114,7 +114,9 @@ pub async fn run(cancel: CancellationToken) -> Result<()> {
     .await
     .context("error updating trust store")?;
 
-    let storage_provider = open_mls_store().await.context("error opening mls store")?;
+    let storage_provider = open_mls_store(profile)
+        .await
+        .context("error opening mls store")?;
 
     let key_retriever = RemoteKeyRetriever::new(rpc.upstream_connection(), trust_store.clone());
 
@@ -229,7 +231,7 @@ async fn cleanup_on_start() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn init_with(data: AgentInitPayload) -> Result<()> {
+pub async fn init_with(data: AgentInitPayload, profile: &str) -> Result<()> {
     let key_source = KeySource::generate_builtin()?;
 
     let config = AgentConfig {
@@ -240,35 +242,35 @@ pub async fn init_with(data: AgentInitPayload) -> Result<()> {
         key_source,
     };
 
-    if get_config().await?.is_some() {
+    if get_config(profile).await?.is_some() {
         return Err(anyhow!("Agent configuration already exists"));
     }
 
-    save_config(&config).await?;
+    save_config(&config, profile).await?;
 
-    save_trust_store(trust_store_path()?.as_path(), &data.trust_store).await?;
+    save_trust_store(trust_store_path(profile)?.as_path(), &data.trust_store).await?;
 
     Ok(())
 }
 
-pub fn data_dir() -> Result<Location, LocationError> {
-    Ok(Location::system_data_dir()?.push("agent"))
+pub fn data_dir(profile: &str) -> Result<Location, LocationError> {
+    Ok(Location::system_data_dir()?.push("agent").push(profile))
 }
 
 pub fn temp_dir() -> Result<Location, LocationError> {
     Ok(Location::system_temp_dir()?.push("svalin-agent"))
 }
 
-fn config_path() -> Result<Location, LocationError> {
-    Ok(data_dir()?.push("config.json"))
+fn config_path(profile: &str) -> Result<Location, LocationError> {
+    Ok(data_dir(profile)?.push("config.json"))
 }
 
-fn trust_store_path() -> Result<Location, LocationError> {
-    Ok(data_dir()?.push("trust-store.json"))
+fn trust_store_path(profile: &str) -> Result<Location, LocationError> {
+    Ok(data_dir(profile)?.push("trust-store.json"))
 }
 
-async fn get_config() -> Result<Option<AgentConfig>> {
-    let location = config_path()?;
+async fn get_config(profile: &str) -> Result<Option<AgentConfig>> {
+    let location = config_path(profile)?;
     if tokio::fs::try_exists(&location).await? {
         let config = tokio::fs::read(&location).await?;
         Ok(Some(serde_json::from_slice(&config)?))
@@ -277,12 +279,14 @@ async fn get_config() -> Result<Option<AgentConfig>> {
     }
 }
 
-fn mls_db_path() -> Result<Location, LocationError> {
-    Ok(data_dir()?.push("mls-store.sqlite"))
+fn mls_db_path(profile: &str) -> Result<Location, LocationError> {
+    Ok(data_dir(profile)?.push("mls-store.sqlite"))
 }
 
-async fn open_mls_store() -> Result<SqliteStorageProvider<PostcardCodec>, OpenMlsStoreError> {
-    let location = mls_db_path()?;
+async fn open_mls_store(
+    profile: &str,
+) -> Result<SqliteStorageProvider<PostcardCodec>, OpenMlsStoreError> {
+    let location = mls_db_path(profile)?;
 
     let path = location
         .as_path()
@@ -292,8 +296,8 @@ async fn open_mls_store() -> Result<SqliteStorageProvider<PostcardCodec>, OpenMl
     Ok(SqliteStorageProvider::open(path).await?)
 }
 
-async fn save_config(config: &AgentConfig) -> Result<()> {
-    let location = config_path()?.ensure_parent_exists().await?;
+async fn save_config(config: &AgentConfig, profile: &str) -> Result<()> {
+    let location = config_path(profile)?.ensure_parent_exists().await?;
     let config = serde_json::to_vec_pretty(config)?;
     tokio::fs::write(&location, config).await?;
     Ok(())

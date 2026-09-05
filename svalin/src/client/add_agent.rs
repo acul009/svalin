@@ -6,13 +6,12 @@ use anyhow::Result;
 use svalin_pki::{Certificate, trust_store};
 use svalin_rpc::rpc::connection::Connection;
 use svalin_store::trust_store_transaction_store::TransactionStoreError;
-use tokio::sync::oneshot;
 
 impl Client {
     pub async fn add_agent_with_code(
         &self,
         join_code: String,
-        confirm_code: oneshot::Sender<oneshot::Sender<String>>,
+        confirm_code: String,
     ) -> Result<Certificate> {
         let connection = self.rpc.upstream_connection();
 

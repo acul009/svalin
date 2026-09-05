@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, anyhow};
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
 use svalin_rpc::verifiers::skip_verify::SkipServerVerification;
 use tokio::sync::oneshot;
@@ -8,8 +8,8 @@ use crate::shared::commands::public_server_status::GetPutblicStatus;
 use crate::shared::join_agent::AgentInitPayload;
 use crate::shared::join_agent::request_handler::RequestJoin;
 
-pub async fn init(address: String) -> Result<WaitingForInit> {
-    if super::get_config().await?.is_some() {
+pub async fn init(address: String, profile: &str) -> anyhow::Result<WaitingForInit> {
+    if super::get_config(profile).await?.is_some() {
         return Err(anyhow!("Agent is already initialized"));
     }
 
@@ -41,9 +41,7 @@ pub async fn init(address: String) -> Result<WaitingForInit> {
         crate::shared::commands::public_server_status::PublicStatus::Ready => {
             // register agent with server first
 
-            let (join_code_send, join_code_recv) = tokio::sync::oneshot::channel::<String>();
-
-            let (confirm_code_send, confirm_code_recv) = tokio::sync::oneshot::channel::<String>();
+            let (join_codes_send, join_codes_recv) = tokio::sync::oneshot::channel();
 
             let (join_success_send, join_success_recv) =
                 tokio::sync::oneshot::channel::<AgentInitPayload>();
@@ -54,8 +52,7 @@ pub async fn init(address: String) -> Result<WaitingForInit> {
                 match conn2
                     .dispatch(RequestJoin {
                         address,
-                        join_code_channel: join_code_send,
-                        confirm_code_channel: confirm_code_send,
+                        join_codes_channel: join_codes_send,
                     })
                     .await
                 {
@@ -68,11 +65,11 @@ pub async fn init(address: String) -> Result<WaitingForInit> {
                 }
             });
 
-            let join_code = join_code_recv.await?;
+            let (join_code, confirm_code) = join_codes_recv.await?;
 
             Ok(WaitingForInit::new(
                 join_code,
-                confirm_code_recv,
+                confirm_code,
                 join_success_recv,
             ))
         }
@@ -81,19 +78,19 @@ pub async fn init(address: String) -> Result<WaitingForInit> {
 
 pub struct WaitingForInit {
     join_code: String,
-    confirm_channel: oneshot::Receiver<String>,
+    confirm_code: String,
     success_channel: oneshot::Receiver<AgentInitPayload>,
 }
 
 impl WaitingForInit {
     fn new(
         join_code: String,
-        confirm_channel: oneshot::Receiver<String>,
+        confirm_code: String,
         success_channel: oneshot::Receiver<AgentInitPayload>,
     ) -> Self {
         Self {
             join_code,
-            confirm_channel,
+            confirm_code,
             success_channel,
         }
     }
@@ -102,37 +99,14 @@ impl WaitingForInit {
         &self.join_code
     }
 
-    pub async fn wait_for_init(self) -> Result<WaitForConfirm> {
-        let confirm_code = self.confirm_channel.await?;
-
-        Ok(WaitForConfirm {
-            join_code: self.join_code,
-            confirm_code,
-            success_channel: self.success_channel,
-        })
-    }
-}
-
-pub struct WaitForConfirm {
-    join_code: String,
-    confirm_code: String,
-    success_channel: oneshot::Receiver<AgentInitPayload>,
-}
-
-impl WaitForConfirm {
-    pub fn join_code(&self) -> &str {
-        &self.join_code
-    }
-
     pub fn confirm_code(&self) -> &str {
         &self.confirm_code
     }
 
-    pub async fn wait_for_confirm(self, _cancel: CancellationToken) -> Result<()> {
-        // TODO: handle cancellation
+    pub async fn wait_for_init(self, profile: &str) -> anyhow::Result<()> {
         let init_data = self.success_channel.await?;
 
-        super::init_with(init_data)
+        super::init_with(init_data, profile)
             .await
             .context("error saving init data")?;
 

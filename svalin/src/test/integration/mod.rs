@@ -5,6 +5,7 @@ use svalin_pki::get_current_timestamp;
 use svalin_store::client_store::persistent::{self, SvalinMetaInfo};
 use test_log::test;
 use tokio::sync::oneshot;
+use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use totp_rs::Totp;
@@ -160,35 +161,8 @@ async fn integration_tests() {
     // ===== TEST AGENT =====
 
     tracing::trace!("initializing agent!");
-    let waiting = agent::init(host.clone()).await.unwrap();
-    let join_code = waiting.join_code().to_owned();
-    tracing::trace!("received join code");
-    let (confirm_send, confirm_recv) = oneshot::channel();
-
     let agent_cancel = CancellationToken::new();
-    let cancel = agent_cancel.clone();
-    let agent_handle = tokio::spawn(async move {
-        let confirm = waiting.wait_for_init().await.unwrap();
-        tracing::trace!("generated confirm code");
-        confirm_send
-            .send(confirm.confirm_code().to_owned())
-            .unwrap();
-        tracing::trace!("agent waiting for confirmation");
-        confirm.wait_for_confirm(cancel.clone()).await.unwrap();
-        agent::run(cancel).await.unwrap()
-    });
-
-    let (send, recv) = oneshot::channel();
-    let client2 = client.clone();
-    let add_agent_handle =
-        tokio::spawn(async move { client2.add_agent_with_code(join_code, send).await });
-
-    tracing::trace!("waiting to receive confirm code");
-
-    let confirm = recv.await.unwrap();
-    confirm.send(confirm_recv.await.unwrap()).unwrap();
-
-    add_agent_handle.await.unwrap().unwrap();
+    let agent_handle = create_agent(&client, host.clone(), agent_cancel.clone(), "agent1").await;
     tracing::trace!("agent was added");
 
     // first update should be the online status
@@ -276,12 +250,22 @@ async fn integration_tests() {
     );
 
     // =====================================================================
+    // Test-Add second agent
+    // =====================================================================
+
+    let agent_handle2 = create_agent(&client, host.clone(), agent_cancel.clone(), "agent2").await;
+
+    // =====================================================================
     // Controlled shutdown
     // =====================================================================
 
     // controlled agent shutdown
     agent_cancel.cancel();
     tokio::time::timeout(Duration::from_secs(1), agent_handle)
+        .await
+        .unwrap()
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(1), agent_handle2)
         .await
         .unwrap()
         .unwrap();
@@ -309,4 +293,26 @@ async fn integration_tests() {
         .unwrap();
 
     process::exit(0);
+}
+
+async fn create_agent(
+    client: &Client,
+    host: String,
+    cancel: CancellationToken,
+    profile: &'static str,
+) -> JoinHandle<()> {
+    let waiting = agent::init(host, profile).await.unwrap();
+    let join_code = waiting.join_code().to_owned();
+    let confirm_code = waiting.confirm_code().to_owned();
+    let agent_handle = tokio::spawn(async move {
+        waiting.wait_for_init(profile).await.unwrap();
+        agent::run(cancel, profile).await.unwrap()
+    });
+
+    client
+        .add_agent_with_code(join_code, confirm_code)
+        .await
+        .unwrap();
+
+    agent_handle
 }

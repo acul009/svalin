@@ -120,7 +120,7 @@ pub async fn update_trust_store(
             .dispatch(UpdateTrustStore::new(trust_store, store, send, cancel))
             .await
         {
-            eprintln!("Error updating trust store: {}", err);
+            eprintln!("Error updating trust store: {:#}", err);
         }
     });
 

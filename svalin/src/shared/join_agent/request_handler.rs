@@ -135,8 +135,7 @@ pub enum RequestJoinError {
 
 pub struct RequestJoin {
     pub address: String,
-    pub join_code_channel: oneshot::Sender<String>,
-    pub confirm_code_channel: oneshot::Sender<String>,
+    pub join_codes_channel: oneshot::Sender<(String, String)>,
 }
 
 impl TakeableCommandDispatcher for RequestJoin {
@@ -165,20 +164,14 @@ impl TakeableCommandDispatcher for RequestJoin {
                 .map_err(RequestJoinError::JoinCodeReadError)?;
 
             // tracing::trace!("received join code from server: {join_code}");
-
-            self.join_code_channel
-                .send(join_code.clone())
+            let confirm_code = svalin_pki::generate_short_code();
+            self.join_codes_channel
+                .send((join_code.clone(), confirm_code.clone()))
                 .map_err(|_| RequestJoinError::ChannelSendError)?;
 
             // tracing::trace!("waiting for client to confirm join code");
 
-            let confirm_code = svalin_pki::generate_short_code();
-
             // tracing::trace!("generated confirm code: {confirm_code}");
-
-            self.confirm_code_channel
-                .send(confirm_code.clone())
-                .unwrap();
 
             let (transport, _) = session.destructure();
             let transport = AucPaceTransport::server(transport, confirm_code.into_bytes())

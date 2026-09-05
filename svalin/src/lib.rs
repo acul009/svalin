@@ -20,6 +20,7 @@ pub mod verifier;
 mod test;
 // mod wip;
 
+pub const DEFAULT_AGENT_PROFILE: &str = "default";
 pub fn commit() -> &'static str {
     env!("GIT_COMMIT_HASH")
 }
