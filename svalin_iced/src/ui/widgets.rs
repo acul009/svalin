@@ -11,12 +11,13 @@ use crate::{Element, bootstrap};
 pub mod card;
 pub mod dialog;
 pub mod error_display;
+pub mod fact_list;
 pub mod form;
 pub mod header;
+pub mod list;
 pub mod loading;
 pub mod percent_display;
 pub mod progress_circle;
-// pub mod realtime;
 pub mod scaffold;
 
 pub fn device_icon(family: &OSFamily, online: bool) -> iced::widget::Text<'static> {
@@ -63,6 +64,16 @@ pub fn header<'a, Message>(
     content: impl Into<Element<'a, Message>>,
 ) -> header::Header<'a, Message> {
     header::Header::new(content)
+}
+
+pub fn list<'a, Message>(
+    children: impl IntoIterator<Item = Element<'a, Message>>,
+) -> list::List<'a, Message> {
+    list::List::with_children(children)
+}
+
+pub fn fact_list<'a, Message>() -> fact_list::FactList<'a, Message> {
+    fact_list::FactList::new()
 }
 
 // pub fn realtime(realtime: &RemoteData<RealtimeStatus>) -> realtime::RealtimeDisplay<'_> {

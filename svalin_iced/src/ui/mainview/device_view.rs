@@ -3,7 +3,7 @@ use std::sync::Arc;
 use iced::{
     Length, Task,
     alignment::Vertical,
-    widget::{self, center, column, container, row, rule, scrollable, space, stack, text},
+    widget::{self, center, column, row, rule, scrollable, space, stack, text},
 };
 use svalin::client::{Client, state::ClientState};
 use svalin_pki::SpkiHash;
@@ -12,7 +12,7 @@ use svalin_sysctl::sytem_report::Disk;
 
 use crate::{
     Element, bootstrap,
-    ui::widgets::{card, device_icon, header, os_icon},
+    ui::widgets::{card, device_icon, fact_list, header, os_icon},
     util::human_i_bytes,
 };
 
@@ -103,25 +103,21 @@ impl State {
         };
 
         let meta = persistent.meta_info().unwrap_or(&PLACEHOLDER_META);
+        let col = if client_state.agent_online(&self.spki_hash) {
+            column![agent_actions(), self.update.view().map(Message::Update)]
+        } else {
+            column![]
+        }
+        .push(self.meta_display.view(&meta).map(Message::MetaDisplay))
+        .push(if let Some(report) = persistent.report() {
+            Some(device_report(report))
+        } else {
+            None
+        })
+        .padding(50)
+        .spacing(50);
 
-        scrollable(
-            column![
-                if client_state.agent_online(&self.spki_hash) {
-                    Some(self.update.view().map(Message::Update))
-                } else {
-                    None
-                },
-                self.meta_display.view(&meta).map(Message::MetaDisplay),
-                if let Some(report) = persistent.report() {
-                    Some(device_report(report))
-                } else {
-                    None
-                },
-            ]
-            .padding(50)
-            .spacing(50),
-        )
-        .into()
+        scrollable(col).into()
     }
 
     pub fn header<'a>(&'a self, client_state: &'a ClientState) -> Element<'a, Message> {
@@ -143,126 +139,104 @@ impl State {
     }
 }
 
+fn agent_actions() -> Element<'static, Message> {
+    card("TODO").title("Agent Actions").into()
+}
+
 fn device_report(svalin_report: &SvalinReport) -> Element<'_, Message> {
     let report = &svalin_report.system_report;
     card(
         column![
-            row![
-                "Agent Version:",
-                space::horizontal(),
-                svalin_report.current_version_identifier.as_str()
-            ],
-            row![
-                "Hostname:",
-                space::horizontal(),
-                report.hostname.as_ref().map(widget::text)
-            ],
-            row![
-                "OS Family:",
-                space::horizontal(),
-                os_icon(&report.os_family).size(16),
-                text!(" {}", report.os_family)
-            ],
-            row![
-                "OS:",
-                space::horizontal(),
-                report.os.as_ref().map(widget::text)
-            ],
-            row![
-                "Kernel Version:",
-                space::horizontal(),
-                text(&report.kernel_version)
-            ],
+            fact_list()
+                .entry(
+                    "Agent Version:",
+                    svalin_report.current_version_identifier.as_str(),
+                )
+                .entry("Hostname:", report.hostname.as_deref().unwrap_or_default())
+                .entry(
+                    "OS:",
+                    row![
+                        report
+                            .os
+                            .as_ref()
+                            .map(iced::widget::text)
+                            .unwrap_or_else(|| text(report.os_family.to_string())),
+                        os_icon(&report.os_family)
+                    ]
+                    .spacing(10)
+                    .align_y(Vertical::Center)
+                )
+                .entry("Kernel Version:", report.kernel_version.as_str())
+                // .entry("CPU Brand:", report.cpu.brand.as_str())
+                .entry("CPU Model:", report.cpu.model.as_str())
+                // .entry("CPU Architecture:", report.cpu.arch.as_str())
+                .entry(
+                    if report.cpu.cores.is_some() {
+                        text("CPU Cores / Threads")
+                    } else {
+                        text("CPU Threads")
+                    },
+                    if let Some(cores) = report.cpu.cores {
+                        text!("{} / {}", cores, report.cpu.threads)
+                    } else {
+                        text!("{}", report.cpu.threads)
+                    }
+                )
+                .entry(
+                    "Total Memory / Swap:",
+                    text!(
+                        "{} / {}",
+                        human_i_bytes(report.total_memory),
+                        human_i_bytes(report.total_swap)
+                    )
+                ),
             rule::horizontal(2),
-            row!["CPU Brand:", space::horizontal(), text(&report.cpu.brand)],
-            row!["CPU Model:", space::horizontal(), text(&report.cpu.model)],
-            row![
-                "CPU Architecture:",
-                space::horizontal(),
-                text(&report.cpu.arch)
-            ],
-            row![
-                "Physical CPU Cores:",
-                space::horizontal(),
-                report.cpu.cores.map(|c| text!("{}", c))
-            ],
-            row![
-                "CPU Threads:",
-                space::horizontal(),
-                text!("{}", report.cpu.threads)
-            ],
-            row![
-                "Total Memory:",
-                space::horizontal(),
-                text(human_i_bytes(report.total_memory)),
-            ],
-            row![
-                "Total Swap:",
-                space::horizontal(),
-                text(human_i_bytes(report.total_swap)),
-            ],
-            widget::column(report.disks.iter().map(disk)).spacing(10)
+            crate::ui::widgets::list(report.disks.iter().map(disk)).entry_height(90),
         ]
-        .spacing(10),
+        .spacing(25),
     )
     .title("System Report")
+    .padding(40)
     .into()
 }
 
 fn disk<'a>(disk: &'a Disk) -> Element<'a, Message> {
-    container(
-        row![
-            bootstrap::hdd().size(50).center(),
-            column![
-                row![
-                    text(&disk.mount_point).size(20),
-                    space::horizontal(),
-                    text(&disk.name)
-                ]
-                .padding([0, 20]),
-                stack![
-                    widget::progress_bar(
-                        0.0..=disk.total_space as f32,
-                        (disk.total_space - disk.available_space) as f32
-                    )
-                    .girth(Length::Fill),
-                    row![
-                        text!(
-                            "{} / {} Free",
-                            human_i_bytes(disk.available_space),
-                            human_i_bytes(disk.total_space)
-                        )
-                        .align_y(Vertical::Center),
-                        space::horizontal(),
-                        text(&disk.file_system).align_y(Vertical::Center)
-                    ]
-                    .align_y(Vertical::Center)
-                    .height(Length::Fill)
-                    .padding([0, 20])
-                ]
-                .height(30)
+    row![
+        bootstrap::hdd().size(50).center(),
+        column![
+            row![
+                text(&disk.mount_point).size(20),
+                space::horizontal(),
+                text(&disk.name)
             ]
-            .spacing(10),
+            .padding([0, 20]),
+            stack![
+                widget::progress_bar(
+                    0.0..=disk.total_space as f32,
+                    (disk.total_space - disk.available_space) as f32
+                )
+                .girth(Length::Fill),
+                row![
+                    text!(
+                        "{} / {} Free",
+                        human_i_bytes(disk.available_space),
+                        human_i_bytes(disk.total_space)
+                    )
+                    .align_y(Vertical::Center),
+                    space::horizontal(),
+                    text(&disk.file_system).align_y(Vertical::Center)
+                ]
+                .align_y(Vertical::Center)
+                .height(Length::Fill)
+                .padding([0, 20])
+            ]
+            .height(30)
         ]
-        .align_y(Vertical::Center)
-        .height(Length::Fill)
-        .spacing(20)
-        .padding([0, 20]),
-        // column![
-        //     text!("{} ({})", &disk.name, &disk.mount_point),
-        //     widget::progress_bar(
-        //         0.0..=disk.total_space as f32,
-        //         (disk.total_space - disk.available_space) as f32
-        //     ),
-        //     text(&disk.file_system),
-        // ]
-        // .spacing(10)
-        // .align_x(Horizontal::Center)
-        // .padding(20)
-        // .width(Length::Fill),
-    )
-    .height(90)
-    .width(Length::Fill)
-    .style(container::rounded_box)
+        .spacing(10),
+    ]
+    .align_y(Vertical::Center)
+    .height(Length::Fill)
+    .spacing(20)
+    .padding([0, 20])
     .into()
 }

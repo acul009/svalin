@@ -1,5 +1,5 @@
 use iced::{
-    Length, Pixels,
+    Length, Padding,
     widget::{column, container},
 };
 
@@ -8,7 +8,7 @@ use crate::Element;
 pub struct Card<'a, Message> {
     title: Option<Element<'a, Message>>,
     content: Element<'a, Message>,
-    padding: Pixels,
+    padding: Padding,
 }
 
 impl<'a, Message> Card<'a, Message> {
@@ -16,7 +16,7 @@ impl<'a, Message> Card<'a, Message> {
         Self {
             title: None,
             content: content.into(),
-            padding: Pixels(16.0),
+            padding: 16.into(),
         }
     }
 
@@ -25,8 +25,8 @@ impl<'a, Message> Card<'a, Message> {
         self
     }
 
-    pub fn padding(mut self, padding: Pixels) -> Self {
-        self.padding = padding;
+    pub fn padding(mut self, padding: impl Into<Padding>) -> Self {
+        self.padding = padding.into();
         self
     }
 }
@@ -43,7 +43,7 @@ where
                     ..Default::default()
                 })
                 .width(Length::Fill)
-                .padding(card.padding),
+                .padding(16),
             container(card.content).padding(card.padding)
         ])
         .style(container::bordered_box)
