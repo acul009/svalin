@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use iced::{
     Length, Task,
-    alignment::{Horizontal, Vertical},
+    alignment::Vertical,
     widget::{self, center, column, container, row, rule, scrollable, space, stack, text},
 };
 use svalin::client::{Client, state::ClientState};

@@ -3,7 +3,7 @@ use std::{borrow::Cow, ops::RangeInclusive};
 // use svalin::client::device::RemoteData;
 // use svalin_sysctl::realtime::RealtimeStatus;
 
-use iced::{Color, color};
+use iced::color;
 use svalin_sysctl::sytem_report::OSFamily;
 
 use crate::{Element, bootstrap};
