@@ -37,14 +37,16 @@ impl TerminalWindow {
     ) -> (Self, Task<Message>) {
         let (term_display, terminal_emulator_task) = frozen_term::Terminal::new();
 
-        let read_task = Task::stream(sipper(move |mut sender| async move {
-            let mut recv = recv;
-            while let Some(output) = recv.recv().await {
-                sender.send(Message::Output(output)).await;
-            }
-
-            Message::Closed
-        }));
+        let read_task = Task::sip(
+            sipper(move |mut sender| async move {
+                let mut recv = recv;
+                while let Some(output) = recv.recv().await {
+                    sender.send(output).await;
+                }
+            }),
+            Message::Output,
+            |_| Message::Closed,
+        );
 
         let task = Task::batch([terminal_emulator_task.map(Message::Terminal), read_task]);
 
@@ -67,6 +69,7 @@ impl TerminalWindow {
                 Task::none()
             }
             Message::Closed => {
+                // TODO: Stop cursor from blinking
                 self.state = State::Closed;
                 Task::none()
             }
