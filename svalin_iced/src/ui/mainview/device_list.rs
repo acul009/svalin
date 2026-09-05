@@ -1,7 +1,7 @@
 use chrono::DateTime;
 use iced::{
     Alignment::Center,
-    Color, Length,
+    Length,
     widget::{button, column, container, row, stack, text},
 };
 // use iced_fonts::{
@@ -10,9 +10,8 @@ use iced::{
 // };
 use svalin::client::state::ClientState;
 use svalin_pki::SpkiHash;
-use svalin_sysctl::sytem_report::OSFamily;
 
-use crate::{Element, bootstrap};
+use crate::{Element, bootstrap, ui::widgets::device_icon};
 
 pub struct DeviceList<'a, Message> {
     state: &'a ClientState,
@@ -57,21 +56,13 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
             .padding(30),
             column(device_list.state.persistent().devices().iter().map(
                 |(spki_hash, persistent)| {
-                    let color = if device_list.state.agent_online(spki_hash) {
-                        Color::from_rgb8(0, 255, 0)
-                    } else {
-                        Color::from_rgb8(255, 0, 0)
-                    };
-
                     button(
                         row![
-                            match persistent.os() {
-                                OSFamily::Windows => bootstrap::windows(),
-                                OSFamily::Linux => bootstrap::tux(),
-                                OSFamily::Unknown => bootstrap::laptop(),
-                            }
-                            .size(16)
-                            .color(color),
+                            device_icon(
+                                &persistent.os(),
+                                device_list.state.agent_online(spki_hash)
+                            )
+                            .size(30),
                             text(persistent.name()),
                             text(
                                 persistent
@@ -93,6 +84,7 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                         ]
                         .spacing(20)
                         .padding(10)
+                        .align_y(Center)
                         .width(Length::Fill),
                     )
                     .on_press_maybe(device_list.on_select.as_ref().map(|f| f(spki_hash.clone())))

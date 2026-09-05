@@ -46,7 +46,7 @@ agent_init $RUST_LOG="svalin=trace":
     cargo run -p svalin agent init localhost:55411
 
 gui $RUST_LOG="svalin=trace":
-    cargo run -p svalin_iced
+    cd svalin_iced; cargo run --features debug
 
 build-debian: build-cross
     cargo deb --package svalin --target x86_64-unknown-linux-gnu --no-build

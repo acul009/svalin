@@ -3,6 +3,9 @@ name = "svalin_iced"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+debug = ["iced/hot", "iced/debug"]
+
 [dependencies]
 
 svalin.workspace = true
@@ -11,8 +14,8 @@ svalin_rpc.workspace = true
 svalin_sysctl.workspace = true
 svalin_store.workspace = true
 
-# frozen_term = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git"}
-# async_pty = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git" }
+frozen_term = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git"}
+async_pty = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git" }
 
 iced = { git = "https://github.com/iced-rs/iced.git", features = [
     "canvas",
@@ -23,14 +26,6 @@ iced = { git = "https://github.com/iced-rs/iced.git", features = [
     "sipper"
 ] }
 iced_core = { git = "https://github.com/iced-rs/iced.git" }
-# iced = { version = "^0.14.0", features = [
-#     "canvas",
-#     "wgpu",
-#     "tokio",
-#     "advanced",
-#     "image",
-#     "sipper"
-# ] }
 anyhow = "1.0.104"
 futures-util = "0.3.34"
 tokio.workspace = true

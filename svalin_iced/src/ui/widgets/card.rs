@@ -38,7 +38,10 @@ where
     fn from(card: Card<'a, Message>) -> Self {
         container(column![
             container(card.title)
-                .style(container::primary)
+                .style(|theme| container::Style {
+                    background: Some(theme.palette().background.strong.color.into()),
+                    ..Default::default()
+                })
                 .width(Length::Fill)
                 .padding(card.padding),
             container(card.content).padding(card.padding)

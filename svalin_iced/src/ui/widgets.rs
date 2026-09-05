@@ -3,7 +3,10 @@ use std::{borrow::Cow, ops::RangeInclusive};
 // use svalin::client::device::RemoteData;
 // use svalin_sysctl::realtime::RealtimeStatus;
 
-use crate::Element;
+use iced::{Color, color};
+use svalin_sysctl::sytem_report::OSFamily;
+
+use crate::{Element, bootstrap};
 
 pub mod card;
 pub mod dialog;
@@ -15,6 +18,24 @@ pub mod percent_display;
 pub mod progress_circle;
 // pub mod realtime;
 pub mod scaffold;
+
+pub fn device_icon(family: &OSFamily, online: bool) -> iced::widget::Text<'static> {
+    os_icon(family).color(if online {
+        color!(0x1fd11f)
+    } else {
+        color!(0xd60000)
+    })
+}
+
+pub fn os_icon(family: &OSFamily) -> iced::widget::Text<'static> {
+    match family {
+        OSFamily::Windows => bootstrap::windows(),
+        OSFamily::Linux => bootstrap::tux(),
+        OSFamily::Unknown => bootstrap::laptop(),
+    }
+    .size(24)
+    .center()
+}
 
 pub fn card<'a, Message>(content: impl Into<Element<'a, Message>>) -> card::Card<'a, Message> {
     card::Card::new(content)

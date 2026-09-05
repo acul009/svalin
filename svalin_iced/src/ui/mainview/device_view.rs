@@ -2,16 +2,18 @@ use std::sync::Arc;
 
 use iced::{
     Length, Task,
-    alignment::Horizontal,
-    widget::{self, center, column, container, row, rule, scrollable, space, text},
+    alignment::{Horizontal, Vertical},
+    widget::{self, center, column, container, row, rule, scrollable, space, stack, text},
 };
 use svalin::client::{Client, state::ClientState};
 use svalin_pki::SpkiHash;
 use svalin_store::client_store::persistent::{SvalinMetaInfo, SvalinReport};
+use svalin_sysctl::sytem_report::Disk;
 
 use crate::{
     Element, bootstrap,
-    ui::widgets::{card, header},
+    ui::widgets::{card, device_icon, header},
+    util::human_i_bytes,
 };
 
 mod meta_display;
@@ -127,9 +129,17 @@ impl State {
             return header(widget::space()).on_back(Message::Back).into();
         };
 
-        header(text(persistent.name()))
-            .on_back(Message::Back)
-            .into()
+        header(
+            row![
+                device_icon(&persistent.os(), client_state.agent_online(&self.spki_hash)),
+                text(persistent.name())
+            ]
+            .align_y(Vertical::Center)
+            .spacing(20)
+            .padding([0, 20]),
+        )
+        .on_back(Message::Back)
+        .into()
     }
 }
 
@@ -183,37 +193,75 @@ fn device_report(svalin_report: &SvalinReport) -> Element<'_, Message> {
             row![
                 "Total Memory:",
                 space::horizontal(),
-                text!("{}", report.total_memory)
+                text(human_i_bytes(report.total_memory)),
             ],
             row![
                 "Total Swap:",
                 space::horizontal(),
-                text!("{}", report.total_swap)
+                text(human_i_bytes(report.total_swap)),
             ],
-            widget::grid(report.disks.iter().map(|disk| {
-                container(
-                    column![
-                        bootstrap::hdd().size(50).center(),
-                        text!("{} ({})", &disk.name, &disk.mount_point),
-                        widget::progress_bar(
-                            0.0..=disk.total_space as f32,
-                            (disk.total_space - disk.available_space) as f32
-                        ),
-                        text(&disk.file_system),
-                    ]
-                    .spacing(10)
-                    .align_x(Horizontal::Center)
-                    .padding(20)
-                    .width(Length::Fill),
-                )
-                .center(100)
-                .style(container::rounded_box)
-                .into()
-            }))
-            .spacing(10)
+            widget::column(report.disks.iter().map(disk)).spacing(10)
         ]
         .spacing(10),
     )
     .title("System Report")
+    .into()
+}
+
+fn disk<'a>(disk: &'a Disk) -> Element<'a, Message> {
+    container(
+        row![
+            bootstrap::hdd().size(50).center(),
+            column![
+                row![
+                    text(&disk.mount_point).size(20),
+                    space::horizontal(),
+                    text(&disk.name)
+                ]
+                .padding([0, 20]),
+                stack![
+                    widget::progress_bar(
+                        0.0..=disk.total_space as f32,
+                        (disk.total_space - disk.available_space) as f32
+                    )
+                    .girth(Length::Fill),
+                    row![
+                        text!(
+                            "{} / {} Free",
+                            human_i_bytes(disk.available_space),
+                            human_i_bytes(disk.total_space)
+                        )
+                        .align_y(Vertical::Center),
+                        space::horizontal(),
+                        text(&disk.file_system).align_y(Vertical::Center)
+                    ]
+                    .align_y(Vertical::Center)
+                    .height(Length::Fill)
+                    .padding([0, 20])
+                ]
+                .height(30)
+            ]
+            .spacing(10),
+        ]
+        .align_y(Vertical::Center)
+        .height(Length::Fill)
+        .spacing(20)
+        .padding([0, 20]),
+        // column![
+        //     text!("{} ({})", &disk.name, &disk.mount_point),
+        //     widget::progress_bar(
+        //         0.0..=disk.total_space as f32,
+        //         (disk.total_space - disk.available_space) as f32
+        //     ),
+        //     text(&disk.file_system),
+        // ]
+        // .spacing(10)
+        // .align_x(Horizontal::Center)
+        // .padding(20)
+        // .width(Length::Fill),
+    )
+    .height(90)
+    .width(Length::Fill)
+    .style(container::rounded_box)
     .into()
 }
