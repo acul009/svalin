@@ -1,12 +1,23 @@
 use std::sync::{Arc, RwLock};
 
 use crate::store::server_store::KeyPackageStore;
-use anyhow::anyhow;
 use svalin_pki::{
-    CertificateChainBuilder, RootCertificate, get_current_timestamp,
+    CertificateChainBuilder, RootCertificate, VerifyChainError, get_current_timestamp,
     mls::{SvalinGroupId, key_retriever::KeyRetriever},
-    trust_store::TrustStore,
+    trust_store::{CompleteCertChainError, TrustStore},
 };
+
+#[derive(Debug, thiserror::Error)]
+pub enum LocalKeyRetrieverError {
+    #[error("agent not found")]
+    AgentNotFound,
+    #[error("failed to complete certificate chain: {0}")]
+    CompleteCertificateChain(#[from] CompleteCertChainError),
+    #[error("failed to verify certificate chain: {0}")]
+    VerifyCertificateChain(#[from] VerifyChainError),
+    #[error("failed to retrieve key packages: {0:#}")]
+    GetKeyPackages(anyhow::Error),
+}
 
 pub struct LocalKeyRetriever {
     root: RootCertificate,
@@ -29,7 +40,7 @@ impl LocalKeyRetriever {
 }
 
 impl KeyRetriever for LocalKeyRetriever {
-    type Error = anyhow::Error;
+    type Error = LocalKeyRetrieverError;
 
     async fn get_required_group_members(
         &self,
@@ -40,7 +51,7 @@ impl KeyRetriever for LocalKeyRetriever {
                 let trust_store = self.trust_store.read().unwrap();
                 let agent = trust_store
                     .get(&spki_hash)
-                    .ok_or_else(|| anyhow!("agent not found"))?
+                    .ok_or(LocalKeyRetrieverError::AgentNotFound)?
                     .clone();
                 let chain = CertificateChainBuilder::new(agent.to_unverified());
 
@@ -57,7 +68,7 @@ impl KeyRetriever for LocalKeyRetriever {
                 let trust_store = self.trust_store.read().unwrap();
                 let agent = trust_store
                     .get(&spki_hash)
-                    .ok_or_else(|| anyhow!("agent not found"))?
+                    .ok_or(LocalKeyRetrieverError::AgentNotFound)?
                     .clone();
                 let chain = CertificateChainBuilder::new(agent.to_unverified());
 
@@ -92,7 +103,8 @@ impl KeyRetriever for LocalKeyRetriever {
         let key_packages = self
             .key_package_store
             .get_key_packages(entities.iter())
-            .await?;
+            .await
+            .map_err(LocalKeyRetrieverError::GetKeyPackages)?;
 
         Ok(key_packages)
     }

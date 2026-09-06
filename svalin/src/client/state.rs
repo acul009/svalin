@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use svalin_pki::SpkiHash;
+use svalin_pki::{SpkiHash, mls::SvalinGroupId};
 
 pub mod persistent;
 pub mod warning;
@@ -11,7 +11,7 @@ pub use warning::Warning;
 pub struct ClientState {
     persistent: persistent::State,
     agents_online: HashSet<SpkiHash>,
-    device_group_broken: HashMap<SpkiHash, String>,
+    device_group_broken: HashMap<SvalinGroupId, String>,
     warnings: warning::State,
 }
 
@@ -19,7 +19,7 @@ pub struct ClientState {
 pub enum Update {
     Persistent(persistent::Update),
     AgentOnline(SpkiHash, bool),
-    DeviceGroupBroken(SpkiHash, String),
+    GroupBroken(SvalinGroupId, String),
 }
 
 impl Update {
@@ -27,7 +27,10 @@ impl Update {
         match self {
             Self::Persistent(update) => update.affected_device(),
             Self::AgentOnline(spki_hash, _) => Some(spki_hash.clone()),
-            Self::DeviceGroupBroken(spki_hash, _) => Some(spki_hash.clone()),
+            Self::GroupBroken(group_id, _) => match group_id {
+                SvalinGroupId::DeviceGroup(spki_hash) => Some(spki_hash.clone()),
+                SvalinGroupId::DeviceMetaGroup(spki_hash) => Some(spki_hash.clone()),
+            },
         }
     }
 }
@@ -63,7 +66,7 @@ impl ClientState {
                     self.agents_online.remove(&spki_hash);
                 }
             }
-            Update::DeviceGroupBroken(group, reason) => {
+            Update::GroupBroken(group, reason) => {
                 self.device_group_broken.insert(group, reason);
             }
         }
@@ -93,7 +96,10 @@ impl ClientState {
             .into_iter()
             .collect();
 
-        if let Some(error_message) = self.device_group_broken.get(spki_hash) {
+        if let Some(error_message) = self
+            .device_group_broken
+            .get(&SvalinGroupId::DeviceGroup(spki_hash.clone()))
+        {
             warnings.push(warning::Device::DeviceGroupBroken(error_message.clone()));
         }
 

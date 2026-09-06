@@ -1,11 +1,11 @@
 use async_pty::TerminalInput;
 use iced::{
     Task,
-    task::sipper,
     widget::{center, stack, text},
 };
 
 use tokio::sync::mpsc;
+use tokio_stream::{StreamExt, wrappers::ReceiverStream};
 
 use crate::{Element, ui::widgets::loading};
 
@@ -37,16 +37,8 @@ impl TerminalWindow {
     ) -> (Self, Task<Message>) {
         let (term_display, terminal_emulator_task) = frozen_term::Terminal::new();
 
-        let read_task = Task::sip(
-            sipper(move |mut sender| async move {
-                let mut recv = recv;
-                while let Some(output) = recv.recv().await {
-                    sender.send(output).await;
-                }
-            }),
-            Message::Output,
-            |_| Message::Closed,
-        );
+        let output = ReceiverStream::new(recv).map(Message::Output);
+        let read_task = Task::stream(output.chain(tokio_stream::once(Message::Closed)));
 
         let task = Task::batch([terminal_emulator_task.map(Message::Terminal), read_task]);
 

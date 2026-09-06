@@ -1,12 +1,11 @@
-use std::fmt::{Debug, Display};
-
 use crate::{
     SpkiHash,
     mls::{group_id::SvalinGroupId, key_package::UnverifiedKeyPackage},
 };
+use std::error::Error;
 
 pub trait KeyRetriever {
-    type Error: Send + Sync + Display + Debug + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     fn get_required_group_members(
         &self,

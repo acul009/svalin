@@ -1,16 +1,13 @@
 use std::{process, sync::Arc, time::Duration};
 
-use iced::{
-    Subscription, Task,
-    task::sipper,
-    widget::{self},
-};
+use iced::{Subscription, Task, widget};
 use svalin::client::{
     Client,
     state::{ClientState, Update},
 };
 use svalin_pki::SpkiHash;
 use tokio::sync::broadcast;
+use tokio_stream::{StreamExt, wrappers::BroadcastStream};
 
 use crate::ui::widgets::{error_display, loading};
 
@@ -100,20 +97,15 @@ impl MainView {
                 self.state = state;
                 self.screen = Screen::DeviceList;
 
-                let (update_task, abort_handle) =
-                    Task::stream(sipper(move |mut sender| async move {
-                        let mut receiver = receiver;
-                        while let Ok(update) = receiver.recv().await {
-                            tracing::trace!("got state update: {update:?}");
-                            sender.send(Message::UpdateState(update)).await;
-                        }
-                    }))
-                    .abortable();
+                let updates = BroadcastStream::new(receiver)
+                    .map_while(|update| update.ok().map(Message::UpdateState));
+                let (update_task, abort_handle) = Task::stream(updates).abortable();
                 self.update_abort_handle = Some(abort_handle.abort_on_drop());
 
                 Action::Run(update_task)
             }
             Message::UpdateState(update) => {
+                tracing::trace!("got update: {update:?}");
                 self.state.update(update);
                 Action::None
             }

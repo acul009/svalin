@@ -377,6 +377,22 @@ pub enum HandleMessageError<RetrieverError> {
     },
 }
 
+impl<RetrieverError> HandleMessageError<RetrieverError> {
+    pub fn group_id(&self) -> Option<SvalinGroupId> {
+        match self {
+            HandleMessageError::TlsCodecError(_) => None,
+            HandleMessageError::Welcome(_) => None,
+            HandleMessageError::GroupIdError(_) => None,
+            HandleMessageError::ProcessMessage { group_id, .. } => Some(group_id.clone()),
+            HandleMessageError::Deserialize { group_id, .. } => Some(group_id.clone()),
+            HandleMessageError::InvalidMessage { group_id } => Some(group_id.clone()),
+            HandleMessageError::ForbiddenSender { group_id } => Some(group_id.clone()),
+            HandleMessageError::CheckCommit { group_id, .. } => Some(group_id.clone()),
+            HandleMessageError::Commit { group_id, .. } => Some(group_id.clone()),
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum HandleWelcomeError<RetrieverError> {
     #[error("join group error: {0}")]

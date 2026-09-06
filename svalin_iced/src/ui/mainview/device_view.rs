@@ -5,9 +5,11 @@ use iced::{
     alignment::Vertical,
     widget::{self, button, center, column, row, rule, scrollable, space, stack, text},
 };
-use svalin::client::{Client, state::ClientState};
+use svalin::client::{
+    Client,
+    state::{ClientState, persistent},
+};
 use svalin_pki::SpkiHash;
-use svalin::store::client_store::persistent::{SvalinMetaInfo, SvalinReport};
 use svalin_sysctl::sytem_report::Disk;
 
 use crate::{
@@ -40,7 +42,7 @@ pub struct State {
     update: update::State,
 }
 
-const PLACEHOLDER_META: &'static SvalinMetaInfo = &SvalinMetaInfo {
+const PLACEHOLDER_META: &'static persistent::MetaInfo = &persistent::MetaInfo {
     updated_at: 0,
     name: String::new(),
     group: String::new(),
@@ -150,7 +152,7 @@ fn agent_actions() -> Element<'static, Message> {
     .into()
 }
 
-fn device_report(svalin_report: &SvalinReport) -> Element<'_, Message> {
+fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
     let report = &svalin_report.system_report;
     card(
         column![

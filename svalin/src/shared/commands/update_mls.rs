@@ -31,7 +31,7 @@ use tracing::trace;
 use uuid::Uuid;
 
 use crate::{
-    client::state::persistent,
+    client::state::{self, persistent},
     message_streaming::client::ClientStateHandle,
     mls::MlsClient,
     remote_key_retriever::RemoteKeyRetriever,
@@ -129,23 +129,43 @@ impl CommandDispatcher for UpdateMls {
 
         while let OldUpdate::Message(uuid, message) = session.read_object().await? {
             match mls.handle_message(&message).await {
-                Ok(message) => match message.content {
-                    MessageDataContent::Report(spki_hash, report) => {
-                        self.client_state
-                            .persistent_update(persistent::Update::SystemReport(spki_hash, report))
-                            .await?
+                Ok(message) => {
+                    match message.content {
+                        MessageDataContent::Report(spki_hash, report) => {
+                            self.client_state
+                                .persistent_update(persistent::Update::SystemReport(
+                                    spki_hash, report,
+                                ))
+                                .await?
+                        }
+                        MessageDataContent::MetaInfo(spki_hash, meta_info) => {
+                            self.client_state
+                                .persistent_update(persistent::Update::MetaInfo(
+                                    spki_hash, meta_info,
+                                ))
+                                .await?
+                        }
+                        MessageDataContent::Internal => (),
                     }
-                    MessageDataContent::MetaInfo(spki_hash, meta_info) => {
-                        self.client_state
-                            .persistent_update(persistent::Update::MetaInfo(spki_hash, meta_info))
-                            .await?
-                    }
-                    MessageDataContent::Internal => (),
-                },
-                Err(err) => todo!(),
-            }
 
-            aknowledged.push(uuid);
+                    aknowledged.push(uuid);
+                }
+                Err(err) => {
+                    if let Some(group_id) = err.group_id() {
+                        tracing::trace!(
+                            "Error handling message in update_mls: {}",
+                            err.to_string()
+                        );
+                        self.client_state
+                            .update(state::Update::GroupBroken(group_id, err.to_string()))
+                            .await?;
+                    } else {
+                        return Err(
+                            anyhow::anyhow!(err).context("error handling message in update_mls")
+                        );
+                    }
+                }
+            }
         }
 
         let mut key_packages = Vec::new();

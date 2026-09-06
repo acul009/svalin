@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Display, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 use openmls::group::GroupId;
 use openmls_sqlx_storage::SqliteStorageProvider;
@@ -247,14 +247,8 @@ impl TestRetriever {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 enum Never {}
-
-impl Display for Never {
-    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        unreachable!()
-    }
-}
 
 impl KeyRetriever for TestRetriever {
     type Error = Never;

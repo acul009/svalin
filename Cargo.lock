@@ -506,7 +506,7 @@ dependencies = [
 [[package]]
 name = "async_pty"
 version = "0.1.0"
-source = "git+https://github.com/Rahn-IT/frostbyte_terminal.git#67726c040d18af94a50ca9632d78624518aef128"
+source = "git+https://github.com/Rahn-IT/frostbyte_terminal.git#5046651cde348bbe02046b6506c0d50fcc10378d"
 dependencies = [
  "anyhow",
  "portable-pty",
@@ -2119,7 +2119,7 @@ dependencies = [
 [[package]]
 name = "frozen_term"
 version = "0.8.2"
-source = "git+https://github.com/Rahn-IT/frostbyte_terminal.git#67726c040d18af94a50ca9632d78624518aef128"
+source = "git+https://github.com/Rahn-IT/frostbyte_terminal.git#5046651cde348bbe02046b6506c0d50fcc10378d"
 dependencies = [
  "iced",
  "termwiz",
@@ -2882,7 +2882,7 @@ dependencies = [
 [[package]]
 name = "iced"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "iced_core",
  "iced_debug",
@@ -2899,7 +2899,7 @@ dependencies = [
 [[package]]
 name = "iced_beacon"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "bincode 1.3.3",
  "futures",
@@ -2914,7 +2914,7 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "bitflags 2.13.1",
  "bytes",
@@ -2934,7 +2934,7 @@ dependencies = [
 [[package]]
 name = "iced_debug"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "cargo-hot-protocol",
  "iced_beacon",
@@ -2946,7 +2946,7 @@ dependencies = [
 [[package]]
 name = "iced_devtools"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "iced_debug",
  "iced_program",
@@ -2970,7 +2970,7 @@ dependencies = [
 [[package]]
 name = "iced_fonts"
 version = "0.3.0"
-source = "git+https://git.redhawkcodes.dev/redhawk18/iced_fonts.git?branch=master#25b6d2ae1fb0d81572131eacdbf4a095e05f3966"
+source = "git+https://git.redhawkcodes.dev/redhawk18/iced_fonts.git?branch=master#7687efdd5c325e4d763ada434768be3c607396fe"
 dependencies = [
  "iced_core",
  "iced_fonts_macros",
@@ -2979,7 +2979,7 @@ dependencies = [
 [[package]]
 name = "iced_fonts_macros"
 version = "0.3.0"
-source = "git+https://git.redhawkcodes.dev/redhawk18/iced_fonts.git?branch=master#25b6d2ae1fb0d81572131eacdbf4a095e05f3966"
+source = "git+https://git.redhawkcodes.dev/redhawk18/iced_fonts.git?branch=master#7687efdd5c325e4d763ada434768be3c607396fe"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2990,7 +2990,7 @@ dependencies = [
 [[package]]
 name = "iced_futures"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "futures",
  "iced_core",
@@ -3004,7 +3004,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "bitflags 2.13.1",
  "bytemuck",
@@ -3024,7 +3024,7 @@ dependencies = [
 [[package]]
 name = "iced_program"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "iced_graphics",
  "iced_runtime",
@@ -3033,7 +3033,7 @@ dependencies = [
 [[package]]
 name = "iced_renderer"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "iced_graphics",
  "iced_tiny_skia",
@@ -3045,7 +3045,7 @@ dependencies = [
 [[package]]
 name = "iced_runtime"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "bytes",
  "iced_core",
@@ -3057,7 +3057,7 @@ dependencies = [
 [[package]]
 name = "iced_tiny_skia"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "bytemuck",
  "cosmic-text",
@@ -3073,7 +3073,7 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "bitflags 2.13.1",
  "bytemuck",
@@ -3092,7 +3092,7 @@ dependencies = [
 [[package]]
 name = "iced_widget"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "iced_renderer",
  "iced_runtime",
@@ -3106,7 +3106,7 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.15.0-dev"
-source = "git+https://github.com/iced-rs/iced.git#f0d6711f3623cebcef7898276f24a7becf67402e"
+source = "git+https://github.com/iced-rs/iced.git#fbf7677060b08a383bcdedc3c4e00d5651ea1a8e"
 dependencies = [
  "arboard",
  "iced_debug",
@@ -3898,9 +3898,9 @@ dependencies = [
 
 [[package]]
 name = "lyon_tessellation"
-version = "1.0.21"
+version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dabea159dc6eea9171a541b458134b70ca95e3162d068132b2b3b9bc01aad06e"
+checksum = "43b8dcf906637ecef61b3c0740c7a4e7f27caeb31257cfac0cc579ce15be6005"
 dependencies = [
  "float_next_after",
  "lyon_path",
@@ -6508,9 +6508,9 @@ checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
 
 [[package]]
 name = "sipper"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bccb4192828b3d9a08e0b5a73f17795080dfb278b50190216e3ae2132cf4f95"
+checksum = "ace7bf650ea0110401c6800171a69ea0d8d0bf40253dfc6055245b6cdfbc4201"
 dependencies = [
  "futures",
  "pin-project-lite",

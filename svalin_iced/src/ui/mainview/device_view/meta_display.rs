@@ -1,5 +1,5 @@
 use iced::widget::{button, column, row, space, text, text_editor, text_input};
-use svalin::store::client_store::persistent::SvalinMetaInfo;
+use svalin::client::state::persistent::MetaInfo;
 use svalin_pki::get_current_timestamp;
 
 use crate::{bootstrap, ui::widgets::card};
@@ -31,11 +31,7 @@ impl State {
         }
     }
 
-    pub fn update<'a>(
-        &'a mut self,
-        msg: Message,
-        current_info: &'a SvalinMetaInfo,
-    ) -> Option<SvalinMetaInfo> {
+    pub fn update<'a>(&'a mut self, msg: Message, current_info: &'a MetaInfo) -> Option<MetaInfo> {
         match msg {
             Message::Edit => {
                 self.edit = true;
@@ -51,7 +47,7 @@ impl State {
             }
             Message::Save => {
                 self.edit = false;
-                return Some(SvalinMetaInfo {
+                return Some(MetaInfo {
                     name: self.name.clone(),
                     group: self.group.clone(),
                     notes: self.notes.text(),
@@ -63,7 +59,7 @@ impl State {
         None
     }
 
-    pub fn view<'a>(&'a self, current_info: &'a SvalinMetaInfo) -> crate::Element<'a, Message> {
+    pub fn view<'a>(&'a self, current_info: &'a MetaInfo) -> crate::Element<'a, Message> {
         if self.edit {
             card(
                 column![

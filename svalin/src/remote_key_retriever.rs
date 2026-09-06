@@ -6,7 +6,17 @@ use svalin_pki::{
 };
 use svalin_rpc::rpc::connection::{Connection, direct_connection::DirectConnection};
 
-use crate::shared::commands::get_key_packages::GetKeyPackages;
+use crate::shared::commands::get_key_packages::{GetKeyPackages, GetKeyPackagesDispatcherError};
+
+#[derive(Debug, thiserror::Error)]
+pub enum RemoteKeyRetrieverError {
+    #[error("failed to load certificate chain: {0}")]
+    LoadCertificateChain(#[from] svalin_pki::trust_store::LoadCertChainError),
+    #[error("failed to retrieve key packages: {0}")]
+    GetKeyPackages(
+        svalin_rpc::rpc::connection::ConnectionDispatchError<GetKeyPackagesDispatcherError>,
+    ),
+}
 
 #[derive(Clone)]
 pub struct RemoteKeyRetriever {
@@ -23,7 +33,7 @@ impl RemoteKeyRetriever {
 }
 
 impl KeyRetriever for RemoteKeyRetriever {
-    type Error = anyhow::Error;
+    type Error = RemoteKeyRetrieverError;
 
     async fn get_required_group_members(
         &self,
@@ -72,7 +82,8 @@ impl KeyRetriever for RemoteKeyRetriever {
         let key_packages = self
             .connection
             .dispatch(GetKeyPackages(entities.to_vec()))
-            .await?;
+            .await
+            .map_err(RemoteKeyRetrieverError::GetKeyPackages)?;
         Ok(key_packages)
     }
 }
