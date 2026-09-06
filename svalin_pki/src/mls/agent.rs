@@ -90,7 +90,8 @@ where
                 todo!("Don't have a use case for an agent joining another group yet")
             }
             MessageToMember::GroupMessage(_private_message_in) => {
-                todo!("There aren't any reasons for an agent to receive a message yet")
+                Ok(())
+                // todo!("There aren't any reasons for an agent to receive a message yet")
             }
             MessageToMember::AddToGroup(message) => self.handle_add_to_group(message).await,
         }
