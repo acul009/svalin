@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -11,12 +11,37 @@ use crate::permissions::PermissionHandler;
 use crate::rpc::{command::handler::HandlerCollection, session::Session};
 use crate::transport::session_transport::SessionTransport;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum ConnectionDispatchError<DError> {
-    #[error("failed to open session: {0}")]
-    OpenSessionError(#[from] anyhow::Error),
-    #[error("failed to dispatch command: {0}")]
-    DispatchError(#[from] SessionDispatchError<DError>),
+    OpenSessionError(anyhow::Error),
+    DispatchError(SessionDispatchError<DError>),
+}
+
+impl<DError: Display> Display for ConnectionDispatchError<DError> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::OpenSessionError(err) => {
+                write!(formatter, "failed to open session: {err:#}")
+            }
+            Self::DispatchError(err) => {
+                write!(formatter, "failed to dispatch command: {err:#}")
+            }
+        }
+    }
+}
+
+impl<DError: Debug + Display> std::error::Error for ConnectionDispatchError<DError> {}
+
+impl<DError> From<anyhow::Error> for ConnectionDispatchError<DError> {
+    fn from(err: anyhow::Error) -> Self {
+        Self::OpenSessionError(err)
+    }
+}
+
+impl<DError> From<SessionDispatchError<DError>> for ConnectionDispatchError<DError> {
+    fn from(err: SessionDispatchError<DError>) -> Self {
+        Self::DispatchError(err)
+    }
 }
 
 #[async_trait]

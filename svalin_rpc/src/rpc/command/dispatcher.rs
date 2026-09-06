@@ -44,7 +44,7 @@ pub trait TakeableCommandDispatcher: Send + Sync {
 pub enum DispatcherError<Error> {
     #[error("tried dispatching command with None")]
     NoneSession,
-    #[error("{0}")]
+    #[error("{0:#}")]
     Other(#[from] Error),
 }
 

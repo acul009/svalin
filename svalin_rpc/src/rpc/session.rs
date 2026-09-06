@@ -69,7 +69,7 @@ pub enum SessionDispatchError<InnerError> {
     ReadResponseError(SessionReadError),
     #[error("session declined with code {code}: {message}")]
     SessionDeclined { code: u32, message: String },
-    #[error("error running dispatcher: {0}")]
+    #[error("error running dispatcher: {0:#}")]
     DispatcherError(#[from] DispatcherError<InnerError>),
 }
 
