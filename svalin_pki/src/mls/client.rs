@@ -3,6 +3,7 @@ use std::{collections::HashSet, marker::PhantomData};
 use anyhow::{Context, anyhow};
 use openmls::{
     error::LibraryError,
+    framing::ProtocolMessage,
     prelude::{PublicMessageIn, Welcome, tls_codec},
 };
 
@@ -105,13 +106,28 @@ where
                 })
             }
             MessageToMember::GroupMessage(message) => {
+                let message = ProtocolMessage::PrivateMessage(message);
+                let group_id = message.group_id().clone();
+                let ProtocolMessage::PrivateMessage(message) = message else {
+                    unreachable!()
+                };
                 tracing::trace!("handling group message");
-                let processed = self
-                    .harness
-                    .processor()
-                    .process_message(message)
-                    .await
-                    .context("error processing group message")?;
+                let processed = match self.harness.processor().process_message(message).await {
+                    Ok(processed) => processed,
+                    Err(err) => match err {
+                        ProcessMessageError::ProcessError(
+                            openmls::group::ProcessMessageError::ValidationError(
+                                openmls::group::ValidationError::CannotDecryptOwnMessage,
+                            ),
+                        ) => {
+                            return Ok(MessageData {
+                                content: MessageDataContent::Internal,
+                                group: SvalinGroupId::from_group_id(&group_id)?,
+                            });
+                        }
+                        err => return Err(err).context("error processing group message"),
+                    },
+                };
                 tracing::trace!("message processed successfully");
                 let group_id = SvalinGroupId::from_group_id(&processed.group_id)
                     .context("error parsing group id")?;
