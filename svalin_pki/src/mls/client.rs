@@ -1,6 +1,6 @@
 use std::{collections::HashSet, marker::PhantomData};
 
-use anyhow::{Context, anyhow};
+use anyhow::anyhow;
 use openmls::{
     error::LibraryError,
     framing::ProtocolMessage,
@@ -78,26 +78,12 @@ where
     pub async fn handle_message(
         &self,
         message: &MessageToMemberTransport,
-    ) -> anyhow::Result<MessageData<Types>> {
+    ) -> Result<MessageData<Types>, HandleMessageError<KeyRetriever::Error>> {
         tracing::trace!("handling message: {:?}", message);
-        match message
-            .unpack()
-            .map_err(|err| {
-                tracing::error!("unpack error: {err}");
-                anyhow!("{}", err)
-            })
-            .context("unpack error")?
-        {
+        match message.unpack()? {
             MessageToMember::Welcome(welcome) => {
                 tracing::trace!("handling welcome");
-                let group = self
-                    .handle_welcome(welcome)
-                    .await
-                    .map_err(|err| {
-                        tracing::error!("error handling welcome: {}", err);
-                        anyhow!("{}", err)
-                    })
-                    .context("handle welcome error")?;
+                let group = self.handle_welcome(welcome).await?;
                 tracing::trace!("welcome handled successfully");
 
                 Ok(MessageData {
@@ -107,7 +93,7 @@ where
             }
             MessageToMember::GroupMessage(message) => {
                 let message = ProtocolMessage::PrivateMessage(message);
-                let group_id = message.group_id().clone();
+                let group_id = SvalinGroupId::from_group_id(message.group_id())?;
                 let ProtocolMessage::PrivateMessage(message) = message else {
                     unreachable!()
                 };
@@ -122,29 +108,32 @@ where
                         ) => {
                             return Ok(MessageData {
                                 content: MessageDataContent::Internal,
-                                group: SvalinGroupId::from_group_id(&group_id)?,
+                                group: group_id,
                             });
                         }
-                        err => return Err(err).context("error processing group message"),
+                        source => {
+                            return Err(HandleMessageError::ProcessMessage { group_id, source });
+                        }
                     },
                 };
                 tracing::trace!("message processed successfully");
-                let group_id = SvalinGroupId::from_group_id(&processed.group_id)
-                    .context("error parsing group id")?;
                 tracing::trace!("group id parsed successfully");
                 let ProcessedContent::Message(decrypted) = processed.content else {
-                    anyhow::bail!("expected data message, got something else instead.")
+                    return Err(HandleMessageError::InvalidMessage { group_id });
                 };
                 let decoded: SvalinMessage<Types> =
-                    postcard::from_bytes(&decrypted).context("postcard error")?;
+                    postcard::from_bytes(&decrypted).map_err(|source| {
+                        HandleMessageError::Deserialize {
+                            group_id: group_id.clone(),
+                            source,
+                        }
+                    })?;
 
                 match decoded {
                     SvalinMessage::Report(report) => match group_id.clone() {
                         SvalinGroupId::DeviceGroup(device) => {
                             if device != processed.sender {
-                                anyhow::bail!(
-                                    "only the device itself can send reports to its group"
-                                )
+                                Err(HandleMessageError::ForbiddenSender { group_id })
                             } else {
                                 Ok(MessageData {
                                     group: group_id,
@@ -153,7 +142,7 @@ where
                             }
                         }
                         #[allow(unreachable_patterns)]
-                        _ => anyhow::bail!("unallowed message type"),
+                        _ => Err(HandleMessageError::InvalidMessage { group_id }),
                     },
                     SvalinMessage::MetaInfo(meta_info) => match group_id.clone() {
                         SvalinGroupId::DeviceMetaGroup(device) => Ok(MessageData {
@@ -161,14 +150,11 @@ where
                             content: MessageDataContent::MetaInfo(device, meta_info),
                         }),
                         #[allow(unreachable_patterns)]
-                        _ => anyhow::bail!("unallowed message type"),
+                        _ => Err(HandleMessageError::InvalidMessage { group_id }),
                     },
                 }
             }
-            MessageToMember::AddToGroup(message) => self
-                .handle_add_to_group(message)
-                .await
-                .context("add to group error"),
+            MessageToMember::AddToGroup(message) => self.handle_add_to_group(message).await,
         }
     }
 
@@ -233,24 +219,45 @@ where
     async fn handle_add_to_group(
         &self,
         message: PublicMessageIn,
-    ) -> anyhow::Result<MessageData<Types>> {
+    ) -> Result<MessageData<Types>, HandleMessageError<KeyRetriever::Error>> {
         tracing::trace!("Handling add to group message");
 
+        let message = ProtocolMessage::PublicMessage(Box::new(message));
+        let group_id = SvalinGroupId::from_group_id(message.group_id())?;
+        let ProtocolMessage::PublicMessage(message) = message else {
+            unreachable!()
+        };
+        let message = *message;
         let processed = self
             .harness
             .processor()
             .process_message(message)
             .await
-            .map_err(|err| anyhow!(err))?;
-        let group_id = processed.group_id()?;
+            .map_err(|source| HandleMessageError::ProcessMessage {
+                group_id: group_id.clone(),
+                source,
+            })?;
 
         let ProcessedContent::Commit(commit) = processed.content else {
-            anyhow::bail!("Expected a commit message, got {:?}", processed.content)
+            return Err(HandleMessageError::InvalidMessage { group_id });
         };
 
-        self.harness.check_commit(&group_id, &commit).await?;
+        self.harness
+            .check_commit(&group_id, &commit)
+            .await
+            .map_err(|source| HandleMessageError::CheckCommit {
+                group_id: group_id.clone(),
+                source,
+            })?;
 
-        self.harness.processor().commit(commit).await?;
+        self.harness
+            .processor()
+            .commit(commit)
+            .await
+            .map_err(|source| HandleMessageError::Commit {
+                group_id: group_id.clone(),
+                source,
+            })?;
 
         Ok(MessageData {
             group: group_id,
@@ -338,16 +345,36 @@ pub enum HandleMessageError<RetrieverError> {
     TlsCodecError(#[from] tls_codec::Error),
     #[error("welcome error: {0}")]
     Welcome(#[from] HandleWelcomeError<RetrieverError>),
-    #[error("process message error: {0}")]
-    ProcessMessage(#[from] ProcessMessageError),
-    #[error("deserialize error: {0}")]
-    DeserializeError(#[from] postcard::Error),
+    #[error("error processing message for group {group_id:?}: {source}")]
+    ProcessMessage {
+        group_id: SvalinGroupId,
+        #[source]
+        source: ProcessMessageError,
+    },
+    #[error("error deserializing message for group {group_id:?}: {source}")]
+    Deserialize {
+        group_id: SvalinGroupId,
+        #[source]
+        source: postcard::Error,
+    },
     #[error("group id error: {0}")]
     GroupIdError(#[from] ParseGroupIdError),
-    #[error("invalid message")]
-    InvalidMessage,
-    #[error("forbidden sender")]
-    ForbiddenSender,
+    #[error("invalid message for group {group_id:?}")]
+    InvalidMessage { group_id: SvalinGroupId },
+    #[error("forbidden sender for group {group_id:?}")]
+    ForbiddenSender { group_id: SvalinGroupId },
+    #[error("commit validation error for group {group_id:?}: {source}")]
+    CheckCommit {
+        group_id: SvalinGroupId,
+        #[source]
+        source: anyhow::Error,
+    },
+    #[error("commit error for group {group_id:?}: {source}")]
+    Commit {
+        group_id: SvalinGroupId,
+        #[source]
+        source: anyhow::Error,
+    },
 }
 
 #[derive(Debug, thiserror::Error)]
