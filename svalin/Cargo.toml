@@ -1,6 +1,6 @@
 [package]
 name = "svalin"
-version = "0.1.3-alpha"
+version.workspace = true
 edition = "2024"
 license-file = "../LICENSE"
 authors = ["Luca Wlcek <luca@it-rahn.de>"]

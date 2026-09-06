@@ -1,4 +1,5 @@
 [workspace]
+package.version = "0.1.4-alpha"
 
 resolver = "2"
 
