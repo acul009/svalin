@@ -13,7 +13,7 @@ pub use user_store::{GetBySpkiHashError, UserStore};
 use sqlx::SqlitePool;
 use std::{path::Path, sync::Arc};
 
-use crate::close_handle::CloseHandle;
+use super::close_handle::CloseHandle;
 
 pub struct ServerStore {
     pub trust_store_transactions: Arc<TrustStoreTransactionStore>,

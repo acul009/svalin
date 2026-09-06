@@ -3,10 +3,10 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use crate::store::server_store::SessionStore;
 use svalin_pki::{
     CertificateChainBuilder, SpkiHash, UnverifiedCertificateChain, trust_store::TrustStore,
 };
-use svalin_store::server_store::SessionStore;
 
 #[derive(Debug, Clone)]
 pub struct ChainLoader {

@@ -1,18 +1,18 @@
 use serde::{Deserialize, Serialize};
 use svalin_pki::TrustStoreVerifier;
-use svalin_store::client_store::persistent::{SvalinMetaInfo, SvalinReport};
 
 use crate::{
-    remote_key_retriever::RemoteKeyRetriever, server::local_key_retriever::LocalKeyRetriever,
+    client::state::persistent, remote_key_retriever::RemoteKeyRetriever,
+    server::local_key_retriever::LocalKeyRetriever,
 };
 
 #[derive(Serialize, Deserialize)]
 pub struct MlsTypes {}
 
 impl svalin_pki::mls::transport_types::MessageTypes for MlsTypes {
-    type Report = SvalinReport;
+    type Report = persistent::Report;
 
-    type MetaInfo = SvalinMetaInfo;
+    type MetaInfo = persistent::MetaInfo;
 }
 
 pub type MlsClient =

@@ -10,7 +10,6 @@ members = [
     "svalin_sysctl",
     "svalin_iced",
     "sqlx_storage",
-    "svalin_store"
 ]
 
 [workspace.dependencies]
@@ -18,7 +17,6 @@ svalin = { path = "svalin" }
 svalin_pki = { path = "svalin_pki" }
 svalin_rpc = { path = "svalin_rpc" }
 svalin_sysctl = { path = "svalin_sysctl" }
-svalin_store = { path = "svalin_store" }
 
 anyhow = "1.0.104"
 async-trait = "0.1.92"

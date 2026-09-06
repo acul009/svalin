@@ -22,7 +22,7 @@ pub trait Store {
     ) -> impl Future<Output = anyhow::Result<Vec<UncheckedBlock<trust_store::Transaction>>>>;
 }
 
-impl Store for svalin_store::trust_store_transaction_store::TrustStoreTransactionStore {
+impl Store for crate::store::trust_store_transaction_store::TrustStoreTransactionStore {
     async fn load_all_after(
         &self,
         after: u64,
@@ -31,7 +31,7 @@ impl Store for svalin_store::trust_store_transaction_store::TrustStoreTransactio
     }
 }
 
-impl Store for svalin_store::server_store::TrustStoreTransactionStore {
+impl Store for crate::store::server_store::TrustStoreTransactionStore {
     async fn load_all_after(
         &self,
         after: u64,
@@ -108,7 +108,7 @@ pub async fn load_trust_store(
 /// but it will continue to download and apply updates in a background task.
 pub async fn update_trust_store(
     trust_store: Arc<RwLock<TrustStore>>,
-    store: Arc<svalin_store::trust_store_transaction_store::TrustStoreTransactionStore>,
+    store: Arc<crate::store::trust_store_transaction_store::TrustStoreTransactionStore>,
     connection: impl Connection + 'static,
     cancel: CancellationToken,
     task_tracker: &TaskTracker,

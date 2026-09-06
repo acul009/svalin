@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use svalin_pki::SpkiHash;
 use svalin_sysctl::sytem_report::{OSFamily, SystemReport};
 
+use crate::client::state::warning;
+
 /// This contains the persistent state of the clients available information.
 /// It is not meant to contain live information like current cpu usage or online status.
 /// This should only contain data which is still relevant after a device has been shut down.
@@ -16,9 +18,18 @@ pub struct State {
 }
 
 #[derive(Clone, Debug)]
-pub enum Message {
-    UpdateSystemReport(SpkiHash, SvalinReport),
-    UpdateMetaInfo(SpkiHash, SvalinMetaInfo),
+pub enum Update {
+    SystemReport(SpkiHash, Report),
+    MetaInfo(SpkiHash, MetaInfo),
+}
+
+impl Update {
+    pub fn affected_device(&self) -> Option<SpkiHash> {
+        match self {
+            Update::SystemReport(spki_hash, _) => Some(spki_hash.clone()),
+            Update::MetaInfo(spki_hash, _) => Some(spki_hash.clone()),
+        }
+    }
 }
 
 impl State {
@@ -28,9 +39,9 @@ impl State {
         }
     }
 
-    pub fn update(&mut self, msg: Message) {
+    pub fn update(&mut self, msg: Update) {
         match msg {
-            Message::UpdateSystemReport(spki_hash, system_report) => {
+            Update::SystemReport(spki_hash, system_report) => {
                 let entry = self.get_device_entry(spki_hash);
                 if let Some(report) = &entry.report {
                     if system_report.system_report.generated_at <= report.system_report.generated_at
@@ -41,7 +52,7 @@ impl State {
 
                 entry.report = Some(system_report);
             }
-            Message::UpdateMetaInfo(spki_hash, meta_info) => {
+            Update::MetaInfo(spki_hash, meta_info) => {
                 let entry = self.get_device_entry(spki_hash);
                 if let Some(meta) = &entry.meta_info {
                     if meta_info.updated_at <= meta.updated_at {
@@ -67,21 +78,48 @@ impl State {
     pub fn devices(&self) -> &HashMap<SpkiHash, DeviceState> {
         &self.devices
     }
+
+    pub(super) fn generate_device_warnings(&self, spki_hash: &SpkiHash) -> Vec<warning::Device> {
+        let mut warnings = Vec::new();
+        let device = self.devices.get(spki_hash).unwrap();
+        if let Some(report) = device.report() {
+            for disk in &report.system_report.disks {
+                let part_free = disk.available_space as f32 / disk.total_space as f32;
+                if part_free < 0.1 {
+                    warnings.push(warning::Device::DiskSpaceLow {
+                        disk: disk.mount_point.clone(),
+                        free: disk.available_space,
+                        total: disk.total_space,
+                    });
+                }
+            }
+        }
+
+        if let Some(meta_info) = device.meta_info() {
+            if meta_info.name.is_empty() {
+                warnings.push(warning::Device::MissingName)
+            }
+        } else {
+            warnings.push(warning::Device::MissingName)
+        }
+
+        warnings
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DeviceState {
     spki_hash: SpkiHash,
-    pub(crate) report: Option<SvalinReport>,
-    pub(crate) meta_info: Option<SvalinMetaInfo>,
+    pub(crate) report: Option<Report>,
+    pub(crate) meta_info: Option<MetaInfo>,
 }
 
 impl DeviceState {
-    pub fn report(&self) -> Option<&SvalinReport> {
+    pub fn report(&self) -> Option<&Report> {
         self.report.as_ref()
     }
 
-    pub fn meta_info(&self) -> Option<&SvalinMetaInfo> {
+    pub fn meta_info(&self) -> Option<&MetaInfo> {
         self.meta_info.as_ref()
     }
 
@@ -107,13 +145,13 @@ impl DeviceState {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SvalinReport {
+pub struct Report {
     pub current_version_identifier: String,
     pub system_report: SystemReport,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SvalinMetaInfo {
+pub struct MetaInfo {
     pub updated_at: u64,
     pub name: String,
     pub group: String,

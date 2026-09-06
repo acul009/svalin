@@ -28,7 +28,6 @@ clap = { workspace = true, features = ["derive", "unstable-doc"] }
 svalin_rpc.workspace = true
 svalin_sysctl.workspace = true
 svalin_pki.workspace = true
-svalin_store.workspace = true
 totp-rs = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 test-log = { workspace = true, features = ["trace"] }
@@ -42,6 +41,7 @@ openmls_sqlx_storage.workspace = true
 windows-registry = "0.6.1"
 windows-service = "0.8.1"
 tracing-appender = "0.2.5"
+sqlx.workspace = true
 
 [package.metadata.deb]
 depends = "libc6 (>= 2.31)"

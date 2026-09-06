@@ -1,5 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
+use crate::store::agent_store::AgentStore;
 use anyhow::{Context, Result, anyhow};
 use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
@@ -15,7 +16,6 @@ use svalin_rpc::{
         connection::{Connection, ServeableConnectionBase},
     },
 };
-use svalin_store::agent_store::AgentStore;
 use tokio::sync::Notify;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::instrument;

@@ -1,5 +1,6 @@
 use std::sync::{Arc, RwLock};
 
+use crate::store::server_store::ServerStore;
 use svalin_pki::{TrustStoreVerifier, trust_store::TrustStore};
 use svalin_rpc::{
     commands::{forward::ForwardHandler, ping::PingHandler},
@@ -8,7 +9,6 @@ use svalin_rpc::{
         server::{RpcServer, config_builder::RpcCommandBuilder},
     },
 };
-use svalin_store::server_store::ServerStore;
 
 use crate::{
     message_streaming::{

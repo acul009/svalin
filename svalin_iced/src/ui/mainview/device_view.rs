@@ -7,7 +7,7 @@ use iced::{
 };
 use svalin::client::{Client, state::ClientState};
 use svalin_pki::SpkiHash;
-use svalin_store::client_store::persistent::{SvalinMetaInfo, SvalinReport};
+use svalin::store::client_store::persistent::{SvalinMetaInfo, SvalinReport};
 use svalin_sysctl::sytem_report::Disk;
 
 use crate::{

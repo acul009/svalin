@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
+use crate::store::server_store::{KeyPackageStore, MessageStore};
 use anyhow::anyhow;
 use svalin_pki::{
     Certificate, CertificateType, TrustStoreVerifier,
     mls::transport_types::MessageToServerTransport,
 };
-use svalin_store::server_store::{KeyPackageStore, MessageStore};
 
 pub struct MlsMessageHandler {
     pub message_store: Arc<MessageStore>,

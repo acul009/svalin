@@ -1,6 +1,7 @@
 use std::sync::RwLock;
 use std::{str, sync::Arc};
 
+use crate::store::server_store::{SessionStore, UserStore};
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage};
@@ -36,7 +37,6 @@ use svalin_rpc::{
     },
     verifiers::skip_verify::{SkipClientVerification, SkipServerVerification},
 };
-use svalin_store::server_store::{SessionStore, UserStore};
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 

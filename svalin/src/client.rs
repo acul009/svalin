@@ -13,13 +13,13 @@ pub mod device;
 mod profile;
 pub mod state;
 
+use crate::store::client_store::ClientStore;
 pub use first_connect::*;
 use svalin_pki::trust_store::TrustStore;
 use svalin_pki::{Certificate, Credential, RootCertificate, SpkiHash, TrustStoreVerifier};
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
-use svalin_store::client_store::ClientStore;
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::error::Elapsed;
 use tokio::time::timeout;

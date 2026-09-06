@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::store::client_store::ClientStore;
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
@@ -8,7 +9,6 @@ use svalin_pki::{
     trust_store::TrustStore,
 };
 use svalin_rpc::rpc::{client::RpcClient, connection::Connection};
-use svalin_store::client_store::ClientStore;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::error;

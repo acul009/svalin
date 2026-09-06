@@ -1,5 +1,6 @@
 use std::sync::{Arc, RwLock};
 
+use crate::store::{server_store, trust_store_transaction_store::TrustStoreTransactionStore};
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -11,7 +12,6 @@ use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::Session,
 };
-use svalin_store::{server_store, trust_store_transaction_store::TrustStoreTransactionStore};
 use tokio::{select, sync::oneshot};
 use tokio_util::sync::CancellationToken;
 

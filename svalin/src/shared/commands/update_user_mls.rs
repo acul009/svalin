@@ -5,6 +5,8 @@ use std::{
     time::Duration,
 };
 
+use crate::store::client_store::persistent;
+use crate::store::server_store::{KeyPackageStore, MessageStore, UserStore};
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use futures::{FutureExt, select};
@@ -19,8 +21,6 @@ use svalin_pki::{
     },
 };
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
-use svalin_store::client_store::persistent;
-use svalin_store::server_store::{KeyPackageStore, MessageStore, UserStore};
 use tokio::{
     sync::mpsc,
     time::{Instant, sleep_until},
@@ -339,14 +339,14 @@ impl CommandDispatcher for UpdateUserMls {
                                 MessageDataContent::Report(spki_hash, report) => {
                                     tracing::trace!("received device report");
                                     let message =
-                                        persistent::Message::UpdateSystemReport(spki_hash, report);
+                                        persistent::Update::UpdateSystemReport(spki_hash, report);
                                     persistent_data.update(message.clone());
                                     self.state_handle.update(message.into()).await;
                                 }
                                 MessageDataContent::MetaInfo(spki_hash, meta_info) => {
                                     tracing::trace!("received device metainfo");
                                     let message =
-                                        persistent::Message::UpdateMetaInfo(spki_hash, meta_info);
+                                        persistent::Update::UpdateMetaInfo(spki_hash, meta_info);
                                     persistent_data.update(message.clone());
                                     self.state_handle.update(message.into()).await;
                                 }

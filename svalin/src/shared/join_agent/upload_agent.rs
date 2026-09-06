@@ -1,5 +1,8 @@
 use std::sync::Arc;
 
+use crate::store::server_store::{
+    AgentStore, CompleteCertChainError, MessageStoreError, UserStore,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -13,9 +16,6 @@ use svalin_rpc::rpc::{
         handler::{CommandHandler, PermissionPrecursor},
     },
     session::{Session, SessionReadError, SessionWriteError},
-};
-use svalin_store::server_store::{
-    AgentStore, CompleteCertChainError, MessageStoreError, UserStore,
 };
 use tokio_util::sync::CancellationToken;
 

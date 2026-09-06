@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::store::server_store::UserStore;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{ArgonParams, CertificateType, EncryptedCredential};
@@ -8,7 +9,6 @@ use svalin_rpc::rpc::{
     peer::Peer,
     session::Session,
 };
-use svalin_store::server_store::UserStore;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Serialize, Deserialize)]

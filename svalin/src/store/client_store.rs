@@ -3,10 +3,9 @@ use sqlx::SqlitePool;
 use std::{fmt::Debug, path::Path, sync::Arc};
 use svalin_pki::SpkiHash;
 
-use crate::{close_handle::CloseHandle, trust_store_transaction_store::TrustStoreTransactionStore};
-use persistent::Message;
+use crate::client::state::persistent;
 
-pub mod persistent;
+use super::{close_handle::CloseHandle, trust_store_transaction_store::TrustStoreTransactionStore};
 
 pub struct ClientStore {
     pool: SqlitePool,
@@ -23,9 +22,9 @@ impl ClientStore {
         })
     }
 
-    pub async fn update(&self, message: &persistent::Message) -> Result<(), Error> {
+    pub async fn update(&self, message: &persistent::Update) -> Result<(), Error> {
         match &message {
-            persistent::Message::UpdateSystemReport(spki_hash, system_report) => {
+            persistent::Update::SystemReport(spki_hash, system_report) => {
                 let report = postcard::to_stdvec(system_report)?;
                 let spki_hash = spki_hash.as_slice();
                 let generated_at = system_report.system_report.generated_at as i64;
@@ -34,7 +33,7 @@ impl ClientStore {
                     .execute(&self.pool)
                     .await?;
             }
-            persistent::Message::UpdateMetaInfo(spki_hash, meta_info) => {
+            persistent::Update::MetaInfo(spki_hash, meta_info) => {
                 let info = postcard::to_stdvec(meta_info)?;
                 let spki_hash = spki_hash.as_slice();
                 let updated_at = meta_info.updated_at as i64;
@@ -60,7 +59,7 @@ impl ClientStore {
             let spki_hash = SpkiHash::from_slice(&row.spki_hash)
                 .expect("values should have been checked when saving in the db");
             match postcard::from_bytes(&row.report) {
-                Ok(report) => state.update(Message::UpdateSystemReport(spki_hash, report)),
+                Ok(report) => state.update(persistent::Update::SystemReport(spki_hash, report)),
                 Err(err) => tracing::error!("failed to load report: {}", err),
             }
         }
@@ -74,7 +73,7 @@ impl ClientStore {
             let spki_hash = SpkiHash::from_slice(&row.spki_hash)
                 .expect("values should have been checked when saving in the db");
             match postcard::from_bytes(&row.data) {
-                Ok(data) => state.update(Message::UpdateMetaInfo(spki_hash, data)),
+                Ok(data) => state.update(persistent::Update::MetaInfo(spki_hash, data)),
                 Err(err) => tracing::error!("failed to load meta info: {}", err),
             }
         }

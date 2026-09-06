@@ -13,6 +13,7 @@ pub mod permissions;
 pub mod remote_key_retriever;
 pub mod server;
 pub mod shared;
+pub mod store;
 pub mod util;
 pub mod verifier;
 

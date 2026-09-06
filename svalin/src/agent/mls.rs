@@ -2,12 +2,12 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use futures::{FutureExt, select};
-use svalin_store::client_store::persistent::SvalinReport;
 use svalin_sysctl::sytem_report::SystemReport;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
+    client::state::persistent,
     message_streaming::{MessageFromAgent, agent::AgentMessageDispatcherHandle},
     mls::MlsAgent,
 };
@@ -61,10 +61,10 @@ async fn send_system_report(
     Ok(())
 }
 
-async fn generate_system_report() -> anyhow::Result<SvalinReport> {
+async fn generate_system_report() -> anyhow::Result<persistent::Report> {
     let system_report = SystemReport::create().await?;
 
-    let report = SvalinReport {
+    let report = persistent::Report {
         current_version_identifier: crate::commit().into(),
         system_report,
     };

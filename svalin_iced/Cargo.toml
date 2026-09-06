@@ -12,7 +12,6 @@ svalin.workspace = true
 svalin_pki.workspace = true
 svalin_rpc.workspace = true
 svalin_sysctl.workspace = true
-svalin_store.workspace = true
 
 frozen_term = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git"}
 async_pty = { git = "https://github.com/Rahn-IT/frostbyte_terminal.git" }

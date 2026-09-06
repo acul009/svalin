@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
+use crate::store::server_store::SessionStore;
 use async_trait::async_trait;
 use svalin_pki::{SpkiHash, UnverifiedCertificate};
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::Session,
 };
-use svalin_store::server_store::SessionStore;
 use tokio_util::sync::CancellationToken;
 
 pub struct ListUserSessionsHandler {

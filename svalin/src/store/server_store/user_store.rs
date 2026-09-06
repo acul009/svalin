@@ -1,6 +1,5 @@
 use std::{fmt::Debug, sync::Arc};
 
-use crate::client_store::persistent;
 use anyhow::{Result, anyhow};
 use aucpace::StrongDatabase;
 use serde::{Deserialize, Serialize};
@@ -14,6 +13,8 @@ use svalin_pki::{
     UnverifiedCertificate, serde_paramsstring, trust_store,
 };
 use totp_rs::Totp;
+
+use crate::client::state::persistent;
 
 #[derive(Serialize, Deserialize)]
 pub struct StoredUser {

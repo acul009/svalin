@@ -1,5 +1,6 @@
 use std::{collections::HashSet, sync::Arc};
 
+use crate::store::server_store::KeyPackageStore;
 use async_trait::async_trait;
 use svalin_pki::{
     SpkiHash,
@@ -9,7 +10,6 @@ use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::{Session, SessionReadError},
 };
-use svalin_store::server_store::KeyPackageStore;
 use tokio_util::sync::CancellationToken;
 
 pub struct GetKeyPackages(pub Vec<SpkiHash>);

@@ -2,10 +2,10 @@ use crate::{message_streaming::MessageFromClient, shared::join_agent::accept_han
 
 use super::Client;
 
+use crate::store::trust_store_transaction_store::TransactionStoreError;
 use anyhow::Result;
 use svalin_pki::{Certificate, trust_store};
 use svalin_rpc::rpc::connection::Connection;
-use svalin_store::trust_store_transaction_store::TransactionStoreError;
 
 impl Client {
     pub async fn add_agent_with_code(

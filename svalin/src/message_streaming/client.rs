@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use crate::{client::state::persistent, store::client_store::ClientStore};
 use svalin_rpc::rpc::command::{dispatcher::CommandDispatcher, handler::CommandHandler};
-use svalin_store::client_store::{ClientStore, persistent};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
@@ -180,13 +180,13 @@ impl ClientMessageReceiver {
                 //     MessageDataContent::Internal => {}
                 //     MessageDataContent::Report(spki_hash, report) => {
                 //         self.update_client_state(ClientStateUpdate::Persistent(
-                //             persistent::Message::UpdateSystemReport(spki_hash, report),
+                //             persistent::Update::UpdateSystemReport(spki_hash, report),
                 //         ))
                 //         .await;
                 //     }
                 //     MessageDataContent::MetaInfo(spki_hash, meta_info) => {
                 //         self.update_client_state(ClientStateUpdate::Persistent(
-                //             persistent::Message::UpdateMetaInfo(spki_hash, meta_info),
+                //             persistent::Update::UpdateMetaInfo(spki_hash, meta_info),
                 //         ))
                 //         .await;
                 //     }
@@ -273,10 +273,7 @@ impl ClientStateHandle {
         Ok(())
     }
 
-    pub async fn persistent_update(
-        &self,
-        update: persistent::Message,
-    ) -> Result<(), anyhow::Error> {
+    pub async fn persistent_update(&self, update: persistent::Update) -> Result<(), anyhow::Error> {
         self.update(ClientStateUpdate::Persistent(update)).await
     }
 }

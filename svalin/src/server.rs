@@ -1,5 +1,6 @@
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
+use crate::store::server_store::{ServerStore, UserStore};
 use anyhow::{Context, Result, anyhow};
 use command_builder::SvalinCommandBuilder;
 use config_builder::ServerConfigBuilder;
@@ -12,7 +13,6 @@ use svalin_rpc::{
     rpc::{command::handler::HandlerCollection, server::Socket},
     verifiers::skip_verify::SkipClientVerification,
 };
-use svalin_store::server_store::{ServerStore, UserStore};
 use tokio::{
     sync::oneshot,
     time::{error::Elapsed, timeout},
@@ -55,7 +55,7 @@ pub const INIT_SERVER_SHUTDOWN_COUNTDOWN: Duration = Duration::from_secs(1);
 pub struct Server {
     rpc: Arc<RpcServer>,
     config: ServerConfig,
-    store_close_handle: svalin_store::CloseHandle,
+    store_close_handle: crate::store::CloseHandle,
     tasks: TaskTracker,
 }
 

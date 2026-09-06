@@ -1,12 +1,12 @@
 use std::sync::{Arc, RwLock};
 
+use crate::store::server_store::KeyPackageStore;
 use anyhow::anyhow;
 use svalin_pki::{
     CertificateChainBuilder, RootCertificate, get_current_timestamp,
     mls::{SvalinGroupId, key_retriever::KeyRetriever},
     trust_store::TrustStore,
 };
-use svalin_store::server_store::KeyPackageStore;
 
 pub struct LocalKeyRetriever {
     root: RootCertificate,

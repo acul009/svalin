@@ -6,12 +6,14 @@ use svalin_rpc::{
     commands::{forward::ForwardConnection, ping::Ping},
     rpc::connection::{Connection, direct_connection::DirectConnection},
 };
-use svalin_store::client_store::persistent::{Message::UpdateMetaInfo, SvalinMetaInfo};
 use tokio::sync::mpsc;
 
-use crate::shared::commands::{
-    request_system_report::RequestSystemReport, terminal::RemoteTerminalDispatcher,
-    update_agent::UpdateAgent, update_mls::MlsUpdate,
+use crate::{
+    client::state::persistent,
+    shared::commands::{
+        request_system_report::RequestSystemReport, terminal::RemoteTerminalDispatcher,
+        update_agent::UpdateAgent, update_mls::MlsUpdate,
+    },
 };
 
 pub struct DeviceHandle<'a>(&'a super::Client, SpkiHash);
@@ -34,7 +36,7 @@ impl<'a> DeviceHandle<'a> {
             .map_err(|err| anyhow!("{}", err))?)
     }
 
-    pub async fn update_metainfo(&self, metainfo: SvalinMetaInfo) -> anyhow::Result<()> {
+    pub async fn update_metainfo(&self, metainfo: persistent::MetaInfo) -> anyhow::Result<()> {
         self.0
             .mls_update_sender
             .send(MlsUpdate::UpdateMetaInfo(self.1.clone(), metainfo.clone()))
@@ -43,7 +45,7 @@ impl<'a> DeviceHandle<'a> {
 
         self.0
             .state_handle
-            .persistent_update(UpdateMetaInfo(self.1.clone(), metainfo))
+            .persistent_update(persistent::Update::MetaInfo(self.1.clone(), metainfo))
             .await?;
 
         Ok(())

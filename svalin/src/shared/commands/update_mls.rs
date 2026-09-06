@@ -21,10 +21,6 @@ use svalin_rpc::rpc::{
     peer::Peer,
     session::Session,
 };
-use svalin_store::{
-    client_store::persistent::{self, SvalinMetaInfo},
-    server_store::{KeyPackageStore, MessageStore, UserStore},
-};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -35,8 +31,12 @@ use tracing::trace;
 use uuid::Uuid;
 
 use crate::{
-    message_streaming::client::ClientStateHandle, mls::MlsClient,
-    remote_key_retriever::RemoteKeyRetriever, server::MlsServer,
+    client::state::persistent,
+    message_streaming::client::ClientStateHandle,
+    mls::MlsClient,
+    remote_key_retriever::RemoteKeyRetriever,
+    server::MlsServer,
+    store::server_store::{KeyPackageStore, MessageStore, UserStore},
 };
 
 const WANTED_KEY_PACKAGES: u64 = 100;
@@ -53,7 +53,7 @@ pub struct UpdateMls {
 }
 
 pub enum MlsUpdate {
-    UpdateMetaInfo(SpkiHash, SvalinMetaInfo),
+    UpdateMetaInfo(SpkiHash, persistent::MetaInfo),
 }
 
 impl CommandDispatcher for UpdateMls {
@@ -100,7 +100,7 @@ impl CommandDispatcher for UpdateMls {
                 }
                 if update_meta {
                     self.client_state
-                        .persistent_update(persistent::Message::UpdateMetaInfo(
+                        .persistent_update(persistent::Update::MetaInfo(
                             device.clone(),
                             saved_meta.clone(),
                         ))
@@ -117,7 +117,7 @@ impl CommandDispatcher for UpdateMls {
                 }
                 if update_report {
                     self.client_state
-                        .persistent_update(persistent::Message::UpdateSystemReport(
+                        .persistent_update(persistent::Update::SystemReport(
                             device.clone(),
                             saved_report.clone(),
                         ))
@@ -132,16 +132,12 @@ impl CommandDispatcher for UpdateMls {
             match message_data.content {
                 MessageDataContent::Report(spki_hash, report) => {
                     self.client_state
-                        .persistent_update(persistent::Message::UpdateSystemReport(
-                            spki_hash, report,
-                        ))
+                        .persistent_update(persistent::Update::SystemReport(spki_hash, report))
                         .await?
                 }
                 MessageDataContent::MetaInfo(spki_hash, meta_info) => {
                     self.client_state
-                        .persistent_update(persistent::Message::UpdateMetaInfo(
-                            spki_hash, meta_info,
-                        ))
+                        .persistent_update(persistent::Update::MetaInfo(spki_hash, meta_info))
                         .await?
                 }
                 MessageDataContent::Internal => (),
@@ -226,14 +222,14 @@ impl CommandDispatcher for UpdateMls {
                             match message_data.content {
                                 MessageDataContent::Report(spki_hash, report) => {
                                     self.client_state
-                                        .persistent_update(persistent::Message::UpdateSystemReport(
+                                        .persistent_update(persistent::Update::SystemReport(
                                             spki_hash, report,
                                         ))
                                         .await?
                                 }
                                 MessageDataContent::MetaInfo(spki_hash, meta_info) => {
                                     self.client_state
-                                        .persistent_update(persistent::Message::UpdateMetaInfo(
+                                        .persistent_update(persistent::Update::MetaInfo(
                                             spki_hash, meta_info,
                                         ))
                                         .await?

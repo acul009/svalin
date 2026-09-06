@@ -2,7 +2,6 @@ use std::{panic, process, time::Duration};
 
 use std::net::ToSocketAddrs;
 use svalin_pki::get_current_timestamp;
-use svalin_store::client_store::persistent::{self, SvalinMetaInfo};
 use test_log::test;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
@@ -10,7 +9,7 @@ use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use totp_rs::Totp;
 
-use crate::client::state::ClientStateUpdate;
+use crate::client::state::{ClientStateUpdate, persistent};
 use crate::{agent, client::Client, server::Server};
 
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -150,7 +149,7 @@ async fn integration_tests() {
     //     .await
     //     .unwrap()
     //     .unwrap();
-    // if let ClientStateUpdate::Persistent(persistent::Message::UpdateFromMainState(_)) = &update {
+    // if let ClientStateUpdate::Persistent(persistent::Update::UpdateFromMainState(_)) = &update {
     //     client_state.update(update);
     // } else {
     //     panic!("expected persistent state update, got: {:?}", &update);
@@ -182,7 +181,7 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::Persistent(persistent::Message::UpdateSystemReport(_, _)) = &update {
+    if let ClientStateUpdate::Persistent(persistent::Update::SystemReport(_, _)) = &update {
         client_state.update(update);
     } else {
         panic!("expected system report, got: {:?}", &update);
@@ -210,7 +209,7 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::Persistent(persistent::Message::UpdateSystemReport(_, _)) = &update {
+    if let ClientStateUpdate::Persistent(persistent::Update::SystemReport(_, _)) = &update {
         client_state.update(update);
     } else {
         panic!("expected system report, got: {:?}", &update);
@@ -219,7 +218,7 @@ async fn integration_tests() {
     // testing sending meta info
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let meta_info = SvalinMetaInfo {
+    let meta_info = persistent::MetaInfo {
         updated_at: get_current_timestamp(),
         name: "Test Device".into(),
         group: "Test Group".into(),
@@ -231,7 +230,7 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::Persistent(persistent::Message::UpdateMetaInfo(_, _)) = &update {
+    if let ClientStateUpdate::Persistent(persistent::Update::MetaInfo(_, _)) = &update {
         client_state.update(update);
     } else {
         panic!("expected update from main status update, got {:?}", &update);

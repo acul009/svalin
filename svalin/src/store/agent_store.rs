@@ -1,7 +1,7 @@
 use sqlx::SqlitePool;
 use std::{fmt::Debug, path::Path, sync::Arc};
 
-use crate::{close_handle::CloseHandle, trust_store_transaction_store::TrustStoreTransactionStore};
+use super::{close_handle::CloseHandle, trust_store_transaction_store::TrustStoreTransactionStore};
 
 pub struct AgentStore {
     pool: SqlitePool,
