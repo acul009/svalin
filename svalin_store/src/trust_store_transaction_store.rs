@@ -1,3 +1,5 @@
+use std::num::NonZeroU64;
+
 use svalin_pki::{
     secure_chain::{CheckedBlock, UncheckedBlock},
     trust_store,
@@ -7,7 +9,7 @@ use tokio::sync::Mutex;
 #[derive(Debug)]
 pub struct TrustStoreTransactionStore {
     pool: sqlx::SqlitePool,
-    current_sequence: tokio::sync::Mutex<u64>,
+    current_sequence: tokio::sync::Mutex<Option<NonZeroU64>>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -29,11 +31,13 @@ impl TrustStoreTransactionStore {
         )
         .fetch_one(&pool)
         .await?
-        .unwrap_or(1);
+        .map(|s| {
+            NonZeroU64::new(s as u64).expect("the database should have data which makes sense")
+        });
 
         Ok(Self {
             pool,
-            current_sequence: Mutex::new(current_sequence as u64),
+            current_sequence: Mutex::new(current_sequence),
         })
     }
 
@@ -42,21 +46,24 @@ impl TrustStoreTransactionStore {
         transaction: &CheckedBlock<trust_store::Transaction>,
     ) -> Result<(), TransactionStoreError> {
         let mut current_sequence = self.current_sequence.lock().await;
-        if transaction.sequence() > *current_sequence + 1 {
-            return Err(TransactionStoreError::SequenceMismatch);
-        }
-        if transaction.sequence() <= *current_sequence {
-            let data: Vec<u8> = sqlx::query_scalar!(
-                "SELECT data FROM trust_store_transactions WHERE sequence = ?",
-                transaction.sequence() as i64
-            )
-            .fetch_one(&self.pool)
-            .await?;
-            let block: UncheckedBlock<trust_store::Transaction> = postcard::from_bytes(&data)?;
-            if &block == transaction.as_unchecked() {
-                return Ok(());
+        if let Some(sequence) = current_sequence.as_ref() {
+            if transaction.sequence() > sequence.get() + 1 {
+                return Err(TransactionStoreError::SequenceMismatch);
+            }
+            if transaction.sequence() <= sequence.get() {
+                let data: Vec<u8> = sqlx::query_scalar!(
+                    "SELECT data FROM trust_store_transactions WHERE sequence = ?",
+                    transaction.sequence() as i64
+                )
+                .fetch_one(&self.pool)
+                .await?;
+                let block: UncheckedBlock<trust_store::Transaction> = postcard::from_bytes(&data)?;
+                if &block == transaction.as_unchecked() {
+                    return Ok(());
+                }
             }
         }
+
         let data = postcard::to_stdvec(&transaction.as_unchecked())?;
         sqlx::query!(
             "INSERT INTO trust_store_transactions (sequence, data) VALUES (?, ?)",
@@ -65,7 +72,9 @@ impl TrustStoreTransactionStore {
         )
         .execute(&self.pool)
         .await?;
-        *current_sequence = transaction.sequence();
+        *current_sequence = Some(
+            NonZeroU64::new(transaction.sequence()).expect("transaction sequence cannot be 0"),
+        );
         Ok(())
     }
 

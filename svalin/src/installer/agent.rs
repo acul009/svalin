@@ -298,7 +298,7 @@ async fn remove_windows_service(service: &str) -> anyhow::Result<()> {
 #[cfg(target_os = "linux")]
 async fn remove_service() -> anyhow::Result<()> {
     if !systemd_available().await {
-        eprintln!(
+        tracing::error!(
             "systemd is not available - automated service removal not yet supported for your init system"
         )
     }

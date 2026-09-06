@@ -86,13 +86,13 @@ pub async fn load_trust_store(
                         guard.export()
                     };
                     if let Err(err)  = save_trust_store(&file_location, &exported).await {
-                        eprintln!("error during scheduled trust store save: {err}")
+                        tracing::error!("error during scheduled trust store save: {err}")
                     }
                 }
                 _ = cancel.cancelled() => {
                     let exported = trust_store.read().unwrap().export();
                     if let Err(err)  = save_trust_store(&file_location, &exported).await {
-                        eprintln!("error during scheduled trust store save: {err}")
+                        tracing::error!("error during scheduled trust store save: {err}")
                     }
                     break;
                 }
@@ -120,7 +120,7 @@ pub async fn update_trust_store(
             .dispatch(UpdateTrustStore::new(trust_store, store, send, cancel))
             .await
         {
-            eprintln!("Error updating trust store: {:#}", err);
+            tracing::error!("Error updating trust store: {:#}\n{:?}", err, err);
         }
     });
 
