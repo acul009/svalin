@@ -399,7 +399,7 @@ async fn run_agent(cancel: CancellationToken) -> anyhow::Result<()> {
     tracing::info!("starting agent!");
     while !cancel.is_cancelled() {
         tracing::trace!("calling agent::run");
-        if let Err(err) = agent::run(cancel.clone(), DEFAULT_AGENT_PROFILE)
+        if let Err(err) = agent::run(cancel.child_token(), DEFAULT_AGENT_PROFILE)
             .await
             .context("error in agent::run")
         {

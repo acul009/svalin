@@ -191,10 +191,12 @@ pub async fn run(cancel: CancellationToken, profile: &str) -> Result<()> {
     });
 
     let connection = rpc.upstream_connection();
+    let cancel2 = cancel.clone();
     tasks.spawn(async move {
         tracing::trace!("Agent will now start serving requests");
         if let Err(err) = rpc.serve(server_commands).await {
             tracing::error!("Failed to serve requests: {err}");
+            cancel2.cancel();
         }
     });
 

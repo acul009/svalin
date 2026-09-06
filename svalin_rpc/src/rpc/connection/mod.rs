@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
@@ -116,11 +116,10 @@ where
                                 let commands2 = commands2;
                                 let res = session
                                     .handle(&commands2, cancel2)
-                                    .await
-                                    .context("error handling session");
+                                    .await;
                                 if let Err(e) = res {
                                     // TODO: Actually handle Error
-                                    error!("{:?}", e);
+                                    error!("error handling session: {:#}", e);
                                     #[cfg(test)]
                                     {
                                         use crate::permissions::PermissionCheckError;
@@ -144,15 +143,19 @@ where
                             });
                         },
                         Err(err) => {
-                            if let Some(err) = err.downcast_ref::<quinn::ConnectionError>() {
-                                if let quinn::ConnectionError::ApplicationClosed(frame) = err {
-                                    if frame.error_code.into_inner() == 0 {
-                                        trace!("connection closed gracefully");
-                                        break;
-                                    }
+                            if let Some(inner_err) = err.downcast_ref::<quinn::ConnectionError>() {
+                                match inner_err {
+                                    quinn::ConnectionError::ApplicationClosed(frame) => {
+                                        // ignore graceful shutdown
+                                        if frame.error_code.into_inner() == 0 {
+                                            trace!("connection closed gracefully");
+                                            break;
+                                        }
+                                    },
+                                    // Likely not recoverable
+                                    _ => return Err(err.into()),
                                 }
                             }
-                            // TODO: ignore graceful shutdown
                             error!("error accepting session: {}", err);
                             break;
                         }
