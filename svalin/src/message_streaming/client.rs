@@ -6,7 +6,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    client::state::{ClientState, ClientStateUpdate},
+    client::state::{ClientState, Update},
     message_streaming::{
         MessageFromClient, MessageToClient,
         with_client::{MessageHandler, MessageSender},
@@ -193,7 +193,7 @@ impl ClientMessageReceiver {
                 // }
             }
             MessageToClient::AgentOnlineStatus(spki_hash, online) => {
-                self.update_client_state(ClientStateUpdate::AgentOnlineStatus(spki_hash, online))
+                self.update_client_state(Update::AgentOnline(spki_hash, online))
                     .await;
             }
             MessageToClient::Goodbye => return Ok(true),
@@ -202,7 +202,7 @@ impl ClientMessageReceiver {
         Ok(false)
     }
 
-    async fn update_client_state(&self, update: ClientStateUpdate) {
+    async fn update_client_state(&self, update: Update) {
         let _ = self
             .update_sender
             .send(ClientStateRequest::Update(update))
@@ -216,8 +216,8 @@ pub struct ClientStateHandle {
 }
 
 enum ClientStateRequest {
-    Update(ClientStateUpdate),
-    Subscribe(oneshot::Sender<(ClientState, broadcast::Receiver<ClientStateUpdate>)>),
+    Update(Update),
+    Subscribe(oneshot::Sender<(ClientState, broadcast::Receiver<Update>)>),
 }
 
 impl ClientStateHandle {
@@ -228,7 +228,7 @@ impl ClientStateHandle {
         let mut state = ClientState::new(persistent);
 
         tokio::spawn(async move {
-            let (update_broadcast, _) = broadcast::channel::<ClientStateUpdate>(100);
+            let (update_broadcast, _) = broadcast::channel::<Update>(100);
 
             while let Some(request) = recv.recv().await {
                 match request {
@@ -241,7 +241,7 @@ impl ClientStateHandle {
                         if update_broadcast.receiver_count() > 0 {
                             let _ = update_broadcast.send(message.clone());
                         }
-                        if let ClientStateUpdate::Persistent(message) = &message {
+                        if let Update::Persistent(message) = &message {
                             if let Err(err) = store.update(message).await {
                                 tracing::error!("Failed to update persistent state: {}", err);
                             }
@@ -257,7 +257,7 @@ impl ClientStateHandle {
 
     pub async fn subscribe(
         &self,
-    ) -> Result<(ClientState, broadcast::Receiver<ClientStateUpdate>), anyhow::Error> {
+    ) -> Result<(ClientState, broadcast::Receiver<Update>), anyhow::Error> {
         let (sender, receiver) = oneshot::channel();
         self.channel
             .send(ClientStateRequest::Subscribe(sender))
@@ -265,7 +265,7 @@ impl ClientStateHandle {
         Ok(receiver.await?)
     }
 
-    pub async fn update(&self, update: ClientStateUpdate) -> Result<(), anyhow::Error> {
+    pub async fn update(&self, update: Update) -> Result<(), anyhow::Error> {
         self.channel
             .send(ClientStateRequest::Update(update))
             .await?;
@@ -274,6 +274,6 @@ impl ClientStateHandle {
     }
 
     pub async fn persistent_update(&self, update: persistent::Update) -> Result<(), anyhow::Error> {
-        self.update(ClientStateUpdate::Persistent(update)).await
+        self.update(Update::Persistent(update)).await
     }
 }

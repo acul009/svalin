@@ -16,21 +16,23 @@ pub struct ClientState {
 }
 
 #[derive(Clone, Debug)]
-pub enum ClientStateUpdate {
+pub enum Update {
     Persistent(persistent::Update),
-    AgentOnlineStatus(SpkiHash, bool),
+    AgentOnline(SpkiHash, bool),
+    DeviceGroupBroken(SpkiHash, String),
 }
 
-impl ClientStateUpdate {
+impl Update {
     pub fn affected_device(&self) -> Option<SpkiHash> {
         match self {
             Self::Persistent(update) => update.affected_device(),
-            Self::AgentOnlineStatus(spki_hash, _) => Some(spki_hash.clone()),
+            Self::AgentOnline(spki_hash, _) => Some(spki_hash.clone()),
+            Self::DeviceGroupBroken(spki_hash, _) => Some(spki_hash.clone()),
         }
     }
 }
 
-impl From<persistent::Update> for ClientStateUpdate {
+impl From<persistent::Update> for Update {
     fn from(msg: persistent::Update) -> Self {
         Self::Persistent(msg)
     }
@@ -50,16 +52,19 @@ impl ClientState {
         }
     }
 
-    pub fn update(&mut self, msg: ClientStateUpdate) {
+    pub fn update(&mut self, msg: Update) {
         let affected = msg.affected_device();
         match msg {
-            ClientStateUpdate::Persistent(msg) => self.persistent.update(msg),
-            ClientStateUpdate::AgentOnlineStatus(spki_hash, online) => {
+            Update::Persistent(msg) => self.persistent.update(msg),
+            Update::AgentOnline(spki_hash, online) => {
                 if online {
                     self.agents_online.insert(spki_hash);
                 } else {
                     self.agents_online.remove(&spki_hash);
                 }
+            }
+            Update::DeviceGroupBroken(group, reason) => {
+                self.device_group_broken.insert(group, reason);
             }
         }
 

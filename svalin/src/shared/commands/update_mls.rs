@@ -128,19 +128,21 @@ impl CommandDispatcher for UpdateMls {
         let mut aknowledged = Vec::new();
 
         while let OldUpdate::Message(uuid, message) = session.read_object().await? {
-            let message_data = mls.handle_message(&message).await?;
-            match message_data.content {
-                MessageDataContent::Report(spki_hash, report) => {
-                    self.client_state
-                        .persistent_update(persistent::Update::SystemReport(spki_hash, report))
-                        .await?
-                }
-                MessageDataContent::MetaInfo(spki_hash, meta_info) => {
-                    self.client_state
-                        .persistent_update(persistent::Update::MetaInfo(spki_hash, meta_info))
-                        .await?
-                }
-                MessageDataContent::Internal => (),
+            match mls.handle_message(&message).await {
+                Ok(message) => match message.content {
+                    MessageDataContent::Report(spki_hash, report) => {
+                        self.client_state
+                            .persistent_update(persistent::Update::SystemReport(spki_hash, report))
+                            .await?
+                    }
+                    MessageDataContent::MetaInfo(spki_hash, meta_info) => {
+                        self.client_state
+                            .persistent_update(persistent::Update::MetaInfo(spki_hash, meta_info))
+                            .await?
+                    }
+                    MessageDataContent::Internal => (),
+                },
+                Err(err) => todo!(),
             }
 
             aknowledged.push(uuid);

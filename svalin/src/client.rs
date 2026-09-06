@@ -28,7 +28,7 @@ use tokio_util::task::TaskTracker;
 use tunnel_manager::TunnelManager;
 
 use crate::client::device::DeviceHandle;
-use crate::client::state::{ClientState, ClientStateUpdate};
+use crate::client::state::{ClientState, Update};
 use crate::message_streaming::MessageFromClient;
 use crate::message_streaming::client::{ClientMessageDispatcherHandle, ClientStateHandle};
 use crate::shared::commands::update_mls::MlsUpdate;
@@ -76,7 +76,7 @@ impl Client {
 
     pub async fn subscribe_state(
         &self,
-    ) -> Result<(ClientState, broadcast::Receiver<ClientStateUpdate>), anyhow::Error> {
+    ) -> Result<(ClientState, broadcast::Receiver<Update>), anyhow::Error> {
         self.state_handle.subscribe().await
     }
 

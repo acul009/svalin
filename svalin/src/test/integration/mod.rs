@@ -9,7 +9,7 @@ use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use totp_rs::Totp;
 
-use crate::client::state::{ClientStateUpdate, persistent};
+use crate::client::state::{Update, persistent};
 use crate::{agent, client::Client, server::Server};
 
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -169,7 +169,7 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::AgentOnlineStatus(_, true) = &update {
+    if let Update::AgentOnline(_, true) = &update {
         client_state.update(update);
         tracing::trace!("agent is online");
     } else {
@@ -181,7 +181,7 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::Persistent(persistent::Update::SystemReport(_, _)) = &update {
+    if let Update::Persistent(persistent::Update::SystemReport(_, _)) = &update {
         client_state.update(update);
     } else {
         panic!("expected system report, got: {:?}", &update);
@@ -209,7 +209,7 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::Persistent(persistent::Update::SystemReport(_, _)) = &update {
+    if let Update::Persistent(persistent::Update::SystemReport(_, _)) = &update {
         client_state.update(update);
     } else {
         panic!("expected system report, got: {:?}", &update);
@@ -230,7 +230,7 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::Persistent(persistent::Update::MetaInfo(_, _)) = &update {
+    if let Update::Persistent(persistent::Update::MetaInfo(_, _)) = &update {
         client_state.update(update);
     } else {
         panic!("expected update from main status update, got {:?}", &update);
@@ -274,7 +274,7 @@ async fn integration_tests() {
         .await
         .unwrap()
         .unwrap();
-    if let ClientStateUpdate::AgentOnlineStatus(_, false) = &update {
+    if let Update::AgentOnline(_, false) = &update {
         client_state.update(update);
         tracing::trace!("agent is offline");
     } else {

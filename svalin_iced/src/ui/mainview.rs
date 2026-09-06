@@ -7,7 +7,7 @@ use iced::{
 };
 use svalin::client::{
     Client,
-    state::{ClientState, ClientStateUpdate},
+    state::{ClientState, Update},
 };
 use svalin_pki::SpkiHash;
 use tokio::sync::broadcast;
@@ -20,9 +20,9 @@ mod device_view;
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    InitState(Arc<(ClientState, broadcast::Receiver<ClientStateUpdate>)>),
+    InitState(Arc<(ClientState, broadcast::Receiver<Update>)>),
     Error(Arc<anyhow::Error>),
-    UpdateState(ClientStateUpdate),
+    UpdateState(Update),
     OpenAddDevice,
     SelectDevice(SpkiHash),
     AddDevice(add_device::Message),
