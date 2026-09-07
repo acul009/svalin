@@ -14,7 +14,7 @@ use svalin_sysctl::sytem_report::Disk;
 
 use crate::{
     Element, bootstrap,
-    ui::widgets::{card, device_icon, fact_list, header, os_icon},
+    ui::widgets::{card, device_icon, fact_list, header, header::Header, os_icon},
     util::human_i_bytes,
 };
 
@@ -108,24 +108,24 @@ impl State {
         };
 
         let meta = persistent.meta_info().unwrap_or(&PLACEHOLDER_META);
-        let col = if client_state.agent_online(&self.spki_hash) {
-            column![agent_actions(), self.update.view().map(Message::Update)]
-        } else {
-            column![]
-        }
-        .push(self.meta_display.view(&meta).map(Message::MetaDisplay))
-        .push(if let Some(report) = persistent.report() {
-            Some(device_report(report))
-        } else {
-            None
-        })
+        let online = client_state.agent_online(&self.spki_hash);
+        let col = column![
+            self.meta_display.view(&meta).map(Message::MetaDisplay),
+            online.then(|| agent_actions()),
+            online.then(|| self.update.view().map(Message::Update)),
+            if let Some(report) = persistent.report() {
+                Some(device_report(report))
+            } else {
+                None
+            }
+        ]
         .padding(50)
         .spacing(50);
 
         scrollable(col).into()
     }
 
-    pub fn header<'a>(&'a self, client_state: &'a ClientState) -> Element<'a, Message> {
+    pub fn header<'a>(&'a self, client_state: &'a ClientState) -> Header<'a, Message> {
         let Some(persistent) = client_state.persistent().devices().get(&self.spki_hash) else {
             return header(widget::space()).on_back(Message::Back).into();
         };
@@ -136,11 +136,9 @@ impl State {
                 text(persistent.name())
             ]
             .align_y(Vertical::Center)
-            .spacing(20)
-            .padding([0, 20]),
+            .spacing(20),
         )
         .on_back(Message::Back)
-        .into()
     }
 }
 

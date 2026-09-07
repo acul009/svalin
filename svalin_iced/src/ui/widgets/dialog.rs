@@ -64,6 +64,11 @@ impl<'a, Message> Dialog<'a, Message> {
         self.float = true;
         self
     }
+
+    pub fn with_float(mut self, float: bool) -> Self {
+        self.float = float;
+        self
+    }
 }
 
 impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Message> {

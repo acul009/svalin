@@ -1,15 +1,26 @@
-use std::{process, sync::Arc, time::Duration};
+use std::{borrow::Cow, process, sync::Arc, time::Duration};
 
-use iced::{Subscription, Task, widget};
+use anyhow::anyhow;
+use iced::{
+    Length, Subscription, Task,
+    widget::{button, column, row, text},
+};
 use svalin::client::{
     Client,
-    state::{ClientState, Update},
+    state::{ClientState, Update, warning},
 };
 use svalin_pki::SpkiHash;
 use tokio::sync::broadcast;
 use tokio_stream::{StreamExt, wrappers::BroadcastStream};
 
-use crate::ui::widgets::{error_display, loading};
+use crate::{
+    Element, bootstrap,
+    ui::{
+        ERROR_COLOR, INFO_COLOR, WARNING_COLOR,
+        widgets::{error_display, header, header::Header, loading, toast},
+    },
+    util::human_i_bytes,
+};
 
 mod add_device;
 mod device_list;
@@ -30,6 +41,8 @@ pub enum Message {
             tokio::sync::mpsc::Receiver<Vec<u8>>,
         )>,
     ),
+    CloseError,
+    Context(Context),
 }
 
 pub enum Action {
@@ -53,6 +66,7 @@ enum Screen {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Context {
     None,
+    Warnings,
 }
 
 pub struct MainView {
@@ -90,6 +104,10 @@ impl MainView {
         match message {
             Message::Error(error) => {
                 self.error = Some(error);
+                Action::None
+            }
+            Message::CloseError => {
+                self.error = None;
                 Action::None
             }
             Message::InitState(state) => {
@@ -140,8 +158,8 @@ impl MainView {
                 let Screen::DeviceView(device_view) = &mut self.screen else {
                     return Action::None;
                 };
-
-                match device_view.update(message, &self.state, &self.client) {
+                let action = device_view.update(message, &self.state, &self.client);
+                match action {
                     device_view::Action::None => Action::None,
                     device_view::Action::Back => {
                         self.screen = Screen::DeviceList;
@@ -160,12 +178,16 @@ impl MainView {
                 }
             }
             Message::OpenTerminal(arc) => Action::OpenTerminal(arc),
+            Message::Context(context) => {
+                self.context = context;
+                Action::None
+            }
         }
     }
 
     pub fn view(&self) -> crate::Element<'_, Message> {
         if let Some(error) = &self.error {
-            return error_display(error).into();
+            return error_display(error).on_close(Message::CloseError).into();
         }
 
         match &self.screen {
@@ -181,41 +203,100 @@ impl MainView {
         }
     }
 
-    pub fn header(&self) -> crate::Element<'_, Message> {
-        match &self.screen {
+    pub fn header(&self) -> Header<'_, Message> {
+        let header = match &self.screen {
             Screen::DeviceView(device_view) => {
                 device_view.header(&self.state).map(Message::DeviceView)
             }
-            _ => widget::space().into(),
-        }
+            _ => header(iced::widget::void()),
+        };
+
+        let severity = self.state.warnings().highest_severity();
+
+        header
+            .action(
+                button(
+                    bootstrap::exclamation_triangle_fill()
+                        .color_maybe(severity.map(|severity| match severity {
+                            warning::Severity::High => ERROR_COLOR,
+                            warning::Severity::Medium => WARNING_COLOR,
+                            warning::Severity::Low => INFO_COLOR,
+                        }))
+                        .size(24)
+                        .center(),
+                )
+                .on_press(Message::Context(Context::Warnings)),
+            )
+            .action(
+                button(bootstrap::x_lg().size(24).center())
+                    .on_press(Message::Context(Context::None)),
+            )
     }
 
     pub fn context(&self) -> Option<crate::Element<'_, Message>> {
         match &self.context {
             Context::None => None,
+            Context::Warnings => Some(
+                column(self.state.warnings().warnings().map(|warning| {
+                    Element::from(toast(
+                        match warning.severity() {
+                            warning::Severity::High => toast::Kind::Error,
+                            warning::Severity::Medium => toast::Kind::Warning,
+                            warning::Severity::Low => toast::Kind::Info,
+                        },
+                        match warning {
+                            warning::Warning::Device(spki_hash, warning) => {
+                                let name = self
+                                    .state
+                                    .persistent()
+                                    .devices()
+                                    .get(spki_hash)
+                                    .map(|d| d.name())
+                                    .unwrap_or_else(|| Cow::Owned(spki_hash.to_string()));
+
+                                let mut actions = row![
+                                    button("Device")
+                                        .on_press(Message::SelectDevice(spki_hash.clone()))
+                                ]
+                                .spacing(10);
+
+                                let message = match warning {
+                                    warning::Device::DeviceGroupBroken(reason) => {
+                                        actions = actions.push(button("Details").on_press(
+                                            Message::Error(Arc::new(anyhow!(reason.to_owned()))),
+                                        ));
+                                        text!("Device associated group broken")
+                                    }
+                                    warning::Device::DiskSpaceLow { disk, free, total } => {
+                                        text!(
+                                            "Disk space low on {}: {} of {} free",
+                                            disk,
+                                            human_i_bytes(*free),
+                                            human_i_bytes(*total)
+                                        )
+                                    }
+                                    warning::Device::MissingName => text("Device has no name yet"),
+                                };
+                                Element::from(
+                                    column![text(name).size(24), message, actions]
+                                        .height(Length::Fit)
+                                        .spacing(10),
+                                )
+                            }
+                        },
+                    ))
+                    .into()
+                }))
+                .padding(20)
+                .spacing(20)
+                .into(),
+            ),
             // Context::Tunnel => Some(self.tunnel_ui.view().map(Message::Tunnel)),
             // Context::Test => Some(text("test").into()),
         }
     }
 
     pub fn subscription(&self) -> iced::Subscription<Message> {
-        // let state_subscription = match &self.state {
-        //     Screen::DeviceList => self.devices.subscription().map(Message::Devices),
-        // };
-
-        // let context_subscription = match &self.context {
-        //     Context::None => None,
-        //     Context::Tunnel => Some(self.tunnel_ui.subscription().map(Message::Tunnel)),
-        //     Context::Test => None,
-        // };
-
-        // let mut subscriptions = vec![state_subscription];
-
-        // if let Some(context_subscription) = context_subscription {
-        //     subscriptions.push(context_subscription);
-        // }
-
-        // Subscription::batch(subscriptions)
         Subscription::none()
     }
 

@@ -1,5 +1,5 @@
 use iced::{
-    Color, Length, Pixels, Shadow,
+    Color, Length, Shadow,
     alignment::Vertical,
     widget::{column, container, row, rule, stack},
 };
@@ -74,8 +74,8 @@ impl<'a, Message> Scaffold<'a, Message> {
     }
 }
 
-pub const HEADER_HEIGHT: Pixels = Pixels(35.0);
-pub const HEADER_PADDING: Pixels = Pixels(7.5);
+pub const HEADER_HEIGHT: f32 = 35.0;
+pub const HEADER_PADDING: f32 = 7.5;
 
 impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, Message> {
     fn from(scaffold: Scaffold<'a, Message>) -> Self {

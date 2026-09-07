@@ -16,6 +16,10 @@ impl State {
         self.warnings.iter()
     }
 
+    pub fn highest_severity(&self) -> Option<Severity> {
+        self.warnings.first().map(Warning::severity)
+    }
+
     pub fn update_device(&mut self, device: &SpkiHash, warnings: Vec<Device>) {
         self.warnings = std::mem::take(&mut self.warnings)
             .into_iter()
@@ -50,7 +54,7 @@ impl Warning {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Severity {
     High,
-    Normal,
+    Medium,
     Low,
 }
 
@@ -65,7 +69,7 @@ impl Device {
     pub fn severity(&self) -> Severity {
         match self {
             Self::DeviceGroupBroken(_) => Severity::High,
-            Self::DiskSpaceLow { .. } => Severity::Normal,
+            Self::DiskSpaceLow { .. } => Severity::Medium,
             Self::MissingName => Severity::Low,
         }
     }

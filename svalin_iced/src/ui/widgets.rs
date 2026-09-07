@@ -19,6 +19,7 @@ pub mod loading;
 pub mod percent_display;
 pub mod progress_circle;
 pub mod scaffold;
+pub mod toast;
 
 pub fn device_icon(family: &OSFamily, online: bool) -> iced::widget::Text<'static> {
     os_icon(family).color(if online {
@@ -60,7 +61,7 @@ pub fn dialog<'a, Message>() -> dialog::Dialog<'a, Message> {
     dialog::Dialog::new()
 }
 
-pub fn header<'a, Message>(
+pub fn header<'a, Message: 'static>(
     content: impl Into<Element<'a, Message>>,
 ) -> header::Header<'a, Message> {
     header::Header::new(content)
@@ -101,4 +102,11 @@ pub fn scaffold<'a, Message>(
     content: impl Into<Element<'a, Message>>,
 ) -> scaffold::Scaffold<'a, Message> {
     scaffold::Scaffold::new(content)
+}
+
+pub fn toast<'a, Message>(
+    kind: toast::Kind,
+    content: impl Into<Element<'a, Message>>,
+) -> toast::Toast<'a, Message> {
+    toast::Toast::new(kind, content)
 }

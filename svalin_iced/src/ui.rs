@@ -6,7 +6,15 @@ use profile_picker::ProfilePicker;
 use widgets::scaffold;
 use window_helper::WindowHelper;
 
-use crate::{Element, ui::widgets::loading};
+use crate::{
+    Element,
+    ui::widgets::{header, loading},
+};
+
+pub const INFO_COLOR: iced::Color = iced::color!(0x328fff);
+pub const SUCCESS_COLOR: iced::Color = iced::color!(0x2ab370);
+pub const WARNING_COLOR: iced::Color = iced::color!(0xf5a623);
+pub const ERROR_COLOR: iced::Color = iced::color!(0xe14848);
 
 mod mainview;
 mod profile_picker;
@@ -139,8 +147,8 @@ impl UI {
             };
 
             let header = match &self.screen {
-                Screen::ProfilePicker(_) => iced::widget::space().into(),
-                Screen::Closing => iced::widget::space().into(),
+                Screen::ProfilePicker(_) => header(iced::widget::void()),
+                Screen::Closing => header(iced::widget::void()),
                 Screen::MainView(mainview) => mainview.header().map(Message::MainView),
             };
 

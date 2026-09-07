@@ -5,12 +5,13 @@ use iced::{
     widget::{button, text},
 };
 
-use super::form;
+use crate::ui::widgets::dialog;
 
 pub struct ErrorDisplay<'a, Error, Message> {
     title: Cow<'a, str>,
     error: &'a Error,
     on_close: Option<Message>,
+    float: bool,
 }
 
 impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
@@ -19,6 +20,7 @@ impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
             error,
             on_close: None,
             title: t!("error-generic").into(),
+            float: false,
         }
     }
 
@@ -36,6 +38,11 @@ impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
         self.on_close = Some(on_close);
         self
     }
+
+    pub fn float(mut self) -> Self {
+        self.float = true;
+        self
+    }
 }
 
 impl<'a, Error, Message: Clone + 'static> From<ErrorDisplay<'a, Error, Message>>
@@ -49,10 +56,11 @@ where
             close_button = close_button.on_press(on_close);
         }
 
-        form()
+        dialog()
             .title(display.title)
             .control(text!("{:#}", display.error))
             .button(close_button)
+            .with_float(display.float)
             .into()
     }
 }
