@@ -1,9 +1,6 @@
 use std::borrow::Cow;
 
-use iced::{
-    Element,
-    widget::{button, text},
-};
+use iced::{Element, widget::text};
 
 use crate::ui::widgets::dialog;
 
@@ -11,7 +8,7 @@ pub struct ErrorDisplay<'a, Error, Message> {
     title: Cow<'a, str>,
     error: &'a Error,
     on_close: Option<Message>,
-    float: bool,
+    display: dialog::Display,
 }
 
 impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
@@ -20,7 +17,7 @@ impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
             error,
             on_close: None,
             title: t!("error-generic").into(),
-            float: false,
+            display: dialog::Display::Normal,
         }
     }
 
@@ -40,7 +37,12 @@ impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
     }
 
     pub fn float(mut self) -> Self {
-        self.float = true;
+        self.display = dialog::Display::Float;
+        self
+    }
+
+    pub fn overlay(mut self) -> Self {
+        self.display = dialog::Display::Overlay;
         self
     }
 }
@@ -51,16 +53,10 @@ where
     Error: std::fmt::Display,
 {
     fn from(display: ErrorDisplay<'a, Error, Message>) -> Self {
-        let mut close_button = button(text(t!("close")));
-        if let Some(on_close) = display.on_close {
-            close_button = close_button.on_press(on_close);
-        }
-
-        dialog()
-            .title(display.title)
-            .control(text!("{:#}", display.error))
-            .button(close_button)
-            .with_float(display.float)
+        dialog(text!("{:#}", display.error))
+            .title(text(display.title))
+            .on_close_maybe(display.on_close)
+            .display(display.display)
             .into()
     }
 }

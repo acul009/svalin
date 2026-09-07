@@ -3,7 +3,7 @@ use std::sync::Arc;
 use iced::{
     Length, Task,
     alignment::Vertical,
-    widget::{self, button, center, column, row, rule, scrollable, space, stack, text},
+    widget::{self, center, column, container, row, rule, scrollable, space, stack, text},
 };
 use svalin::client::{
     Client,
@@ -13,8 +13,9 @@ use svalin_pki::SpkiHash;
 use svalin_sysctl::sytem_report::Disk;
 
 use crate::{
-    Element, bootstrap,
-    ui::widgets::{card, device_icon, fact_list, header, header::Header, os_icon},
+    Element,
+    bootstrap::{self},
+    ui::widgets::{card, device_icon, dialog, fact_list, header, icon_button, os_icon},
     util::human_i_bytes,
 };
 
@@ -25,8 +26,10 @@ mod update;
 pub enum Message {
     Back,
     OpenTerminal,
+    Overlay(Overlay),
     MetaDisplay(meta_display::Message),
     Update(update::Message),
+    CloseOverlay,
 }
 
 pub enum Action {
@@ -40,6 +43,18 @@ pub struct State {
     spki_hash: SpkiHash,
     meta_display: meta_display::State,
     update: update::State,
+    overlay: Option<Overlay>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Overlay {
+    Update,
+}
+
+impl From<Overlay> for Message {
+    fn from(overlay: Overlay) -> Self {
+        Self::Overlay(overlay)
+    }
 }
 
 const PLACEHOLDER_META: &'static persistent::MetaInfo = &persistent::MetaInfo {
@@ -55,6 +70,7 @@ impl State {
             spki_hash,
             meta_display: meta_display::State::new(),
             update: update::State::new(),
+            overlay: None,
         }
     }
 
@@ -74,6 +90,14 @@ impl State {
 
         match message {
             Message::Back => Action::Back,
+            Message::Overlay(overlay) => {
+                self.overlay = Some(overlay);
+                Action::None
+            }
+            Message::CloseOverlay => {
+                self.overlay = None;
+                Action::None
+            }
             Message::MetaDisplay(message) => {
                 let meta = persistent.meta_info().unwrap_or(&PLACEHOLDER_META);
                 let Some(new_meta) = self.meta_display.update(message, &meta) else {
@@ -110,9 +134,8 @@ impl State {
         let meta = persistent.meta_info().unwrap_or(&PLACEHOLDER_META);
         let online = client_state.agent_online(&self.spki_hash);
         let col = column![
-            self.meta_display.view(&meta).map(Message::MetaDisplay),
             online.then(|| agent_actions()),
-            online.then(|| self.update.view().map(Message::Update)),
+            self.meta_display.view(&meta).map(Message::MetaDisplay),
             if let Some(report) = persistent.report() {
                 Some(device_report(report))
             } else {
@@ -122,18 +145,27 @@ impl State {
         .padding(50)
         .spacing(50);
 
-        scrollable(col).into()
+        let overlay: Option<Element<Message>> =
+            self.overlay.as_ref().map(|overlay| match overlay {
+                Overlay::Update => dialog(self.update.view().map(Message::Update))
+                    .title("Update Agent")
+                    .on_close(Message::CloseOverlay)
+                    .overlay()
+                    .into(),
+            });
+
+        stack![scrollable(col), overlay].height(Length::Fill).into()
     }
 
-    pub fn header<'a>(&'a self, client_state: &'a ClientState) -> Header<'a, Message> {
+    pub fn header<'a>(&'a self, client_state: &'a ClientState) -> header::Header<'a, Message> {
         let Some(persistent) = client_state.persistent().devices().get(&self.spki_hash) else {
             return header(widget::space()).on_back(Message::Back).into();
         };
 
         header(
             row![
-                device_icon(&persistent.os(), client_state.agent_online(&self.spki_hash)),
-                text(persistent.name())
+                device_icon(&persistent.os(), client_state.agent_online(&self.spki_hash)).size(30),
+                text(persistent.name()).size(24)
             ]
             .align_y(Vertical::Center)
             .spacing(20),
@@ -143,9 +175,21 @@ impl State {
 }
 
 fn agent_actions() -> Element<'static, Message> {
-    card(row![
-        button(bootstrap::terminal().center().size(40)).on_press(Message::OpenTerminal)
-    ])
+    card(
+        row![
+            icon_button(bootstrap::terminal())
+                .size(50)
+                .tooltip("Open Terminal")
+                .on_press(Message::OpenTerminal),
+            icon_button(bootstrap::download())
+                .size(50)
+                .tooltip("Update Device")
+                .on_press(Overlay::Update.into())
+        ]
+        .padding(20)
+        .spacing(20),
+    )
+    .padding(0)
     .title("Agent Actions")
     .into()
 }
@@ -154,56 +198,60 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
     let report = &svalin_report.system_report;
     card(
         column![
-            fact_list()
-                .entry(
-                    "Agent Version:",
-                    svalin_report.current_version_identifier.as_str(),
-                )
-                .entry("Hostname:", report.hostname.as_deref().unwrap_or_default())
-                .entry(
-                    "OS:",
-                    row![
-                        report
-                            .os
-                            .as_ref()
-                            .map(iced::widget::text)
-                            .unwrap_or_else(|| text(report.os_family.to_string())),
-                        os_icon(&report.os_family)
-                    ]
-                    .spacing(10)
-                    .align_y(Vertical::Center)
-                )
-                .entry("Kernel Version:", report.kernel_version.as_str())
-                // .entry("CPU Brand:", report.cpu.brand.as_str())
-                .entry("CPU Model:", report.cpu.model.as_str())
-                // .entry("CPU Architecture:", report.cpu.arch.as_str())
-                .entry(
-                    if report.cpu.cores.is_some() {
-                        text("CPU Cores / Threads")
-                    } else {
-                        text("CPU Threads")
-                    },
-                    if let Some(cores) = report.cpu.cores {
-                        text!("{} / {}", cores, report.cpu.threads)
-                    } else {
-                        text!("{}", report.cpu.threads)
-                    }
-                )
-                .entry(
-                    "Total Memory / Swap:",
-                    text!(
-                        "{} / {}",
-                        human_i_bytes(report.total_memory),
-                        human_i_bytes(report.total_swap)
+            container(
+                fact_list()
+                    .entry(
+                        "Agent Version:",
+                        svalin_report.current_version_identifier.as_str(),
                     )
-                ),
+                    .entry("Hostname:", report.hostname.as_deref().unwrap_or_default())
+                    .entry(
+                        "OS:",
+                        row![
+                            report
+                                .os
+                                .as_ref()
+                                .map(iced::widget::text)
+                                .unwrap_or_else(|| text(report.os_family.to_string())),
+                            os_icon(&report.os_family)
+                        ]
+                        .spacing(10)
+                        .align_y(Vertical::Center)
+                    )
+                    .entry("Kernel Version:", report.kernel_version.as_str())
+                    // .entry("CPU Brand:", report.cpu.brand.as_str())
+                    .entry("CPU Model:", report.cpu.model.as_str())
+                    // .entry("CPU Architecture:", report.cpu.arch.as_str())
+                    .entry(
+                        if report.cpu.cores.is_some() {
+                            text("CPU Cores / Threads")
+                        } else {
+                            text("CPU Threads")
+                        },
+                        if let Some(cores) = report.cpu.cores {
+                            text!("{} / {}", cores, report.cpu.threads)
+                        } else {
+                            text!("{}", report.cpu.threads)
+                        }
+                    )
+                    .entry(
+                        "Total Memory / Swap:",
+                        text!(
+                            "{} / {}",
+                            human_i_bytes(report.total_memory),
+                            human_i_bytes(report.total_swap)
+                        )
+                    )
+            )
+            .padding(30),
             rule::horizontal(2),
-            crate::ui::widgets::list(report.disks.iter().map(disk)).entry_height(90),
+            container(crate::ui::widgets::list(report.disks.iter().map(disk)).entry_height(90))
+                .padding(30),
         ]
-        .spacing(25),
+        .spacing(15),
     )
     .title("System Report")
-    .padding(40)
+    .padding(0)
     .into()
 }
 

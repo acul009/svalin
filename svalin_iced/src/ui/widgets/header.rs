@@ -1,12 +1,15 @@
 use iced::{
     Length,
     alignment::Vertical,
-    widget::{button, row, space},
+    widget::{center, row},
 };
 
 use crate::{
     Element, bootstrap,
-    ui::widgets::scaffold::{HEADER_HEIGHT, HEADER_PADDING},
+    ui::widgets::{
+        icon_button,
+        scaffold::{HEADER_HEIGHT, HEADER_PADDING},
+    },
 };
 
 pub struct Header<'a, Message> {
@@ -63,17 +66,11 @@ impl<'a, Message: Clone + 'static> From<Header<'a, Message>> for Element<'a, Mes
     fn from(header: Header<'a, Message>) -> Self {
         let mut row = match header.on_back {
             None => row!(),
-            Some(on_back) => row![
-                button(bootstrap::arrow_left().size(20).center())
-                    .on_press(on_back)
-                    .width(HEADER_HEIGHT)
-                    .height(Length::Fill)
-            ],
+            Some(on_back) => row![icon_button(bootstrap::arrow_left()).on_press(on_back)],
         };
 
         row = row
-            .push(header.content)
-            .push(space::horizontal())
+            .push(center(header.content))
             .extend(header.actions)
             .align_y(Vertical::Center)
             .spacing(HEADER_PADDING)

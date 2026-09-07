@@ -74,8 +74,8 @@ impl<'a, Message> Scaffold<'a, Message> {
     }
 }
 
-pub const HEADER_HEIGHT: f32 = 35.0;
-pub const HEADER_PADDING: f32 = 7.5;
+pub const HEADER_HEIGHT: f32 = 60.0;
+pub const HEADER_PADDING: f32 = 10.0;
 
 impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, Message> {
     fn from(scaffold: Scaffold<'a, Message>) -> Self {
@@ -95,7 +95,7 @@ impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, M
                         })
                         .align_y(Vertical::Center)
                         .padding(HEADER_PADDING)
-                        .height(HEADER_HEIGHT + HEADER_PADDING + HEADER_PADDING)
+                        .height(HEADER_HEIGHT)
                         .width(Length::Fill)
                 }),
                 has_header.then(|| rule::horizontal(2)),

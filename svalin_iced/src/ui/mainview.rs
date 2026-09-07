@@ -3,7 +3,7 @@ use std::{borrow::Cow, process, sync::Arc, time::Duration};
 use anyhow::anyhow;
 use iced::{
     Length, Subscription, Task,
-    widget::{button, column, row, text},
+    widget::{button, column, row, stack, text},
 };
 use svalin::client::{
     Client,
@@ -17,7 +17,7 @@ use crate::{
     Element, bootstrap,
     ui::{
         ERROR_COLOR, INFO_COLOR, WARNING_COLOR,
-        widgets::{error_display, header, header::Header, loading, toast},
+        widgets::{error_display, header, icon_button, loading, toast},
     },
     util::human_i_bytes,
 };
@@ -186,11 +186,7 @@ impl MainView {
     }
 
     pub fn view(&self) -> crate::Element<'_, Message> {
-        if let Some(error) = &self.error {
-            return error_display(error).on_close(Message::CloseError).into();
-        }
-
-        match &self.screen {
+        let screen = match &self.screen {
             Screen::Loading(text) => loading(text).into(),
             Screen::DeviceList => device_list::DeviceList::new(&self.state)
                 .on_new(Message::OpenAddDevice)
@@ -200,10 +196,20 @@ impl MainView {
             Screen::DeviceView(device_view) => {
                 device_view.view(&self.state).map(Message::DeviceView)
             }
+        };
+
+        if let Some(error) = &self.error {
+            stack![
+                screen,
+                error_display(error).on_close(Message::CloseError).overlay()
+            ]
+            .into()
+        } else {
+            screen
         }
     }
 
-    pub fn header(&self) -> Header<'_, Message> {
+    pub fn header(&self) -> header::Header<'_, Message> {
         let header = match &self.screen {
             Screen::DeviceView(device_view) => {
                 device_view.header(&self.state).map(Message::DeviceView)
@@ -215,22 +221,19 @@ impl MainView {
 
         header
             .action(
-                button(
-                    bootstrap::exclamation_triangle_fill()
-                        .color_maybe(severity.map(|severity| match severity {
+                icon_button(
+                    bootstrap::exclamation_triangle_fill().color_maybe(severity.map(|severity| {
+                        match severity {
                             warning::Severity::High => ERROR_COLOR,
                             warning::Severity::Medium => WARNING_COLOR,
                             warning::Severity::Low => INFO_COLOR,
-                        }))
-                        .size(24)
-                        .center(),
+                        }
+                    })),
                 )
+                .tooltip("Show Warnings")
                 .on_press(Message::Context(Context::Warnings)),
             )
-            .action(
-                button(bootstrap::x_lg().size(24).center())
-                    .on_press(Message::Context(Context::None)),
-            )
+            .action(icon_button(bootstrap::x_lg()).on_press(Message::Context(Context::None)))
     }
 
     pub fn context(&self) -> Option<crate::Element<'_, Message>> {

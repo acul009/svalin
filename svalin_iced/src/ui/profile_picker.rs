@@ -332,12 +332,13 @@ impl ProfilePicker {
         };
 
         let dialog = self.confirm_delete.as_ref().map(|profile| {
-            dialog()
-                .body(t!("profile-picker.confirm-delete", "profile" => profile))
-                .button(button(text("Cancel")).on_press(Message::CancelDelete))
-                .button(button(text("Delete")).on_press(Message::ConfirmDelete(profile.clone())))
-                .title("Delete Profile")
-                .float()
+            dialog(text(
+                t!("profile-picker.confirm-delete", "profile" => profile),
+            ))
+            .button(button(text("Cancel")).on_press(Message::CancelDelete))
+            .button(button(text("Delete")).on_press(Message::ConfirmDelete(profile.clone())))
+            .title("Delete Profile")
+            .float()
         });
 
         stack![content, dialog].into()

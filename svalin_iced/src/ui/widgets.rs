@@ -3,7 +3,7 @@ use std::{borrow::Cow, ops::RangeInclusive};
 // use svalin::client::device::RemoteData;
 // use svalin_sysctl::realtime::RealtimeStatus;
 
-use iced::color;
+use iced::{color, widget::Text};
 use svalin_sysctl::sytem_report::OSFamily;
 
 use crate::{Element, bootstrap};
@@ -14,6 +14,7 @@ pub mod error_display;
 pub mod fact_list;
 pub mod form;
 pub mod header;
+pub mod icon_button;
 pub mod list;
 pub mod loading;
 pub mod percent_display;
@@ -57,8 +58,8 @@ pub fn loading<'a>(message: impl Into<Cow<'a, str>>) -> loading::Loading<'a> {
     loading::Loading::new(message)
 }
 
-pub fn dialog<'a, Message>() -> dialog::Dialog<'a, Message> {
-    dialog::Dialog::new()
+pub fn dialog<'a, Message>(body: impl Into<Element<'a, Message>>) -> dialog::Dialog<'a, Message> {
+    dialog::Dialog::new(body)
 }
 
 pub fn header<'a, Message: 'static>(
@@ -75,6 +76,10 @@ pub fn list<'a, Message>(
 
 pub fn fact_list<'a, Message>() -> fact_list::FactList<'a, Message> {
     fact_list::FactList::new()
+}
+
+pub fn icon_button<'a, Message>(icon: Text<'a>) -> icon_button::IconButton<'a, Message> {
+    icon_button::IconButton::new(icon)
 }
 
 // pub fn realtime(realtime: &RemoteData<RealtimeStatus>) -> realtime::RealtimeDisplay<'_> {

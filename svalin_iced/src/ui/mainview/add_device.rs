@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use iced::{
     Task,
-    widget::{button, operation, text_input},
+    widget::{button, column, operation, text_input},
 };
 use svalin::client::Client;
 use svalin_pki::{Certificate, SpkiHash};
@@ -105,21 +105,19 @@ impl AddDevice {
         match &self.screen {
             Screen::Error(err) => error_display(err).on_close(Message::Cancel).into(),
             Screen::Loading(message) => loading(message).into(),
-            Screen::Input => dialog()
-                .control(
-                    text_input("Join Code", &self.join_code)
-                        .on_input(Message::JoinCode)
-                        .id("join_code"),
-                )
-                .control(
-                    text_input("Confirm Code", &self.confirm_code)
-                        .id("confirm_code")
-                        .on_input(Message::ConfirmCode)
-                        .on_submit(Message::ConnectToDevice),
-                )
-                .button(button("Cancel").on_press(Message::Cancel))
-                .button(button("Continue").on_press(Message::ConnectToDevice))
-                .into(),
+            Screen::Input => dialog(column![
+                text_input("Join Code", &self.join_code)
+                    .on_input(Message::JoinCode)
+                    .id("join_code"),
+                text_input("Confirm Code", &self.confirm_code)
+                    .id("confirm_code")
+                    .on_input(Message::ConfirmCode)
+                    .on_submit(Message::ConnectToDevice),
+            ])
+            .on_close(Message::Cancel)
+            .button(button("Cancel").on_press(Message::Cancel))
+            .button(button("Continue").on_press(Message::ConnectToDevice))
+            .into(),
         }
     }
 }

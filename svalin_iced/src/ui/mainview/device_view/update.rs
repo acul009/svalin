@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
 
-use crate::{Element, ui::widgets::card};
+use crate::Element;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -132,44 +132,41 @@ impl State {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        card(
-            column![
-                row![
-                    button("Select File").on_press(Message::SelectFile),
-                    self.file_path
-                        .as_ref()
-                        .map(|path| text!("{}", path.display()))
-                ]
-                .spacing(10),
-                button("Update").on_press_maybe(
-                    if self.file_path.is_some() && !self.status.is_updating() {
-                        Some(Message::StartAgentUpdate)
-                    } else {
-                        None
-                    }
-                ),
-                match &self.status {
-                    Status::None => {
-                        Element::from(iced::widget::void())
-                    }
-                    Status::Updating(progress, _) => {
-                        progress_bar(0.0..=1.0, *progress).into()
-                    }
-                    Status::Success => {
-                        stack![progress_bar(0.0..=1.0, 1.0), text("Update successful")].into()
-                    }
-                    Status::Error(err) => {
-                        stack![
-                            progress_bar(0.0..=1.0, 1.0),
-                            text!("Update failed: {}", err)
-                        ]
-                        .into()
-                    }
-                }
+        column![
+            row![
+                button("Select File").on_press(Message::SelectFile),
+                self.file_path
+                    .as_ref()
+                    .map(|path| text!("{}", path.display()))
             ]
             .spacing(10),
-        )
-        .title("Agent Update")
+            button("Update").on_press_maybe(
+                if self.file_path.is_some() && !self.status.is_updating() {
+                    Some(Message::StartAgentUpdate)
+                } else {
+                    None
+                }
+            ),
+            match &self.status {
+                Status::None => {
+                    Element::from(iced::widget::void())
+                }
+                Status::Updating(progress, _) => {
+                    progress_bar(0.0..=1.0, *progress).into()
+                }
+                Status::Success => {
+                    stack![progress_bar(0.0..=1.0, 1.0), text("Update successful")].into()
+                }
+                Status::Error(err) => {
+                    stack![
+                        progress_bar(0.0..=1.0, 1.0),
+                        text!("Update failed: {}", err)
+                    ]
+                    .into()
+                }
+            },
+        ]
+        .spacing(20)
         .into()
     }
 }

@@ -1,105 +1,139 @@
-use std::borrow::Cow;
-
 use iced::{
-    Background, Color,
-    widget::{center, container, float, opaque, text},
+    Color, Length,
+    widget::{center, column, container, float, opaque, row},
 };
 
-use crate::Element;
-
-use super::form::Form;
+use crate::{
+    Element, bootstrap,
+    ui::widgets::{card, icon_button},
+};
 
 pub struct Dialog<'a, Message> {
-    form: Form<'a, Message>,
-    body: Option<Cow<'a, str>>,
-    controls: Vec<Element<'a, Message>>,
-    max_width: iced::Pixels,
-    max_height: iced::Pixels,
-    float: bool,
+    body: Element<'a, Message>,
+    buttons: Vec<Element<'a, Message>>,
+    title: Element<'a, Message>,
+    on_close: Option<Message>,
+    width: Length,
+    height: Length,
+    display: Display,
+}
+
+pub enum Display {
+    Normal,
+    Overlay,
+    Float,
 }
 
 impl<'a, Message> Dialog<'a, Message> {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(body: impl Into<Element<'a, Message>>) -> Self {
         Self {
-            form: Form::new(),
-            body: None,
-            controls: vec![],
-            max_width: 500.into(),
-            max_height: 300.into(),
-            float: false,
+            body: body.into(),
+            buttons: vec![],
+            title: iced::widget::void().into(),
+            on_close: None,
+            width: 500.into(),
+            height: 300.into(),
+            display: Display::Normal,
         }
     }
 
-    pub fn title(mut self, title: impl Into<Cow<'a, str>>) -> Self {
-        self.form = self.form.title(title);
-        self
-    }
-
-    pub fn control(mut self, control: impl Into<Element<'a, Message>>) -> Self {
-        self.controls.push(control.into());
-        self
-    }
-
-    pub fn body(mut self, body: impl Into<Cow<'a, str>>) -> Self {
-        self.body = Some(body.into());
+    pub fn title(mut self, title: impl Into<Element<'a, Message>>) -> Self {
+        self.title = title.into();
         self
     }
 
     pub fn button(mut self, button: impl Into<Element<'a, Message>>) -> Self {
-        self.form = self.form.button(button);
+        self.buttons.push(button.into());
         self
     }
 
-    pub fn max_width(mut self, max_width: impl Into<iced::Pixels>) -> Self {
-        self.max_width = max_width.into();
+    pub fn on_close(mut self, on_close: Message) -> Self {
+        self.on_close = Some(on_close);
         self
     }
 
-    pub fn max_height(mut self, max_height: impl Into<iced::Pixels>) -> Self {
-        self.max_height = max_height.into();
+    pub fn on_close_maybe(mut self, on_close: Option<Message>) -> Self {
+        self.on_close = on_close;
+        self
+    }
+
+    pub fn width(mut self, max_width: impl Into<Length>) -> Self {
+        self.width = max_width.into();
+        self
+    }
+
+    pub fn height(mut self, max_height: impl Into<Length>) -> Self {
+        self.height = max_height.into();
+        self
+    }
+
+    pub fn fill(mut self) -> Self {
+        self.width = Length::Fill;
+        self.height = Length::Fill;
         self
     }
 
     pub fn float(mut self) -> Self {
-        self.float = true;
+        self.display = Display::Float;
         self
     }
 
-    pub fn with_float(mut self, float: bool) -> Self {
-        self.float = float;
+    pub(crate) fn overlay(mut self) -> Self {
+        self.display = Display::Overlay;
+        self
+    }
+
+    pub fn display(mut self, display: Display) -> Self {
+        self.display = display;
         self
     }
 }
 
 impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Message> {
     fn from(value: Dialog<'a, Message>) -> Self {
-        let dialog = center(
-            container(
-                value.controls.into_iter().fold(
-                    value.form.control_maybe(
-                        value
-                            .body
-                            .map(|body| text(body).wrapping(text::Wrapping::WordOrGlyph)),
-                    ),
-                    |form, control| form.control(control),
-                ),
-            )
-            .style(|theme| container::Style {
-                background: Some(Background::Color(theme.palette().background.base.color)),
-                ..Default::default()
-            })
-            .width(iced::Length::Fit.max(value.max_width))
-            .height(iced::Length::Fit.max(value.max_height)),
+        let dialog = card(
+            column![
+                value.body,
+                if !value.buttons.is_empty() {
+                    Some(row(value.buttons).spacing(20))
+                } else {
+                    None
+                }
+            ]
+            .spacing(20),
         )
-        .style(|_| container::Style {
-            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
-            ..Default::default()
-        });
+        .title(value.title)
+        .action(
+            value
+                .on_close
+                .map(|message| icon_button(bootstrap::x_lg()).on_press(message)),
+        )
+        .width(value.width)
+        .height(value.height);
 
-        if value.float {
-            float(opaque(dialog)).into()
-        } else {
-            dialog.into()
+        match value.display {
+            Display::Normal => dialog.into(),
+            Display::Float => float(overlay(dialog)).into(),
+            Display::Overlay => overlay(dialog),
         }
     }
+}
+
+fn overlay<'a, Message: 'static>(dialog: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
+    opaque(center(dialog).style(|theme| {
+        container::Style {
+            background: Some(
+                theme
+                    .palette()
+                    .background
+                    .base
+                    .color
+                    .scale_alpha(0.8)
+                    .mix(Color::BLACK, 0.5)
+                    .into(),
+            ),
+            ..Default::default()
+        }
+    }))
+    .into()
 }

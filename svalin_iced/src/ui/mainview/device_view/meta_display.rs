@@ -1,8 +1,11 @@
-use iced::widget::{button, column, row, space, text, text_editor, text_input};
+use iced::widget::{column, row, space, text, text_editor, text_input};
 use svalin::client::state::persistent::MetaInfo;
 use svalin_pki::get_current_timestamp;
 
-use crate::{bootstrap, ui::widgets::card};
+use crate::{
+    bootstrap,
+    ui::widgets::{card, icon_button},
+};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -81,12 +84,9 @@ impl State {
                 ]
                 .spacing(10),
             )
-            .title(row![
-                "Device Information",
-                space::horizontal(),
-                button(bootstrap::floppy()).on_press(Message::Save),
-                button(bootstrap::x_square()).on_press(Message::CancelEdit)
-            ])
+            .title("Device Information")
+            .action(icon_button(bootstrap::floppy()).on_press(Message::Save))
+            .action(icon_button(bootstrap::x_square()).on_press(Message::CancelEdit))
             .into()
         } else {
             card(
@@ -97,11 +97,8 @@ impl State {
                 ]
                 .spacing(10),
             )
-            .title(row![
-                "Device Information",
-                space::horizontal(),
-                button(bootstrap::pencil()).on_press(Message::Edit)
-            ])
+            .title("Device Information")
+            .action(icon_button(bootstrap::pencil()).on_press(Message::Edit))
             .into()
         }
     }
