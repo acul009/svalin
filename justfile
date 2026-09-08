@@ -32,7 +32,7 @@ reset-win:
     Remove-Item -Path C:\ProgramData\svalin\* -Recurse -Force
 
 agent $RUST_LOG="svalin=trace":
-    cargo run -p svalin agent run
+    cargo run -p svalin agent run --profile development
 
 agent_install $RUST_LOG="svalin=trace":
     cargo build --release -p svalin

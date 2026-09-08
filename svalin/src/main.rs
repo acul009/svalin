@@ -58,6 +58,9 @@ enum Command {
 enum AgentAction {
     /// Run the agent with the already initiallized config
     Run {
+        /// Profile to run
+        #[clap(long, default_value = DEFAULT_AGENT_PROFILE)]
+        profile: String,
         #[cfg_attr(target_os = "windows", clap(long, action))]
         #[cfg(target_os = "windows")]
         /// Run the agent as a windows service
@@ -155,7 +158,7 @@ fn run_service_agent() -> anyhow::Result<()> {
         process_id: None,
     })?;
 
-    let run_result = run_async(run_agent(cancel));
+    let run_result = run_async(run_agent(cancel, DEFAULT_AGENT_PROFILE.to_owned()));
 
     let _ = status_handle.set_service_status(ServiceStatus {
         service_type: SERVICE_TYPE,
@@ -274,6 +277,7 @@ fn main() {
         Command::Server { address } => run_async(start_server(address)).unwrap(),
         Command::Agent { action } => match action {
             AgentAction::Run {
+                profile,
                 #[cfg(target_os = "windows")]
                 service,
             } => {
@@ -284,10 +288,10 @@ fn main() {
                     service_dispatcher::start(installer::WINDOWS_SERVICE_NAME, ffi_service_agent)
                         .unwrap();
                 } else {
-                    run_async(run_agent(CancellationToken::new())).unwrap()
+                    run_async(run_agent(CancellationToken::new(), profile)).unwrap()
                 }
                 #[cfg(not(target_os = "windows"))]
-                run_async(run_agent(CancellationToken::new())).unwrap()
+                run_async(run_agent(CancellationToken::new(), profile)).unwrap()
             }
             #[cfg(target_os = "windows")]
             AgentAction::UpdateService => {
@@ -386,7 +390,7 @@ async fn init_agent(address: String, profile: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn run_agent(cancel: CancellationToken) -> anyhow::Result<()> {
+async fn run_agent(cancel: CancellationToken, profile: String) -> anyhow::Result<()> {
     let cancel2 = cancel.clone();
     tokio::spawn(async move {
         // Wait for shutdown signal
@@ -399,7 +403,7 @@ async fn run_agent(cancel: CancellationToken) -> anyhow::Result<()> {
     tracing::info!("starting agent!");
     while !cancel.is_cancelled() {
         tracing::trace!("calling agent::run");
-        if let Err(err) = agent::run(cancel.child_token(), DEFAULT_AGENT_PROFILE)
+        if let Err(err) = agent::run(cancel.child_token(), &profile)
             .await
             .context("error in agent::run")
         {
