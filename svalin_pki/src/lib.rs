@@ -77,3 +77,7 @@ pub fn get_current_timestamp() -> u64 {
         .unwrap()
         .as_secs()
 }
+
+pub fn get_certificate_timestamp() -> time::OffsetDateTime {
+    time::OffsetDateTime::now_utc().saturating_sub(time::Duration::seconds(30))
+}

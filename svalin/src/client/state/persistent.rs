@@ -81,7 +81,9 @@ impl State {
 
     pub(super) fn generate_device_warnings(&self, spki_hash: &SpkiHash) -> Vec<warning::Device> {
         let mut warnings = Vec::new();
-        let device = self.devices.get(spki_hash).unwrap();
+        let Some(device) = self.devices.get(spki_hash) else {
+            return warnings;
+        };
         if let Some(report) = device.report() {
             for disk in &report.system_report.disks {
                 let part_free = disk.available_space as f32 / disk.total_space as f32;

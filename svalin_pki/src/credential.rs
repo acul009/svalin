@@ -2,16 +2,15 @@ use std::{fmt::Debug, sync::Arc};
 
 use anyhow::Result;
 
-use rcgen::{Issuer, PublicKeyData};
-use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
-
 use crate::{
     Certificate, CertificateParseError, EncryptError, KeyPair,
     certificate::{CertificateType, UnverifiedCertificate},
     encrypt::{EncryptedObject, EncryptionKey},
+    get_certificate_timestamp,
     keypair::{DecodeKeypairError, ExportedPublicKey, SavedKeypair},
 };
+use rcgen::{Issuer, PublicKeyData};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 struct CredentialData {
@@ -119,9 +118,10 @@ impl Credential {
     pub fn generate_temporary() -> Result<Self, CreateCredentialsError> {
         let cert_type = CertificateType::Temporary;
         let mut temp_parameters = rcgen::CertificateParams::default();
-        temp_parameters.not_before = OffsetDateTime::now_utc();
-        temp_parameters.not_after =
-            OffsetDateTime::now_utc().saturating_add(cert_type.validity_duration());
+        temp_parameters.not_before = get_certificate_timestamp();
+        temp_parameters.not_after = temp_parameters
+            .not_before
+            .saturating_add(cert_type.validity_duration());
 
         temp_parameters.is_ca = rcgen::IsCa::NoCa;
 
@@ -153,9 +153,10 @@ impl Credential {
     /// Generates a new root certificate with 10 year lifetime and options tuned for svalin
     pub fn generate_root() -> Result<Self, CreateCredentialsError> {
         let mut root_parameters = rcgen::CertificateParams::default();
-        root_parameters.not_before = OffsetDateTime::now_utc();
-        root_parameters.not_after =
-            OffsetDateTime::now_utc().saturating_add(CertificateType::Root.validity_duration());
+        root_parameters.not_before = get_certificate_timestamp();
+        root_parameters.not_after = root_parameters
+            .not_before
+            .saturating_add(CertificateType::Root.validity_duration());
 
         root_parameters.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
 
@@ -205,9 +206,10 @@ impl Credential {
         certificate_type: CertificateType,
     ) -> Result<UnverifiedCertificate, CreateCertificateError> {
         let mut leaf_parameters = rcgen::CertificateParams::default();
-        leaf_parameters.not_before = OffsetDateTime::now_utc();
-        leaf_parameters.not_after =
-            OffsetDateTime::now_utc().saturating_add(certificate_type.validity_duration());
+        leaf_parameters.not_before = get_certificate_timestamp();
+        leaf_parameters.not_after = leaf_parameters
+            .not_before
+            .saturating_add(certificate_type.validity_duration());
 
         leaf_parameters.is_ca = match certificate_type.should_be_ca() {
             true => rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained),
