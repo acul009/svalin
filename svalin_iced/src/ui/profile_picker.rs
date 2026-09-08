@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{Element, bootstrap};
+use crate::{Element, bootstrap, ui::widgets::icon_button};
 use iced::{
     Length, Task,
     alignment::Vertical,
@@ -272,10 +272,9 @@ impl ProfilePicker {
                             .on_press(Message::SelectProfile(p.clone()))
                             .width(Length::Fill)
                             .height(Length::Fill),
-                        button(bootstrap::trash().size(20).height(Length::Fill).center())
+                        icon_button(bootstrap::trash())
                             .on_press(Message::DeleteProfile(p.clone()))
-                            .width(60)
-                            .height(Length::Fill)
+                            .size(60)
                     ]
                     .padding(10)
                     .spacing(10)
@@ -319,7 +318,7 @@ impl ProfilePicker {
             State::AddProfile { host } => form()
                 .title(t!("profile-picker.title.add"))
                 .control(
-                    text_input("Host", host)
+                    text_input(t!("generic.host"), host)
                         .id("host")
                         .on_input(|input| Message::Input(Input::Host(input)))
                         .on_submit(Message::Connect(host.clone())),
@@ -335,9 +334,12 @@ impl ProfilePicker {
             dialog(text(
                 t!("profile-picker.confirm-delete", "profile" => profile),
             ))
-            .button(button(text("Cancel")).on_press(Message::CancelDelete))
-            .button(button(text("Delete")).on_press(Message::ConfirmDelete(profile.clone())))
-            .title("Delete Profile")
+            .button(button(text(t!("generic.cancel"))).on_press(Message::CancelDelete))
+            .button(
+                button(text(t!("generic.delete")))
+                    .on_press(Message::ConfirmDelete(profile.clone())),
+            )
+            .title(text(t!("profile-picker.title.delete")))
             .float()
         });
 

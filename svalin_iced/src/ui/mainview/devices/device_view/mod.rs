@@ -107,7 +107,8 @@ impl DeviceView {
         scrollable(
             column![
                 self.status.view().map(Message::Status),
-                iced::widget::button("Terminal").on_press(Message::OpenTerminal),
+                iced::widget::button(text(t!("device.actions.open-terminal")))
+                    .on_press(Message::OpenTerminal),
                 self.tunnel_opener.view().map(Message::TunnelOpener),
                 self.update_installer.view().map(Message::UpdateInstaller),
             ]

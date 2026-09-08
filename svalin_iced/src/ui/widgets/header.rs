@@ -66,7 +66,7 @@ impl<'a, Message: Clone + 'static> From<Header<'a, Message>> for Element<'a, Mes
     fn from(header: Header<'a, Message>) -> Self {
         let mut row = match header.on_back {
             None => row!(),
-            Some(on_back) => row![icon_button(bootstrap::arrow_left()).on_press(on_back)],
+            Some(on_back) => row![icon_button::back().on_press(on_back)],
         };
 
         row = row

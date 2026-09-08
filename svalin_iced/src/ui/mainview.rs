@@ -83,7 +83,7 @@ impl MainView {
         let client2 = client.clone();
         (
             Self {
-                screen: Screen::Loading("Loading devices...".into()),
+                screen: Screen::Loading(t!("device-list.loading").to_string()),
                 state: ClientState::empty(),
                 context: Context::None,
                 client,
@@ -230,7 +230,7 @@ impl MainView {
                         }
                     })),
                 )
-                .tooltip("Show Warnings")
+                .tooltip(text(t!("warnings.show")))
                 .on_press(Message::Context(Context::Warnings)),
             )
             .action(icon_button(bootstrap::x_lg()).on_press(Message::Context(Context::None)))
@@ -258,27 +258,33 @@ impl MainView {
                                     .unwrap_or_else(|| Cow::Owned(spki_hash.to_string()));
 
                                 let mut actions = row![
-                                    button("Device")
+                                    button(text(t!("warnings.device.action")))
                                         .on_press(Message::SelectDevice(spki_hash.clone()))
                                 ]
                                 .spacing(10);
 
                                 let message = match warning {
                                     warning::Device::DeviceGroupBroken(reason) => {
-                                        actions = actions.push(button("Details").on_press(
-                                            Message::Error(Arc::new(anyhow!(reason.to_owned()))),
-                                        ));
-                                        text!("Device associated group broken")
+                                        actions = actions.push(
+                                            button(text(t!("generic.details"))).on_press(
+                                                Message::Error(Arc::new(anyhow!(
+                                                    reason.to_owned()
+                                                ))),
+                                            ),
+                                        );
+                                        text(t!("warnings.device.group-broken"))
                                     }
                                     warning::Device::DiskSpaceLow { disk, free, total } => {
-                                        text!(
-                                            "Disk space low on {}: {} of {} free",
-                                            disk,
-                                            human_i_bytes(*free),
-                                            human_i_bytes(*total)
-                                        )
+                                        text(t!(
+                                            "warnings.device.disk-space-low",
+                                            "disk" => disk,
+                                            "free" => human_i_bytes(*free),
+                                            "total" => human_i_bytes(*total)
+                                        ))
                                     }
-                                    warning::Device::MissingName => text("Device has no name yet"),
+                                    warning::Device::MissingName => {
+                                        text(t!("warnings.device.missing-name"))
+                                    }
                                 };
                                 Element::from(
                                     column![text(name).size(24), message, actions]

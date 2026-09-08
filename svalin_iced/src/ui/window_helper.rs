@@ -68,7 +68,7 @@ impl WindowHelper {
                 .view()
                 .map(move |message| Message::Forwarded { id, message })
         } else {
-            center(text!("Window Error")).into()
+            center(text(t!("window.error"))).into()
         }
     }
 
@@ -95,7 +95,7 @@ impl WindowHelper {
         if let Some(window) = self.windows.get(&window_id) {
             window.title()
         } else {
-            "Window Error".to_string()
+            t!("window.error").to_string()
         }
     }
 

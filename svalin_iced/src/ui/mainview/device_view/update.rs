@@ -134,13 +134,13 @@ impl State {
     pub fn view(&self) -> Element<'_, Message> {
         column![
             row![
-                button("Select File").on_press(Message::SelectFile),
+                button(text(t!("device.update.select-file"))).on_press(Message::SelectFile),
                 self.file_path
                     .as_ref()
                     .map(|path| text!("{}", path.display()))
             ]
             .spacing(10),
-            button("Update").on_press_maybe(
+            button(text(t!("device.update.start"))).on_press_maybe(
                 if self.file_path.is_some() && !self.status.is_updating() {
                     Some(Message::StartAgentUpdate)
                 } else {
@@ -155,12 +155,16 @@ impl State {
                     progress_bar(0.0..=1.0, *progress).into()
                 }
                 Status::Success => {
-                    stack![progress_bar(0.0..=1.0, 1.0), text("Update successful")].into()
+                    stack![
+                        progress_bar(0.0..=1.0, 1.0),
+                        text(t!("device.update.success"))
+                    ]
+                    .into()
                 }
                 Status::Error(err) => {
                     stack![
                         progress_bar(0.0..=1.0, 1.0),
-                        text!("Update failed: {}", err)
+                        text(t!("device.update.failed", "error" => err))
                     ]
                     .into()
                 }

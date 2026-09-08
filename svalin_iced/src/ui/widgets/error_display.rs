@@ -16,7 +16,7 @@ impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
         Self {
             error,
             on_close: None,
-            title: t!("error-generic").into(),
+            title: t!("generic.error").into(),
             display: dialog::Display::Normal,
         }
     }

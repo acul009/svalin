@@ -4,10 +4,6 @@ use iced::{
     Length,
     widget::{button, column, container, row, stack, text},
 };
-// use iced_fonts::{
-//     BOOTSTRAP_FONT,
-//     bootstrap::{self, bootstrap},
-// };
 use svalin::client::state::ClientState;
 use svalin_pki::SpkiHash;
 
@@ -79,7 +75,7 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                                             .format("%Y-%m-%d %H:%M:%S")
                                             .to_string()
                                     })
-                                    .unwrap_or_else(|| "Unknown".to_string())
+                                    .unwrap_or_else(|| t!("generic.unknown").to_string())
                             )
                         ]
                         .spacing(20)

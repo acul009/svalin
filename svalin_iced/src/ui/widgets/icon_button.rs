@@ -4,7 +4,7 @@ use iced::{
 };
 
 use crate::{
-    Element,
+    Element, bootstrap,
     ui::widgets::scaffold::{HEADER_HEIGHT, HEADER_PADDING},
 };
 
@@ -13,6 +13,10 @@ pub struct IconButton<'a, Message> {
     tooltip: Option<Element<'a, Message>>,
     on_press: Option<Message>,
     size: iced::Pixels,
+}
+
+pub fn back<'a, Message>() -> IconButton<'a, Message> {
+    IconButton::new(bootstrap::arrow_left())
 }
 
 impl<'a, Message> IconButton<'a, Message> {

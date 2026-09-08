@@ -67,37 +67,49 @@ impl State {
             card(
                 column![
                     row![
-                        "Name:",
+                        text(t!("device.info.name")),
                         space::horizontal(),
                         text_input("", &self.name).on_input(Message::ChangeName)
                     ],
                     row![
-                        "Group:",
+                        text(t!("device.info.group")),
                         space::horizontal(),
                         text_input("", &self.group).on_input(Message::ChangeGroup)
                     ],
                     row![
-                        "Notes:",
+                        text(t!("device.info.notes")),
                         space::horizontal(),
                         text_editor(&self.notes).on_action(Message::ChangeNotes)
                     ],
                 ]
                 .spacing(10),
             )
-            .title("Device Information")
+            .title(text(t!("device.info.title")))
             .action(icon_button(bootstrap::floppy()).on_press(Message::Save))
             .action(icon_button(bootstrap::x_square()).on_press(Message::CancelEdit))
             .into()
         } else {
             card(
                 column![
-                    row!["Name:", space::horizontal(), text(&current_info.name)],
-                    row!["Group:", space::horizontal(), text(&current_info.group)],
-                    row!["Notes:", space::horizontal(), text(&current_info.notes)],
+                    row![
+                        text(t!("device.info.name")),
+                        space::horizontal(),
+                        text(&current_info.name)
+                    ],
+                    row![
+                        text(t!("device.info.group")),
+                        space::horizontal(),
+                        text(&current_info.group)
+                    ],
+                    row![
+                        text(t!("device.info.notes")),
+                        space::horizontal(),
+                        text(&current_info.notes)
+                    ],
                 ]
                 .spacing(10),
             )
-            .title("Device Information")
+            .title(text(t!("device.info.title")))
             .action(icon_button(bootstrap::pencil()).on_press(Message::Edit))
             .into()
         }

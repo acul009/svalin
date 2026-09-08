@@ -93,7 +93,7 @@ impl AddDevice {
 
                 self._handle = Some(handle.abort_on_drop());
 
-                self.screen = Screen::Loading("Connecting via join code...".into());
+                self.screen = Screen::Loading(t!("add-device.connecting").to_string());
 
                 Action::Run(add_task)
             }
@@ -106,17 +106,20 @@ impl AddDevice {
             Screen::Error(err) => error_display(err).on_close(Message::Cancel).into(),
             Screen::Loading(message) => loading(message).into(),
             Screen::Input => dialog(column![
-                text_input("Join Code", &self.join_code)
+                text_input(t!("add-device.input.join-code"), &self.join_code)
                     .on_input(Message::JoinCode)
                     .id("join_code"),
-                text_input("Confirm Code", &self.confirm_code)
+                text_input(t!("add-device.input.confirm-code"), &self.confirm_code)
                     .id("confirm_code")
                     .on_input(Message::ConfirmCode)
                     .on_submit(Message::ConnectToDevice),
             ])
             .on_close(Message::Cancel)
-            .button(button("Cancel").on_press(Message::Cancel))
-            .button(button("Continue").on_press(Message::ConnectToDevice))
+            .button(button(iced::widget::text(t!("generic.cancel"))).on_press(Message::Cancel))
+            .button(
+                button(iced::widget::text(t!("generic.continue")))
+                    .on_press(Message::ConnectToDevice),
+            )
             .into(),
         }
     }

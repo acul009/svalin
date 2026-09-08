@@ -30,12 +30,18 @@ generic:
   success: Erfolg
   unlock: Entsperren
   username: Benutzername
+  host: Host
+  delete: Löschen
+  details: Details
+  unknown: Unbekannt
+  shutting-down: Wird heruntergefahren...
 profile-picker:
   add: Profil hinzufügen
   confirm-delete: Sind Sie sicher, dass Sie %{profile} löschen möchten?
   connecting-to-server: Verbindung zum Server herstellen...
   copy-totp: TOTP-Geheimnis kopieren
   error:
+    list: Fehler beim Laden der Profile
     connect-to-server: Fehler beim Herstellen einer Verbindung zum Server
     delete: Fehler beim Löschen des Profils
     server-init: Fehler beim Initialisieren des Servers
@@ -43,14 +49,58 @@ profile-picker:
       register: Fehler beim Erstellen des TOTP-Geheimnisses
       verify: Fehler beim Überprüfen des TOTP-Codes
     unlock: Fehler beim Entsperren des Profils
+    login: Fehler bei der Anmeldung
   init-loading: Server wird initialisiert...
   input:
     confirm-password: Passwort bestätigen
     totp: 2FA-Code
   title:
     add: Profil hinzufügen
+    delete: Profil löschen
     unlock: Geben Sie Ihr Passwort ein, um das Profil zu entsperren
   unlocking: Profil entsperren...
+  login: Anmelden
+  login-loading: Anmeldung läuft...
+  wrong-password: Benutzername oder Passwort ist falsch!
+  invalid-totp: Der TOTP-Code war ungültig
+device-list:
+  loading: Geräte werden geladen...
+device:
+  unavailable: Gerät ist noch nicht verfügbar
+  actions:
+    title: Agentenaktionen
+    open-terminal: Terminal öffnen
+    update: Agent aktualisieren
+  info:
+    title: Geräteinformationen
+    name: 'Name:'
+    group: 'Gruppe:'
+    notes: 'Notizen:'
+  report:
+    title: Systembericht
+    agent-version: 'Agent-Version:'
+    hostname: 'Hostname:'
+    os: 'Betriebssystem:'
+    kernel-version: 'Kernel-Version:'
+    cpu-model: 'CPU-Modell:'
+    cpu-cores-threads: CPU-Kerne / Threads
+    cpu-threads: CPU-Threads
+    total-memory-swap: 'Arbeitsspeicher / Swap gesamt:'
+    disk-free: '%{free} / %{total} frei'
+  update:
+    error-during-update: Fehler beim Aktualisieren des Agenten
+    loading-status: Agent-Aktualisierungsstatus wird geladen...
+    status-unavailable: Agent-Aktualisierungsstatus nicht verfügbar!
+    updating: Der Agent wird gerade aktualisiert...
+    current-version: Agent-Version
+    method: Installationsmethode
+    start: Agent jetzt aktualisieren
+    available-version: Verfügbare Agent-Aktualisierung
+    unsupported: Diese Installationsmethode unterstützt keine Remote-Aktualisierung des Agenten.
+    title: Agent aktualisieren
+    select-file: Datei auswählen
+    success: Agent erfolgreich aktualisiert
+    failed: 'Agent-Aktualisierung fehlgeschlagen: %{error}'
 realtime:
   connecting: Verbinden...
   core: Kern %{id}
@@ -63,7 +113,22 @@ tunnel:
   close: Schließen
   error: Fehler beim Öffnen des Tunnels
   input:
+    local_port: Lokaler Port
     remote_host: Remote-Host und Port
-  open: Offen
+  open: Öffnen
   opener:
-    title: Offener Tunnel
+    title: Tunnel öffnen
+  no_tunnels: Es sind noch keine Tunnel geöffnet!
+warnings:
+  show: Warnungen anzeigen
+  device:
+    action: Gerät
+    group-broken: Die zugeordnete Gerätegruppe ist beschädigt
+    disk-space-low: 'Wenig Speicherplatz auf %{disk}: %{free} von %{total} frei'
+    missing-name: Das Gerät hat noch keinen Namen
+window:
+  error: Fensterfehler
+terminal:
+  connecting: Verbindung zum Terminal wird hergestellt...
+  unavailable: Terminal nicht verfügbar
+  closed: Terminal geschlossen

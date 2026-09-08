@@ -13,8 +13,7 @@ use svalin_pki::SpkiHash;
 use svalin_sysctl::sytem_report::Disk;
 
 use crate::{
-    Element,
-    bootstrap::{self},
+    Element, bootstrap,
     ui::widgets::{card, device_icon, dialog, fact_list, header, icon_button, os_icon},
     util::human_i_bytes,
 };
@@ -128,7 +127,7 @@ impl State {
 
     pub fn view<'a>(&'a self, client_state: &'a ClientState) -> Element<'a, Message> {
         let Some(persistent) = client_state.persistent().devices().get(&self.spki_hash) else {
-            return center("Device not yet available").into();
+            return center(text(t!("device.unavailable"))).into();
         };
 
         let meta = persistent.meta_info().unwrap_or(&PLACEHOLDER_META);
@@ -148,7 +147,7 @@ impl State {
         let overlay: Option<Element<Message>> =
             self.overlay.as_ref().map(|overlay| match overlay {
                 Overlay::Update => dialog(self.update.view().map(Message::Update))
-                    .title("Update Agent")
+                    .title(text(t!("device.update.title")))
                     .on_close(Message::CloseOverlay)
                     .overlay()
                     .into(),
@@ -179,18 +178,18 @@ fn agent_actions() -> Element<'static, Message> {
         row![
             icon_button(bootstrap::terminal())
                 .size(50)
-                .tooltip("Open Terminal")
+                .tooltip(text(t!("device.actions.open-terminal")))
                 .on_press(Message::OpenTerminal),
             icon_button(bootstrap::download())
                 .size(50)
-                .tooltip("Update Device")
+                .tooltip(text(t!("device.actions.update")))
                 .on_press(Overlay::Update.into())
         ]
         .padding(20)
         .spacing(20),
     )
     .padding(0)
-    .title("Agent Actions")
+    .title(text(t!("device.actions.title")))
     .into()
 }
 
@@ -201,12 +200,15 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
             container(
                 fact_list()
                     .entry(
-                        "Agent Version:",
+                        text(t!("device.report.agent-version")),
                         svalin_report.current_version_identifier.as_str(),
                     )
-                    .entry("Hostname:", report.hostname.as_deref().unwrap_or_default())
                     .entry(
-                        "OS:",
+                        text(t!("device.report.hostname")),
+                        report.hostname.as_deref().unwrap_or_default()
+                    )
+                    .entry(
+                        text(t!("device.report.os")),
                         row![
                             report
                                 .os
@@ -218,15 +220,21 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
                         .spacing(10)
                         .align_y(Vertical::Center)
                     )
-                    .entry("Kernel Version:", report.kernel_version.as_str())
+                    .entry(
+                        text(t!("device.report.kernel-version")),
+                        report.kernel_version.as_str()
+                    )
                     // .entry("CPU Brand:", report.cpu.brand.as_str())
-                    .entry("CPU Model:", report.cpu.model.as_str())
+                    .entry(
+                        text(t!("device.report.cpu-model")),
+                        report.cpu.model.as_str()
+                    )
                     // .entry("CPU Architecture:", report.cpu.arch.as_str())
                     .entry(
                         if report.cpu.cores.is_some() {
-                            text("CPU Cores / Threads")
+                            text(t!("device.report.cpu-cores-threads"))
                         } else {
-                            text("CPU Threads")
+                            text(t!("device.report.cpu-threads"))
                         },
                         if let Some(cores) = report.cpu.cores {
                             text!("{} / {}", cores, report.cpu.threads)
@@ -235,7 +243,7 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
                         }
                     )
                     .entry(
-                        "Total Memory / Swap:",
+                        text(t!("device.report.total-memory-swap")),
                         text!(
                             "{} / {}",
                             human_i_bytes(report.total_memory),
@@ -250,7 +258,7 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
         ]
         .spacing(15),
     )
-    .title("System Report")
+    .title(text(t!("device.report.title")))
     .padding(0)
     .into()
 }
@@ -272,11 +280,11 @@ fn disk<'a>(disk: &'a Disk) -> Element<'a, Message> {
                 )
                 .girth(Length::Fill),
                 row![
-                    text!(
-                        "{} / {} Free",
-                        human_i_bytes(disk.available_space),
-                        human_i_bytes(disk.total_space)
-                    )
+                    text(t!(
+                        "device.report.disk-free",
+                        "free" => human_i_bytes(disk.available_space),
+                        "total" => human_i_bytes(disk.total_space)
+                    ))
                     .align_y(Vertical::Center),
                     space::horizontal(),
                     text(&disk.file_system).align_y(Vertical::Center)

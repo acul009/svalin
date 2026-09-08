@@ -13,8 +13,14 @@ generic:
   required-field: required
   passwords-dont-match: Passwords must match
   username: Username
+  host: Host
+  delete: Delete
+  details: Details
+  unknown: Unknown
+  shutting-down: Shutting down...
 profile-picker:
   error:
+    list: Error while loading profiles
     totp:
       register: Error while creating TOTP secret
       verify: Error while verifying TOTP code
@@ -30,6 +36,7 @@ profile-picker:
   title:
     unlock: Enter password to unlock profile
     add: Add Profile
+    delete: Delete Profile
   confirm-delete: Are you sure you want to delete %{profile}
   input:
     confirm-password: Confirm Password
@@ -74,14 +81,54 @@ tunnel:
   no_tunnels: There are no open tunnels yet!
 device_list:
   add: Add Device
+device-list:
+  loading: Loading devices...
 device:
+  unavailable: Device not yet available
+  actions:
+    title: Agent Actions
+    open-terminal: Open Terminal
+    update: Update Agent
+  info:
+    title: Device Information
+    name: 'Name:'
+    group: 'Group:'
+    notes: 'Notes:'
+  report:
+    title: System Report
+    agent-version: 'Agent Version:'
+    hostname: 'Hostname:'
+    os: 'OS:'
+    kernel-version: 'Kernel Version:'
+    cpu-model: 'CPU Model:'
+    cpu-cores-threads: CPU Cores / Threads
+    cpu-threads: CPU Threads
+    total-memory-swap: 'Total Memory / Swap:'
+    disk-free: '%{free} / %{total} Free'
   update:
-    loading-status: Loading update status...
-    status-unavailable: Update status unavailable!
-    updating: Device is currently updating...
+    error-during-update: Error during agent update
+    loading-status: Loading agent update status...
+    status-unavailable: Agent update status unavailable!
+    updating: Agent is currently updating...
     current-version: Agent Version
     method: Installation Method
-    start: Update Now
-    available-version: Available Update
-    unsupported: This installation method does not support remote updates.
+    start: Update Agent Now
+    available-version: Available Agent Update
+    unsupported: This installation method does not support remote agent updates.
     title: Agent Update
+    select-file: Select File
+    success: Agent update successful
+    failed: 'Agent update failed: %{error}'
+warnings:
+  show: Show Warnings
+  device:
+    action: Device
+    group-broken: Device associated group broken
+    disk-space-low: 'Disk space low on %{disk}: %{free} of %{total} free'
+    missing-name: Device has no name yet
+window:
+  error: Window Error
+terminal:
+  connecting: Connecting to terminal...
+  unavailable: Terminal unavailable
+  closed: Terminal closed

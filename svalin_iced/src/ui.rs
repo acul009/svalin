@@ -143,7 +143,7 @@ impl UI {
                     profile_picker.view().map(Message::ProfilePicker)
                 }
                 Screen::MainView(mainview) => mainview.view().map(Message::MainView),
-                Screen::Closing => loading("Shutting down...").into(),
+                Screen::Closing => loading(t!("generic.shutting-down")).into(),
             };
 
             let header = match &self.screen {
