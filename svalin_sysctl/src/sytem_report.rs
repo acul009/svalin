@@ -26,6 +26,12 @@ pub struct Extensions {
     proxmox_ve: Option<proxmox_ve::ProxmoxVE>,
 }
 
+impl Extensions {
+    pub fn proxmox_ve(&self) -> Option<&proxmox_ve::ProxmoxVE> {
+        self.proxmox_ve.as_ref()
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Cpu {
     pub brand: String,

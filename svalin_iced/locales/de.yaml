@@ -1,4 +1,4 @@
-_version: '1'
+_version: "1"
 add-device:
   connecting: Mit Gerät verbinden...
   enrolling: Gerät wird registriert...
@@ -26,7 +26,7 @@ generic:
   loading: In Arbeit...
   password: Passwort
   passwords-dont-match: Passwörter müssen übereinstimmen
-  required-field: Pflichtfeld 
+  required-field: Pflichtfeld
   success: Erfolg
   unlock: Entsperren
   username: Benutzername
@@ -70,23 +70,24 @@ device:
   actions:
     title: Agentenaktionen
     open-terminal: Terminal öffnen
+    open-pve: Proxmox-VE öffnen
     update: Agent aktualisieren
   info:
     title: Geräteinformationen
-    name: 'Name:'
-    group: 'Gruppe:'
-    notes: 'Notizen:'
+    name: "Name:"
+    group: "Gruppe:"
+    notes: "Notizen:"
   report:
     title: Systembericht
-    agent-version: 'Agent-Version:'
-    hostname: 'Hostname:'
-    os: 'Betriebssystem:'
-    kernel-version: 'Kernel-Version:'
-    cpu-model: 'CPU-Modell:'
+    agent-version: "Agent-Version:"
+    hostname: "Hostname:"
+    os: "Betriebssystem:"
+    kernel-version: "Kernel-Version:"
+    cpu-model: "CPU-Modell:"
     cpu-cores-threads: CPU-Kerne / Threads
     cpu-threads: CPU-Threads
-    total-memory-swap: 'Arbeitsspeicher / Swap gesamt:'
-    disk-free: '%{free} / %{total} frei'
+    total-memory-swap: "Arbeitsspeicher / Swap gesamt:"
+    disk-free: "%{free} / %{total} frei"
   update:
     error-during-update: Fehler beim Aktualisieren des Agenten
     loading-status: Agent-Aktualisierungsstatus wird geladen...
@@ -100,7 +101,9 @@ device:
     title: Agent aktualisieren
     select-file: Datei auswählen
     success: Agent erfolgreich aktualisiert
-    failed: 'Agent-Aktualisierung fehlgeschlagen: %{error}'
+    failed: "Agent-Aktualisierung fehlgeschlagen: %{error}"
+  tunnel:
+    open-error: Fehler beim Öffnen des Tunnels
 realtime:
   connecting: Verbinden...
   core: Kern %{id}
@@ -124,7 +127,7 @@ warnings:
   device:
     action: Gerät
     group-broken: Die zugeordnete Gerätegruppe ist beschädigt
-    disk-space-low: 'Wenig Speicherplatz auf %{disk}: %{free} von %{total} frei'
+    disk-space-low: "Wenig Speicherplatz auf %{disk}: %{free} von %{total} frei"
     missing-name: Das Gerät hat noch keinen Namen
 window:
   error: Fensterfehler

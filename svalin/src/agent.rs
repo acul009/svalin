@@ -28,14 +28,14 @@ pub use init::init;
 use crate::util::location::{Location, LocationError};
 use crate::util::{key_storage::KeySource, trust_store::save_trust_store};
 use crate::{
+    client::tunnel_manager::tcp::TcpForwardHandler,
+    message_streaming::agent::AgentMessageDispatcher,
+};
+use crate::{
     installer,
     shared::commands::{
         realtime_status::RealtimeStatusHandler, request_system_report::RequestSystemReportHandler,
     },
-};
-use crate::{
-    // client::tunnel_manager::tcp::handler::TcpForwardHandler,
-    message_streaming::agent::AgentMessageDispatcher,
 };
 use crate::{
     message_streaming::agent::AgentMessageReceiver,
@@ -145,7 +145,7 @@ pub async fn run(cancel: CancellationToken, profile: &str) -> Result<()> {
         .add(PingHandler)
         .add(RealtimeStatusHandler)
         .add(RemoteTerminalHandler)
-        // .add(TcpForwardHandler)
+        .add(TcpForwardHandler)
         .add(UpdateAgentHandler::new())
         .add(RequestSystemReportHandler {
             notify: system_report_notify.clone(),

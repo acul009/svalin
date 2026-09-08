@@ -88,23 +88,24 @@ device:
   actions:
     title: Agent Actions
     open-terminal: Open Terminal
+    open-pve: Open Proxmox-VE
     update: Update Agent
   info:
     title: Device Information
-    name: 'Name:'
-    group: 'Group:'
-    notes: 'Notes:'
+    name: "Name:"
+    group: "Group:"
+    notes: "Notes:"
   report:
     title: System Report
-    agent-version: 'Agent Version:'
-    hostname: 'Hostname:'
-    os: 'OS:'
-    kernel-version: 'Kernel Version:'
-    cpu-model: 'CPU Model:'
+    agent-version: "Agent Version:"
+    hostname: "Hostname:"
+    os: "OS:"
+    kernel-version: "Kernel Version:"
+    cpu-model: "CPU Model:"
     cpu-cores-threads: CPU Cores / Threads
     cpu-threads: CPU Threads
-    total-memory-swap: 'Total Memory / Swap:'
-    disk-free: '%{free} / %{total} Free'
+    total-memory-swap: "Total Memory / Swap:"
+    disk-free: "%{free} / %{total} Free"
   update:
     error-during-update: Error during agent update
     loading-status: Loading agent update status...
@@ -118,13 +119,15 @@ device:
     title: Agent Update
     select-file: Select File
     success: Agent update successful
-    failed: 'Agent update failed: %{error}'
+    failed: "Agent update failed: %{error}"
+  tunnel:
+    open-error: Error opening Tunnel
 warnings:
   show: Show Warnings
   device:
     action: Device
     group-broken: Device associated group broken
-    disk-space-low: 'Disk space low on %{disk}: %{free} of %{total} free'
+    disk-space-low: "Disk space low on %{disk}: %{free} of %{total} free"
     missing-name: Device has no name yet
 window:
   error: Window Error

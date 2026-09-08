@@ -1,18 +1,30 @@
 use std::{collections::HashMap, time::Duration};
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use svalin_rpc::rpc::command::dispatcher::CommandDispatcher;
+use svalin_rpc::rpc::{
+    command::{
+        dispatcher::CommandDispatcher,
+        handler::{CommandHandler, PermissionPrecursor},
+    },
+    session::Session,
+};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
     select,
-    sync::mpsc,
+    sync::{mpsc, oneshot},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
+
+use crate::permissions::Permission;
+
+const TCP_TUNNEL_KEY: &str = "forward-tcp";
 
 pub struct TcpTunnelDispatcher {
     pub listener: TcpListener,
     pub cancel: CancellationToken,
+    pub ready: oneshot::Sender<()>,
     pub remote_host: String,
 }
 
@@ -38,6 +50,14 @@ impl ToClient {
     }
 }
 
+impl ToAgent {
+    fn id(&self) -> u64 {
+        match self {
+            ToAgent::Opened(id) | ToAgent::Closed(id) | ToAgent::Data(id, _) => *id,
+        }
+    }
+}
+
 impl CommandDispatcher for TcpTunnelDispatcher {
     type Output = ();
 
@@ -46,7 +66,7 @@ impl CommandDispatcher for TcpTunnelDispatcher {
     type Request = String;
 
     fn key() -> String {
-        "forward-tcp".into()
+        TCP_TUNNEL_KEY.into()
     }
 
     fn get_request(&self) -> &Self::Request {
@@ -107,6 +127,146 @@ impl CommandDispatcher for TcpTunnelDispatcher {
         };
 
         Ok(())
+    }
+}
+
+#[derive(Default)]
+pub struct TcpForwardHandler;
+
+impl From<&PermissionPrecursor<TcpForwardHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<TcpForwardHandler>) -> Self {
+        Permission::RootOnlyPlaceholder
+    }
+}
+
+#[async_trait]
+impl CommandHandler for TcpForwardHandler {
+    type Request = String;
+
+    fn key() -> String {
+        TCP_TUNNEL_KEY.into()
+    }
+
+    async fn handle(
+        &self,
+        session: &mut Session,
+        remote_host: Self::Request,
+        cancel: CancellationToken,
+    ) -> anyhow::Result<()> {
+        let mut connections: HashMap<u64, mpsc::Sender<ToAgent>> = HashMap::new();
+        let (all_send, mut all_recv) = mpsc::channel(100);
+        let tasks = TaskTracker::new();
+
+        loop {
+            select! {
+                _ = cancel.cancelled() => break,
+                to_agent = session.read_object::<ToAgent>() => {
+                    let to_agent = to_agent?;
+                    let id = to_agent.id();
+
+                    match to_agent {
+                        ToAgent::Opened(_) => {
+                            let (send, recv) = mpsc::channel(100);
+                            connections.insert(id, send);
+                            tasks.spawn(copy_remote_conn_task(
+                                id,
+                                remote_host.clone(),
+                                recv,
+                                all_send.clone(),
+                            ));
+                        }
+                        ToAgent::Closed(_) => {
+                            connections.remove(&id);
+                        }
+                        packet @ ToAgent::Data(_, _) => {
+                            if let Some(connection) = connections.get_mut(&id)
+                                && connection.send(packet).await.is_err()
+                            {
+                                connections.remove(&id);
+                            }
+                        }
+                    }
+                }
+                to_client = all_recv.recv() => {
+                    let Some(to_client) = to_client else {
+                        break;
+                    };
+                    if let ToClient::Closed(id) = &to_client {
+                        connections.remove(id);
+                    }
+                    session.write_object(&to_client).await?;
+                }
+            }
+        }
+
+        all_recv.close();
+        drop(connections);
+        tasks.close();
+        if tokio::time::timeout(Duration::from_secs(5), tasks.wait())
+            .await
+            .is_err()
+        {
+            tracing::error!("Failed to close all remote tunnel helper tasks in time");
+        }
+
+        Ok(())
+    }
+}
+
+async fn copy_remote_conn_task(
+    id: u64,
+    remote_host: String,
+    mut recv: mpsc::Receiver<ToAgent>,
+    to_all: mpsc::Sender<ToClient>,
+) {
+    let mut conn = match TcpStream::connect(&remote_host).await {
+        Ok(conn) => conn,
+        Err(err) => {
+            tracing::error!("Failed to connect tunnel stream to {remote_host}: {err}");
+            let _ = to_all.send(ToClient::Closed(id)).await;
+            return;
+        }
+    };
+    let mut buffer = vec![0; 1024];
+
+    loop {
+        select! {
+            read = conn.read(&mut buffer) => {
+                match read {
+                    Ok(0) => {
+                        let _ = to_all.send(ToClient::Closed(id)).await;
+                        break;
+                    }
+                    Ok(read) => {
+                        if to_all
+                            .send(ToClient::Data(id, buffer[..read].to_vec()))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Err(err) => {
+                        tracing::error!("Error reading from remote tunnel connection: {err}");
+                        let _ = to_all.send(ToClient::Closed(id)).await;
+                        break;
+                    }
+                }
+            }
+            from_client = recv.recv() => {
+                match from_client {
+                    Some(ToAgent::Data(_, data)) => {
+                        if let Err(err) = conn.write_all(&data).await {
+                            tracing::error!("Error writing to remote tunnel connection: {err}");
+                            let _ = to_all.send(ToClient::Closed(id)).await;
+                            break;
+                        }
+                    }
+                    Some(ToAgent::Closed(_)) | None => break,
+                    Some(ToAgent::Opened(_)) => {}
+                }
+            }
+        }
     }
 }
 

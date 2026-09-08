@@ -8,7 +8,7 @@ use std::{
 
 use svalin_pki::SpkiHash;
 use svalin_rpc::rpc::connection::Connection;
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::oneshot};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -35,6 +35,8 @@ pub enum TunnelCreateError {
     BindListenerError(#[from] std::io::Error),
     #[error("error updating tunnel state: {0}")]
     StateUpdateError(#[from] SendUpdateError),
+    #[error("tunnel could not be opened")]
+    Aborted,
 }
 
 impl TunnelManager {
@@ -50,6 +52,8 @@ impl TunnelManager {
         tunnel: TunnelDefinition,
     ) -> Result<(), TunnelCreateError> {
         let connection = client.device(tunnel.target.clone()).connection().await?;
+        let (send_ready, recv_ready) = oneshot::channel::<()>();
+        let id = Uuid::new_v4();
 
         match &tunnel.config {
             TunnelConfig::Tcp {
@@ -66,7 +70,6 @@ impl TunnelManager {
                 let listener = TcpListener::bind(format!("127.0.0.1:{}", local_port)).await?;
                 let cancel = client.cancel.child_token();
 
-                let id = Uuid::new_v4();
                 {
                     let mut active = self.active.lock().unwrap();
                     active.insert(id.clone(), cancel.clone());
@@ -88,6 +91,7 @@ impl TunnelManager {
                         .dispatch(TcpTunnelDispatcher {
                             listener,
                             cancel,
+                            ready: send_ready,
                             remote_host,
                         })
                         .await
@@ -103,6 +107,11 @@ impl TunnelManager {
             }
         }
 
+        if let Err(_err) = recv_ready.await {
+            self.active.lock().unwrap().remove(&id);
+            return Err(TunnelCreateError::Aborted);
+        }
+
         Ok(())
     }
 
@@ -115,9 +124,9 @@ impl TunnelManager {
 
 #[derive(Clone, Debug)]
 pub struct TunnelDefinition {
-    target: SpkiHash,
-    name: String,
-    config: TunnelConfig,
+    pub target: SpkiHash,
+    pub name: String,
+    pub config: TunnelConfig,
 }
 
 #[derive(Clone, Debug)]

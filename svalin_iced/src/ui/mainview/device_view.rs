@@ -8,6 +8,7 @@ use iced::{
 use svalin::client::{
     Client,
     state::{ClientState, persistent},
+    tunnel_manager::{TunnelConfig, TunnelDefinition},
 };
 use svalin_pki::SpkiHash;
 use svalin_sysctl::sytem_report::Disk;
@@ -29,6 +30,8 @@ pub enum Message {
     MetaDisplay(meta_display::Message),
     Update(update::Message),
     CloseOverlay,
+    OpenProxmoxVE,
+    TunnelOpened,
 }
 
 pub enum Action {
@@ -48,6 +51,7 @@ pub struct State {
 #[derive(Debug, Clone)]
 pub enum Overlay {
     Update,
+    TunnelOpenError,
 }
 
 impl From<Overlay> for Message {
@@ -122,6 +126,30 @@ impl State {
                 }
             }
             Message::OpenTerminal => Action::OpenTerminal(self.spki_hash.clone()),
+            Message::OpenProxmoxVE => {
+                let client = client.clone();
+                let spki_hash = self.spki_hash.clone();
+                let tunnel = TunnelDefinition {
+                    name: "Proxmox-VE".into(),
+                    target: self.spki_hash.clone(),
+                    config: TunnelConfig::Tcp {
+                        local_port: None,
+                        remote_host: "https://127.0.0.1:8006".into(),
+                    },
+                };
+
+                Action::Run(Task::future(async move {
+                    if let Err(_err) = client.device(spki_hash).open_tunnel(tunnel).await {
+                        Overlay::TunnelOpenError.into()
+                    } else {
+                        Message::TunnelOpened
+                    }
+                }))
+            }
+            Message::TunnelOpened => {
+                // Todo
+                Action::None
+            }
         }
     }
 
@@ -133,7 +161,7 @@ impl State {
         let meta = persistent.meta_info().unwrap_or(&PLACEHOLDER_META);
         let online = client_state.agent_online(&self.spki_hash);
         let col = column![
-            online.then(|| agent_actions()),
+            online.then(|| agent_actions(persistent)),
             self.meta_display.view(&meta).map(Message::MetaDisplay),
             if let Some(report) = persistent.report() {
                 Some(device_report(report))
@@ -148,6 +176,10 @@ impl State {
             self.overlay.as_ref().map(|overlay| match overlay {
                 Overlay::Update => dialog(self.update.view().map(Message::Update))
                     .title(text(t!("device.update.title")))
+                    .on_close(Message::CloseOverlay)
+                    .overlay()
+                    .into(),
+                Overlay::TunnelOpenError => dialog(text(t!("device.tunnel.open-error")))
                     .on_close(Message::CloseOverlay)
                     .overlay()
                     .into(),
@@ -173,7 +205,11 @@ impl State {
     }
 }
 
-fn agent_actions() -> Element<'static, Message> {
+fn agent_actions<'a>(device_state: &persistent::DeviceState) -> Element<'a, Message> {
+    let is_proxmox = device_state
+        .report()
+        .map(|r| r.system_report.extensions.proxmox_ve().is_some())
+        .unwrap_or(false);
     card(
         row![
             icon_button(bootstrap::terminal())
@@ -183,7 +219,17 @@ fn agent_actions() -> Element<'static, Message> {
             icon_button(bootstrap::download())
                 .size(50)
                 .tooltip(text(t!("device.actions.update")))
-                .on_press(Overlay::Update.into())
+                .on_press(Overlay::Update.into()),
+            if is_proxmox {
+                Some(
+                    icon_button(bootstrap::download())
+                        .size(50)
+                        .tooltip(text(t!("device.actions.open-pve")))
+                        .on_press(Message::OpenProxmoxVE),
+                )
+            } else {
+                None
+            }
         ]
         .padding(20)
         .spacing(20),
