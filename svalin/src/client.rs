@@ -4,14 +4,12 @@ use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 
-// pub mod device;
-mod first_connect;
-// pub mod tunnel_manager;
-
 pub mod add_agent;
 pub mod device;
+mod first_connect;
 mod profile;
 pub mod state;
+pub mod tunnel_manager;
 
 use crate::store::client_store::ClientStore;
 pub use first_connect::*;

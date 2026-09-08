@@ -3,11 +3,14 @@ use std::collections::HashMap;
 use svalin_pki::SpkiHash;
 use uuid::Uuid;
 
+use crate::client::tunnel_manager::TunnelDefinition;
+
 #[derive(Clone, Debug)]
 pub struct State {
     active: HashMap<SpkiHash, HashMap<Uuid, TunnelDefinition>>,
 }
 
+#[derive(Clone, Debug)]
 pub enum Update {
     Opened(SpkiHash, Uuid, TunnelDefinition),
     Closed(SpkiHash, Uuid),

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use svalin_pki::{SpkiHash, mls::SvalinGroupId};
 
 pub mod persistent;
-// pub mod tunneling;
+pub mod tunneling;
 pub mod warning;
 
 pub use warning::Warning;
@@ -14,6 +14,7 @@ pub struct ClientState {
     agents_online: HashSet<SpkiHash>,
     device_group_broken: HashMap<SvalinGroupId, String>,
     warnings: warning::State,
+    tunneling: tunneling::State,
 }
 
 #[derive(Clone, Debug)]
@@ -21,6 +22,7 @@ pub enum Update {
     Persistent(persistent::Update),
     AgentOnline(SpkiHash, bool),
     GroupBroken(SvalinGroupId, String),
+    Tunnel(tunneling::Update),
 }
 
 impl Update {
@@ -32,6 +34,7 @@ impl Update {
                 SvalinGroupId::DeviceGroup(spki_hash) => Some(spki_hash.clone()),
                 SvalinGroupId::DeviceMetaGroup(spki_hash) => Some(spki_hash.clone()),
             },
+            Self::Tunnel(_) => None,
         }
     }
 }
@@ -53,6 +56,7 @@ impl ClientState {
             agents_online: HashSet::new(),
             device_group_broken: HashMap::new(),
             warnings: warning::State::new(),
+            tunneling: tunneling::State::new(),
         }
     }
 
@@ -70,6 +74,7 @@ impl ClientState {
             Update::GroupBroken(group, reason) => {
                 self.device_group_broken.insert(group, reason);
             }
+            Update::Tunnel(update) => self.tunneling.update(update),
         }
 
         if let Some(device) = affected {

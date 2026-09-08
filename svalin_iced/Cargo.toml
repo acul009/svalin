@@ -46,4 +46,5 @@ rfd = "0.17.2"
 iced_fontello = {git = "https://github.com/hecrj/iced_fontello.git"}
 
 [target."cfg(windows)".dependencies]
-windows = "0.62.2"
+windows-result = "0.3.4"
+windows = { version = "0.62.2", features = ["Win32_System_Console"]}

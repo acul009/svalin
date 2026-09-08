@@ -3,7 +3,6 @@
 // The segregation I wanted to use here doesn't really make sense in practice.
 // TODO: refactor module locations
 pub mod agent;
-// pub mod async_com;
 pub mod client;
 pub mod installer;
 pub mod message_streaming;
