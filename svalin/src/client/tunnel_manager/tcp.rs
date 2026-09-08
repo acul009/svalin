@@ -13,6 +13,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 pub struct TcpTunnelDispatcher {
     pub listener: TcpListener,
     pub cancel: CancellationToken,
+    pub remote_host: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -42,14 +43,14 @@ impl CommandDispatcher for TcpTunnelDispatcher {
 
     type Error = anyhow::Error;
 
-    type Request = ();
+    type Request = String;
 
     fn key() -> String {
         "forward-tcp".into()
     }
 
     fn get_request(&self) -> &Self::Request {
-        &()
+        &self.remote_host
     }
 
     async fn dispatch(
@@ -82,6 +83,9 @@ impl CommandDispatcher for TcpTunnelDispatcher {
                 }
                 to_agent = all_recv.recv() => {
                     if let Some(to_agent) = to_agent {
+                        if let ToAgent::Closed(id) = to_agent {
+                            connections.remove(&id);
+                        }
                         session.write_object(&to_agent).await?;
                     }
                 }
@@ -98,9 +102,11 @@ impl CommandDispatcher for TcpTunnelDispatcher {
         all_recv.close();
         drop(connections);
         tasks.close();
-        tokio::time::timeout(Duration::from_secs(5), tasks.wait()).await?;
+        if let Err(_err) = tokio::time::timeout(Duration::from_secs(5), tasks.wait()).await {
+            tracing::error!("Failed to close all tunnel helper tasks in time");
+        };
 
-        todo!();
+        Ok(())
     }
 }
 
@@ -134,7 +140,9 @@ async fn copy_conn_task(
             from_agent = recv.recv() => {
                 match from_agent {
                     Some(ToClient::Data(_, data)) => {
-                        let _ = conn.write_all(&data).await;
+                        if let Err(_err) = conn.write_all(&data).await {
+                            let _ = to_all.send(ToAgent::Closed(id)).await;
+                        }
                     }
                     Some(ToClient::Closed(_)) | None => {
                         break;

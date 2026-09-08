@@ -40,8 +40,10 @@ fn main() {
 }
 
 #[cfg(target_os = "windows")]
-fn attach() -> Result<(), windows_result::Error> {
+fn attach() -> Result<(), windows::core::Error> {
     unsafe {
-        windows::System::Console::AttachConsole(windows::System::Console::ATTACH_PARENT_PROCESS)
+        windows::Win32::System::Console::AttachConsole(
+            windows::Win32::System::Console::ATTACH_PARENT_PROCESS,
+        )
     }
 }

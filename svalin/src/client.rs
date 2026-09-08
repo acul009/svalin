@@ -11,6 +11,7 @@ mod profile;
 pub mod state;
 pub mod tunnel_manager;
 
+use crate::client::tunnel_manager::TunnelManager;
 use crate::store::client_store::ClientStore;
 pub use first_connect::*;
 use svalin_pki::trust_store::TrustStore;
@@ -39,7 +40,7 @@ pub struct Client {
     device_credential: Credential,
     trust_store: Arc<RwLock<TrustStore>>,
     store: Arc<ClientStore>,
-    // tunnel_manager: TunnelManager,
+    tunnel_manager: TunnelManager,
     message_sender: ClientMessageDispatcherHandle,
     state_handle: ClientStateHandle,
     background_tasks: TaskTracker,
@@ -74,7 +75,7 @@ impl Client {
     pub async fn subscribe_state(
         &self,
     ) -> Result<(ClientState, broadcast::Receiver<Update>), anyhow::Error> {
-        self.state_handle.subscribe().await
+        Ok(self.state_handle.subscribe().await?)
     }
 
     pub async fn ping_upstream(&self) -> anyhow::Result<Duration> {

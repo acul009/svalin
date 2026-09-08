@@ -6,19 +6,19 @@ use std::{
     sync::Mutex,
 };
 
-use svalin_pki::{Certificate, SpkiHash};
-use svalin_rpc::{
-    commands::forward::ForwardConnection,
-    rpc::connection::{Connection, direct_connection::DirectConnection},
-};
-use tokio::{net::TcpListener, sync::watch};
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use svalin_pki::SpkiHash;
+use svalin_rpc::rpc::connection::Connection;
+use tokio::net::TcpListener;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::client::{
-    Client,
-    state::{self, tunneling},
-    tunnel_manager::tcp::TcpTunnelDispatcher,
+use crate::{
+    client::{
+        Client,
+        state::{self, tunneling},
+        tunnel_manager::tcp::TcpTunnelDispatcher,
+    },
+    message_streaming::client::SendUpdateError,
 };
 
 pub mod tcp;
@@ -27,7 +27,15 @@ pub(crate) struct TunnelManager {
     active: Mutex<HashMap<Uuid, CancellationToken>>,
 }
 
-type TunnelConnection = ForwardConnection<DirectConnection>;
+#[derive(Debug, thiserror::Error)]
+pub enum TunnelCreateError {
+    #[error("error connecting to target device: {0}")]
+    ConnectionError(#[from] anyhow::Error),
+    #[error("error binding local TCP listener: {0}")]
+    BindListenerError(#[from] std::io::Error),
+    #[error("error updating tunnel state: {0}")]
+    StateUpdateError(#[from] SendUpdateError),
+}
 
 impl TunnelManager {
     pub fn new() -> Self {
@@ -41,9 +49,9 @@ impl TunnelManager {
         client: &Client,
         tunnel: TunnelDefinition,
     ) -> Result<(), TunnelCreateError> {
-        let connection = client.device(tunnel.target).connection().await?;
+        let connection = client.device(tunnel.target.clone()).connection().await?;
 
-        match tunnel.config {
+        match &tunnel.config {
             TunnelConfig::Tcp {
                 local_port,
                 remote_host,
@@ -58,32 +66,39 @@ impl TunnelManager {
                 let listener = TcpListener::bind(format!("127.0.0.1:{}", local_port)).await?;
                 let cancel = client.cancel.child_token();
 
-                let active = self.active.lock().unwrap();
                 let id = Uuid::new_v4();
-                active.insert(id.clone(), cancel.clone());
+                {
+                    let mut active = self.active.lock().unwrap();
+                    active.insert(id.clone(), cancel.clone());
+                }
 
                 let state_handle = client.state_handle.clone();
+                let target = tunnel.target.clone();
+                let remote_host = remote_host.clone();
                 state_handle
                     .update(state::Update::Tunnel(tunneling::Update::Opened(
                         tunnel.target.clone(),
                         id.clone(),
-                        tunnel,
+                        tunnel.clone(),
                     )))
                     .await?;
 
                 client.background_tasks.spawn(async move {
                     if let Err(err) = connection
-                        .dispatch(TcpTunnelDispatcher { listener, cancel })
+                        .dispatch(TcpTunnelDispatcher {
+                            listener,
+                            cancel,
+                            remote_host,
+                        })
                         .await
                     {
                         tracing::error!("error in tcp tunnel: {err:#}");
                     }
                     let _ = state_handle
-                        .update(state::Update::Tunnel(tunneling::Update::Closed(
-                            tunnel.target,
-                            id,
-                        )))
+                        .update(state::Update::Tunnel(tunneling::Update::Closed(target, id)))
                         .await;
+
+                    //Todo: cleanup cancellation token
                 });
             }
         }
@@ -91,12 +106,10 @@ impl TunnelManager {
         Ok(())
     }
 
-    pub fn close_tunnel(&self, id: &Uuid) {
-        todo!()
-    }
-
-    pub fn watch_tunnels(&self) -> watch::Receiver<HashMap<Certificate, HashMap<Uuid, Tunnel>>> {
-        todo!()
+    pub fn close(&self, id: &Uuid) {
+        if let Some(cancel) = self.active.lock().unwrap().remove(id) {
+            cancel.cancel();
+        }
     }
 }
 

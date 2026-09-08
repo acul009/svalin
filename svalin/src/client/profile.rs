@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::store::client_store::ClientStore;
+use crate::{client::tunnel_manager::TunnelManager, store::client_store::ClientStore};
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
@@ -329,6 +329,7 @@ impl Client {
             device_credential,
             verifier: verifier.clone(),
             trust_store: trust_store,
+            tunnel_manager: TunnelManager::new(),
             store: client_store,
             mls_update_sender,
             message_sender: dispatcher_handle.clone(),

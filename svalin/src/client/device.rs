@@ -7,9 +7,10 @@ use svalin_rpc::{
     rpc::connection::{Connection, direct_connection::DirectConnection},
 };
 use tokio::sync::mpsc;
+use uuid::Uuid;
 
 use crate::{
-    client::state::persistent,
+    client::{state::persistent, tunnel_manager::TunnelDefinition},
     shared::commands::{
         request_system_report::RequestSystemReport, terminal::RemoteTerminalDispatcher,
         update_agent::UpdateAgent, update_mls::MlsUpdate,
@@ -99,6 +100,14 @@ impl<'a> DeviceHandle<'a> {
             }
         });
         Ok((input_send, output_recv))
+    }
+
+    pub async fn open_tunnel(&self, tunnel: TunnelDefinition) -> anyhow::Result<()> {
+        Ok(self.0.tunnel_manager.open(&self.0, tunnel).await?)
+    }
+
+    pub fn close_tunnel(&self, tunnel: Uuid) {
+        self.0.tunnel_manager.close(&tunnel);
     }
 }
 

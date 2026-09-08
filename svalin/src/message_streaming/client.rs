@@ -257,7 +257,7 @@ impl ClientStateHandle {
 
     pub async fn subscribe(
         &self,
-    ) -> Result<(ClientState, broadcast::Receiver<Update>), anyhow::Error> {
+    ) -> Result<(ClientState, broadcast::Receiver<Update>), SendUpdateError> {
         let (sender, receiver) = oneshot::channel();
         self.channel
             .send(ClientStateRequest::Subscribe(sender))
@@ -265,7 +265,7 @@ impl ClientStateHandle {
         Ok(receiver.await?)
     }
 
-    pub async fn update(&self, update: Update) -> Result<(), anyhow::Error> {
+    pub async fn update(&self, update: Update) -> Result<(), SendUpdateError> {
         self.channel
             .send(ClientStateRequest::Update(update))
             .await?;
@@ -273,7 +273,30 @@ impl ClientStateHandle {
         Ok(())
     }
 
-    pub async fn persistent_update(&self, update: persistent::Update) -> Result<(), anyhow::Error> {
+    pub async fn persistent_update(
+        &self,
+        update: persistent::Update,
+    ) -> Result<(), SendUpdateError> {
         self.update(Update::Persistent(update)).await
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SendUpdateError {
+    #[error("Failed to send update through channel")]
+    SendError,
+    #[error("Failed to receive feedback")]
+    RecvError,
+}
+
+impl<T> From<mpsc::error::SendError<T>> for SendUpdateError {
+    fn from(_: mpsc::error::SendError<T>) -> Self {
+        Self::SendError
+    }
+}
+
+impl From<oneshot::error::RecvError> for SendUpdateError {
+    fn from(_: oneshot::error::RecvError) -> Self {
+        Self::RecvError
     }
 }
