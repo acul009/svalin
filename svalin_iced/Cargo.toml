@@ -44,3 +44,6 @@ rfd = "0.17.2"
 
 [build-dependencies]
 iced_fontello = {git = "https://github.com/hecrj/iced_fontello.git"}
+
+[target."cfg(windows)".dependencies]
+windows = "0.62.2"

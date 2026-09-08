@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 use ui::UI;
 
 pub mod ui;
@@ -21,6 +22,9 @@ type Theme = iced::Theme;
 type Element<'a, Message> = iced::Element<'a, Message, crate::Theme>;
 
 fn main() {
+    #[cfg(target_os = "windows")]
+    attach().unwrap();
+
     tracing_subscriber::fmt()
         .with_writer(std::io::stdout)
         .init();
@@ -33,4 +37,11 @@ fn main() {
         .antialiasing(true)
         .run()
         .unwrap();
+}
+
+#[cfg(target_os = "windows")]
+fn attach() -> Result<(), windows_result::Error> {
+    unsafe {
+        windows::System::Console::AttachConsole(windows::System::Console::ATTACH_PARENT_PROCESS)
+    }
 }
