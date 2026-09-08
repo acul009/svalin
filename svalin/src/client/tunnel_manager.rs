@@ -50,9 +50,9 @@ impl TunnelManager {
         &self,
         client: &Client,
         tunnel: TunnelDefinition,
-    ) -> Result<(), TunnelCreateError> {
+    ) -> Result<u16, TunnelCreateError> {
         let connection = client.device(tunnel.target.clone()).connection().await?;
-        let (send_ready, recv_ready) = oneshot::channel::<()>();
+        let (send_ready, recv_ready) = oneshot::channel();
         let id = Uuid::new_v4();
 
         match &tunnel.config {
@@ -107,12 +107,13 @@ impl TunnelManager {
             }
         }
 
-        if let Err(_err) = recv_ready.await {
-            self.active.lock().unwrap().remove(&id);
-            return Err(TunnelCreateError::Aborted);
+        match recv_ready.await {
+            Ok(port) => Ok(port),
+            Err(_err) => {
+                self.active.lock().unwrap().remove(&id);
+                Err(TunnelCreateError::Aborted)
+            }
         }
-
-        Ok(())
     }
 
     pub fn close(&self, id: &Uuid) {

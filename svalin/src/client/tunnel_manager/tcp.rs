@@ -24,7 +24,7 @@ const TCP_TUNNEL_KEY: &str = "forward-tcp";
 pub struct TcpTunnelDispatcher {
     pub listener: TcpListener,
     pub cancel: CancellationToken,
-    pub ready: oneshot::Sender<()>,
+    pub ready: oneshot::Sender<u16>,
     pub remote_host: String,
 }
 
@@ -81,6 +81,13 @@ impl CommandDispatcher for TcpTunnelDispatcher {
         let mut id_counter: u64 = 0;
         let (all_send, mut all_recv) = tokio::sync::mpsc::channel(100);
         let tasks = TaskTracker::new();
+
+        let _ = self.ready.send(
+            self.listener
+                .local_addr()
+                .expect("I already set the local address")
+                .port(),
+        );
 
         loop {
             select! {

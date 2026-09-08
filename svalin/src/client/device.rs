@@ -102,7 +102,7 @@ impl<'a> DeviceHandle<'a> {
         Ok((input_send, output_recv))
     }
 
-    pub async fn open_tunnel(&self, tunnel: TunnelDefinition) -> anyhow::Result<()> {
+    pub async fn open_tunnel(&self, tunnel: TunnelDefinition) -> anyhow::Result<u16> {
         Ok(self.0.tunnel_manager.open(&self.0, tunnel).await?)
     }
 

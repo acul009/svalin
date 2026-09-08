@@ -23,7 +23,7 @@ type Element<'a, Message> = iced::Element<'a, Message, crate::Theme>;
 
 fn main() {
     #[cfg(target_os = "windows")]
-    attach().unwrap();
+    attach();
 
     tracing_subscriber::fmt()
         .with_writer(std::io::stdout)
@@ -40,10 +40,10 @@ fn main() {
 }
 
 #[cfg(target_os = "windows")]
-fn attach() -> Result<(), windows::core::Error> {
-    unsafe {
+fn attach() {
+    let _ = unsafe {
         windows::Win32::System::Console::AttachConsole(
             windows::Win32::System::Console::ATTACH_PARENT_PROCESS,
         )
-    }
+    };
 }

@@ -41,6 +41,7 @@ iced_fonts = { git = "https://git.redhawkcodes.dev/redhawk18/iced_fonts.git", br
 chrono = "0.4.45"
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 rfd = "0.17.2"
+open = "5.4.3"
 
 [build-dependencies]
 iced_fontello = {git = "https://github.com/hecrj/iced_fontello.git"}

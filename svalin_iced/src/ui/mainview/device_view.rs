@@ -31,7 +31,7 @@ pub enum Message {
     Update(update::Message),
     CloseOverlay,
     OpenProxmoxVE,
-    TunnelOpened,
+    ProxmoxVEOpened(u16),
 }
 
 pub enum Action {
@@ -134,20 +134,19 @@ impl State {
                     target: self.spki_hash.clone(),
                     config: TunnelConfig::Tcp {
                         local_port: None,
-                        remote_host: "https://127.0.0.1:8006".into(),
+                        remote_host: "127.0.0.1:8006".into(),
                     },
                 };
 
                 Action::Run(Task::future(async move {
-                    if let Err(_err) = client.device(spki_hash).open_tunnel(tunnel).await {
-                        Overlay::TunnelOpenError.into()
-                    } else {
-                        Message::TunnelOpened
+                    match client.device(spki_hash).open_tunnel(tunnel).await {
+                        Err(_err) => Message::Overlay(Overlay::TunnelOpenError),
+                        Ok(port) => Message::ProxmoxVEOpened(port),
                     }
                 }))
             }
-            Message::TunnelOpened => {
-                // Todo
+            Message::ProxmoxVEOpened(local_port) => {
+                open::that_in_background(format!("https://127.0.0.1:{local_port}"));
                 Action::None
             }
         }
@@ -222,7 +221,7 @@ fn agent_actions<'a>(device_state: &persistent::DeviceState) -> Element<'a, Mess
                 .on_press(Overlay::Update.into()),
             if is_proxmox {
                 Some(
-                    icon_button(bootstrap::download())
+                    icon_button(bootstrap::window_fullscreen())
                         .size(50)
                         .tooltip(text(t!("device.actions.open-pve")))
                         .on_press(Message::OpenProxmoxVE),
