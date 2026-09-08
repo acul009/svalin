@@ -5,6 +5,8 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+pub mod proxmox_ve;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SystemReport {
     pub generated_at: u64,
@@ -16,6 +18,12 @@ pub struct SystemReport {
     pub total_memory: u64,
     pub total_swap: u64,
     pub disks: Vec<Disk>,
+    pub extensions: Extensions,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct Extensions {
+    proxmox_ve: Option<proxmox_ve::ProxmoxVE>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -39,7 +47,9 @@ pub struct Disk {
 
 impl SystemReport {
     pub async fn create() -> anyhow::Result<Self> {
-        Ok(tokio::task::spawn_blocking(|| Self::create_inner()).await??)
+        let mut base = tokio::task::spawn_blocking(|| Self::create_inner()).await??;
+        base.extensions.proxmox_ve = proxmox_ve::ProxmoxVE::create().await?;
+        Ok(base)
     }
     pub fn create_inner() -> anyhow::Result<Self> {
         let sys = sysinfo::System::new_all();
@@ -94,6 +104,7 @@ impl SystemReport {
             total_memory: sys.total_memory(),
             total_swap: sys.total_swap(),
             disks,
+            extensions: Extensions::default(),
         })
     }
 }
