@@ -14,7 +14,6 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::error;
 
 use crate::{
-    client::tunnel_manager::TunnelManager,
     message_streaming::client::{ClientMessageDispatcher, ClientMessageReceiver},
     remote_key_retriever::RemoteKeyRetriever,
     shared::commands::{get_user_credentials::GetUserCredential, update_mls::UpdateMls},
@@ -268,8 +267,6 @@ impl Client {
         //     verifier.clone(),
         // )?);
 
-        let tunnel_manager = TunnelManager::new();
-
         let (dispatcher_handle, message_dispatcher) = ClientMessageDispatcher::new();
 
         let connection = rpc.upstream_connection();
@@ -331,7 +328,6 @@ impl Client {
             user_credential,
             device_credential,
             verifier: verifier.clone(),
-            tunnel_manager,
             trust_store: trust_store,
             store: client_store,
             mls_update_sender,

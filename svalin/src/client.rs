@@ -6,7 +6,7 @@ use anyhow::{Result, anyhow};
 
 // pub mod device;
 mod first_connect;
-pub mod tunnel_manager;
+// pub mod tunnel_manager;
 
 pub mod add_agent;
 pub mod device;
@@ -25,7 +25,6 @@ use tokio::time::error::Elapsed;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
-use tunnel_manager::TunnelManager;
 
 use crate::client::device::DeviceHandle;
 use crate::client::state::{ClientState, Update};
@@ -42,7 +41,7 @@ pub struct Client {
     device_credential: Credential,
     trust_store: Arc<RwLock<TrustStore>>,
     store: Arc<ClientStore>,
-    tunnel_manager: TunnelManager,
+    // tunnel_manager: TunnelManager,
     message_sender: ClientMessageDispatcherHandle,
     state_handle: ClientStateHandle,
     background_tasks: TaskTracker,
@@ -86,10 +85,6 @@ impl Client {
             .dispatch(Ping)
             .await
             .map_err(|err| anyhow!(err))
-    }
-
-    pub fn tunnel_manager(&self) -> &TunnelManager {
-        &self.tunnel_manager
     }
 
     pub fn device(&self, spki_hash: SpkiHash) -> DeviceHandle<'_> {

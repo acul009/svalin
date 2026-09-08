@@ -1,10 +1,13 @@
 use std::{
     collections::HashMap,
+    hash::Hasher,
+    num::NonZeroU16,
+    ops::Range,
     sync::{Arc, Mutex},
 };
 
 use serde::{Deserialize, Serialize};
-use svalin_pki::Certificate;
+use svalin_pki::{Certificate, SpkiHash};
 use svalin_rpc::{
     commands::forward::ForwardConnection,
     rpc::{
@@ -15,46 +18,61 @@ use svalin_rpc::{
 use tcp::{TcpTunnelConfig, TcpTunnelCreateError, TcpTunnelRunError};
 use thiserror::Error;
 use tokio::{
+    net::TcpListener,
     sync::{oneshot, watch},
     task::JoinSet,
 };
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use uuid::Uuid;
+
+use crate::client::Client;
 
 pub mod tcp;
 
-#[derive(Clone)]
-pub struct TunnelManager {
-    active_tunnels: watch::Sender<HashMap<Certificate, HashMap<Uuid, Tunnel>>>,
-    join_set: Arc<Mutex<JoinSet<()>>>,
+pub(crate) struct TunnelManager {
+    active: HashMap<SpkiHash, HashMap<Uuid, CancellationToken>>,
 }
 
 type TunnelConnection = ForwardConnection<DirectConnection>;
 
 impl TunnelManager {
     pub fn new() -> Self {
-        let (active_tunnels, _) = watch::channel(HashMap::new());
         Self {
-            active_tunnels,
-            join_set: Arc::new(Mutex::new(JoinSet::new())),
+            active: HashMap::new(),
         }
     }
 
-    pub async fn open(
+    pub(crate) async fn open(
         &self,
-        connection: TunnelConnection,
-        config: TunnelConfig,
+        client: &Client,
+        tunnel: TunnelDefinition,
     ) -> Result<(), TunnelCreateError> {
-        let certificate = match connection.peer() {
-            Peer::Anonymous => return Err(TunnelCreateError::NoPeerOnConnection),
-            Peer::Certificate(certificate) => certificate.clone(),
-        };
+        let connection = client.device(tunnel.target).connection().await?;
+
+        match tunnel.config {
+            TunnelConfig::Tcp {
+                local_port,
+                remote_host,
+            } => {
+                let local_port = local_port.unwrap_or_else(|| {
+                    let mut hasher = Fnv1aHasher::default();
+                    tunnel.target.hash(&mut hasher);
+                    tunnel.name.hash(&mut hasher);
+                    stable_port(&hasher)
+                });
+
+                let listener = TcpListener::bind(format!("127.0.0.1:{}", local_port)).await?;
+
+                todo!();
+            }
+        }
 
         let mut tunnel = Tunnel::open(connection, config).await?;
 
         let id = tunnel.id();
         let tunnel_result = tunnel.take_result().unwrap();
 
-        self.active_tunnels
+        self.active
             .send_modify(|tunnels| match tunnels.get_mut(&certificate) {
                 Some(peer_tunnels) => {
                     peer_tunnels.insert(id, tunnel);
@@ -66,7 +84,7 @@ impl TunnelManager {
                 }
             });
 
-        let active_tunnels = self.active_tunnels.clone();
+        let active_tunnels = self.active.clone();
 
         self.join_set.lock().unwrap().spawn(async move {
             let result = tunnel_result.await_result().await;
@@ -90,11 +108,11 @@ impl TunnelManager {
     }
 
     pub fn tunnels(&self) -> watch::Ref<'_, HashMap<Certificate, HashMap<Uuid, Tunnel>>> {
-        self.active_tunnels.borrow()
+        self.active.borrow()
     }
 
     pub fn close_tunnel(&self, id: &Uuid) {
-        self.active_tunnels.send_modify(|tunnels| {
+        self.active.send_modify(|tunnels| {
             for (_, peer_tunnels) in tunnels.iter_mut() {
                 if let Some(tunnel) = peer_tunnels.get_mut(id) {
                     tunnel.close();
@@ -105,102 +123,53 @@ impl TunnelManager {
     }
 
     pub fn watch_tunnels(&self) -> watch::Receiver<HashMap<Certificate, HashMap<Uuid, Tunnel>>> {
-        self.active_tunnels.subscribe()
+        self.active.subscribe()
     }
 }
 
-#[derive(Debug)]
-pub struct Tunnel {
-    id: Uuid,
+pub struct TunnelDefinition {
+    target: SpkiHash,
+    name: String,
     config: TunnelConfig,
-    run_result: Option<TunnelRunResult>,
-    active_send: watch::Sender<bool>,
-    peer: Peer,
 }
 
-impl Drop for Tunnel {
-    fn drop(&mut self) {
-        let _ = self.active_send.send(false);
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TunnelConfig {
-    Tcp(TcpTunnelConfig),
+    Tcp {
+        local_port: Option<NonZeroU16>,
+        remote_host: String,
+    },
 }
 
-#[derive(Debug, Error)]
-pub enum TunnelCreateError {
-    #[error("given connection has no peer")]
-    NoPeerOnConnection,
-    #[error(transparent)]
-    Tcp(#[from] TcpTunnelCreateError),
+const FORWARD_PORT_RANGE: Range<u16> = 10240..65535;
+
+fn stable_port(hasher: &impl Hasher) -> NonZeroU16 {
+    let width = u64::from(FORWARD_PORT_RANGE.end - FORWARD_PORT_RANGE.start);
+    let stable = FORWARD_PORT_RANGE.start + (hasher.finish() % width) as u16;
+    NonZeroU16::new(stable).expect("stable port is always non-zero thanks to FORWARD_PORT_RANGE")
 }
 
-#[derive(Debug, Error)]
-pub enum TunnelRunError {
-    #[error(transparent)]
-    Tcp(#[from] TcpTunnelRunError),
+#[derive(Clone)]
+struct Fnv1aHasher {
+    state: u64,
 }
 
-#[derive(Debug)]
-pub enum TunnelRunResult {
-    Tcp(oneshot::Receiver<TcpTunnelRunError>),
-}
-
-impl TunnelRunResult {
-    pub async fn await_result(self) -> Result<(), TunnelRunError> {
-        match self {
-            TunnelRunResult::Tcp(result) => match result.await {
-                Ok(err) => Err(err.into()),
-                Err(_) => Ok(()),
-            },
+impl Default for Fnv1aHasher {
+    fn default() -> Self {
+        Self {
+            state: 0xcbf29ce484222325,
         }
     }
 }
 
-impl Tunnel {
-    pub async fn open(
-        connection: impl Connection + 'static,
-        config: TunnelConfig,
-    ) -> Result<Tunnel, TunnelCreateError> {
-        let peer = connection.peer().clone();
-        let (active_send, active_recv) = watch::channel(true);
-        let run_result = Some(match &config {
-            TunnelConfig::Tcp(config) => {
-                TunnelRunResult::Tcp(config.run(connection, active_recv).await?)
-            }
-        });
-        let id = Uuid::new_v4();
-
-        Ok(Self {
-            id,
-            config,
-            run_result,
-            active_send,
-            peer,
-        })
+impl Hasher for Fnv1aHasher {
+    fn finish(&self) -> u64 {
+        self.state
     }
 
-    pub fn id(&self) -> Uuid {
-        self.id
-    }
-
-    pub fn config(&self) -> &TunnelConfig {
-        &self.config
-    }
-
-    pub fn peer(&self) -> &Peer {
-        &self.peer
-    }
-
-    pub fn take_result(&mut self) -> Option<TunnelRunResult> {
-        self.run_result.take()
-    }
-
-    pub fn close(&mut self) {
-        // we only care about shutting down the tunnel.
-        // if it's already closed, we don't need to do anything
-        let _ = self.active_send.send(false);
+    fn write(&mut self, bytes: &[u8]) {
+        for &byte in bytes {
+            self.state ^= u64::from(byte);
+            self.state = self.state.wrapping_mul(0x100000001b3);
+        }
     }
 }

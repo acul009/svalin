@@ -5,7 +5,6 @@
 pub mod agent;
 // pub mod async_com;
 pub mod client;
-pub mod device;
 pub mod installer;
 pub mod message_streaming;
 pub mod mls;

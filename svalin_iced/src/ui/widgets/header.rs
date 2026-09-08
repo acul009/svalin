@@ -5,7 +5,7 @@ use iced::{
 };
 
 use crate::{
-    Element, bootstrap,
+    Element,
     ui::widgets::{
         icon_button,
         scaffold::{HEADER_HEIGHT, HEADER_PADDING},

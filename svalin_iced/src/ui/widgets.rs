@@ -3,7 +3,11 @@ use std::{borrow::Cow, ops::RangeInclusive};
 // use svalin::client::device::RemoteData;
 // use svalin_sysctl::realtime::RealtimeStatus;
 
-use iced::{color, widget::Text};
+use iced::{
+    alignment::Vertical,
+    color,
+    widget::{Button, Text, button, row, text},
+};
 use svalin_sysctl::sytem_report::OSFamily;
 
 use crate::{Element, bootstrap};
@@ -80,6 +84,22 @@ pub fn fact_list<'a, Message>() -> fact_list::FactList<'a, Message> {
 
 pub fn icon_button<'a, Message>(icon: Text<'a>) -> icon_button::IconButton<'a, Message> {
     icon_button::IconButton::new(icon)
+}
+
+pub fn back_button<'a, Message: 'static>() -> Button<'a, Message> {
+    button(
+        row![bootstrap::arrow_left(), text(t!("generic.back"))]
+            .align_y(Vertical::Center)
+            .spacing(10),
+    )
+}
+
+pub fn forward_button<'a, Message: 'static>() -> Button<'a, Message> {
+    button(
+        row![text(t!("generic.continue")), bootstrap::arrow_right()]
+            .align_y(Vertical::Center)
+            .spacing(10),
+    )
 }
 
 // pub fn realtime(realtime: &RemoteData<RealtimeStatus>) -> realtime::RealtimeDisplay<'_> {

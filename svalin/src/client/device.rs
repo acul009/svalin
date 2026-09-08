@@ -65,7 +65,7 @@ impl<'a> DeviceHandle<'a> {
         Ok(())
     }
 
-    async fn connection(&self) -> anyhow::Result<ForwardConnection<DirectConnection>> {
+    pub(crate) async fn connection(&self) -> anyhow::Result<ForwardConnection<DirectConnection>> {
         let cert = self
             .0
             .verifier
