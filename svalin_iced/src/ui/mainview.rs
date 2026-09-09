@@ -293,6 +293,12 @@ impl MainView {
                                         warning::Device::BitlockerActive { drive, .. } => {
                                             text!("Drive {drive} has bitlocker active!")
                                         }
+                                        warning::Device::PMGAttachmentQuarantine(count) => {
+                                            text!("There are {count} mails in the attachment quarantine")
+                                        }
+                                        warning::Device::PMGVirusQuarantine(count) => {
+                                            text!("There are {count} mails in the virus quarantine")
+                                        }
                                     };
                                     Element::from(
                                         column![text(name).size(24), message, actions]

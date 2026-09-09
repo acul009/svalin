@@ -74,6 +74,8 @@ pub enum Device {
         protection: windows::ProtectionStatus,
         percentage: u8,
     },
+    PMGAttachmentQuarantine(u64),
+    PMGVirusQuarantine(u64),
 }
 
 impl Device {
@@ -83,6 +85,8 @@ impl Device {
             Self::DiskSpaceLow { .. } => Severity::Medium,
             Self::MissingName => Severity::Low,
             Self::BitlockerActive { .. } => Severity::Medium,
+            Self::PMGAttachmentQuarantine(_) => Severity::Low,
+            Self::PMGVirusQuarantine(_) => Severity::Low,
         }
     }
 }

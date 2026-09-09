@@ -102,6 +102,20 @@ impl State {
             if let Some(windows) = extensions.windows() {
                 self.generate_windows_warnings(&mut warnings, windows);
             }
+            if let Some(pmg) = extensions.proxmox_mg() {
+                if pmg.attachment_quarantine_count > 0 {
+                    warnings.push(warning::Device::PMGAttachmentQuarantine(
+                        pmg.attachment_quarantine_count,
+                    ));
+                }
+            }
+            if let Some(pmg) = extensions.proxmox_mg() {
+                if pmg.virus_quarantine_count > 0 {
+                    warnings.push(warning::Device::PMGVirusQuarantine(
+                        pmg.virus_quarantine_count,
+                    ));
+                }
+            }
         }
 
         if let Some(meta_info) = device.meta_info() {

@@ -5,8 +5,8 @@ const PMGSH: &str = "/usr/bin/pmgsh";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProxmoxMG {
-    pub attachment_quarantine_count: Option<u64>,
-    pub virus_quarantine_count: Option<u64>,
+    pub attachment_quarantine_count: u64,
+    pub virus_quarantine_count: u64,
 }
 
 impl ProxmoxMG {
@@ -19,23 +19,17 @@ impl ProxmoxMG {
             return Ok(None);
         }
 
-        if !tokio::fs::try_exists(PMGSH).await? {
-            return Ok(Some(Self {
-                attachment_quarantine_count: None,
-                virus_quarantine_count: None,
-            }));
-        }
-
         let endtime = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs()
-            .to_string();
+            .as_secs();
+        let starttime = endtime.saturating_sub(7 * 24 * 60 * 60).to_string();
+        let endtime = endtime.to_string();
 
         let attachment_args = [
             "get",
             "/quarantine/attachment",
             "--starttime",
-            "0",
+            &starttime,
             "--endtime",
             &endtime,
         ];
@@ -52,7 +46,7 @@ impl ProxmoxMG {
     }
 }
 
-async fn quarantine_count(kind: &str, args: &[&str]) -> Option<u64> {
+async fn quarantine_count(kind: &str, args: &[&str]) -> u64 {
     let output = match Command::new(PMGSH)
         .args(args)
         .args(["--output-format", "json"])
@@ -67,7 +61,7 @@ async fn quarantine_count(kind: &str, args: &[&str]) -> Option<u64> {
                 stderr = %String::from_utf8_lossy(&output.stderr),
                 "failed to query Proxmox Mail Gateway quarantine"
             );
-            return None;
+            return 0;
         }
         Err(error) => {
             tracing::warn!(
@@ -75,18 +69,18 @@ async fn quarantine_count(kind: &str, args: &[&str]) -> Option<u64> {
                 %error,
                 "failed to run Proxmox Mail Gateway CLI"
             );
-            return None;
+            return 0;
         }
     };
 
     match parse_quarantine_count(kind, &output.stdout) {
-        Some(count) => Some(count),
+        Some(count) => count,
         None => {
             tracing::warn!(
                 quarantine = kind,
                 "Proxmox Mail Gateway CLI returned an unexpected response"
             );
-            None
+            0
         }
     }
 }
