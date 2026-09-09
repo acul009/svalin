@@ -289,6 +289,9 @@ impl MainView {
                                     warning::Device::MissingName => {
                                         text(t!("warnings.device.missing-name"))
                                     }
+                                    warning::Device::BitlockerActive { drive, .. } => {
+                                        text!("Drive {drive} has bitlocker active!")
+                                    }
                                 };
                                 Element::from(
                                     column![text(name).size(24), message, actions]

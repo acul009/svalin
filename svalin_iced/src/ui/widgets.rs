@@ -8,7 +8,7 @@ use iced::{
     color,
     widget::{Button, Text, button, row, text},
 };
-use svalin_sysctl::sytem_report::OSFamily;
+use svalin_sysctl::system_report::OSFamily;
 
 use crate::{Element, bootstrap};
 

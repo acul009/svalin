@@ -11,7 +11,7 @@ use svalin::client::{
     tunnel_manager::{TunnelConfig, TunnelDefinition},
 };
 use svalin_pki::SpkiHash;
-use svalin_sysctl::sytem_report::Disk;
+use svalin_sysctl::system_report::Disk;
 use url::Url;
 
 use crate::{

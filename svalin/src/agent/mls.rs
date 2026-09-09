@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use futures::{FutureExt, select};
-use svalin_sysctl::sytem_report::SystemReport;
+use svalin_sysctl::system_report::SystemReport;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 

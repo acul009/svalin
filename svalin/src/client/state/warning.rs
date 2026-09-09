@@ -1,4 +1,5 @@
 use svalin_pki::SpkiHash;
+use svalin_sysctl::system_report::windows;
 
 #[derive(Clone, Debug)]
 pub struct State {
@@ -61,8 +62,18 @@ pub enum Severity {
 #[derive(Clone, Debug)]
 pub enum Device {
     DeviceGroupBroken(String),
-    DiskSpaceLow { disk: String, free: u64, total: u64 },
+    DiskSpaceLow {
+        disk: String,
+        free: u64,
+        total: u64,
+    },
     MissingName,
+    BitlockerActive {
+        drive: String,
+        status: windows::VolumeStatus,
+        protection: windows::ProtectionStatus,
+        percentage: u8,
+    },
 }
 
 impl Device {
@@ -71,6 +82,7 @@ impl Device {
             Self::DeviceGroupBroken(_) => Severity::High,
             Self::DiskSpaceLow { .. } => Severity::Medium,
             Self::MissingName => Severity::Low,
+            Self::BitlockerActive { .. } => Severity::Medium,
         }
     }
 }

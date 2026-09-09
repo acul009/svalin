@@ -2,7 +2,10 @@ use std::{borrow::Cow, collections::HashMap, fmt::Debug};
 
 use serde::{Deserialize, Serialize};
 use svalin_pki::SpkiHash;
-use svalin_sysctl::sytem_report::{OSFamily, SystemReport};
+use svalin_sysctl::system_report::{
+    OSFamily, SystemReport,
+    windows::{ProtectionStatus, VolumeStatus},
+};
 
 use crate::client::state::warning;
 
@@ -95,6 +98,10 @@ impl State {
                     });
                 }
             }
+            let extensions = &report.system_report.extensions;
+            if let Some(windows) = extensions.windows() {
+                self.generate_windows_warnings(&mut warnings, windows);
+            }
         }
 
         if let Some(meta_info) = device.meta_info() {
@@ -106,6 +113,29 @@ impl State {
         }
 
         warnings
+    }
+
+    fn generate_windows_warnings(
+        &self,
+        warnings: &mut Vec<warning::Device>,
+        windows: &svalin_sysctl::system_report::windows::Windows,
+    ) {
+        if let Some(bitlocker) = &windows.bitlocker_volumes {
+            for drive in bitlocker {
+                if drive.volume_status == VolumeStatus::FullyDecrypted
+                    && drive.protection_status == ProtectionStatus::Off
+                    && drive.encryption_percentage == 0
+                {
+                    continue;
+                }
+                warnings.push(warning::Device::BitlockerActive {
+                    drive: drive.mount_point.clone(),
+                    status: drive.volume_status.clone(),
+                    protection: drive.protection_status.clone(),
+                    percentage: drive.encryption_percentage,
+                });
+            }
+        }
     }
 }
 

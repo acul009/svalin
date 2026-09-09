@@ -78,6 +78,7 @@ impl SystemReport {
         let mut base = tokio::task::spawn_blocking(|| Self::create_inner()).await??;
         base.extensions.proxmox_ve = proxmox_ve::ProxmoxVE::create().await?;
         base.extensions.proxmox_mg = proxmox_mg::ProxmoxMG::create().await?;
+        base.extensions.windows = windows::Windows::create().await;
         Ok(base)
     }
     pub fn create_inner() -> anyhow::Result<Self> {
