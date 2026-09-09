@@ -89,6 +89,8 @@ device:
     title: Agent Actions
     open-terminal: Open Terminal
     open-pve: Open Proxmox-VE
+    open-pbs: Open Proxmox-Backup-Server
+    open-pmg: Open Proxmox-Mail-Gateway
     update: Update Agent
   info:
     title: Device Information
@@ -105,6 +107,8 @@ device:
     cpu-cores-threads: CPU Cores / Threads
     cpu-threads: CPU Threads
     total-memory-swap: "Total Memory / Swap:"
+    attachment-quarantine: "Attachment Quarantine:"
+    virus-quarantine: "Virus Quarantine:"
     disk-free: "%{free} / %{total} Free"
   update:
     error-during-update: Error during agent update

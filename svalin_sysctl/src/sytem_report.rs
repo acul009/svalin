@@ -5,7 +5,10 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+pub mod proxmox_bs;
+pub mod proxmox_mg;
 pub mod proxmox_ve;
+pub mod windows;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SystemReport {
@@ -23,12 +26,31 @@ pub struct SystemReport {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Extensions {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     proxmox_ve: Option<proxmox_ve::ProxmoxVE>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    proxmox_mg: Option<proxmox_mg::ProxmoxMG>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    proxmox_bs: Option<proxmox_bs::ProxmoxBS>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    windows: Option<windows::Windows>,
 }
 
 impl Extensions {
     pub fn proxmox_ve(&self) -> Option<&proxmox_ve::ProxmoxVE> {
         self.proxmox_ve.as_ref()
+    }
+
+    pub fn proxmox_mg(&self) -> Option<&proxmox_mg::ProxmoxMG> {
+        self.proxmox_mg.as_ref()
+    }
+
+    pub fn proxmox_bs(&self) -> Option<&proxmox_bs::ProxmoxBS> {
+        self.proxmox_bs.as_ref()
+    }
+
+    pub fn windows(&self) -> Option<&windows::Windows> {
+        self.windows.as_ref()
     }
 }
 
@@ -55,6 +77,7 @@ impl SystemReport {
     pub async fn create() -> anyhow::Result<Self> {
         let mut base = tokio::task::spawn_blocking(|| Self::create_inner()).await??;
         base.extensions.proxmox_ve = proxmox_ve::ProxmoxVE::create().await?;
+        base.extensions.proxmox_mg = proxmox_mg::ProxmoxMG::create().await?;
         Ok(base)
     }
     pub fn create_inner() -> anyhow::Result<Self> {

@@ -71,6 +71,8 @@ device:
     title: Agentenaktionen
     open-terminal: Terminal öffnen
     open-pve: Proxmox-VE öffnen
+    open-pbs: Proxmox-Backup-Server öffnen
+    open-pmg: Proxmox-Mail-Gateway öffnen
     update: Agent aktualisieren
   info:
     title: Geräteinformationen
@@ -87,6 +89,8 @@ device:
     cpu-cores-threads: CPU-Kerne / Threads
     cpu-threads: CPU-Threads
     total-memory-swap: "Arbeitsspeicher / Swap gesamt:"
+    attachment-quarantine: "Anhang-Quarantäne:"
+    virus-quarantine: "Virus-Quarantäne:"
     disk-free: "%{free} / %{total} frei"
   update:
     error-during-update: Fehler beim Aktualisieren des Agenten

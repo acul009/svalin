@@ -12,6 +12,7 @@ use svalin::client::{
 };
 use svalin_pki::SpkiHash;
 use svalin_sysctl::sytem_report::Disk;
+use url::Url;
 
 use crate::{
     Element, bootstrap,
@@ -30,8 +31,8 @@ pub enum Message {
     MetaDisplay(meta_display::Message),
     Update(update::Message),
     CloseOverlay,
-    OpenProxmoxVE,
-    ProxmoxVEOpened(u16),
+    OpenRemoteWebinterface(Url),
+    RemoteWebinterfaceOpened { scheme: String, local_port: u16 },
 }
 
 pub enum Action {
@@ -126,27 +127,32 @@ impl State {
                 }
             }
             Message::OpenTerminal => Action::OpenTerminal(self.spki_hash.clone()),
-            Message::OpenProxmoxVE => {
+            Message::OpenRemoteWebinterface(url) => {
                 let client = client.clone();
                 let spki_hash = self.spki_hash.clone();
+                let Some((host, port)) = url.host_str().zip(url.port_or_known_default()) else {
+                    return Action::None;
+                };
+                let scheme = url.scheme().to_string();
+                let remote_host = format!("{}:{}", host, port);
                 let tunnel = TunnelDefinition {
                     name: "Proxmox-VE".into(),
                     target: self.spki_hash.clone(),
                     config: TunnelConfig::Tcp {
                         local_port: None,
-                        remote_host: "127.0.0.1:8006".into(),
+                        remote_host,
                     },
                 };
 
                 Action::Run(Task::future(async move {
                     match client.device(spki_hash).open_tunnel(tunnel).await {
                         Err(_err) => Message::Overlay(Overlay::TunnelOpenError),
-                        Ok(port) => Message::ProxmoxVEOpened(port),
+                        Ok(local_port) => Message::RemoteWebinterfaceOpened { local_port, scheme },
                     }
                 }))
             }
-            Message::ProxmoxVEOpened(local_port) => {
-                open::that_in_background(format!("https://127.0.0.1:{local_port}"));
+            Message::RemoteWebinterfaceOpened { scheme, local_port } => {
+                open::that_in_background(format!("{scheme}://127.0.0.1:{local_port}"));
                 Action::None
             }
         }
@@ -205,9 +211,15 @@ impl State {
 }
 
 fn agent_actions<'a>(device_state: &persistent::DeviceState) -> Element<'a, Message> {
-    let is_proxmox = device_state
-        .report()
-        .map(|r| r.system_report.extensions.proxmox_ve().is_some())
+    let extensions = device_state.report().map(|r| &r.system_report.extensions);
+    let is_proxmox_ve = extensions
+        .map(|e| e.proxmox_ve().is_some())
+        .unwrap_or(false);
+    let is_proxmox_bs = extensions
+        .map(|e| e.proxmox_bs().is_some())
+        .unwrap_or(false);
+    let is_proxmox_mg = extensions
+        .map(|e| e.proxmox_mg().is_some())
         .unwrap_or(false);
     card(
         row![
@@ -219,16 +231,36 @@ fn agent_actions<'a>(device_state: &persistent::DeviceState) -> Element<'a, Mess
                 .size(50)
                 .tooltip(text(t!("device.actions.update")))
                 .on_press(Overlay::Update.into()),
-            if is_proxmox {
-                Some(
-                    icon_button(bootstrap::window_fullscreen())
-                        .size(50)
-                        .tooltip(text(t!("device.actions.open-pve")))
-                        .on_press(Message::OpenProxmoxVE),
-                )
-            } else {
-                None
-            }
+            is_proxmox_ve.then(|| {
+                icon_button(bootstrap::window_fullscreen())
+                    .size(50)
+                    .tooltip(text(t!("device.actions.open-pve")))
+                    .on_press(Message::OpenRemoteWebinterface(
+                        "https://127.0.0.1:8006"
+                            .parse()
+                            .expect("hand coded urls have to parse"),
+                    ))
+            }),
+            is_proxmox_bs.then(|| {
+                icon_button(bootstrap::window_fullscreen())
+                    .size(50)
+                    .tooltip(text(t!("device.actions.open-pbs")))
+                    .on_press(Message::OpenRemoteWebinterface(
+                        "https://127.0.0.1:8007"
+                            .parse()
+                            .expect("hand coded urls have to parse"),
+                    ))
+            }),
+            is_proxmox_mg.then(|| {
+                icon_button(bootstrap::window_fullscreen())
+                    .size(50)
+                    .tooltip(text(t!("device.actions.open-pmg")))
+                    .on_press(Message::OpenRemoteWebinterface(
+                        "https://127.0.0.1:8006"
+                            .parse()
+                            .expect("hand coded urls have to parse"),
+                    ))
+            }),
         ]
         .padding(20)
         .spacing(20),
