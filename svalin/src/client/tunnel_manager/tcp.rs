@@ -14,12 +14,14 @@ use tokio::{
     net::{TcpListener, TcpStream},
     select,
     sync::{mpsc, oneshot},
+    time::Instant,
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use crate::permissions::Permission;
 
 const TCP_TUNNEL_KEY: &str = "forward-tcp";
+const TCP_TUNNEL_IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 pub struct TcpTunnelDispatcher {
     pub listener: TcpListener,
@@ -81,6 +83,8 @@ impl CommandDispatcher for TcpTunnelDispatcher {
         let mut id_counter: u64 = 0;
         let (all_send, mut all_recv) = tokio::sync::mpsc::channel(100);
         let tasks = TaskTracker::new();
+        let idle_timeout = tokio::time::sleep(TCP_TUNNEL_IDLE_TIMEOUT);
+        tokio::pin!(idle_timeout);
 
         let _ = self.ready.send(
             self.listener
@@ -92,6 +96,9 @@ impl CommandDispatcher for TcpTunnelDispatcher {
         loop {
             select! {
                 _ = self.cancel.cancelled() => {
+                    break;
+                }
+                _ = &mut idle_timeout, if connections.is_empty() => {
                     break;
                 }
                 accept_result = self.listener.accept() => {
@@ -112,6 +119,9 @@ impl CommandDispatcher for TcpTunnelDispatcher {
                     if let Some(to_agent) = to_agent {
                         if let ToAgent::Closed(id) = to_agent {
                             connections.remove(&id);
+                            if connections.is_empty() {
+                                idle_timeout.as_mut().reset(Instant::now() + TCP_TUNNEL_IDLE_TIMEOUT);
+                            }
                         }
                         session.write_object(&to_agent).await?;
                     }

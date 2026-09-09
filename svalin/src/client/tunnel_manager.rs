@@ -3,7 +3,7 @@ use std::{
     hash::{Hash, Hasher},
     num::NonZeroU16,
     ops::Range,
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
 use svalin_pki::SpkiHash;
@@ -24,7 +24,7 @@ use crate::{
 pub mod tcp;
 
 pub(crate) struct TunnelManager {
-    active: Mutex<HashMap<Uuid, CancellationToken>>,
+    active: Arc<Mutex<HashMap<Uuid, CancellationToken>>>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -42,7 +42,7 @@ pub enum TunnelCreateError {
 impl TunnelManager {
     pub fn new() -> Self {
         Self {
-            active: Mutex::new(HashMap::new()),
+            active: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -76,6 +76,7 @@ impl TunnelManager {
                 }
 
                 let state_handle = client.state_handle.clone();
+                let active = self.active.clone();
                 let target = tunnel.target.clone();
                 let remote_host = remote_host.clone();
                 state_handle
@@ -98,11 +99,10 @@ impl TunnelManager {
                     {
                         tracing::error!("error in tcp tunnel: {err:#}");
                     }
+                    active.lock().unwrap().remove(&id);
                     let _ = state_handle
                         .update(state::Update::Tunnel(tunneling::Update::Closed(target, id)))
                         .await;
-
-                    //Todo: cleanup cancellation token
                 });
             }
         }
