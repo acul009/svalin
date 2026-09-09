@@ -44,7 +44,7 @@ agent_uninstall $RUST_LOG="svalin=trace":
     sudo target/release/svalin agent uninstall
 
 agent_init $RUST_LOG="svalin=trace":
-    cargo run -p svalin agent init localhost:55411
+    cargo run -p svalin agent init localhost:55411 --profile development
 
 gui $RUST_LOG="svalin=trace":
     cd svalin_iced; cargo run

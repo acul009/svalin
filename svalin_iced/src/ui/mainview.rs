@@ -192,7 +192,11 @@ impl MainView {
                 .on_new(Message::OpenAddDevice)
                 .on_select(Message::SelectDevice)
                 .into(),
-            Screen::AddDevice(add_device) => add_device.view().map(Message::AddDevice),
+            Screen::AddDevice(add_device) => stack![
+                device_list::DeviceList::new(&self.state),
+                add_device.view().map(Message::AddDevice)
+            ]
+            .into(),
             Screen::DeviceView(device_view) => {
                 device_view.view(&self.state).map(Message::DeviceView)
             }

@@ -103,23 +103,33 @@ impl AddDevice {
 
     pub fn view(&self) -> Element<'_, Message> {
         match &self.screen {
-            Screen::Error(err) => error_display(err).on_close(Message::Cancel).into(),
-            Screen::Loading(message) => loading(message).into(),
-            Screen::Input => dialog(column![
-                text_input(t!("add-device.input.join-code"), &self.join_code)
-                    .on_input(Message::JoinCode)
-                    .id("join_code"),
-                text_input(t!("add-device.input.confirm-code"), &self.confirm_code)
-                    .id("confirm_code")
-                    .on_input(Message::ConfirmCode)
-                    .on_submit(Message::ConnectToDevice),
-            ])
+            Screen::Error(err) => error_display(err)
+                .on_close(Message::Cancel)
+                .overlay()
+                .into(),
+            Screen::Loading(message) => dialog(loading(message))
+                .title("Adding Device...")
+                .overlay()
+                .into(),
+            Screen::Input => dialog(
+                column![
+                    text_input(t!("add-device.input.join-code"), &self.join_code)
+                        .on_input(Message::JoinCode)
+                        .id("join_code"),
+                    text_input(t!("add-device.input.confirm-code"), &self.confirm_code)
+                        .id("confirm_code")
+                        .on_input(Message::ConfirmCode)
+                        .on_submit(Message::ConnectToDevice),
+                ]
+                .spacing(10),
+            )
+            .title("Add Device")
             .on_close(Message::Cancel)
-            .button(button(iced::widget::text(t!("generic.cancel"))).on_press(Message::Cancel))
             .button(
                 button(iced::widget::text(t!("generic.continue")))
                     .on_press(Message::ConnectToDevice),
             )
+            .overlay()
             .into(),
         }
     }
