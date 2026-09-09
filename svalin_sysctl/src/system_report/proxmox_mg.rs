@@ -33,7 +33,7 @@ impl ProxmoxMG {
             "--endtime",
             &endtime,
         ];
-        let virus_args = ["get", "/quarantine/virusstatus"];
+        let virus_args = ["get", "/quarantine/virus"];
         let (attachment_quarantine_count, virus_quarantine_count) = tokio::join!(
             quarantine_count("attachment", &attachment_args),
             quarantine_count("virus", &virus_args),
@@ -73,51 +73,12 @@ async fn quarantine_count(kind: &str, args: &[&str]) -> u64 {
         }
     };
 
-    match parse_quarantine_count(kind, &output.stdout) {
-        Some(count) => count,
-        None => {
-            tracing::warn!(
-                quarantine = kind,
-                "Proxmox Mail Gateway CLI returned an unexpected response"
-            );
-            0
-        }
-    }
+    parse_quarantine_count(&output.stdout)
 }
 
-fn parse_quarantine_count(kind: &str, output: &[u8]) -> Option<u64> {
-    let value: serde_json::Value = serde_json::from_slice(output).ok()?;
-
-    match kind {
-        "attachment" => u64::try_from(value.as_array()?.len()).ok(),
-        "virus" => value.get("count")?.as_u64(),
-        _ => None,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::parse_quarantine_count;
-
-    #[test]
-    fn parses_attachment_list_count() {
-        assert_eq!(
-            parse_quarantine_count("attachment", br#"[{"id":"one"},{"id":"two"}]"#),
-            Some(2)
-        );
-    }
-
-    #[test]
-    fn parses_virus_status_count() {
-        assert_eq!(
-            parse_quarantine_count("virus", br#"{"count":7,"mbytes":1.5}"#),
-            Some(7)
-        );
-    }
-
-    #[test]
-    fn rejects_unexpected_output() {
-        assert_eq!(parse_quarantine_count("attachment", b"{}"), None);
-        assert_eq!(parse_quarantine_count("virus", b"[]"), None);
-    }
+fn parse_quarantine_count(output: &[u8]) -> u64 {
+    let utf = String::from_utf8_lossy(output);
+    utf.lines()
+        .filter(|line| line.trim_ascii_start().starts_with("\"bytes\""))
+        .count() as u64
 }
