@@ -3,7 +3,7 @@ use std::{borrow::Cow, process, sync::Arc, time::Duration};
 use anyhow::anyhow;
 use iced::{
     Length, Subscription, Task,
-    widget::{button, column, row, stack, text},
+    widget::{button, column, row, scrollable, stack, text},
 };
 use svalin::client::{
     Client,
@@ -244,67 +244,69 @@ impl MainView {
         match &self.context {
             Context::None => None,
             Context::Warnings => Some(
-                column(self.state.warnings().warnings().map(|warning| {
-                    Element::from(toast(
-                        match warning.severity() {
-                            warning::Severity::High => toast::Kind::Error,
-                            warning::Severity::Medium => toast::Kind::Warning,
-                            warning::Severity::Low => toast::Kind::Info,
-                        },
-                        match warning {
-                            warning::Warning::Device(spki_hash, warning) => {
-                                let name = self
-                                    .state
-                                    .persistent()
-                                    .devices()
-                                    .get(spki_hash)
-                                    .map(|d| d.name())
-                                    .unwrap_or_else(|| Cow::Owned(spki_hash.to_string()));
+                scrollable(
+                    column(self.state.warnings().warnings().map(|warning| {
+                        Element::from(toast(
+                            match warning.severity() {
+                                warning::Severity::High => toast::Kind::Error,
+                                warning::Severity::Medium => toast::Kind::Warning,
+                                warning::Severity::Low => toast::Kind::Info,
+                            },
+                            match warning {
+                                warning::Warning::Device(spki_hash, warning) => {
+                                    let name = self
+                                        .state
+                                        .persistent()
+                                        .devices()
+                                        .get(spki_hash)
+                                        .map(|d| d.name())
+                                        .unwrap_or_else(|| Cow::Owned(spki_hash.to_string()));
 
-                                let mut actions = row![
-                                    button(text(t!("warnings.device.action")))
-                                        .on_press(Message::SelectDevice(spki_hash.clone()))
-                                ]
-                                .spacing(10);
+                                    let mut actions = row![
+                                        button(text(t!("warnings.device.action")))
+                                            .on_press(Message::SelectDevice(spki_hash.clone()))
+                                    ]
+                                    .spacing(10);
 
-                                let message = match warning {
-                                    warning::Device::DeviceGroupBroken(reason) => {
-                                        actions = actions.push(
-                                            button(text(t!("generic.details"))).on_press(
-                                                Message::Error(Arc::new(anyhow!(
-                                                    reason.to_owned()
-                                                ))),
-                                            ),
-                                        );
-                                        text(t!("warnings.device.group-broken"))
-                                    }
-                                    warning::Device::DiskSpaceLow { disk, free, total } => {
-                                        text(t!(
-                                            "warnings.device.disk-space-low",
-                                            "disk" => disk,
-                                            "free" => human_i_bytes(*free),
-                                            "total" => human_i_bytes(*total)
-                                        ))
-                                    }
-                                    warning::Device::MissingName => {
-                                        text(t!("warnings.device.missing-name"))
-                                    }
-                                    warning::Device::BitlockerActive { drive, .. } => {
-                                        text!("Drive {drive} has bitlocker active!")
-                                    }
-                                };
-                                Element::from(
-                                    column![text(name).size(24), message, actions]
-                                        .height(Length::Fit)
-                                        .spacing(10),
-                                )
-                            }
-                        },
-                    ))
-                    .into()
-                }))
-                .padding(20)
-                .spacing(20)
+                                    let message = match warning {
+                                        warning::Device::DeviceGroupBroken(reason) => {
+                                            actions = actions.push(
+                                                button(text(t!("generic.details"))).on_press(
+                                                    Message::Error(Arc::new(anyhow!(
+                                                        reason.to_owned()
+                                                    ))),
+                                                ),
+                                            );
+                                            text(t!("warnings.device.group-broken"))
+                                        }
+                                        warning::Device::DiskSpaceLow { disk, free, total } => {
+                                            text(t!(
+                                                "warnings.device.disk-space-low",
+                                                "disk" => disk,
+                                                "free" => human_i_bytes(*free),
+                                                "total" => human_i_bytes(*total)
+                                            ))
+                                        }
+                                        warning::Device::MissingName => {
+                                            text(t!("warnings.device.missing-name"))
+                                        }
+                                        warning::Device::BitlockerActive { drive, .. } => {
+                                            text!("Drive {drive} has bitlocker active!")
+                                        }
+                                    };
+                                    Element::from(
+                                        column![text(name).size(24), message, actions]
+                                            .height(Length::Fit)
+                                            .spacing(10),
+                                    )
+                                }
+                            },
+                        ))
+                        .into()
+                    }))
+                    .padding(20)
+                    .spacing(20),
+                )
                 .into(),
             ),
             // Context::Tunnel => Some(self.tunnel_ui.view().map(Message::Tunnel)),
