@@ -47,12 +47,7 @@ impl ProxmoxMG {
 }
 
 async fn quarantine_count(kind: &str, args: &[&str]) -> u64 {
-    let output = match Command::new(PMGSH)
-        .args(args)
-        .args(["--output-format", "json"])
-        .output()
-        .await
-    {
+    let output = match Command::new(PMGSH).args(args).output().await {
         Ok(output) if output.status.success() => output,
         Ok(output) => {
             tracing::warn!(
