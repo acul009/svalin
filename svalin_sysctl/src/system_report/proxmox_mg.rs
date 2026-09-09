@@ -19,20 +19,7 @@ impl ProxmoxMG {
             return Ok(None);
         }
 
-        let endtime = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs();
-        let starttime = endtime.saturating_sub(7 * 24 * 60 * 60).to_string();
-        let endtime = endtime.to_string();
-
-        let attachment_args = [
-            "get",
-            "/quarantine/attachment",
-            "--starttime",
-            &starttime,
-            "--endtime",
-            &endtime,
-        ];
+        let attachment_args = ["get", "/quarantine/attachment"];
         let virus_args = ["get", "/quarantine/virus"];
         let (attachment_quarantine_count, virus_quarantine_count) = tokio::join!(
             quarantine_count("attachment", &attachment_args),
