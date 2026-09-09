@@ -29,7 +29,8 @@ reset:
     rm -r /var/lib/svalin/*
 
 reset-win:
-    Remove-Item -Path C:\ProgramData\svalin\* -Recurse -Force
+    Remove-Item -Path C:\ProgramData\svalin\server -Recurse -Force
+    Remove-Item -Path C:\ProgramData\svalin\agent\development -Recurse -Force
 
 agent $RUST_LOG="svalin=trace":
     cargo run -p svalin agent run --profile development
