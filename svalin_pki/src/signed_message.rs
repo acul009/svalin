@@ -67,13 +67,13 @@ impl SignedMessage<'_> {
     fn encode(message: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
         let signed = SignedMessage { message, signature };
 
-        let vec = postcard::to_extend(&signed, Vec::<u8>::new())?;
+        let vec = rmp_serde::to_vec_named(&signed)?;
 
         Ok(vec)
     }
 
     fn decode(signed_message: &[u8]) -> Result<(&[u8], &[u8])> {
-        let decoded: SignedMessage = postcard::from_bytes(signed_message)?;
+        let decoded: SignedMessage = rmp_serde::from_slice(signed_message)?;
         Ok((decoded.message, decoded.signature))
     }
 }

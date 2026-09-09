@@ -16,7 +16,7 @@ use crate::{
         SvalinGroupId,
         group_id::ParseGroupIdError,
         harness::AnyMlsProcessor,
-        provider::{PostcardCodec, SvalinProvider},
+        provider::{MessagePackCodec, SvalinProvider},
         transport_types::{MessageToMemberTransport, MessageToSend, NewGroup},
     },
 };
@@ -26,7 +26,7 @@ pub(crate) struct PublicProcessorHandle {
 }
 
 impl PublicProcessorHandle {
-    pub fn new(storage_provider: SqliteStorageProvider<PostcardCodec>) -> Self {
+    pub fn new(storage_provider: SqliteStorageProvider<MessagePackCodec>) -> Self {
         let (send, mut recv) = mpsc::channel(10);
 
         let public_processor = PublicProcessor {

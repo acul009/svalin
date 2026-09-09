@@ -6,7 +6,7 @@ use openmls_sqlx_storage::SqliteStorageProvider;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
     EncryptedCredential, ExactVerififier, TrustStoreVerifier, UnverifiedCertificate, Verifier,
-    get_current_timestamp, mls::provider::PostcardCodec,
+    get_current_timestamp, mls::provider::MessagePackCodec,
 };
 use svalin_rpc::{
     commands::{deauthenticate::DeauthenticateHandler, e2e::E2EHandler, ping::PingHandler},
@@ -287,7 +287,7 @@ fn mls_db_path(profile: &str) -> Result<Location, LocationError> {
 
 async fn open_mls_store(
     profile: &str,
-) -> Result<SqliteStorageProvider<PostcardCodec>, OpenMlsStoreError> {
+) -> Result<SqliteStorageProvider<MessagePackCodec>, OpenMlsStoreError> {
     let location = mls_db_path(profile)?;
 
     let path = location

@@ -25,8 +25,10 @@ pub enum TransactionStoreError {
     SqlxError(#[from] sqlx::Error),
     #[error("Sequence mismatch: expected {expected}, got {actual}")]
     SequenceMismatch { expected: u64, actual: u64 },
-    #[error("Postcard error: {0}")]
-    PostcardError(#[from] postcard::Error),
+    #[error("MessagePack encode error: {0}")]
+    MessagePackEncode(#[from] rmp_serde::encode::Error),
+    #[error("MessagePack decode error: {0}")]
+    MessagePackDecode(#[from] rmp_serde::decode::Error),
     #[error("Broadcast error")]
     BroadcastError,
 }
@@ -59,7 +61,7 @@ impl TrustStoreTransactionStore {
                 actual: transaction.sequence(),
             });
         }
-        let data = postcard::to_stdvec(&transaction.as_unchecked())?;
+        let data = rmp_serde::to_vec_named(&transaction.as_unchecked())?;
         sqlx::query!(
             "INSERT INTO trust_store_transactions (sequence, data) VALUES (?, ?)",
             transaction.sequence() as i64,
@@ -97,10 +99,10 @@ impl TrustStoreTransactionStore {
             .into_iter()
             .map(|record| {
                 let block: UncheckedBlock<trust_store::Transaction> =
-                    postcard::from_bytes(&record.data)?;
+                    rmp_serde::from_slice(&record.data)?;
                 Ok(block)
             })
-            .collect::<Result<Vec<_>, postcard::Error>>()?;
+            .collect::<Result<Vec<_>, rmp_serde::decode::Error>>()?;
 
         while let Ok(block) = receiver.try_recv() {
             if block.sequence() > transactions.last().map(|b| b.sequence()).unwrap_or(after) {
@@ -117,6 +119,8 @@ impl TrustStoreTransactionStore {
 pub enum LoadTransactionError {
     #[error("sqlx error: {0}")]
     Sqlx(#[from] sqlx::Error),
-    #[error("postcard error: {0}")]
-    Postcard(#[from] postcard::Error),
+    #[error("MessagePack encode error: {0}")]
+    MessagePackEncode(#[from] rmp_serde::encode::Error),
+    #[error("MessagePack decode error: {0}")]
+    MessagePackDecode(#[from] rmp_serde::decode::Error),
 }

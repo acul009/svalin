@@ -25,7 +25,7 @@ impl ClientStore {
     pub async fn update(&self, message: &persistent::Update) -> Result<(), Error> {
         match &message {
             persistent::Update::SystemReport(spki_hash, system_report) => {
-                let report = postcard::to_stdvec(system_report)?;
+                let report = rmp_serde::to_vec_named(system_report)?;
                 let spki_hash = spki_hash.as_slice();
                 let generated_at = system_report.system_report.generated_at as i64;
 
@@ -34,7 +34,7 @@ impl ClientStore {
                     .await?;
             }
             persistent::Update::MetaInfo(spki_hash, meta_info) => {
-                let info = postcard::to_stdvec(meta_info)?;
+                let info = rmp_serde::to_vec_named(meta_info)?;
                 let spki_hash = spki_hash.as_slice();
                 let updated_at = meta_info.updated_at as i64;
 
@@ -58,7 +58,7 @@ impl ClientStore {
             let row = row?;
             let spki_hash = SpkiHash::from_slice(&row.spki_hash)
                 .expect("values should have been checked when saving in the db");
-            match postcard::from_bytes(&row.report) {
+            match rmp_serde::from_slice(&row.report) {
                 Ok(report) => state.update(persistent::Update::SystemReport(spki_hash, report)),
                 Err(err) => tracing::error!("failed to load report: {}", err),
             }
@@ -72,7 +72,7 @@ impl ClientStore {
             let row = row?;
             let spki_hash = SpkiHash::from_slice(&row.spki_hash)
                 .expect("values should have been checked when saving in the db");
-            match postcard::from_bytes(&row.data) {
+            match rmp_serde::from_slice(&row.data) {
                 Ok(data) => state.update(persistent::Update::MetaInfo(spki_hash, data)),
                 Err(err) => tracing::error!("failed to load meta info: {}", err),
             }
@@ -92,8 +92,10 @@ impl ClientStore {
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error(transparent)]
-    Postcard(#[from] postcard::Error),
+    #[error("MessagePack encode error: {0}")]
+    MessagePackEncode(#[from] rmp_serde::encode::Error),
+    #[error("MessagePack decode error: {0}")]
+    MessagePackDecode(#[from] rmp_serde::decode::Error),
     #[error(transparent)]
     Sqlx(#[from] sqlx::Error),
 }

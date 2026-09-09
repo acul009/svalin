@@ -13,17 +13,25 @@ use serde::{Deserialize, Serialize};
 use crate::{DecryptError, EncryptError, EncryptedObject, encrypt::EncryptionKey};
 
 #[derive(Default)]
-pub struct PostcardCodec {}
+pub struct MessagePackCodec {}
 
-impl openmls_sqlx_storage::Codec for PostcardCodec {
-    type Error = postcard::Error;
+#[derive(Debug, thiserror::Error)]
+pub enum MessagePackCodecError {
+    #[error(transparent)]
+    Encode(#[from] rmp_serde::encode::Error),
+    #[error(transparent)]
+    Decode(#[from] rmp_serde::decode::Error),
+}
+
+impl openmls_sqlx_storage::Codec for MessagePackCodec {
+    type Error = MessagePackCodecError;
 
     fn to_vec<T: serde::Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, Self::Error> {
-        postcard::to_stdvec(value)
+        Ok(rmp_serde::to_vec_named(value)?)
     }
 
     fn from_slice<T: serde::de::DeserializeOwned + ?Sized>(slice: &[u8]) -> Result<T, Self::Error> {
-        postcard::from_bytes(slice)
+        Ok(rmp_serde::from_slice(slice)?)
     }
 }
 
@@ -73,7 +81,7 @@ impl OpenMlsProvider for SvalinProvider {
 }
 
 pub enum SvalinStorage {
-    Sqlite(SqliteStorageProvider<PostcardCodec>),
+    Sqlite(SqliteStorageProvider<MessagePackCodec>),
     Memory(Arc<MemoryStorage>),
 }
 
@@ -123,8 +131,8 @@ impl ExportHandle {
     }
 }
 
-impl From<SqliteStorageProvider<PostcardCodec>> for SvalinStorage {
-    fn from(sqlite: SqliteStorageProvider<PostcardCodec>) -> Self {
+impl From<SqliteStorageProvider<MessagePackCodec>> for SvalinStorage {
+    fn from(sqlite: SqliteStorageProvider<MessagePackCodec>) -> Self {
         Self::Sqlite(sqlite)
     }
 }

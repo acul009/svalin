@@ -18,8 +18,10 @@ pub enum TransactionStoreError {
     SqlxError(#[from] sqlx::Error),
     #[error("Sequence mismatch")]
     SequenceMismatch,
-    #[error("Postcard error: {0}")]
-    PostcardError(#[from] postcard::Error),
+    #[error("MessagePack encode error: {0}")]
+    MessagePackEncode(#[from] rmp_serde::encode::Error),
+    #[error("MessagePack decode error: {0}")]
+    MessagePackDecode(#[from] rmp_serde::decode::Error),
 }
 
 impl TrustStoreTransactionStore {
@@ -57,14 +59,14 @@ impl TrustStoreTransactionStore {
                 )
                 .fetch_one(&self.pool)
                 .await?;
-                let block: UncheckedBlock<trust_store::Transaction> = postcard::from_bytes(&data)?;
+                let block: UncheckedBlock<trust_store::Transaction> = rmp_serde::from_slice(&data)?;
                 if &block == transaction.as_unchecked() {
                     return Ok(());
                 }
             }
         }
 
-        let data = postcard::to_stdvec(&transaction.as_unchecked())?;
+        let data = rmp_serde::to_vec_named(&transaction.as_unchecked())?;
         sqlx::query!(
             "INSERT INTO trust_store_transactions (sequence, data) VALUES (?, ?)",
             transaction.sequence() as i64,
@@ -93,10 +95,10 @@ impl TrustStoreTransactionStore {
             .into_iter()
             .map(|record| {
                 let block: UncheckedBlock<trust_store::Transaction> =
-                    postcard::from_bytes(&record.data)?;
+                    rmp_serde::from_slice(&record.data)?;
                 Ok(block)
             })
-            .collect::<Result<Vec<_>, postcard::Error>>()?;
+            .collect::<Result<Vec<_>, rmp_serde::decode::Error>>()?;
 
         Ok(transactions)
     }
@@ -106,6 +108,8 @@ impl TrustStoreTransactionStore {
 pub enum LoadTransactionError {
     #[error("sqlx error: {0}")]
     Sqlx(#[from] sqlx::Error),
-    #[error("postcard error: {0}")]
-    Postcard(#[from] postcard::Error),
+    #[error("MessagePack encode error: {0}")]
+    MessagePackEncode(#[from] rmp_serde::encode::Error),
+    #[error("MessagePack decode error: {0}")]
+    MessagePackDecode(#[from] rmp_serde::decode::Error),
 }

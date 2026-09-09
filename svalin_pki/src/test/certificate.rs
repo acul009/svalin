@@ -22,9 +22,9 @@ fn test_certificate_serde_serialization() {
         cert2: credentials2.certificate().to_owned().to_unverified(),
     };
 
-    let encoded = postcard::to_extend(&test_struct, Vec::new()).unwrap();
+    let encoded = rmp_serde::to_vec_named(&test_struct).unwrap();
 
-    let rebuilt: SerializationTestStruct = postcard::from_bytes(&encoded).unwrap();
+    let rebuilt: SerializationTestStruct = rmp_serde::from_slice(&encoded).unwrap();
 
     assert_eq!(test_struct, rebuilt);
 }
@@ -44,9 +44,9 @@ pub fn serde_serialization() {
     let perm_creds = Credential::generate_temporary().unwrap();
     let cert = perm_creds.certificate().as_unverified();
 
-    let serialized = postcard::to_extend(&cert, Vec::new()).unwrap();
+    let serialized = rmp_serde::to_vec_named(&cert).unwrap();
 
-    let cert2: UnverifiedCertificate = postcard::from_bytes(&serialized).unwrap();
+    let cert2: UnverifiedCertificate = rmp_serde::from_slice(&serialized).unwrap();
     assert_eq!(cert, &cert2)
 }
 
@@ -74,17 +74,17 @@ async fn test_create_leaf() {
     let keypair = KeyPair::generate();
 
     let public_key = keypair.export_public_key();
-    let serialized = postcard::to_extend(&public_key, Vec::new()).unwrap();
+    let serialized = rmp_serde::to_vec_named(&public_key).unwrap();
 
-    let public_key: ExportedPublicKey = postcard::from_bytes(&serialized).unwrap();
+    let public_key: ExportedPublicKey = rmp_serde::from_slice(&serialized).unwrap();
 
     let leaf = root
         .create_agent_certificate_for_key(&public_key)
         .unwrap()
         .to_unverified();
 
-    let serialized = postcard::to_extend(&leaf, Vec::new()).unwrap();
-    let leaf: UnverifiedCertificate = postcard::from_bytes(&serialized).unwrap();
+    let serialized = rmp_serde::to_vec_named(&leaf).unwrap();
+    let leaf: UnverifiedCertificate = rmp_serde::from_slice(&serialized).unwrap();
 
     let _verified = leaf
         .verify_signature(root.certificate(), get_current_timestamp())

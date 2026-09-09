@@ -19,7 +19,7 @@ impl ObjectTransport {
         &mut self,
         object: &U,
     ) -> Result<(), ObjectWriterError> {
-        let encoded = postcard::to_extend(object, Vec::new())?;
+        let encoded = rmp_serde::to_vec_named(object)?;
 
         #[cfg(test)]
         {
@@ -50,7 +50,7 @@ impl ObjectTransport {
 
         let chunk = self.transport.read_chunk().await?;
 
-        let object: U = postcard::from_bytes(&chunk)?;
+        let object: U = rmp_serde::from_slice(&chunk)?;
 
         Ok(object)
     }
@@ -77,7 +77,7 @@ pub enum ObjectReaderError {
     #[error("Failed to read chunk: {0}")]
     ChunkReadError(#[from] ChunkReaderError),
     #[error("Failed to deserialize object: {0}")]
-    DeserializeError(#[from] postcard::Error),
+    DeserializeError(#[from] rmp_serde::decode::Error),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -85,7 +85,7 @@ pub enum ObjectWriterError {
     #[error("Failed to write chunk: {0}")]
     ChunkWriteError(#[from] ChunkWriterError),
     #[error("Failed to serialize object: {0}")]
-    SerializeError(#[from] postcard::Error),
+    SerializeError(#[from] rmp_serde::encode::Error),
 }
 
 #[cfg(test)]
@@ -93,18 +93,18 @@ mod test {
     use std::time::SystemTime;
 
     #[test]
-    fn test_postcard_u64() {
+    fn test_messagepack_u64() {
         let number = 98345254575894875u64;
-        let encoded = postcard::to_extend(&number, Vec::new()).unwrap();
-        let copy: u64 = postcard::from_bytes(&encoded).unwrap();
-        assert!(number == copy, "postcard u64 test failed");
+        let encoded = rmp_serde::to_vec_named(&number).unwrap();
+        let copy: u64 = rmp_serde::from_slice(&encoded).unwrap();
+        assert!(number == copy, "MessagePack u64 test failed");
     }
 
     #[test]
     fn test_system_time() {
         let now = SystemTime::now();
-        let encoded = postcard::to_extend(&now, Vec::new()).unwrap();
-        let copy: SystemTime = postcard::from_bytes(&encoded).unwrap();
-        assert!(now == copy, "postcard system time test failed")
+        let encoded = rmp_serde::to_vec_named(&now).unwrap();
+        let copy: SystemTime = rmp_serde::from_slice(&encoded).unwrap();
+        assert!(now == copy, "MessagePack system time test failed")
     }
 }

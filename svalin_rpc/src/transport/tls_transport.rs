@@ -66,8 +66,10 @@ pub enum PresharedError {
     EncryptError(#[from] EncryptError),
     #[error("error decrypting temporary certificate: {0}")]
     DecryptError(#[from] DecryptError),
-    #[error("error encoding or decoding temporary credentials: {0}")]
-    PostcardError(#[from] postcard::Error),
+    #[error("MessagePack encode error: {0}")]
+    MessagePackEncode(#[from] rmp_serde::encode::Error),
+    #[error("MessagePack decode error: {0}")]
+    MessagePackDecode(#[from] rmp_serde::decode::Error),
     #[error("error reading or writing to transport: {0}")]
     ReadWriteError(#[from] std::io::Error),
     #[error("certificate did not pass validation as temporary credential")]
@@ -230,7 +232,7 @@ where
         // Write my cert
         let encrypted =
             EncryptedObject::encrypt(credentials.certificate().as_unverified(), &preshared)?;
-        let encoded = postcard::to_stdvec(&encrypted)?;
+        let encoded = rmp_serde::to_vec_named(&encrypted)?;
 
         let length_bytes = (encoded.len() as u32).to_be_bytes();
 
@@ -244,7 +246,7 @@ where
 
         let mut encoded = vec![0u8; length];
         base_transport.read_exact(&mut encoded).await?;
-        let encrypted: EncryptedObject<UnverifiedCertificate> = postcard::from_bytes(&encoded)?;
+        let encrypted: EncryptedObject<UnverifiedCertificate> = rmp_serde::from_slice(&encoded)?;
 
         let unverified_certificate = encrypted.decrypt(&preshared)?;
         let certificate = unverified_certificate

@@ -26,7 +26,7 @@ impl MessageStore {
         let mut tx = self.pool.begin().await?;
         let message_id = Uuid::new_v4();
         let received_at = get_current_timestamp() as i64;
-        let data = postcard::to_stdvec(&message.message)?;
+        let data = rmp_serde::to_vec_named(&message.message)?;
         let data = &data;
 
         sqlx::query!(
@@ -70,7 +70,7 @@ impl MessageStore {
         .fetch(&self.pool)
         .map(|row| -> Result<_, MessageStoreError> {
             let row = row?;
-            let message: MessageToMemberTransport = postcard::from_bytes(&row.data)?;
+            let message: MessageToMemberTransport = rmp_serde::from_slice(&row.data)?;
             Ok((row.id, message))
         }).try_collect().await?;
 
@@ -138,8 +138,10 @@ impl MessageStore {
 pub enum MessageStoreError {
     #[error("db error: {0}")]
     DBError(#[from] sqlx::Error),
-    #[error("postcard error: {0}")]
-    PostcardError(#[from] postcard::Error),
+    #[error("MessagePack encode error: {0}")]
+    MessagePackEncode(#[from] rmp_serde::encode::Error),
+    #[error("MessagePack decode error: {0}")]
+    MessagePackDecode(#[from] rmp_serde::decode::Error),
 }
 
 #[derive(Debug)]

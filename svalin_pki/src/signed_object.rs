@@ -23,7 +23,7 @@ where
     T: Serialize,
 {
     pub fn new(object: &T, credentials: &Credential) -> Result<Self> {
-        let data = postcard::to_extend(object, Vec::new())?;
+        let data = rmp_serde::to_vec_named(object)?;
 
         let raw = credentials.sign(&data)?;
 
@@ -49,7 +49,7 @@ where
             .verify(&self.raw)
             .context("failed to verify signature of signed object")?;
 
-        let object = postcard::from_bytes(&data).context("failed to deserialize signed object")?;
+        let object = rmp_serde::from_slice(&data).context("failed to deserialize signed object")?;
 
         Ok(VerifiedObject {
             signed_object: self,
@@ -123,8 +123,8 @@ mod tests {
 
         let signed = super::SignedObject::new(&object, &credentials).unwrap();
 
-        let encoded = postcard::to_extend(&signed, Vec::new()).unwrap();
-        let signed2: SignedObject<TestSign> = postcard::from_bytes(&encoded).unwrap();
+        let encoded = rmp_serde::to_vec_named(&signed).unwrap();
+        let signed2: SignedObject<TestSign> = rmp_serde::from_slice(&encoded).unwrap();
 
         let verifier = ExactVerififier::new(credentials.certificate().clone());
 
@@ -155,7 +155,7 @@ mod tests {
             blob: vec![4, 5, 6],
         };
 
-        let data = postcard::to_extend(&object2, Vec::new()).unwrap();
+        let data = rmp_serde::to_vec_named(&object2).unwrap();
 
         signed.raw[0..data.len()].copy_from_slice(&data);
 

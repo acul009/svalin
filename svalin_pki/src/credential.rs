@@ -84,7 +84,7 @@ pub enum CreateCertificateError {
 #[derive(Debug, thiserror::Error)]
 pub enum DecodeCredentialsError {
     #[error("error decoding credentials: {0}")]
-    DecodeStructError(#[from] postcard::Error),
+    DecodeStructError(#[from] rmp_serde::decode::Error),
     #[error("error parsing certificate: {0}")]
     ParseCertificateError(#[from] CertificateParseError),
     #[error("error parsing keypair: {0}")]

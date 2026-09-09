@@ -19,7 +19,7 @@ use crate::{
             CreateGroupError, CreateGroupMessageError, CreateKeyPackageError, GroupExistsError,
             JoinGroupError, MlsProcessorHandle, ProcessedContent,
         },
-        provider::{PostcardCodec, SvalinProvider},
+        provider::{MessagePackCodec, SvalinProvider},
         transport_types::{
             MessageToMember, MessageToMemberTransport, MessageToServerTransport, MessageTypes,
             SvalinMessage,
@@ -54,7 +54,7 @@ where
 {
     pub async fn new(
         credential: Credential,
-        storage_provider: SqliteStorageProvider<PostcardCodec>,
+        storage_provider: SqliteStorageProvider<MessagePackCodec>,
         key_retriever: KeyRetriever,
         verifier: Verifier,
     ) -> Result<Self, MlsAgentCreateError> {
@@ -163,7 +163,7 @@ where
     ) -> Result<MessageToServerTransport, SendDeviceMessageError> {
         let group_id = SvalinGroupId::DeviceGroup(self.me.spki_hash().clone()).to_group_id();
         let message = SvalinMessage::<Types>::Report(report);
-        let encoded = postcard::to_stdvec(&message)?;
+        let encoded = rmp_serde::to_vec_named(&message)?;
         let to_server = self
             .harness
             .processor()
@@ -186,8 +186,10 @@ where
 
 #[derive(Debug, thiserror::Error)]
 pub enum CreateSystemreportError {
-    #[error("postcard error: {0}")]
-    PostcardError(#[from] postcard::Error),
+    #[error("MessagePack encode error: {0}")]
+    MessagePackEncode(#[from] rmp_serde::encode::Error),
+    #[error("MessagePack decode error: {0}")]
+    MessagePackDecode(#[from] rmp_serde::decode::Error),
     #[error("create message error: {0}")]
     CreateMessageError(#[from] CreateGroupMessageError),
 }
@@ -220,8 +222,10 @@ pub enum HandleWelcomeError<RetrieverError> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum SendDeviceMessageError {
-    #[error("postcard error: {0}")]
-    PostcardError(#[from] postcard::Error),
+    #[error("MessagePack encode error: {0}")]
+    MessagePackEncode(#[from] rmp_serde::encode::Error),
+    #[error("MessagePack decode error: {0}")]
+    MessagePackDecode(#[from] rmp_serde::decode::Error),
     #[error("create message error: {0}")]
     CreateMessageError(#[from] CreateGroupMessageError),
 }

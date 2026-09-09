@@ -75,7 +75,7 @@ where
     T: Serialize,
 {
     pub fn encrypt(object: &T, encryption_key: &EncryptionKey) -> Result<Self, EncryptError> {
-        let serialized = postcard::to_stdvec(object)?;
+        let serialized = rmp_serde::to_vec_named(object)?;
         let ciphertext = EncryptedData::encrypt(&serialized, encryption_key)?;
         Ok(Self {
             ciphertext,
@@ -90,7 +90,7 @@ where
 {
     pub fn decrypt(self, encryption_key: &EncryptionKey) -> Result<T, DecryptError> {
         let encoded = self.ciphertext.decrypt(encryption_key)?;
-        Ok(postcard::from_bytes(&encoded)?)
+        Ok(rmp_serde::from_slice(&encoded)?)
     }
 }
 
@@ -133,7 +133,7 @@ static DEFAULT_ALG: EncryptionAlgorithm = EncryptionAlgorithm::Chacha20Poly1305;
 #[derive(Debug, thiserror::Error)]
 pub enum DecryptError {
     #[error("error decoding encrypted data: {0}")]
-    UnmarshalError(#[from] postcard::Error),
+    UnmarshalError(#[from] rmp_serde::decode::Error),
     #[error("missing hash parameters in encrypted data")]
     MissingHashParameters,
     #[error("error loading key into ring: {0}")]
@@ -145,7 +145,7 @@ pub enum DecryptError {
 #[derive(Debug, thiserror::Error)]
 pub enum EncryptError {
     #[error("error marshalling data: {0}")]
-    MarshalError(#[from] postcard::Error),
+    MarshalError(#[from] rmp_serde::encode::Error),
     #[error("error loading key into ring: {0}")]
     CreateUnboundError(ring::error::Unspecified),
     #[error("error sealing data: {0}")]

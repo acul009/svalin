@@ -91,7 +91,7 @@ impl UserStore {
         let spki_hash = cert.spki_hash().as_slice();
         let username = &user.username;
 
-        let data = postcard::to_stdvec(&user)?;
+        let data = rmp_serde::to_vec_named(&user)?;
 
         sqlx::query!(
             "INSERT INTO users (spki_hash, username, data) VALUES (?, ?, ?)",
@@ -116,7 +116,7 @@ impl UserStore {
             .await?;
         match user_data {
             None => Ok(None),
-            Some(user_data) => Ok(Some(postcard::from_bytes(&user_data.data)?)),
+            Some(user_data) => Ok(Some(rmp_serde::from_slice(&user_data.data)?)),
         }
     }
 
@@ -129,7 +129,7 @@ impl UserStore {
             .await?;
         match user_data {
             None => Ok(None),
-            Some(user_data) => Ok(Some(postcard::from_bytes(&user_data.data)?)),
+            Some(user_data) => Ok(Some(rmp_serde::from_slice(&user_data.data)?)),
         }
     }
 
@@ -145,7 +145,7 @@ impl UserStore {
         match user_data {
             None => Ok(None),
             Some(user_data) => {
-                let user: StoredUser = postcard::from_bytes(&user_data)?;
+                let user: StoredUser = rmp_serde::from_slice(&user_data)?;
                 Ok(Some(user.encrypted_credential.take_certificate()))
             }
         }
@@ -166,13 +166,13 @@ impl UserStore {
 
         let mut user: StoredUser = match user_data {
             None => return Err(UpdateMlsDataError::UnknownUser(spki_hash.clone())),
-            Some(user_data) => postcard::from_bytes(&user_data.data)?,
+            Some(user_data) => rmp_serde::from_slice(&user_data.data)?,
         };
 
         user.mls_store = mls_store;
         user.persistent_data = persistent_data;
 
-        let data = postcard::to_stdvec(&user)?;
+        let data = rmp_serde::to_vec_named(&user)?;
         sqlx::query!("UPDATE users SET data = ? WHERE spki_hash = ?", data, spki)
             .execute(&mut *tx)
             .await?;
@@ -189,16 +189,20 @@ pub enum UpdateMlsDataError {
     SqlxError(#[from] sqlx::Error),
     #[error("user with spki hash {0} not found")]
     UnknownUser(SpkiHash),
-    #[error("postcard decode error: {0}")]
-    PostcardError(#[from] postcard::Error),
+    #[error("MessagePack encode error: {0}")]
+    MessagePackEncode(#[from] rmp_serde::encode::Error),
+    #[error("MessagePack decode error: {0}")]
+    MessagePackDecode(#[from] rmp_serde::decode::Error),
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum GetBySpkiHashError {
     #[error("sqlx error: {0}")]
     SqlxError(#[from] sqlx::Error),
-    #[error("postcard decode error: {0}")]
-    PostcardError(#[from] postcard::Error),
+    #[error("MessagePack encode error: {0}")]
+    MessagePackEncode(#[from] rmp_serde::encode::Error),
+    #[error("MessagePack decode error: {0}")]
+    MessagePackDecode(#[from] rmp_serde::decode::Error),
 }
 
 impl StrongDatabase for UserStore {

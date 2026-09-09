@@ -16,7 +16,7 @@ pub enum DecodeKeypairError {
     #[error("error decrypting credentials: {0}")]
     DecryptError(#[from] crate::encrypt::DecryptError),
     #[error("error decoding credentials: {0}")]
-    DecodeError(#[from] postcard::Error),
+    DecodeError(#[from] rmp_serde::decode::Error),
     #[error("error detecting key encoding")]
     DetectEncodingError,
     #[error("error parsing keypair: {0}")]

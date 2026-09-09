@@ -13,7 +13,7 @@ use crate::{
         key_package::{KeyPackage, UnverifiedKeyPackage},
         key_retriever::KeyRetriever,
         processor::{MlsProcessorHandle, ProcessedContent},
-        provider::PostcardCodec,
+        provider::MessagePackCodec,
         public_processor::PublicProcessorHandle,
         server::MlsServer,
         transport_types::{
@@ -24,7 +24,7 @@ use crate::{
 
 async fn create_processor(credential: Credential) -> MlsProcessorHandle {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    let storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
+    let storage = SqliteStorageProvider::<MessagePackCodec>::new(pool);
     storage.run_migrations().await.unwrap();
     let handle =
         crate::mls::processor::MlsProcessorHandle::new_processor(credential, storage.into());
@@ -33,7 +33,7 @@ async fn create_processor(credential: Credential) -> MlsProcessorHandle {
 
 async fn create_public_processor() -> PublicProcessorHandle {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    let storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
+    let storage = SqliteStorageProvider::<MessagePackCodec>::new(pool);
     storage.run_migrations().await.unwrap();
     let handle = PublicProcessorHandle::new(storage);
     handle
@@ -312,7 +312,7 @@ async fn test_device_group() {
     let retriever = TestRetriever::new();
 
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    let client_storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
+    let client_storage = SqliteStorageProvider::<MessagePackCodec>::new(pool);
     client_storage.run_migrations().await.unwrap();
     let user_credential = Credential::generate_root().unwrap();
     verifier.push(user_credential.certificate().clone());
@@ -321,7 +321,7 @@ async fn test_device_group() {
     verifier.push(client_credential.certificate().clone());
 
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    let agent_storage = SqliteStorageProvider::<PostcardCodec>::new(pool.clone());
+    let agent_storage = SqliteStorageProvider::<MessagePackCodec>::new(pool.clone());
     agent_storage.run_migrations().await.unwrap();
     let keypair = KeyPair::generate();
     let public_key = keypair.export_public_key();
@@ -358,7 +358,7 @@ async fn test_device_group() {
         .unwrap();
 
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    let storage = SqliteStorageProvider::<PostcardCodec>::new(pool);
+    let storage = SqliteStorageProvider::<MessagePackCodec>::new(pool);
     storage.run_migrations().await.unwrap();
     let server = MlsServer::new(storage, verifier.clone(), retriever.clone());
     let welcome = server.process_message(new_group).await.unwrap();

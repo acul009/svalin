@@ -122,7 +122,7 @@ where
                     return Err(HandleMessageError::InvalidMessage { group_id });
                 };
                 let decoded: SvalinMessage<Types> =
-                    postcard::from_bytes(&decrypted).map_err(|source| {
+                    rmp_serde::from_slice(&decrypted).map_err(|source| {
                         HandleMessageError::Deserialize {
                             group_id: group_id.clone(),
                             source,
@@ -322,7 +322,7 @@ where
     ) -> anyhow::Result<MessageToServerTransport> {
         let group_id = SvalinGroupId::DeviceMetaGroup(spki_hash).to_group_id();
         let message = SvalinMessage::<Types>::MetaInfo(metainfo);
-        let encoded = postcard::to_stdvec(&message)?;
+        let encoded = rmp_serde::to_vec_named(&message)?;
         let to_server = self
             .harness
             .processor()
@@ -355,7 +355,7 @@ pub enum HandleMessageError<RetrieverError> {
     Deserialize {
         group_id: SvalinGroupId,
         #[source]
-        source: postcard::Error,
+        source: rmp_serde::decode::Error,
     },
     #[error("group id error: {0}")]
     GroupIdError(#[from] ParseGroupIdError),

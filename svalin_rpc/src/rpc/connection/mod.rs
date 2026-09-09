@@ -124,7 +124,7 @@ where
                                     {
                                         use crate::permissions::PermissionCheckError;
                                         let mut chain = e.chain();
-                                        chain.next(); // error handling session
+                                        // chain.next(); // error handling session
                                         chain.next(); // error handling session with key
                                         if let Some(err) = chain.next() {
                                             if let Some(err) = err.downcast_ref::<PermissionCheckError>() {
@@ -134,7 +134,11 @@ where
                                                             // since the client will be
                                                             // notified anyway
                                                 }
+                                            } else {
+                                                panic!("wrong error in chain selected: {:?}", err);
                                             }
+                                        } else {
+                                            panic!("chain shorter than expected")
                                         }
                                         // all other errors should crash, so the test fails
                                         panic!("{:?}", e);

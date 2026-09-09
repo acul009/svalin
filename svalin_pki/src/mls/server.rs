@@ -10,7 +10,7 @@ use crate::{
         group_id::{ParseGroupIdError, SvalinGroupId},
         harness::MlsHarness,
         key_package::{KeyPackage, KeyPackageError, UnverifiedKeyPackage},
-        provider::PostcardCodec,
+        provider::MessagePackCodec,
         public_processor::{AddGroupError, ProcessedContent, PublicProcessorHandle},
         transport_types::{
             AddToGroup, MessageToMemberTransport, MessageToSend, MessageToServer,
@@ -29,7 +29,7 @@ where
     KeyRetriever: crate::mls::key_retriever::KeyRetriever,
 {
     pub fn new(
-        storage_provider: SqliteStorageProvider<PostcardCodec>,
+        storage_provider: SqliteStorageProvider<MessagePackCodec>,
         verifier: Verifier,
         key_retriever: KeyRetriever,
     ) -> Self {

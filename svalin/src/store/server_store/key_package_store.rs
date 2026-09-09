@@ -23,7 +23,7 @@ impl KeyPackageStore {
             anyhow::bail!("Key package hash mismatch");
         }
 
-        let data = postcard::to_stdvec(&member)?;
+        let data = rmp_serde::to_vec_named(&member)?;
         let id = uuid::Uuid::new_v4().as_hyphenated().to_string();
 
         sqlx::query!(
@@ -71,7 +71,7 @@ impl KeyPackageStore {
             sqlx::query!("DELETE FROM key_packages WHERE id = ?", key_package.id)
                 .execute(&mut *transaction)
                 .await?;
-            let key_package: UnverifiedKeyPackage = postcard::from_bytes(&key_package.data)?;
+            let key_package: UnverifiedKeyPackage = rmp_serde::from_slice(&key_package.data)?;
             if &key_package.spki_hash()? != spki_hash {
                 anyhow::bail!("Key package in store does not match the expected owner");
             }
