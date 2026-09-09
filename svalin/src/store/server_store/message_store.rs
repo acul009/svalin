@@ -23,6 +23,9 @@ impl MessageStore {
     }
 
     pub async fn add_message(&self, message: MessageToSend) -> Result<(), MessageStoreError> {
+        if message.receivers.is_empty() {
+            return Ok(());
+        }
         let mut tx = self.pool.begin().await?;
         let message_id = Uuid::new_v4();
         let received_at = get_current_timestamp() as i64;
