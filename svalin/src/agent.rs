@@ -91,7 +91,7 @@ pub async fn run(cancel: CancellationToken, profile: &str) -> Result<()> {
     .await
     .context("error connecting rpc")?;
 
-    tracing::trace!("connection to server established");
+    tracing::info!("connected to server");
 
     let tasks = TaskTracker::new();
 
