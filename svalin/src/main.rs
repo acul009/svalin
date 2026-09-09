@@ -74,7 +74,11 @@ enum AgentAction {
     /// Uninstall the agent and delete all data
     Uninstall,
     /// Initialize the agent by connecting to a server
-    Init { address: String },
+    Init {
+        #[clap(long, default_value = DEFAULT_AGENT_PROFILE)]
+        profile: String,
+        address: String,
+    },
 }
 
 #[cfg(target_os = "windows")]
@@ -305,8 +309,8 @@ fn main() {
             }
             AgentAction::Install => run_async(installer::install_agent()).unwrap(),
             AgentAction::Uninstall => run_async(installer::uninstall_agent()).unwrap(),
-            AgentAction::Init { address } => {
-                run_async(init_agent(address, DEFAULT_AGENT_PROFILE)).unwrap()
+            AgentAction::Init { address, profile } => {
+                run_async(init_agent(address, &profile)).unwrap()
             }
         },
         Command::Version => {
