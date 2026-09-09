@@ -35,6 +35,7 @@ fn main() {
         .theme(|_: &'_ UI, _| iced::Theme::Dark)
         .font(BOOTSTRAP_FONT_BYTES)
         .antialiasing(true)
+        .default_font(iced::Font::MONOSPACE)
         .run()
         .unwrap();
 }
