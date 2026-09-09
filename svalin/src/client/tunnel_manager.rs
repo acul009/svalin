@@ -63,7 +63,7 @@ impl TunnelManager {
                 let local_port = local_port.unwrap_or_else(|| {
                     let mut hasher = Fnv1aHasher::default();
                     tunnel.target.hash(&mut hasher);
-                    tunnel.name.hash(&mut hasher);
+                    remote_host.hash(&mut hasher);
                     stable_port(&hasher)
                 });
 
