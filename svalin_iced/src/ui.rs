@@ -11,7 +11,7 @@ use crate::{
     ui::widgets::{header, loading},
 };
 
-pub const INFO_COLOR: iced::Color = iced::color!(0x328fff);
+pub const INFO_COLOR: iced::Color = iced::color!(0x7910a6);
 pub const SUCCESS_COLOR: iced::Color = iced::color!(0x2ab370);
 pub const WARNING_COLOR: iced::Color = iced::color!(0xf5a623);
 pub const ERROR_COLOR: iced::Color = iced::color!(0xe14848);

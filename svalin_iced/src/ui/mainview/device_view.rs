@@ -3,7 +3,9 @@ use std::sync::Arc;
 use iced::{
     Length, Task,
     alignment::Vertical,
-    widget::{self, center, column, container, row, rule, scrollable, space, stack, text},
+    widget::{
+        self, center, column, container, progress_bar, row, rule, scrollable, space, stack, text,
+    },
 };
 use svalin::client::{
     Client,
@@ -367,10 +369,11 @@ fn disk<'a>(disk: &'a Disk) -> Element<'a, Message> {
             ]
             .padding([0, 20]),
             stack![
-                widget::progress_bar(
+                progress_bar(
                     0.0..=disk.total_space as f32,
                     (disk.total_space - disk.available_space) as f32
                 )
+                .style(progress_bar::secondary)
                 .girth(Length::Fill),
                 row![
                     text(t!(
