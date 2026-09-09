@@ -33,6 +33,7 @@ pub enum Message {
     CloseOverlay,
     OpenRemoteWebinterface(Url),
     RemoteWebinterfaceOpened { scheme: String, local_port: u16 },
+    RefreshReport,
 }
 
 pub enum Action {
@@ -154,6 +155,16 @@ impl State {
             Message::RemoteWebinterfaceOpened { scheme, local_port } => {
                 open::that_in_background(format!("{scheme}://127.0.0.1:{local_port}"));
                 Action::None
+            }
+            Message::RefreshReport => {
+                let spki_hash = self.spki_hash.clone();
+                let client = client.clone();
+                Action::Run(
+                    Task::future(
+                        async move { client.device(spki_hash).request_system_report().await },
+                    )
+                    .discard(),
+                )
             }
         }
     }
@@ -336,6 +347,11 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
         .spacing(15),
     )
     .title(text(t!("device.report.title")))
+    .action(
+        icon_button(bootstrap::arrow_clockwise())
+            .tooltip("Generate New Report")
+            .on_press(Message::RefreshReport),
+    )
     .padding(0)
     .into()
 }
