@@ -73,17 +73,42 @@ pub struct Disk {
     pub kind: sysinfo::DiskKind,
 }
 
-impl SystemReport {
-    pub async fn create() -> anyhow::Result<Self> {
-        let mut base = tokio::task::spawn_blocking(|| Self::create_inner()).await??;
-        base.extensions.proxmox_ve = proxmox_ve::ProxmoxVE::create().await?;
-        base.extensions.proxmox_bs = proxmox_bs::ProxmoxBS::create().await?;
-        base.extensions.proxmox_mg = proxmox_mg::ProxmoxMG::create().await?;
-        base.extensions.windows = windows::Windows::create().await;
-        Ok(base)
+/// Owns the system state used for periodic reports, independently of live data.
+#[derive(Default)]
+pub struct SystemReporter {
+    system: sysinfo::System,
+}
+
+impl SystemReporter {
+    pub fn new() -> Self {
+        Self::default()
     }
-    pub fn create_inner() -> anyhow::Result<Self> {
-        let sys = sysinfo::System::new_all();
+
+    /// Returns the reporter for reuse, including when report collection fails.
+    pub async fn create(mut self) -> (Self, anyhow::Result<SystemReport>) {
+        let (reporter, base) = tokio::task::spawn_blocking(move || {
+            let base = Self::collect(&mut self.system);
+            (self, base)
+        })
+        .await
+        .expect("system report collection task panicked");
+        let report = async {
+            let mut base = base?;
+            base.extensions.proxmox_ve = proxmox_ve::ProxmoxVE::create().await?;
+            base.extensions.proxmox_bs = proxmox_bs::ProxmoxBS::create().await?;
+            base.extensions.proxmox_mg = proxmox_mg::ProxmoxMG::create().await?;
+            base.extensions.windows = windows::Windows::create().await;
+            Ok(base)
+        }
+        .await;
+        (reporter, report)
+    }
+    fn collect(sys: &mut sysinfo::System) -> anyhow::Result<SystemReport> {
+        sys.refresh_specifics(
+            sysinfo::RefreshKind::nothing()
+                .with_cpu(sysinfo::CpuRefreshKind::everything())
+                .with_memory(sysinfo::MemoryRefreshKind::everything()),
+        );
 
         #[cfg(windows)]
         let os = OSFamily::Windows;
@@ -125,7 +150,7 @@ impl SystemReport {
             .collect::<Vec<_>>();
         disks.sort_by_cached_key(|disk| disk.mount_point.clone());
 
-        Ok(Self {
+        Ok(SystemReport {
             os_family: os,
             os: sysinfo::System::long_os_version(),
             kernel_version: sysinfo::System::kernel_long_version(),
