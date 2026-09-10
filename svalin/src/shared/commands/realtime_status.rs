@@ -9,7 +9,7 @@ use svalin_rpc::rpc::{
     },
     session::{Session, SessionReadError},
 };
-use svalin_sysctl::realtime::RealtimeStatus;
+use svalin_sysctl::realtime::{RealtimeReporter, RealtimeStatus};
 use tokio::{select, sync::watch};
 use tokio_util::sync::CancellationToken;
 
@@ -39,8 +39,9 @@ impl CommandHandler for RealtimeStatusHandler {
         cancel: CancellationToken,
     ) -> Result<()> {
         // tracing::trace!("realtime status requested");
+        let mut reporter = RealtimeReporter::new();
         loop {
-            let status = RealtimeStatus::get().await;
+            let status = reporter.get().await;
             // tracing::trace!("sending realtime status");
             // tracing::trace!("cpu: {:?}", status.cpu);
 

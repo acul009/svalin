@@ -76,7 +76,7 @@ pub struct Disk {
 /// Owns the system state used for periodic reports, independently of live data.
 #[derive(Default)]
 pub struct SystemReporter {
-    system: sysinfo::System,
+    system: Option<sysinfo::System>,
 }
 
 impl SystemReporter {
@@ -84,24 +84,22 @@ impl SystemReporter {
         Self::default()
     }
 
-    /// Returns the reporter for reuse, including when report collection fails.
-    pub async fn create(mut self) -> (Self, anyhow::Result<SystemReport>) {
-        let (reporter, base) = tokio::task::spawn_blocking(move || {
-            let base = Self::collect(&mut self.system);
-            (self, base)
+    /// Lazily initializes the system. Cancelling its blocking refresh resets sampling history.
+    pub async fn create(&mut self) -> anyhow::Result<SystemReport> {
+        let system = self.system.take();
+        let (system, report) = tokio::task::spawn_blocking(move || {
+            let mut system = system.unwrap_or_default();
+            let report = Self::collect(&mut system);
+            (system, report)
         })
-        .await
-        .expect("system report collection task panicked");
-        let report = async {
-            let mut base = base?;
-            base.extensions.proxmox_ve = proxmox_ve::ProxmoxVE::create().await?;
-            base.extensions.proxmox_bs = proxmox_bs::ProxmoxBS::create().await?;
-            base.extensions.proxmox_mg = proxmox_mg::ProxmoxMG::create().await?;
-            base.extensions.windows = windows::Windows::create().await;
-            Ok(base)
-        }
-        .await;
-        (reporter, report)
+        .await?;
+        self.system = Some(system);
+        let mut report = report?;
+        report.extensions.proxmox_ve = proxmox_ve::ProxmoxVE::create().await?;
+        report.extensions.proxmox_bs = proxmox_bs::ProxmoxBS::create().await?;
+        report.extensions.proxmox_mg = proxmox_mg::ProxmoxMG::create().await?;
+        report.extensions.windows = windows::Windows::create().await;
+        Ok(report)
     }
     fn collect(sys: &mut sysinfo::System) -> anyhow::Result<SystemReport> {
         sys.refresh_specifics(

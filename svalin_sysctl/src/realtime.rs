@@ -73,11 +73,10 @@ pub struct SwapStatus {
     pub used: u64,
 }
 
-/// Owns the sampling history for one live data stream.
-/// Keep this reporter between polls; separate reporters have independent samples.
+/// Retains sampling history between live updates.
 #[derive(Default)]
 pub struct RealtimeReporter {
-    system: System,
+    system: Option<System>,
 }
 
 impl RealtimeReporter {
@@ -85,14 +84,18 @@ impl RealtimeReporter {
         Self::default()
     }
 
-    /// Moves collection onto a blocking worker and returns the reporter for reuse.
-    pub async fn get(mut self) -> (Self, RealtimeStatus) {
-        tokio::task::spawn_blocking(move || {
-            let status = Self::collect(&mut self.system);
-            (self, status)
+    /// Lazily initializes the system. Cancelling collection resets sampling history.
+    pub async fn get(&mut self) -> RealtimeStatus {
+        let system = self.system.take();
+        let (system, status) = tokio::task::spawn_blocking(move || {
+            let mut system = system.unwrap_or_default();
+            let status = Self::collect(&mut system);
+            (system, status)
         })
         .await
-        .expect("realtime status collection task panicked")
+        .expect("realtime status collection task panicked");
+        self.system = Some(system);
+        status
     }
 
     fn collect(sys: &mut System) -> RealtimeStatus {
@@ -165,5 +168,95 @@ impl RealtimeReporter {
             },
             processes,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{future::Future, task::Poll};
+
+    #[tokio::test]
+    async fn live_processes_refresh_and_round_trip() {
+        if !sysinfo::IS_SUPPORTED_SYSTEM {
+            return;
+        }
+        let mut reporter = RealtimeReporter::new();
+        let first = reporter.get().await;
+        let first_process = first
+            .processes
+            .iter()
+            .find(|p| p.pid == std::process::id())
+            .unwrap();
+        assert!(!first_process.name.is_empty());
+        assert!(first_process.memory > 0);
+
+        tokio::time::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL).await;
+        let status = reporter.get().await;
+        let process = status
+            .processes
+            .iter()
+            .find(|p| p.pid == std::process::id())
+            .unwrap();
+        assert_eq!(process.start_time, first_process.start_time);
+        assert!(process.cpu_usage.is_finite() && process.cpu_usage >= 0.0);
+        assert!(process.io.total_read_bytes >= first_process.io.total_read_bytes);
+        assert!(process.io.total_written_bytes >= first_process.io.total_written_bytes);
+        assert!(
+            status
+                .processes
+                .windows(2)
+                .all(|pair| pair[0].pid < pair[1].pid)
+        );
+
+        let encoded = serde_json::to_value(&status).unwrap();
+        let decoded: RealtimeStatus = serde_json::from_value(encoded.clone()).unwrap();
+        assert_eq!(serde_json::to_value(decoded).unwrap(), encoded);
+
+        let mut legacy = encoded;
+        legacy.as_object_mut().unwrap().remove("processes");
+        assert!(
+            serde_json::from_value::<RealtimeStatus>(legacy)
+                .unwrap()
+                .processes
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn reporter_reinitializes_after_cancelled_refresh() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .max_blocking_threads(1)
+            .build()
+            .unwrap();
+        let mut reporter = RealtimeReporter::new();
+        assert!(reporter.system.is_none());
+        runtime.block_on(reporter.get());
+        assert!(reporter.system.is_some());
+
+        // Keep the only blocking worker occupied so the refresh cannot finish
+        // before its future is dropped.
+        let (release, wait) = std::sync::mpsc::channel();
+        let (started, ready) = std::sync::mpsc::channel();
+        let blocker = runtime.spawn_blocking(move || {
+            started.send(()).unwrap();
+            let _ = wait.recv();
+        });
+        ready.recv().unwrap();
+        runtime.block_on(async {
+            let mut refresh = Box::pin(reporter.get());
+            std::future::poll_fn(|context| {
+                assert!(refresh.as_mut().poll(context).is_pending());
+                Poll::Ready(())
+            })
+            .await;
+        });
+        assert!(reporter.system.is_none());
+        release.send(()).unwrap();
+        runtime.block_on(blocker).unwrap();
+
+        runtime.block_on(reporter.get());
+        assert!(reporter.system.is_some());
     }
 }

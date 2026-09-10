@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use futures::{FutureExt, select};
-use svalin_sysctl::system_report::SystemReport;
+use svalin_sysctl::system_report::SystemReporter;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
@@ -36,8 +36,9 @@ pub(super) async fn schedule_system_reports(
     cancel: CancellationToken,
     notify: Arc<Notify>,
 ) {
+    let mut reporter = SystemReporter::new();
     loop {
-        if let Err(err) = send_system_report(&mls, &messager_handle).await {
+        if let Err(err) = send_system_report(&mls, &messager_handle, &mut reporter).await {
             tracing::error!("Failed to send system report: {}", err);
         }
 
@@ -52,17 +53,20 @@ pub(super) async fn schedule_system_reports(
 async fn send_system_report(
     mls: &MlsAgent,
     messager_handle: &AgentMessageDispatcherHandle,
+    reporter: &mut SystemReporter,
 ) -> Result<(), anyhow::Error> {
     tracing::trace!("Generating and sending system report");
-    let report = generate_system_report().await?;
+    let report = generate_system_report(reporter).await?;
     let message = mls.send_report(report).await?;
     messager_handle.send(MessageFromAgent::Mls(message)).await;
     tracing::trace!("System report sent");
     Ok(())
 }
 
-async fn generate_system_report() -> anyhow::Result<persistent::Report> {
-    let system_report = SystemReport::create().await?;
+async fn generate_system_report(
+    reporter: &mut SystemReporter,
+) -> anyhow::Result<persistent::Report> {
+    let system_report = reporter.create().await?;
 
     let report = persistent::Report {
         current_version_identifier: crate::commit().into(),
