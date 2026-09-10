@@ -12,3 +12,6 @@ sysinfo = { workspace = true, features = ["serde"] }
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-registry = "0.6.1"

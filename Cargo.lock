@@ -7021,6 +7021,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "windows-registry",
 ]
 
 [[package]]
