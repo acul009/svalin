@@ -1,5 +1,5 @@
 use svalin_pki::SpkiHash;
-use svalin_sysctl::system_report::windows;
+use svalin_sysctl::system_report::windows::bitlocker;
 
 #[derive(Clone, Debug)]
 pub struct State {
@@ -70,8 +70,8 @@ pub enum Device {
     MissingName,
     BitlockerActive {
         drive: String,
-        status: windows::VolumeStatus,
-        protection: windows::ProtectionStatus,
+        status: bitlocker::VolumeStatus,
+        protection: bitlocker::ProtectionStatus,
         percentage: u8,
     },
     PMGAttachmentQuarantine(u64),

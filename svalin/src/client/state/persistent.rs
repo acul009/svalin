@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use svalin_pki::SpkiHash;
 use svalin_sysctl::system_report::{
     OSFamily, SystemReport,
-    windows::{ProtectionStatus, VolumeStatus},
+    windows::bitlocker::{ProtectionStatus, VolumeStatus},
 };
 
 use crate::client::state::warning;
