@@ -9,6 +9,7 @@ pub mod proxmox_bs;
 pub mod proxmox_mg;
 pub mod proxmox_ve;
 pub mod windows;
+pub mod zfs;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SystemReport {
@@ -34,9 +35,15 @@ pub struct Extensions {
     proxmox_bs: Option<proxmox_bs::ProxmoxBS>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     windows: Option<windows::Windows>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    zfs: Option<zfs::Zfs>,
 }
 
 impl Extensions {
+    pub fn zfs(&self) -> Option<&zfs::Zfs> {
+        self.zfs.as_ref()
+    }
+
     pub fn proxmox_ve(&self) -> Option<&proxmox_ve::ProxmoxVE> {
         self.proxmox_ve.as_ref()
     }
@@ -99,6 +106,7 @@ impl SystemReporter {
         report.extensions.proxmox_bs = proxmox_bs::ProxmoxBS::create().await?;
         report.extensions.proxmox_mg = proxmox_mg::ProxmoxMG::create().await?;
         report.extensions.windows = windows::Windows::create().await;
+        report.extensions.zfs = zfs::Zfs::create().await;
         Ok(report)
     }
     fn collect(sys: &mut sysinfo::System) -> anyhow::Result<SystemReport> {
