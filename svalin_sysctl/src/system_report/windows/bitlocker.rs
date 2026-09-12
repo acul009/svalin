@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use tokio::process::Command;
 
 const BITLOCKER_COMMAND: &str = r#"Get-BitLockerVolume | ForEach-Object {
@@ -44,15 +45,27 @@ pub enum ProtectionStatus {
 }
 
 pub(super) async fn query_volumes() -> Option<Vec<BitLockerVolume>> {
-    let output = Command::new("powershell.exe")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            BITLOCKER_COMMAND,
-        ])
-        .output()
-        .await;
+    let output = tokio::time::timeout(
+        Duration::from_secs(30),
+        Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                BITLOCKER_COMMAND,
+            ])
+            .kill_on_drop(true)
+            .output(),
+    )
+    .await;
+
+    let output = match output {
+        Ok(output) => output,
+        Err(error) => {
+            tracing::warn!(%error, "BitLocker query timed out");
+            return None;
+        }
+    };
 
     match output {
         Ok(output) if output.status.success() => match parse_bitlocker_volumes(&output.stdout) {

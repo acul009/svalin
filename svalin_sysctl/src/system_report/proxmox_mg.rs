@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use tokio::process::Command;
 
 const PMGSH: &str = "/usr/bin/pmgsh";
@@ -34,7 +35,19 @@ impl ProxmoxMG {
 }
 
 async fn quarantine_count(kind: &str, args: &[&str]) -> u64 {
-    let output = match Command::new(PMGSH).args(args).output().await {
+    let output = match tokio::time::timeout(
+        Duration::from_secs(30),
+        Command::new(PMGSH).args(args).kill_on_drop(true).output(),
+    )
+    .await
+    {
+        Ok(output) => output,
+        Err(error) => {
+            tracing::warn!(quarantine = kind, %error, "Proxmox Mail Gateway query timed out");
+            return 0;
+        }
+    };
+    let output = match output {
         Ok(output) if output.status.success() => output,
         Ok(output) => {
             tracing::warn!(

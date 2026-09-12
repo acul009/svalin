@@ -102,9 +102,27 @@ impl SystemReporter {
         .await?;
         self.system = Some(system);
         let mut report = report?;
-        report.extensions.proxmox_ve = proxmox_ve::ProxmoxVE::create().await?;
-        report.extensions.proxmox_bs = proxmox_bs::ProxmoxBS::create().await?;
-        report.extensions.proxmox_mg = proxmox_mg::ProxmoxMG::create().await?;
+        report.extensions.proxmox_ve =
+            proxmox_ve::ProxmoxVE::create()
+                .await
+                .unwrap_or_else(|error| {
+                    tracing::warn!(%error, "failed to collect Proxmox VE extension");
+                    None
+                });
+        report.extensions.proxmox_bs =
+            proxmox_bs::ProxmoxBS::create()
+                .await
+                .unwrap_or_else(|error| {
+                    tracing::warn!(%error, "failed to collect Proxmox Backup Server extension");
+                    None
+                });
+        report.extensions.proxmox_mg =
+            proxmox_mg::ProxmoxMG::create()
+                .await
+                .unwrap_or_else(|error| {
+                    tracing::warn!(%error, "failed to collect Proxmox Mail Gateway extension");
+                    None
+                });
         report.extensions.windows = windows::Windows::create().await;
         report.extensions.zfs = zfs::Zfs::create().await;
         Ok(report)
