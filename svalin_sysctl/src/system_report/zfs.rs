@@ -28,31 +28,31 @@ impl Zfs {
         let Some(output) = query(&["status", "-j", "--json-int", "-p", "-P"]).await? else {
             return Ok(None);
         };
-        let Some(mut report) = Self::from_status(&output)? else {
+        let status: PoolOutput = serde_json::from_slice(&output)?;
+        if status.pools.is_empty() {
             return Ok(None);
+        }
+        let mut report = Self {
+            userspace_version: None,
+            kernel_version: None,
+            pools: status.pools,
         };
-        match query(&["version", "-j"]).await {
-            Ok(Some(output)) => match serde_json::from_slice::<VersionOutput>(&output) {
-                Ok(version) => {
-                    report.userspace_version = version.zfs_version.userland;
-                    report.kernel_version = version.zfs_version.kernel;
-                }
-                Err(error) => tracing::warn!(%error, "invalid ZFS version response"),
-            },
-            Ok(None) => tracing::warn!("zpool unavailable for version query"),
+        match query_version().await {
+            Ok(version) => {
+                report.userspace_version = version.userland;
+                report.kernel_version = version.kernel;
+            }
             Err(error) => tracing::warn!(%error, "failed to collect ZFS version"),
         }
         Ok(Some(report))
     }
+}
 
-    fn from_status(output: &[u8]) -> anyhow::Result<Option<Self>> {
-        let status: PoolOutput = serde_json::from_slice(output)?;
-        Ok((!status.pools.is_empty()).then_some(Self {
-            userspace_version: None,
-            kernel_version: None,
-            pools: status.pools,
-        }))
-    }
+async fn query_version() -> anyhow::Result<VersionFields> {
+    let output = query(&["version", "-j"])
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("zpool unavailable for version query"))?;
+    Ok(serde_json::from_slice::<VersionOutput>(&output)?.zfs_version)
 }
 
 // Only the command envelopes are separate: pool and device data deserialize
@@ -160,7 +160,7 @@ impl ZfsVdev {
     fn needs_attention(&self) -> bool {
         // Available/in-use spares are normal, but unknown states remain advisory.
         let healthy_spare = self.class == Some(ZfsVdevClass::Spare)
-            && matches!(&self.state, ZfsHealth::Other(state) if state == "AVAIL" || state == "INUSE");
+            && matches!(self.state, ZfsHealth::Available | ZfsHealth::InUse);
         (self.state != ZfsHealth::Online && !healthy_spare)
             || self.errors.read > 0
             || self.errors.write > 0
@@ -208,6 +208,8 @@ impl ZfsScan {
 }
 
 string_enum!(ZfsHealth {
+    Available => "AVAIL",
+    InUse => "INUSE",
     Online => "ONLINE" | "HEALTHY",
     Degraded => "DEGRADED",
     Faulted => "FAULTED",

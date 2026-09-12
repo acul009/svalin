@@ -154,7 +154,7 @@ impl SystemReporter {
                 !disk.mount_point.starts_with("/var/lib/docker") && disk.file_system != "overlay"
             })
             .collect::<Vec<_>>();
-        disks.sort_by_cached_key(|disk| disk.mount_point.clone());
+        disks.sort_by(|a, b| a.mount_point.cmp(&b.mount_point));
 
         Ok(SystemReport {
             os_family: os,

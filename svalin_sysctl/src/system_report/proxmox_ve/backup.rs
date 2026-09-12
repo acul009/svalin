@@ -85,6 +85,7 @@ struct Task {
     upid: String,
     starttime: u64,
     endtime: Option<u64>,
+    status: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -133,89 +134,105 @@ async fn collect_jobs() -> anyhow::Result<Vec<BackupJob>> {
         .iter()
         .filter_map(|(_, state)| state.as_ref().and_then(|state| state.upid.as_deref()))
         .collect();
-    let history = match task_history(node, &wanted).await {
-        Ok(history) => history,
-        Err(error) => {
-            tracing::warn!(%error, "PVE backup task history unavailable");
-            HashMap::new()
-        }
-    };
+    let history = task_history(node, &wanted).await;
     let mut jobs = Vec::new();
-    for (config, state) in &states {
-        let mut status = BackupStatus::Unknown;
-        let mut baseline = state
-            .as_ref()
-            .and_then(|state| state.time)
-            .filter(|time| *time > 0);
-        if let Some(state) = state {
-            if let Some(upid) = &state.upid {
-                let archived = history.get(upid);
-                baseline = archived
-                    .map(|task| task.starttime)
-                    .or_else(|| upid_starttime(upid));
-                match query::<TaskStatus>(&format!("/nodes/{node}/tasks/{upid}/status"), &[]).await
-                {
-                    Ok(task) => {
-                        baseline = Some(task.starttime);
-                        status = match task.status.as_str() {
-                            "running" => BackupStatus::Running {
-                                started_at: task.starttime,
-                            },
-                            "stopped" => result_status(
-                                task.exitstatus.as_deref(),
-                                archived.and_then(|task| task.endtime),
-                            ),
-                            _ => BackupStatus::Unknown,
-                        };
-                    }
-                    Err(error) => {
-                        tracing::warn!(job = %config.id, %error, "PVE backup task status unavailable");
-                        if state.state == "stopped" {
-                            status = result_status(
-                                state.msg.as_deref(),
-                                archived.and_then(|task| task.endtime),
-                            );
-                        }
-                    }
-                }
-            } else if state.state == "stopped" {
-                // Scheduler failures can occur before a worker receives a UPID.
-                status = result_status(state.msg.as_deref(), state.time);
-            }
-        }
-        let due_at = if let Some(baseline) = baseline {
-            let start = baseline.to_string();
-            match query::<Vec<ScheduleEvent>>(
-                "/cluster/jobs/schedule-analyze",
-                &[
-                    "--schedule",
-                    &config.schedule,
-                    "--starttime",
-                    &start,
-                    "--iterations",
-                    "1",
-                ],
-            )
-            .await
-            {
-                Ok(events) => events.first().map(|event| event.timestamp),
-                Err(error) => {
-                    tracing::warn!(job = %config.id, %error, "PVE backup due time unavailable");
-                    None
-                }
-            }
-        } else {
-            None
-        };
+    for (config, state) in states {
+        let (status, baseline) = last_run(node, &config.id, state.as_ref(), &history).await;
+        let due_at = next_due(&config, baseline).await;
         jobs.push(BackupJob {
-            id: config.id.clone(),
-            storage: config.storage.clone(),
-            schedule: config.schedule.clone(),
+            id: config.id,
+            storage: config.storage,
+            schedule: config.schedule,
             due_at,
             status,
         });
     }
     Ok(jobs)
+}
+
+async fn last_run(
+    node: &str,
+    job: &str,
+    state: Option<&JobState>,
+    history: &HashMap<String, Task>,
+) -> (BackupStatus, Option<u64>) {
+    let Some(state) = state else {
+        return (BackupStatus::Unknown, None);
+    };
+    let Some(upid) = &state.upid else {
+        let status = if state.state == "stopped" {
+            result_status(state.msg.as_deref(), state.time)
+        } else {
+            BackupStatus::Unknown
+        };
+        return (status, state.time.filter(|time| *time > 0));
+    };
+    let archived = history.get(upid);
+    if let Some(task) = archived {
+        if task.endtime.is_some()
+            && task
+                .status
+                .as_deref()
+                .is_some_and(|s| !s.is_empty() && s != "RUNNING")
+        {
+            return (
+                result_status(task.status.as_deref(), task.endtime),
+                Some(task.starttime),
+            );
+        }
+    }
+    match query::<TaskStatus>(&format!("/nodes/{node}/tasks/{upid}/status"), &[]).await {
+        Ok(task) => {
+            let status = match task.status.as_str() {
+                "running" => BackupStatus::Running {
+                    started_at: task.starttime,
+                },
+                "stopped" => result_status(
+                    task.exitstatus.as_deref(),
+                    archived.and_then(|task| task.endtime),
+                ),
+                _ => BackupStatus::Unknown,
+            };
+            (status, Some(task.starttime))
+        }
+        Err(error) => {
+            tracing::warn!(job, %error, "PVE backup task status unavailable");
+            let status = if state.state == "stopped" {
+                result_status(state.msg.as_deref(), archived.and_then(|task| task.endtime))
+            } else {
+                BackupStatus::Unknown
+            };
+            (
+                status,
+                archived
+                    .map(|task| task.starttime)
+                    .or_else(|| upid_starttime(upid)),
+            )
+        }
+    }
+}
+
+async fn next_due(config: &JobConfig, baseline: Option<u64>) -> Option<u64> {
+    let start = baseline?.to_string();
+    match query::<Vec<ScheduleEvent>>(
+        "/cluster/jobs/schedule-analyze",
+        &[
+            "--schedule",
+            &config.schedule,
+            "--starttime",
+            &start,
+            "--iterations",
+            "1",
+        ],
+    )
+    .await
+    {
+        Ok(events) => events.first().map(|event| event.timestamp),
+        Err(error) => {
+            tracing::warn!(job = %config.id, %error, "PVE backup due time unavailable");
+            None
+        }
+    }
 }
 
 fn result_status(result: Option<&str>, finished_at: Option<u64>) -> BackupStatus {
@@ -248,16 +265,16 @@ fn upid_starttime(upid: &str) -> Option<u64> {
     u64::from_str_radix(upid.split(':').nth(4)?, 16).ok()
 }
 
-async fn task_history(node: &str, wanted: &[&str]) -> anyhow::Result<HashMap<String, Task>> {
+async fn task_history(node: &str, wanted: &[&str]) -> HashMap<String, Task> {
     let mut history = HashMap::new();
     if wanted.is_empty() {
-        return Ok(history);
+        return history;
     }
     // Bound collection even on nodes with extensive history. Missing entries
     // leave completion timestamps unknown; they do not imply failed backups.
     for page in 0..20 {
         let start = (page * 100).to_string();
-        let tasks: Vec<Task> = query(
+        let tasks = query::<Vec<Task>>(
             &format!("/nodes/{node}/tasks"),
             &[
                 "--typefilter",
@@ -270,14 +287,23 @@ async fn task_history(node: &str, wanted: &[&str]) -> anyhow::Result<HashMap<Str
                 &start,
             ],
         )
-        .await?;
+        .await;
+        let tasks = match tasks {
+            Ok(tasks) => tasks,
+            Err(error) => {
+                tracing::warn!(%error, "PVE backup task history unavailable");
+                break;
+            }
+        };
         let count = tasks.len();
         for task in tasks {
-            history.insert(task.upid.clone(), task);
+            if wanted.contains(&task.upid.as_str()) {
+                history.insert(task.upid.clone(), task);
+            }
         }
         if count < 100 || wanted.iter().all(|upid| history.contains_key(*upid)) {
             break;
         }
     }
-    Ok(history)
+    history
 }
