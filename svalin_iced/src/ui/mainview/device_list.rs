@@ -1,4 +1,3 @@
-use chrono::DateTime;
 use iced::{
     Alignment::Center,
     Length,
@@ -10,6 +9,7 @@ use svalin_pki::SpkiHash;
 use crate::{
     Element, bootstrap,
     ui::widgets::{button_list, device_icon},
+    util::format_timestamp,
 };
 
 pub struct DeviceList<'a, Message> {
@@ -72,16 +72,7 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                                     persistent
                                         .report()
                                         .map(|report| {
-                                            DateTime::from_timestamp_secs(
-                                                report.system_report.generated_at as i64,
-                                            )
-                                        })
-                                        .flatten()
-                                        .map(|datetime| {
-                                            datetime
-                                                .naive_local()
-                                                .format("%Y-%m-%d %H:%M:%S")
-                                                .to_string()
+                                            format_timestamp(report.system_report.generated_at)
                                         })
                                         .unwrap_or_else(|| t!("generic.unknown").to_string())
                                 )
