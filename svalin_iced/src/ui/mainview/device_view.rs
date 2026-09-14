@@ -343,6 +343,7 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
             )
             .padding(30),
             rule::horizontal(2),
+            rule::horizontal(2),
             container(crate::ui::widgets::list(report.disks.iter().map(disk)).entry_height(90))
                 .padding(30),
         ]

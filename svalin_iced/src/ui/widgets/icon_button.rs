@@ -13,6 +13,7 @@ pub struct IconButton<'a, Message> {
     tooltip: Option<Element<'a, Message>>,
     on_press: Option<Message>,
     size: iced::Pixels,
+    selected: bool,
 }
 
 pub fn back<'a, Message>() -> IconButton<'a, Message> {
@@ -26,6 +27,7 @@ impl<'a, Message> IconButton<'a, Message> {
             on_press: None,
             tooltip: None,
             size: (HEADER_HEIGHT - 2.0 * HEADER_PADDING).into(),
+            selected: false,
         }
     }
 
@@ -43,6 +45,11 @@ impl<'a, Message> IconButton<'a, Message> {
         self.size = size.into();
         self
     }
+
+    pub fn selected(mut self, selected: bool) -> Self {
+        self.selected = selected;
+        self
+    }
 }
 
 impl<'a, Message: Clone + 'static> From<IconButton<'a, Message>> for Element<'a, Message> {
@@ -58,8 +65,41 @@ impl<'a, Message: Clone + 'static> From<IconButton<'a, Message>> for Element<'a,
         .width(value.size)
         .height(value.size)
         .on_press_maybe(value.on_press);
+        let button = if value.selected {
+            button.style(|theme: &iced::Theme, status| {
+                let palette = theme.palette();
+                let mut style = button::primary(theme, status);
+                let darken = match status {
+                    button::Status::Active => 0.50,
+                    button::Status::Hovered => 0.40,
+                    button::Status::Pressed => 0.60,
+                    button::Status::Disabled => 0.0,
+                };
+                if !matches!(status, button::Status::Disabled) {
+                    style.background = Some(
+                        palette
+                            .primary
+                            .base
+                            .color
+                            .mix(iced::Color::BLACK, darken)
+                            .into(),
+                    );
+                }
+                style
+            })
+        } else {
+            button
+        };
         if let Some(tip) = value.tooltip {
-            tooltip(button, tip, tooltip::Position::Top).into()
+            tooltip(button, tip, tooltip::Position::Top)
+                .padding(8)
+                .style(|_| iced::widget::container::Style {
+                    background: Some(iced::Color::BLACK.scale_alpha(0.70).into()),
+                    text_color: Some(iced::Color::WHITE),
+                    border: iced::border::rounded(4),
+                    ..Default::default()
+                })
+                .into()
         } else {
             button.into()
         }

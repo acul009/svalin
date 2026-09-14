@@ -1,6 +1,5 @@
 use iced::{
     Color, Length, Shadow,
-    alignment::Vertical,
     widget::{column, container, row, rule, stack},
 };
 
@@ -79,26 +78,10 @@ pub const HEADER_PADDING: f32 = 10.0;
 
 impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, Message> {
     fn from(scaffold: Scaffold<'a, Message>) -> Self {
-        let has_header = scaffold.header.is_some();
         let has_context = scaffold.context.is_some();
         stack![
             column![
-                scaffold.header.map(|header| {
-                    container(header)
-                        .style(|_| container::Style {
-                            shadow: Shadow {
-                                blur_radius: 50.0,
-                                color: Color::BLACK.scale_alpha(0.5),
-                                offset: iced::Vector { x: 0.0, y: 10.0 },
-                            },
-                            ..Default::default()
-                        })
-                        .align_y(Vertical::Center)
-                        .padding(HEADER_PADDING)
-                        .height(HEADER_HEIGHT)
-                        .width(Length::Fill)
-                }),
-                has_header.then(|| rule::horizontal(2)),
+                scaffold.header,
                 row![
                     scaffold.body,
                     has_context.then(|| rule::vertical(2)),

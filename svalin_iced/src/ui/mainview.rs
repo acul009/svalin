@@ -1,9 +1,8 @@
-use std::{borrow::Cow, process, sync::Arc, time::Duration};
+use std::{process, sync::Arc, time::Duration};
 
-use anyhow::anyhow;
 use iced::{
-    Length, Subscription, Task,
-    widget::{button, column, row, scrollable, stack, text},
+    Subscription, Task,
+    widget::{stack, text},
 };
 use svalin::client::{
     Client,
@@ -14,18 +13,18 @@ use tokio::sync::broadcast;
 use tokio_stream::{StreamExt, wrappers::BroadcastStream};
 
 use crate::{
-    Element, bootstrap,
+    bootstrap,
     ui::{
         ERROR_COLOR, INFO_COLOR, WARNING_COLOR,
-        widgets::{error_display, header, icon_button, loading, toast},
+        widgets::{error_display, header, icon_button, loading, scaffold},
     },
-    util::human_i_bytes,
 };
 
 mod add_device;
 mod device_list;
 mod device_view;
 mod tunnel_menu;
+mod warning_menu;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -72,11 +71,16 @@ pub enum Context {
     Tunnels,
 }
 
+impl From<Context> for Message {
+    fn from(context: Context) -> Self {
+        Self::Context(context)
+    }
+}
+
 pub struct MainView {
     screen: Screen,
     state: ClientState,
     context: Context,
-    tunnel_menu: tunnel_menu::TunnelMenu,
     client: Arc<Client>,
     error: Option<Arc<anyhow::Error>>,
     update_abort_handle: Option<iced::task::Handle>,
@@ -90,7 +94,6 @@ impl MainView {
                 screen: Screen::Loading(t!("device-list.loading").to_string()),
                 state: ClientState::empty(),
                 context: Context::None,
-                tunnel_menu: tunnel_menu::TunnelMenu::new(),
                 client,
                 error: None,
                 update_abort_handle: None,
@@ -183,7 +186,7 @@ impl MainView {
                 }
             }
             Message::OpenTerminal(arc) => Action::OpenTerminal(arc),
-            Message::TunnelMenu(message) => match self.tunnel_menu.update(message, &self.client) {
+            Message::TunnelMenu(message) => match tunnel_menu::update(message, &self.client) {
                 tunnel_menu::Action::None => Action::None,
                 tunnel_menu::Action::SelectDevice(device) => {
                     self.screen = Screen::DeviceView(device_view::State::new(device));
@@ -191,7 +194,11 @@ impl MainView {
                 }
             },
             Message::Context(context) => {
-                self.context = context;
+                self.context = if self.context == context {
+                    Context::None
+                } else {
+                    context
+                };
                 Action::None
             }
         }
@@ -238,8 +245,9 @@ impl MainView {
         header
             .action(
                 icon_button(bootstrap::ethernet())
+                    .selected(self.context == Context::Tunnels)
                     .tooltip(text(t!("tunnel.menu.show")))
-                    .on_press(Message::Context(Context::Tunnels)),
+                    .on_press(Context::Tunnels.into()),
             )
             .action(
                 icon_button(
@@ -251,114 +259,28 @@ impl MainView {
                         }
                     })),
                 )
+                .selected(self.context == Context::Warnings)
                 .tooltip(text(t!("warnings.show")))
-                .on_press(Message::Context(Context::Warnings)),
+                .on_press(Context::Warnings.into()),
             )
-            .action(icon_button(bootstrap::x_lg()).on_press(Message::Context(Context::None)))
     }
 
     pub fn context(&self) -> Option<crate::Element<'_, Message>> {
         match &self.context {
             Context::None => None,
-            Context::Tunnels => Some(self.tunnel_menu.view(&self.state).map(Message::TunnelMenu)),
+            Context::Tunnels => Some(
+                scaffold(tunnel_menu::view(&self.state).map(Message::TunnelMenu))
+                    .header(
+                        tunnel_menu::header()
+                            .map(Message::TunnelMenu)
+                            .on_back(Context::None.into()),
+                    )
+                    .into(),
+            ),
             Context::Warnings => Some(
-                scrollable(
-                    column(self.state.warnings().warnings().map(|warning| {
-                        Element::from(toast(
-                            match warning.severity() {
-                                warning::Severity::High => toast::Kind::Error,
-                                warning::Severity::Medium => toast::Kind::Warning,
-                                warning::Severity::Low => toast::Kind::Info,
-                            },
-                            match warning {
-                                warning::Warning::Device(spki_hash, warning) => {
-                                    let name = self
-                                        .state
-                                        .persistent()
-                                        .devices()
-                                        .get(spki_hash)
-                                        .map(|d| d.name())
-                                        .unwrap_or_else(|| Cow::Owned(spki_hash.to_string()));
-
-                                    let mut actions = row![
-                                        button(text(t!("warnings.device.action")))
-                                            .on_press(Message::SelectDevice(spki_hash.clone()))
-                                    ]
-                                    .spacing(10);
-
-                                    let message = match warning {
-                                        warning::Device::DeviceGroupBroken(reason) => {
-                                            actions = actions.push(
-                                                button(text(t!("generic.details"))).on_press(
-                                                    Message::Error(Arc::new(anyhow!(
-                                                        reason.to_owned()
-                                                    ))),
-                                                ),
-                                            );
-                                            text(t!("warnings.device.group-broken"))
-                                        }
-                                        warning::Device::DiskSpaceLow { disk, free, total } => {
-                                            text(t!(
-                                                "warnings.device.disk-space-low",
-                                                "disk" => disk,
-                                                "free" => human_i_bytes(*free),
-                                                "total" => human_i_bytes(*total)
-                                            ))
-                                        }
-                                        warning::Device::MissingName => {
-                                            text(t!("warnings.device.missing-name"))
-                                        }
-                                        warning::Device::BitlockerActive { drive, .. } => {
-                                            text!("Drive {drive} has bitlocker active!")
-                                        }
-                                        warning::Device::PMGAttachmentQuarantine(count) => {
-                                            text!("There are {count} mails in the attachment quarantine")
-                                        }
-                                        warning::Device::PMGVirusQuarantine(count) => {
-                                            text!("There are {count} mails in the virus quarantine")
-                                        }
-                                        warning::Device::BackupOverdue { name, due_at } => {
-                                            text(t!(
-                                                "warnings.device.backup-overdue",
-                                                "name" => name,
-                                                "due_at" => format_warning_timestamp(*due_at)
-                                            ))
-                                        }
-                                        warning::Device::BackupFailed {
-                                            name,
-                                            message,
-                                            finished_at,
-                                        } => {
-                                            if let Some(finished_at) = finished_at {
-                                                text(t!(
-                                                    "warnings.device.backup-failed-at",
-                                                    "name" => name,
-                                                    "message" => message,
-                                                    "finished_at" => format_warning_timestamp(*finished_at)
-                                                ))
-                                            } else {
-                                                text(t!(
-                                                    "warnings.device.backup-failed",
-                                                    "name" => name,
-                                                    "message" => message
-                                                ))
-                                            }
-                                        }
-                                    };
-                                    Element::from(
-                                        column![text(name).size(24), message, actions]
-                                            .height(Length::Fit)
-                                            .spacing(10),
-                                    )
-                                }
-                            },
-                        ))
-                        .into()
-                    }))
-                    .padding(20)
-                    .spacing(20),
-                )
-                .into(),
+                scaffold(warning_menu::view(&self.state))
+                    .header(warning_menu::header().on_back(Context::None.into()))
+                    .into(),
             ),
         }
     }
@@ -377,16 +299,4 @@ impl MainView {
             }
         })
     }
-}
-
-fn format_warning_timestamp(timestamp: u64) -> String {
-    i64::try_from(timestamp)
-        .ok()
-        .and_then(chrono::DateTime::from_timestamp_secs)
-        .map(|time| {
-            time.with_timezone(&chrono::Local)
-                .format("%Y-%m-%d %H:%M %:z")
-                .to_string()
-        })
-        .unwrap_or_else(|| t!("warnings.device.unknown-time").into_owned())
 }

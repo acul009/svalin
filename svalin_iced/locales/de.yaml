@@ -132,6 +132,7 @@ tunnel:
     title: Tunnel öffnen
   no_tunnels: Es sind noch keine Tunnel geöffnet!
 warnings:
+  title: Warnungen
   show: Warnungen anzeigen
   device:
     action: Gerät

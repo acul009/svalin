@@ -1,7 +1,11 @@
 pub mod watch_recipe;
 
-/// Formats Unix seconds in the local timezone, or returns the translated unknown label.
+/// Formats Unix seconds in the local timezone; zero or invalid timestamps return the translated unknown label.
 pub fn format_timestamp(timestamp: u64) -> String {
+    if timestamp == 0 {
+        return t!("generic.unknown").into_owned();
+    }
+
     i64::try_from(timestamp)
         .ok()
         .and_then(chrono::DateTime::from_timestamp_secs)

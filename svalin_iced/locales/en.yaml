@@ -132,6 +132,7 @@ device:
   tunnel:
     open-error: Error opening Tunnel
 warnings:
+  title: Warnings
   show: Show Warnings
   device:
     action: Device
