@@ -3,7 +3,7 @@ use std::{borrow::Cow, sync::Arc};
 use anyhow::anyhow;
 use iced::{
     Length,
-    widget::{button, column, row, scrollable, text},
+    widget::{button, column, container, row, scrollable, text},
 };
 use svalin::client::state::{ClientState, warning};
 
@@ -16,13 +16,17 @@ use crate::{
 use super::Message;
 
 pub fn header<'a>() -> crate::ui::widgets::header::Header<'a, Message> {
-    crate::ui::widgets::header(text(t!("warnings.title")).size(20))
-        .drawer()
+    crate::ui::widgets::header(text(t!("warnings.title")).size(20)).drawer()
 }
 
 pub fn view(state: &ClientState) -> Element<'_, Message> {
+    let mut warnings = state.warnings().warnings().peekable();
+    if warnings.peek().is_none() {
+        return container(text(t!("warnings.empty"))).padding(20).into();
+    }
+
     scrollable(
-        column(state.warnings().warnings().map(|warning| {
+        column(warnings.map(|warning| {
             Element::from(toast(
                 match warning.severity() {
                     warning::Severity::High => toast::Kind::Error,

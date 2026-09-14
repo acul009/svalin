@@ -134,6 +134,7 @@ tunnel:
 warnings:
   title: Warnungen
   show: Warnungen anzeigen
+  empty: Keine Probleme erkannt
   device:
     action: Gerät
     group-broken: Die zugeordnete Gerätegruppe ist beschädigt

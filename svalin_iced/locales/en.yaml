@@ -134,6 +134,7 @@ device:
 warnings:
   title: Warnings
   show: Show Warnings
+  empty: No problems detected
   device:
     action: Device
     group-broken: Device associated group broken
