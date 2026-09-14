@@ -57,15 +57,10 @@ impl TunnelManager {
 
         match &tunnel.config {
             TunnelConfig::Tcp {
-                local_port,
+                local_port: _,
                 remote_host,
             } => {
-                let local_port = local_port.unwrap_or_else(|| {
-                    let mut hasher = Fnv1aHasher::default();
-                    tunnel.target.hash(&mut hasher);
-                    remote_host.hash(&mut hasher);
-                    stable_port(&hasher)
-                });
+                let local_port = tunnel.local_port();
 
                 let listener = TcpListener::bind(format!("127.0.0.1:{}", local_port)).await?;
                 let cancel = client.cancel.child_token();
@@ -128,6 +123,22 @@ pub struct TunnelDefinition {
     pub target: SpkiHash,
     pub name: String,
     pub config: TunnelConfig,
+}
+
+impl TunnelDefinition {
+    pub fn local_port(&self) -> NonZeroU16 {
+        match &self.config {
+            TunnelConfig::Tcp {
+                local_port,
+                remote_host,
+            } => local_port.unwrap_or_else(|| {
+                let mut hasher = Fnv1aHasher::default();
+                self.target.hash(&mut hasher);
+                remote_host.hash(&mut hasher);
+                stable_port(&hasher)
+            }),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

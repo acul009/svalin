@@ -95,6 +95,10 @@ impl ClientState {
         &self.warnings
     }
 
+    pub fn tunneling(&self) -> &tunneling::State {
+        &self.tunneling
+    }
+
     fn generate_device_warnings(&self, spki_hash: &SpkiHash) -> Vec<warning::Device> {
         let mut warnings: Vec<warning::Device> = self
             .persistent()

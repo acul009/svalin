@@ -25,6 +25,7 @@ use crate::{
 mod add_device;
 mod device_list;
 mod device_view;
+mod tunnel_menu;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -35,6 +36,7 @@ pub enum Message {
     SelectDevice(SpkiHash),
     AddDevice(add_device::Message),
     DeviceView(device_view::Message),
+    TunnelMenu(tunnel_menu::Message),
     OpenTerminal(
         Arc<(
             tokio::sync::mpsc::Sender<async_pty::TerminalInput>,
@@ -67,12 +69,14 @@ enum Screen {
 pub enum Context {
     None,
     Warnings,
+    Tunnels,
 }
 
 pub struct MainView {
     screen: Screen,
     state: ClientState,
     context: Context,
+    tunnel_menu: tunnel_menu::TunnelMenu,
     client: Arc<Client>,
     error: Option<Arc<anyhow::Error>>,
     update_abort_handle: Option<iced::task::Handle>,
@@ -86,6 +90,7 @@ impl MainView {
                 screen: Screen::Loading(t!("device-list.loading").to_string()),
                 state: ClientState::empty(),
                 context: Context::None,
+                tunnel_menu: tunnel_menu::TunnelMenu::new(),
                 client,
                 error: None,
                 update_abort_handle: None,
@@ -178,6 +183,13 @@ impl MainView {
                 }
             }
             Message::OpenTerminal(arc) => Action::OpenTerminal(arc),
+            Message::TunnelMenu(message) => match self.tunnel_menu.update(message, &self.client) {
+                tunnel_menu::Action::None => Action::None,
+                tunnel_menu::Action::SelectDevice(device) => {
+                    self.screen = Screen::DeviceView(device_view::State::new(device));
+                    Action::None
+                }
+            },
             Message::Context(context) => {
                 self.context = context;
                 Action::None
@@ -225,6 +237,11 @@ impl MainView {
 
         header
             .action(
+                icon_button(bootstrap::ethernet())
+                    .tooltip(text(t!("tunnel.menu.show")))
+                    .on_press(Message::Context(Context::Tunnels)),
+            )
+            .action(
                 icon_button(
                     bootstrap::exclamation_triangle_fill().color_maybe(severity.map(|severity| {
                         match severity {
@@ -243,6 +260,7 @@ impl MainView {
     pub fn context(&self) -> Option<crate::Element<'_, Message>> {
         match &self.context {
             Context::None => None,
+            Context::Tunnels => Some(self.tunnel_menu.view(&self.state).map(Message::TunnelMenu)),
             Context::Warnings => Some(
                 scrollable(
                     column(self.state.warnings().warnings().map(|warning| {
@@ -342,8 +360,6 @@ impl MainView {
                 )
                 .into(),
             ),
-            // Context::Tunnel => Some(self.tunnel_ui.view().map(Message::Tunnel)),
-            // Context::Test => Some(text("test").into()),
         }
     }
 

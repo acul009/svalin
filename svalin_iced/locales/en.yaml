@@ -70,6 +70,11 @@ realtime:
   swap: Swap
   cpu: CPU
 tunnel:
+  menu:
+    title: Open Tunnels
+    show: Show Tunnels
+    local: Local address
+    remote: Remote address
   close: Close
   opener:
     title: Open Tunnel
