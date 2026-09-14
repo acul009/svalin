@@ -62,12 +62,12 @@ pub enum Severity {
 #[derive(Clone, Debug)]
 pub enum Device {
     DeviceGroupBroken(String),
+    MissingName,
     DiskSpaceLow {
         disk: String,
         free: u64,
         total: u64,
     },
-    MissingName,
     BitlockerActive {
         drive: String,
         status: bitlocker::VolumeStatus,
@@ -76,6 +76,15 @@ pub enum Device {
     },
     PMGAttachmentQuarantine(u64),
     PMGVirusQuarantine(u64),
+    BackupOverdue {
+        name: String,
+        due_at: u64,
+    },
+    BackupFailed {
+        name: String,
+        message: String,
+        finished_at: Option<u64>,
+    },
 }
 
 impl Device {
@@ -87,6 +96,8 @@ impl Device {
             Self::BitlockerActive { .. } => Severity::Medium,
             Self::PMGAttachmentQuarantine(_) => Severity::Low,
             Self::PMGVirusQuarantine(_) => Severity::Low,
+            Device::BackupOverdue { .. } => Severity::High,
+            Device::BackupFailed { .. } => Severity::High,
         }
     }
 }

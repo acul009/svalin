@@ -299,6 +299,33 @@ impl MainView {
                                         warning::Device::PMGVirusQuarantine(count) => {
                                             text!("There are {count} mails in the virus quarantine")
                                         }
+                                        warning::Device::BackupOverdue { name, due_at } => {
+                                            text(t!(
+                                                "warnings.device.backup-overdue",
+                                                "name" => name,
+                                                "due_at" => format_warning_timestamp(*due_at)
+                                            ))
+                                        }
+                                        warning::Device::BackupFailed {
+                                            name,
+                                            message,
+                                            finished_at,
+                                        } => {
+                                            if let Some(finished_at) = finished_at {
+                                                text(t!(
+                                                    "warnings.device.backup-failed-at",
+                                                    "name" => name,
+                                                    "message" => message,
+                                                    "finished_at" => format_warning_timestamp(*finished_at)
+                                                ))
+                                            } else {
+                                                text(t!(
+                                                    "warnings.device.backup-failed",
+                                                    "name" => name,
+                                                    "message" => message
+                                                ))
+                                            }
+                                        }
                                     };
                                     Element::from(
                                         column![text(name).size(24), message, actions]
@@ -334,4 +361,16 @@ impl MainView {
             }
         })
     }
+}
+
+fn format_warning_timestamp(timestamp: u64) -> String {
+    i64::try_from(timestamp)
+        .ok()
+        .and_then(chrono::DateTime::from_timestamp_secs)
+        .map(|time| {
+            time.with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M %:z")
+                .to_string()
+        })
+        .unwrap_or_else(|| t!("warnings.device.unknown-time").into_owned())
 }

@@ -133,6 +133,10 @@ warnings:
     group-broken: Die zugeordnete Gerätegruppe ist beschädigt
     disk-space-low: "Wenig Speicherplatz auf %{disk}: %{free} von %{total} frei"
     missing-name: Das Gerät hat noch keinen Namen
+    backup-overdue: "Backup-Auftrag %{name} ist überfällig (fällig: %{due_at})"
+    backup-failed: "Backup-Auftrag %{name} fehlgeschlagen: %{message}"
+    backup-failed-at: "Backup-Auftrag %{name} ist am %{finished_at} fehlgeschlagen: %{message}"
+    unknown-time: Unbekannter Zeitpunkt
 window:
   error: Fensterfehler
 terminal:

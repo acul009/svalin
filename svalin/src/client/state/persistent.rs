@@ -1,7 +1,7 @@
 use std::{borrow::Cow, collections::HashMap, fmt::Debug};
 
 use serde::{Deserialize, Serialize};
-use svalin_pki::SpkiHash;
+use svalin_pki::{SpkiHash, get_current_timestamp};
 use svalin_sysctl::system_report::{
     OSFamily, SystemReport,
     windows::bitlocker::{ProtectionStatus, VolumeStatus},
@@ -102,14 +102,15 @@ impl State {
             if let Some(windows) = extensions.windows() {
                 self.generate_windows_warnings(&mut warnings, windows);
             }
+            if let Some(pve) = extensions.proxmox_ve() {
+                self.generate_proxmox_ve_warnings(&mut warnings, pve);
+            }
             if let Some(pmg) = extensions.proxmox_mg() {
                 if pmg.attachment_quarantine_count > 0 {
                     warnings.push(warning::Device::PMGAttachmentQuarantine(
                         pmg.attachment_quarantine_count,
                     ));
                 }
-            }
-            if let Some(pmg) = extensions.proxmox_mg() {
                 if pmg.virus_quarantine_count > 0 {
                     warnings.push(warning::Device::PMGVirusQuarantine(
                         pmg.virus_quarantine_count,
@@ -127,6 +128,35 @@ impl State {
         }
 
         warnings
+    }
+
+    fn generate_proxmox_ve_warnings(
+        &self,
+        warnings: &mut Vec<warning::Device>,
+        pve: &svalin_sysctl::system_report::proxmox_ve::ProxmoxVE,
+    ) {
+        for backup_job in pve.backup_jobs.iter().flatten() {
+            if backup_job.is_overdue(get_current_timestamp()) {
+                warnings.push(warning::Device::BackupOverdue {
+                    name: backup_job.id.clone(),
+                    due_at: backup_job.due_at.expect("already checked in is_overdue"),
+                });
+                continue;
+            }
+            match &backup_job.status {
+                svalin_sysctl::system_report::proxmox_ve::backup::BackupStatus::Failed {
+                    finished_at,
+                    message,
+                } => {
+                    warnings.push(warning::Device::BackupFailed {
+                        name: backup_job.id.clone(),
+                        message: message.clone(),
+                        finished_at: *finished_at,
+                    });
+                }
+                _ => (),
+            }
+        }
     }
 
     fn generate_windows_warnings(

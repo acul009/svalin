@@ -133,6 +133,10 @@ warnings:
     group-broken: Device associated group broken
     disk-space-low: "Disk space low on %{disk}: %{free} of %{total} free"
     missing-name: Device has no name yet
+    backup-overdue: "Backup job %{name} is overdue (due: %{due_at})"
+    backup-failed: "Backup job %{name} failed: %{message}"
+    backup-failed-at: "Backup job %{name} failed at %{finished_at}: %{message}"
+    unknown-time: Unknown time
 window:
   error: Window Error
 terminal:
