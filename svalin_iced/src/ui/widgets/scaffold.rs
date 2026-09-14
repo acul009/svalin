@@ -1,6 +1,6 @@
 use iced::{
     Color, Length, Shadow,
-    widget::{column, container, row, rule, stack},
+    widget::{column, container, row, rule, space, stack},
 };
 
 use crate::Element;
@@ -82,15 +82,15 @@ impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, M
                 scaffold.header.map(|header| {
                     container(header).style(|_| container::Style {
                         shadow: Shadow {
-                            blur_radius: 50.0,
-                            color: Color::BLACK.scale_alpha(0.5),
-                            offset: iced::Vector { x: -10.0, y: 0.0 },
+                            blur_radius: 12.0,
+                            color: Color::BLACK.scale_alpha(0.4),
+                            offset: iced::Vector { x: 0.0, y: 3.0 },
                         },
                         ..Default::default()
                     })
                 }),
                 has_header.then(|| rule::horizontal(2)),
-                row![
+                stack![row![
                     scaffold.body,
                     has_context.then(|| rule::vertical(2)),
                     scaffold.context.map(|context| {
@@ -98,9 +98,9 @@ impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, M
                             container(context)
                                 .style(|_| container::Style {
                                     shadow: Shadow {
-                                        blur_radius: 50.0,
-                                        color: Color::BLACK.scale_alpha(0.5),
-                                        offset: iced::Vector { x: -10.0, y: 0.0 },
+                                        blur_radius: 14.0,
+                                        color: Color::BLACK.scale_alpha(0.45),
+                                        offset: iced::Vector { x: -3.0, y: 0.0 },
                                     },
                                     ..Default::default()
                                 })
@@ -108,7 +108,10 @@ impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, M
                                 .height(Length::Fill)
                         }
                     })
-                ],
+                ]]
+                // Stack clips upper drawing layers; keep the row as its layout base.
+                .push_under(space())
+                .clip(true),
                 scaffold.footer
             ],
             scaffold.dialog
