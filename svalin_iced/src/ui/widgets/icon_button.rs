@@ -5,7 +5,7 @@ use iced::{
 
 use crate::{
     Element, bootstrap,
-    ui::widgets::scaffold::{HEADER_HEIGHT, HEADER_PADDING},
+    ui::widgets::header::{HEADER_HEIGHT, HEADER_PADDING},
 };
 
 pub struct IconButton<'a, Message> {

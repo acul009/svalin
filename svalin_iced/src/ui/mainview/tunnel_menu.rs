@@ -31,9 +31,8 @@ pub fn update(message: Message, client: &Arc<Client>) -> Action {
     }
 }
 
-pub fn header<'a>() -> crate::ui::widgets::header::Header<'a, Message> {
-    crate::ui::widgets::header(text(t!("tunnel.menu.title")).size(20))
-        .drawer()
+pub fn header<'a, Message: 'static>() -> crate::ui::widgets::header::Header<'a, Message> {
+    crate::ui::widgets::header(text(t!("tunnel.menu.title")).size(20)).drawer()
 }
 
 pub fn view(state: &ClientState) -> Element<'_, Message> {

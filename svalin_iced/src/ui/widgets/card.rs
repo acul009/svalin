@@ -1,13 +1,9 @@
 use iced::{
     Length, Padding,
-    alignment::Vertical,
-    widget::{center, column, container, row, space, stack},
+    widget::{column, container},
 };
 
-use crate::{
-    Element,
-    ui::widgets::scaffold::{HEADER_HEIGHT, HEADER_PADDING},
-};
+use crate::{Element, ui::widgets::header};
 
 pub struct Card<'a, Message> {
     title: Option<Element<'a, Message>>,
@@ -58,23 +54,16 @@ impl<'a, Message> Card<'a, Message> {
 
 impl<'a, Message> From<Card<'a, Message>> for Element<'a, Message>
 where
-    Message: 'a,
+    Message: 'static + Clone,
 {
     fn from(card: Card<'a, Message>) -> Self {
         container(column![
-            stack![
-                center(card.title).style(|theme| container::Style {
+            container(header(card.title).with_actions(card.actions)).style(|theme| {
+                container::Style {
                     background: Some(theme.palette().background.strong.color.into()),
                     ..Default::default()
-                }),
-                row![space::horizontal()]
-                    .extend(card.actions)
-                    .height(Length::Fill)
-                    .align_y(Vertical::Center)
-                    .spacing(HEADER_PADDING)
-                    .padding([0.0, HEADER_PADDING])
-            ]
-            .height(HEADER_HEIGHT),
+                }
+            }),
             container(card.content).padding(card.padding)
         ])
         .style(container::bordered_box)

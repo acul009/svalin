@@ -2,7 +2,7 @@ use std::{process, sync::Arc, time::Duration};
 
 use iced::{
     Subscription, Task,
-    widget::{stack, text},
+    widget::{column, stack, text},
 };
 use svalin::client::{
     Client,
@@ -16,7 +16,7 @@ use crate::{
     bootstrap,
     ui::{
         ERROR_COLOR, INFO_COLOR, WARNING_COLOR,
-        widgets::{error_display, header, icon_button, loading, scaffold},
+        widgets::{error_display, header, icon_button, loading},
     },
 };
 
@@ -269,18 +269,18 @@ impl MainView {
         match &self.context {
             Context::None => None,
             Context::Tunnels => Some(
-                scaffold(tunnel_menu::view(&self.state).map(Message::TunnelMenu))
-                    .header(
-                        tunnel_menu::header()
-                            .map(Message::TunnelMenu)
-                            .on_back(Context::None.into()),
-                    )
-                    .into(),
+                column![
+                    tunnel_menu::header().on_back(Context::None.into()),
+                    tunnel_menu::view(&self.state).map(Message::TunnelMenu),
+                ]
+                .into(),
             ),
             Context::Warnings => Some(
-                scaffold(warning_menu::view(&self.state))
-                    .header(warning_menu::header().on_back(Context::None.into()))
-                    .into(),
+                column![
+                    warning_menu::header().on_back(Context::None.into()),
+                    warning_menu::view(&self.state)
+                ]
+                .into(),
             ),
         }
     }

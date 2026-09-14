@@ -73,15 +73,23 @@ impl<'a, Message> Scaffold<'a, Message> {
     }
 }
 
-pub const HEADER_HEIGHT: f32 = 60.0;
-pub const HEADER_PADDING: f32 = 10.0;
-
 impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, Message> {
     fn from(scaffold: Scaffold<'a, Message>) -> Self {
+        let has_header = scaffold.header.is_some();
         let has_context = scaffold.context.is_some();
         stack![
             column![
-                scaffold.header,
+                scaffold.header.map(|header| {
+                    container(header).style(|_| container::Style {
+                        shadow: Shadow {
+                            blur_radius: 50.0,
+                            color: Color::BLACK.scale_alpha(0.5),
+                            offset: iced::Vector { x: -10.0, y: 0.0 },
+                        },
+                        ..Default::default()
+                    })
+                }),
+                has_header.then(|| rule::horizontal(2)),
                 row![
                     scaffold.body,
                     has_context.then(|| rule::vertical(2)),

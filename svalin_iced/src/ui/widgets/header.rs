@@ -1,16 +1,10 @@
 use iced::{
-    Color, Length, Shadow,
+    Length,
     alignment::Vertical,
-    widget::{center, column, container, row, rule, space, stack},
+    widget::{center, container, row, space, stack},
 };
 
-use crate::{
-    Element, bootstrap,
-    ui::widgets::{
-        icon_button,
-        scaffold::{HEADER_HEIGHT, HEADER_PADDING},
-    },
-};
+use crate::{Element, bootstrap, ui::widgets::icon_button};
 
 #[derive(Clone, Copy, Default)]
 pub enum HeaderStyle {
@@ -58,6 +52,11 @@ impl<'a, Message: 'static> Header<'a, Message> {
         self
     }
 
+    pub(crate) fn with_actions(mut self, actions: Vec<Element<'a, Message>>) -> Self {
+        self.actions.extend(actions);
+        self
+    }
+
     pub fn map<NewMessage>(
         self,
         f: impl 'a + Copy + Fn(Message) -> NewMessage,
@@ -76,6 +75,9 @@ impl<'a, Message: 'static> Header<'a, Message> {
         }
     }
 }
+
+pub const HEADER_HEIGHT: f32 = 60.0;
+pub const HEADER_PADDING: f32 = 10.0;
 
 impl<'a, Message: Clone + 'static> From<Header<'a, Message>> for Element<'a, Message> {
     fn from(header: Header<'a, Message>) -> Self {
@@ -98,24 +100,10 @@ impl<'a, Message: Clone + 'static> From<Header<'a, Message>> for Element<'a, Mes
             .width(Length::Fill)
             .height(Length::Fill);
 
-        let cont = container(stack![center(header.content), row])
+        container(stack![center(header.content), row])
             .padding(padding)
             .height(height)
-            .width(Length::Fill);
-        match header.style {
-            HeaderStyle::Drawer => cont.into(),
-            HeaderStyle::Default => column![
-                cont.style(|_| container::Style {
-                    shadow: Shadow {
-                        blur_radius: 50.0,
-                        color: Color::BLACK.scale_alpha(0.5),
-                        offset: iced::Vector { x: 0.0, y: 10.0 },
-                    },
-                    ..Default::default()
-                }),
-                rule::horizontal(2),
-            ]
-            .into(),
-        }
+            .width(Length::Fill)
+            .into()
     }
 }
