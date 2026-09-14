@@ -12,6 +12,7 @@ use svalin_sysctl::system_report::OSFamily;
 
 use crate::{Element, bootstrap};
 
+pub mod button_list;
 pub mod card;
 pub mod dialog;
 pub mod error_display;
@@ -77,6 +78,23 @@ pub fn list<'a, Message>(
 ) -> list::List<'a, Message> {
     list::List::with_children(children)
 }
+
+/// Creates a button list from entries.
+pub fn button_list<'a, Message>(
+    entries: impl IntoIterator<Item = button_list::Entry<'a, Message>>,
+) -> button_list::ButtonList<'a, Message> {
+    button_list::ButtonList::with_children(entries)
+}
+
+/// Creates a button list from entries built with `button_list::entry`.
+#[macro_export]
+macro_rules! button_list {
+    ($($entry:expr),* $(,)?) => {
+        $crate::ui::widgets::button_list([$($entry),*])
+    };
+}
+
+pub use crate::button_list;
 
 pub fn fact_list<'a, Message>() -> fact_list::FactList<'a, Message> {
     fact_list::FactList::new()

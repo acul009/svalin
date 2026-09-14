@@ -2,12 +2,15 @@ use chrono::DateTime;
 use iced::{
     Alignment::Center,
     Length,
-    widget::{button, column, container, row, stack, text},
+    widget::{button, container, row, scrollable, stack, text},
 };
 use svalin::client::state::ClientState;
 use svalin_pki::SpkiHash;
 
-use crate::{Element, bootstrap, ui::widgets::device_icon};
+use crate::{
+    Element, bootstrap,
+    ui::widgets::{button_list, device_icon},
+};
 
 pub struct DeviceList<'a, Message> {
     state: &'a ClientState,
@@ -50,44 +53,48 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
             .align_bottom(Length::Fill)
             .align_right(Length::Fill)
             .padding(30),
-            column(device_list.state.persistent().devices().iter().map(
-                |(spki_hash, persistent)| {
-                    button(
-                        row![
-                            device_icon(
-                                &persistent.os(),
-                                device_list.state.agent_online(spki_hash)
-                            )
-                            .size(30),
-                            text(persistent.name()),
-                            text(
-                                persistent
-                                    .report()
-                                    .map(|report| {
-                                        DateTime::from_timestamp_secs(
-                                            report.system_report.generated_at as i64,
-                                        )
-                                    })
-                                    .flatten()
-                                    .map(|datetime| {
-                                        datetime
-                                            .naive_local()
-                                            .format("%Y-%m-%d %H:%M:%S")
-                                            .to_string()
-                                    })
-                                    .unwrap_or_else(|| t!("generic.unknown").to_string())
-                            )
-                        ]
-                        .spacing(20)
-                        .padding(10)
-                        .align_y(Center)
-                        .width(Length::Fill),
-                    )
-                    .on_press_maybe(device_list.on_select.as_ref().map(|f| f(spki_hash.clone())))
-                    .style(button::subtle)
-                    .into()
-                }
-            ),)
+            scrollable(button_list(
+                device_list
+                    .state
+                    .persistent()
+                    .devices()
+                    .iter()
+                    .map(|(spki_hash, persistent)| {
+                        button_list::entry(
+                            row![
+                                device_icon(
+                                    &persistent.os(),
+                                    device_list.state.agent_online(spki_hash)
+                                )
+                                .size(30),
+                                text(persistent.name()),
+                                text(
+                                    persistent
+                                        .report()
+                                        .map(|report| {
+                                            DateTime::from_timestamp_secs(
+                                                report.system_report.generated_at as i64,
+                                            )
+                                        })
+                                        .flatten()
+                                        .map(|datetime| {
+                                            datetime
+                                                .naive_local()
+                                                .format("%Y-%m-%d %H:%M:%S")
+                                                .to_string()
+                                        })
+                                        .unwrap_or_else(|| t!("generic.unknown").to_string())
+                                )
+                            ]
+                            .spacing(20)
+                            .align_y(Center)
+                            .width(Length::Fill),
+                        )
+                        .on_press_maybe(
+                            device_list.on_select.as_ref().map(|f| f(spki_hash.clone())),
+                        )
+                    })
+            ))
         ]
         .into()
     }

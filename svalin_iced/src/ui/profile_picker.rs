@@ -263,7 +263,7 @@ impl ProfilePicker {
         let content = match &self.state {
             State::InitServer(init_server) => init_server.view().map(Message::InitServer),
             State::LoginDialog(login_dialog) => login_dialog.view().map(Message::LoginDialog),
-            State::Error(display_info) => display_info.view().on_close(Message::Reset).into(),
+            State::Error(display_info) => display_info.view().on_close(Message::Reset).overlay().into(),
             State::Loading(message) => loading(message).expand().into(),
             State::SelectProfile(profiles) => {
                 let profiles = column(profiles.iter().map(|p| {
