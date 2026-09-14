@@ -1,4 +1,5 @@
 target/
+concepts/security reviews/
 *.jammdb
 *.sled
 *.sqlite
