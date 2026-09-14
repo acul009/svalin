@@ -3,7 +3,7 @@ use std::{borrow::Cow, sync::LazyLock};
 use iced::{
     Element, Length,
     alignment::{Horizontal, Vertical},
-    widget::{column, container, text},
+    widget::{column, container, opaque, text},
 };
 
 pub struct Loading<'a> {
@@ -38,7 +38,7 @@ impl<'a> Loading<'a> {
 
 impl<'a, Message: Clone + 'static> From<Loading<'a>> for Element<'a, Message> {
     fn from(loading: Loading<'a>) -> Self {
-        let mut prepared = container(column![
+        let mut prepared = container(opaque(column![
             container(
                 Circular::new()
                     .easing(&EMPHASIZED)
@@ -51,11 +51,16 @@ impl<'a, Message: Clone + 'static> From<Loading<'a>> for Element<'a, Message> {
                 .center()
                 .width(Length::Fill)
                 .align_x(Horizontal::Center),
-        ])
+        ]))
         .align_x(Horizontal::Center)
         .align_y(Vertical::Center)
         .height(Length::Fill)
         .width(Length::Fill)
+        .style(|_| container::Style {
+            background: Some(Color::BLACK.scale_alpha(0.50).into()),
+            text_color: Some(Color::WHITE),
+            ..Default::default()
+        })
         .padding(16);
 
         if let Some(height) = loading.height {
