@@ -13,13 +13,15 @@ use svalin::client::{
     tunnel_manager::{TunnelConfig, TunnelDefinition},
 };
 use svalin_pki::SpkiHash;
-use svalin_sysctl::system_report::Disk;
+use svalin_sysctl::system_report::{Disk, proxmox_ve::backup::BackupStatus};
 use url::Url;
 
 use crate::{
     Element, bootstrap,
-    ui::widgets::{card, device_icon, dialog, fact_list, header, icon_button, os_icon},
-    util::human_i_bytes,
+    ui::widgets::{
+        button_list, card, device_icon, dialog, fact_list, header, icon_button, os_icon,
+    },
+    util::{format_timestamp, human_i_bytes},
 };
 
 mod meta_display;
@@ -56,6 +58,8 @@ pub struct State {
 pub enum Overlay {
     Update,
     TunnelOpenError,
+    ProxmoxVeBackup,
+    InstalledPrograms,
 }
 
 impl From<Overlay> for Message {
@@ -192,6 +196,8 @@ impl State {
 
         let overlay: Option<Element<Message>> =
             self.overlay.as_ref().map(|overlay| match overlay {
+                Overlay::ProxmoxVeBackup => proxmox_ve_backup(persistent.report()),
+                Overlay::InstalledPrograms => installed_programs(persistent.report()),
                 Overlay::Update => dialog(self.update.view().map(Message::Update))
                     .title(text(t!("device.update.title")))
                     .on_close(Message::CloseOverlay)
@@ -290,6 +296,10 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
             container(
                 fact_list()
                     .entry(
+                        text(t!("device.report.collected")),
+                        text(format_timestamp(report.generated_at)),
+                    )
+                    .entry(
                         text(t!("device.report.agent-version")),
                         svalin_report.current_version_identifier.as_str(),
                     )
@@ -343,6 +353,29 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
             )
             .padding(30),
             rule::horizontal(2),
+            button_list::ButtonList::new().push_maybe(
+                report.extensions.proxmox_ve()
+                    .and_then(|proxmox| proxmox.backup_jobs.as_ref())
+                    .filter(|jobs| !jobs.is_empty())
+                    .map(|jobs| {
+                        let errors = jobs.iter()
+                            .filter(|job| matches!(job.status, BackupStatus::Failed { .. }))
+                            .count();
+                        let entry = button_list::entry(row![
+                            text(t!("device.report.backup")),
+                            space::horizontal(),
+                            text(t!("device.report.backup-summary", "jobs" => jobs.len(), "errors" => errors)),
+                        ].align_y(Vertical::Center))
+                        .on_press(Overlay::ProxmoxVeBackup.into());
+                        if errors > 0 { entry.error() } else { entry }
+                    }),
+            ).push_maybe(
+                report.extensions.windows()
+                    .and_then(|windows| windows.installed_programs.as_ref())
+                    .map(|programs| button_list::entry(text(t!(
+                        "device.report.installed-programs-summary", "count" => programs.len()
+                    ))).on_press(Overlay::InstalledPrograms.into())),
+            ),
             rule::horizontal(2),
             container(crate::ui::widgets::list(report.disks.iter().map(disk)).entry_height(90))
                 .padding(30),
@@ -357,6 +390,82 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
     )
     .padding(0)
     .into()
+}
+
+fn proxmox_ve_backup(report: Option<&persistent::Report>) -> Element<'_, Message> {
+    let jobs = report
+        .and_then(|report| report.system_report.extensions.proxmox_ve())
+        .and_then(|proxmox| proxmox.backup_jobs.as_deref())
+        .unwrap_or_default();
+    let content = column(jobs.iter().map(|job| {
+        let status = match &job.status {
+            BackupStatus::Running { .. } => t!("device.report.backup-running").to_string(),
+            BackupStatus::Succeeded { .. } => t!("device.report.backup-succeeded").to_string(),
+            BackupStatus::Failed { message, .. } => {
+                format!("{}: {message}", t!("device.report.backup-failed"))
+            }
+            BackupStatus::Unknown => t!("device.report.backup-unknown").to_string(),
+        };
+        let unknown = t!("device.report.backup-unknown").to_string();
+        let due = job.due_at.map(format_timestamp).unwrap_or_else(|| unknown.clone());
+        let mut details = column![
+            text(t!("device.report.backup-storage", "value" => job.storage.as_deref()
+                .map(str::to_owned).unwrap_or_else(|| t!("device.report.backup-default-storage").to_string()))),
+            text(t!("device.report.backup-schedule", "value" => &job.schedule)),
+            text(t!("device.report.backup-due", "value" => due)),
+            text(status),
+        ].spacing(8);
+        // Evaluate the snapshot against its collection time, not a stale job's current due time.
+        if report.is_some_and(|report| job.is_overdue(report.system_report.generated_at)) {
+            details = details.push(text(t!("device.report.backup-overdue")).color(crate::ui::ERROR_COLOR));
+        }
+        match &job.status {
+            BackupStatus::Running { started_at } => {
+                details = details.push(text(t!("device.report.backup-started", "value" => format_timestamp(*started_at))));
+            }
+            BackupStatus::Succeeded { finished_at } | BackupStatus::Failed { finished_at, .. } => {
+                details = details.push(text(t!("device.report.backup-finished", "value" => finished_at.map(format_timestamp).unwrap_or(unknown))));
+            }
+            BackupStatus::Unknown => {},
+        }
+        card(details).title(text(&job.id)).into()
+    }))
+    .spacing(16);
+    dialog(scrollable(content).height(Length::Fill))
+        .width(800)
+        .height(600)
+        .title(text(t!("device.report.backup")))
+        .on_close(Message::CloseOverlay)
+        .overlay()
+        .into()
+}
+
+fn installed_programs(report: Option<&persistent::Report>) -> Element<'_, Message> {
+    let programs = report
+        .and_then(|report| report.system_report.extensions.windows())
+        .and_then(|windows| windows.installed_programs.as_deref())
+        .unwrap_or_default();
+    let content = column(programs.iter().map(|program| {
+        column![
+            row![
+                text(&program.name),
+                space::horizontal(),
+                text(program.version.as_deref().unwrap_or_default())
+            ]
+            .spacing(16),
+            text(program.publisher.as_deref().unwrap_or_default()),
+        ]
+        .spacing(4)
+        .into()
+    }))
+    .spacing(16);
+    dialog(scrollable(content).height(400))
+        .title(text(
+            t!("device.report.installed-programs-summary", "count" => programs.len()),
+        ))
+        .on_close(Message::CloseOverlay)
+        .overlay()
+        .into()
 }
 
 fn disk<'a>(disk: &'a Disk) -> Element<'a, Message> {

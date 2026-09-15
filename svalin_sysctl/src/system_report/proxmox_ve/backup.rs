@@ -6,10 +6,11 @@
 //!
 //! Tracks scheduled executions, not the continued existence of backup archives.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
+use tokio::process::Command;
 
 use super::query;
 
@@ -214,19 +215,44 @@ async fn last_run(
 
 async fn next_due(config: &JobConfig, baseline: Option<u64>) -> Option<u64> {
     let start = baseline?.to_string();
-    match query::<Vec<ScheduleEvent>>(
-        "/cluster/jobs/schedule-analyze",
-        &[
-            "--schedule",
-            &config.schedule,
-            "--starttime",
-            &start,
-            "--iterations",
-            "1",
-        ],
-    )
-    .await
-    {
+    // pvesh can pass starttime to the Rust calendar binding as a string.
+    // Use the same calendar library with an explicit integer conversion.
+    // TODO: Make report to proxmox to fix their conversion of pvesh
+    let result: anyhow::Result<Vec<ScheduleEvent>> = async {
+        let output = tokio::time::timeout(
+            Duration::from_secs(30),
+            Command::new("/usr/bin/perl")
+                .args([
+                    "-MPVE::CalendarEvent",
+                    "-MJSON",
+                    "-e",
+                    r#"
+my ($schedule, $start) = @ARGV;
+die "Expected a UNIX timestamp\n"
+    unless defined($start) && $start =~ /^\d+$/;
+my $event = PVE::CalendarEvent::parse_calendar_event($schedule);
+my $next = PVE::CalendarEvent::compute_next_event($event, int($start));
+print encode_json(defined($next) ? [{ timestamp => $next }] : []), "\n";
+"#,
+                    "--",
+                    &config.schedule,
+                    &start,
+                ])
+                .kill_on_drop(true)
+                .output(),
+        )
+        .await
+        .context("PVE calendar calculation timed out")?
+        .context("failed to run PVE calendar calculation")?;
+        anyhow::ensure!(
+            output.status.success(),
+            "PVE calendar calculation failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+        serde_json::from_slice(&output.stdout).context("invalid PVE calendar response")
+    }
+    .await;
+    match result {
         Ok(events) => events.first().map(|event| event.timestamp),
         Err(error) => {
             tracing::warn!(job = %config.id, %error, "PVE backup due time unavailable");

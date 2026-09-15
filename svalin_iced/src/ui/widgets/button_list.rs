@@ -42,6 +42,11 @@ impl<'a, Message> Entry<'a, Message> {
         self.color = Some(color);
         self
     }
+
+    /// Gives the entry a subtle error-colored background.
+    pub fn error(self) -> Self {
+        self.color(crate::ui::ERROR_COLOR.scale_alpha(0.15))
+    }
 }
 
 impl<'a, Message> ButtonList<'a, Message> {
@@ -66,6 +71,14 @@ impl<'a, Message> ButtonList<'a, Message> {
     pub fn push(mut self, entry: Entry<'a, Message>) -> Self {
         self.entries.push(entry);
         self
+    }
+
+    /// Appends an entry when present, leaving the list unchanged for `None`.
+    pub fn push_maybe(self, entry: Option<Entry<'a, Message>>) -> Self {
+        match entry {
+            Some(entry) => self.push(entry),
+            None => self,
+        }
     }
 
     pub fn entry_height(mut self, height: impl Into<Pixels>) -> Self {

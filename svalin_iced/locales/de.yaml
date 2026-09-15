@@ -81,6 +81,21 @@ device:
     notes: "Notizen:"
   report:
     title: Systembericht
+    backup: Backup
+    backup-running: Läuft
+    backup-succeeded: Erfolgreich
+    backup-failed: Fehlgeschlagen
+    backup-unknown: Unbekannt
+    backup-storage: "Speicher: %{value}"
+    backup-default-storage: Aus vzdump-Standardwerten übernommen
+    backup-schedule: "Zeitplan: %{value}"
+    backup-due: "Fällig: %{value}"
+    backup-overdue: Überfällig (mehr als zwei Stunden)
+    backup-started: "Gestartet: %{value}"
+    backup-finished: "Beendet: %{value}"
+    collected: "Bericht erstellt:"
+    backup-summary: "%{jobs} Aufträge · %{errors} mit Fehlern"
+    installed-programs-summary: "%{count} installierte Programme"
     agent-version: "Agent-Version:"
     hostname: "Hostname:"
     os: "Betriebssystem:"
