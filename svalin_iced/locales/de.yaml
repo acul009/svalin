@@ -82,6 +82,13 @@ device:
   report:
     title: Systembericht
     backup: Backup
+    backup-coverage: Konfigurierter Backup-Umfang
+    backup-no-guests: Keine Gäste ausgewählt.
+    backup-no-volumes: Keine Volume-Informationen verfügbar.
+    backup-vm: Virtuelle Maschine
+    backup-container: Container
+    backup-included: Eingeschlossen
+    backup-excluded: Ausgeschlossen
     backup-running: Läuft
     backup-succeeded: Erfolgreich
     backup-failed: Fehlgeschlagen

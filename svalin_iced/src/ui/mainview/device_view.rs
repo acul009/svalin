@@ -428,10 +428,43 @@ fn proxmox_ve_backup(report: Option<&persistent::Report>) -> Element<'_, Message
             }
             BackupStatus::Unknown => {},
         }
+        details = details
+            .push(rule::horizontal(1))
+            .push(text(t!("device.report.backup-coverage")).size(18));
+        if job.coverage.guests.is_empty() {
+            details = details.push(text(t!("device.report.backup-no-guests")));
+        }
+        for guest in &job.coverage.guests {
+            let kind = match guest.guest_type.as_str() {
+                "qemu" => t!("device.report.backup-vm").to_string(),
+                "lxc" => t!("device.report.backup-container").to_string(),
+                _ => t!("device.report.backup-unknown").to_string(),
+            };
+            let mut volumes = column![].spacing(8);
+            for volume in &guest.volumes {
+                volumes = volumes.push(column![
+                    text(format!("{} — {}", volume.id, volume.name)),
+                    text(format!("{} — {}", if volume.included {
+                        t!("device.report.backup-included")
+                    } else {
+                        t!("device.report.backup-excluded")
+                    }, volume.reason)).size(14),
+                ].spacing(4));
+            }
+            if guest.volumes.is_empty() {
+                volumes = volumes.push(text(t!("device.report.backup-no-volumes")));
+            }
+            details = details.push(column![
+                text(format!("{} · {} · {}", guest.id,
+                    guest.name.as_deref().unwrap_or_default(), kind)).size(16),
+                container(volumes).padding(iced::Padding::new(0.0).left(16.0)),
+            ].spacing(8));
+        }
         card(details).title(text(&job.id)).into()
     }))
     .spacing(16);
-    dialog(scrollable(content).height(Length::Fill))
+    dialog(scrollable(content.padding(16)).height(Length::Fill))
+        .padding(0)
         .width(800)
         .height(600)
         .title(text(t!("device.report.backup")))

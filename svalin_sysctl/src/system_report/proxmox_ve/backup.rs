@@ -14,6 +14,8 @@ use tokio::process::Command;
 
 use super::query;
 
+pub mod coverage;
+
 pub const BACKUP_OVERDUE_GRACE_SECONDS: u64 = 2 * 60 * 60;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -25,6 +27,9 @@ pub struct BackupJob {
     /// Unix seconds; unavailable when no reliable scheduling baseline exists.
     pub due_at: Option<u64>,
     pub status: BackupStatus,
+    /// Current configured guests and volumes, not proof of a completed backup.
+    #[serde(default)]
+    pub coverage: coverage::Coverage,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -140,12 +145,19 @@ async fn collect_jobs() -> anyhow::Result<Vec<BackupJob>> {
     for (config, state) in states {
         let (status, baseline) = last_run(node, &config.id, state.as_ref(), &history).await;
         let due_at = next_due(&config, baseline).await;
+        let coverage = query(
+            &format!("/cluster/backup/{}/included_volumes", config.id),
+            &[],
+        )
+        .await
+        .with_context(|| format!("failed to collect PVE backup coverage for {}", config.id))?;
         jobs.push(BackupJob {
             id: config.id,
             storage: config.storage,
             schedule: config.schedule,
             due_at,
             status,
+            coverage,
         });
     }
     Ok(jobs)

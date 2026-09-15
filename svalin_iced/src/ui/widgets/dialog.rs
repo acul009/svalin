@@ -1,5 +1,5 @@
 use iced::{
-    Color, Length,
+    Color, Length, Padding,
     widget::{center, column, container, float, opaque, row},
 };
 
@@ -15,6 +15,7 @@ pub struct Dialog<'a, Message> {
     on_close: Option<Message>,
     width: Length,
     height: Length,
+    padding: Padding,
     display: Display,
 }
 
@@ -33,12 +34,18 @@ impl<'a, Message> Dialog<'a, Message> {
             on_close: None,
             width: 500.into(),
             height: 300.into(),
+            padding: 16.into(),
             display: Display::Normal,
         }
     }
 
     pub fn title(mut self, title: impl Into<Element<'a, Message>>) -> Self {
         self.title = title.into();
+        self
+    }
+
+    pub fn padding(mut self, padding: impl Into<Padding>) -> Self {
+        self.padding = padding.into();
         self
     }
 
@@ -109,6 +116,7 @@ impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Mes
                 .map(|message| icon_button(bootstrap::x_lg()).on_press(message)),
         )
         .width(value.width)
+        .padding(value.padding)
         .height(value.height);
 
         match value.display {

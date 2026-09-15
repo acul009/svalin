@@ -105,6 +105,13 @@ device:
   report:
     title: System Report
     backup: Backup
+    backup-coverage: Configured backup coverage
+    backup-no-guests: No guests selected.
+    backup-no-volumes: No volume information available.
+    backup-vm: Virtual machine
+    backup-container: Container
+    backup-included: Included
+    backup-excluded: Excluded
     backup-running: Running
     backup-succeeded: Succeeded
     backup-failed: Failed
