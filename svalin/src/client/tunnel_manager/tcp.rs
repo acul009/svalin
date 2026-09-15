@@ -129,7 +129,12 @@ impl CommandDispatcher for TcpTunnelDispatcher {
                 to_client = session.read_object::<ToClient>() => {
                     let to_client = to_client?;
                     let id = to_client.id();
-                    if let Some(channel) = connections.get_mut(&id) {
+                    if let ToClient::Closed(_) = to_client {
+                        connections.remove(&id);
+                        if connections.is_empty() {
+                            idle_timeout.as_mut().reset(Instant::now() + TCP_TUNNEL_IDLE_TIMEOUT);
+                        }
+                    } else if let Some(channel) = connections.get_mut(&id) {
                         channel.send(to_client).await?;
                     }
                 }
