@@ -289,7 +289,7 @@ async fn read_state(id: &str) -> anyhow::Result<JobState> {
         !id.is_empty()
             && id
                 .bytes()
-                .all(|c| c.is_ascii_alphanumeric() || b"-_.".contains(&c)),
+                .all(|c| c.is_ascii_alphanumeric() || b"-_.:".contains(&c)),
         "invalid backup job ID"
     );
     let data = tokio::fs::read(format!("/var/lib/pve-manager/jobs/vzdump-{id}.json")).await?;
