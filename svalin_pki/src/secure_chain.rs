@@ -59,6 +59,7 @@ enum TimeRatchetMode {
 }
 
 const MAX_REALTIME_OFFSET_SECONDS: u64 = 10;
+const MAX_FUTURE_CLOCK_SKEW_SECONDS: u64 = 10;
 
 impl TimeRatchetMode {
     fn is_allowed(&self, time: u64) -> bool {
@@ -185,7 +186,8 @@ impl<State: ChainState> Chain<State> {
             }
         }
 
-        if block.time > get_current_timestamp() {
+        // Allow for clock differences between the block signer and verifier.
+        if block.time > get_current_timestamp().saturating_add(MAX_FUTURE_CLOCK_SKEW_SECONDS) {
             return Err(CheckBlockError::TimeInFuture);
         }
         if !self.time_ratchet.is_allowed(block.time) {
