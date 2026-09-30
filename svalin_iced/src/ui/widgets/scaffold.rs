@@ -10,6 +10,7 @@ pub struct Scaffold<'a, Message> {
     header: Option<Element<'a, Message>>,
     footer: Option<Element<'a, Message>>,
     dialog: Option<Element<'a, Message>>,
+    sidebar: Option<Element<'a, Message>>,
     context: Option<Element<'a, Message>>,
 }
 
@@ -20,6 +21,7 @@ impl<'a, Message> Scaffold<'a, Message> {
             header: None,
             footer: None,
             dialog: None,
+            sidebar: None,
             context: None,
         }
     }
@@ -60,6 +62,18 @@ impl<'a, Message> Scaffold<'a, Message> {
         self
     }
 
+    pub fn sidebar(mut self, sidebar: impl Into<Element<'a, Message>>) -> Self {
+        self.sidebar = Some(sidebar.into());
+        self
+    }
+
+    pub fn sidebar_maybe(mut self, sidebar: Option<impl Into<Element<'a, Message>>>) -> Self {
+        if let Some(sidebar) = sidebar {
+            self.sidebar = Some(sidebar.into());
+        }
+        self
+    }
+
     pub fn context(mut self, context: impl Into<Element<'a, Message>>) -> Self {
         self.context = Some(context.into());
         self
@@ -77,6 +91,7 @@ impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, M
     fn from(scaffold: Scaffold<'a, Message>) -> Self {
         let has_header = scaffold.header.is_some();
         let has_context = scaffold.context.is_some();
+        let has_sidebar = scaffold.sidebar.is_some();
         stack![
             column![
                 scaffold.header.map(|header| {
@@ -91,22 +106,34 @@ impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, M
                 }),
                 has_header.then(|| rule::horizontal(2)),
                 stack![row![
+                    scaffold.sidebar.map(|sidebar| {
+                        container(sidebar)
+                            .style(|_| container::Style {
+                                shadow: Shadow {
+                                    blur_radius: 14.0,
+                                    color: Color::BLACK.scale_alpha(0.45),
+                                    offset: iced::Vector { x: -3.0, y: 0.0 },
+                                },
+                                ..Default::default()
+                            })
+                            .width(300)
+                            .height(Length::Fill)
+                    }),
+                    has_sidebar.then(|| rule::vertical(2)),
                     scaffold.body,
                     has_context.then(|| rule::vertical(2)),
                     scaffold.context.map(|context| {
-                        {
-                            container(context)
-                                .style(|_| container::Style {
-                                    shadow: Shadow {
-                                        blur_radius: 14.0,
-                                        color: Color::BLACK.scale_alpha(0.45),
-                                        offset: iced::Vector { x: -3.0, y: 0.0 },
-                                    },
-                                    ..Default::default()
-                                })
-                                .width(400)
-                                .height(Length::Fill)
-                        }
+                        container(context)
+                            .style(|_| container::Style {
+                                shadow: Shadow {
+                                    blur_radius: 14.0,
+                                    color: Color::BLACK.scale_alpha(0.45),
+                                    offset: iced::Vector { x: -3.0, y: 0.0 },
+                                },
+                                ..Default::default()
+                            })
+                            .width(400)
+                            .height(Length::Fill)
                     })
                 ]]
                 // Stack clips upper drawing layers; keep the row as its layout base.

@@ -164,9 +164,22 @@ impl UI {
                 }
             };
 
+            let sidebar = match &self.screen {
+                Screen::ProfilePicker(_) => None,
+                Screen::Closing => None,
+                Screen::MainView(mainview) => {
+                    if let Some(context) = mainview.sidebar() {
+                        Some(context.map(Message::MainView))
+                    } else {
+                        None
+                    }
+                }
+            };
+
             scaffold(screen)
                 .header(header)
                 .context_maybe(context)
+                .sidebar_maybe(sidebar)
                 .into()
         } else {
             self.window_helper

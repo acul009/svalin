@@ -3,7 +3,7 @@ use iced::{
     Length,
     widget::{button, container, row, scrollable, stack, text},
 };
-use svalin::client::state::ClientState;
+use svalin::client::state::{ClientState, persistent};
 use svalin_pki::SpkiHash;
 
 use crate::{
@@ -16,6 +16,7 @@ pub struct DeviceList<'a, Message> {
     state: &'a ClientState,
     on_select: Option<Box<dyn Fn(SpkiHash) -> Message + 'a>>,
     on_new: Option<Message>,
+    group_filter: &'a super::GroupFilter,
 }
 
 impl<'a, Message> DeviceList<'a, Message> {
@@ -24,6 +25,7 @@ impl<'a, Message> DeviceList<'a, Message> {
             state,
             on_select: None,
             on_new: None,
+            group_filter: &super::GroupFilter::NoFilter,
         }
     }
 
@@ -34,6 +36,11 @@ impl<'a, Message> DeviceList<'a, Message> {
 
     pub fn on_new(mut self, on_new: Message) -> Self {
         self.on_new = Some(on_new);
+        self
+    }
+
+    pub(crate) fn group_filter(mut self, group_filter: &'a super::GroupFilter) -> Self {
+        self.group_filter = group_filter;
         self
     }
 }
@@ -53,40 +60,50 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
             .align_bottom(Length::Fill)
             .align_right(Length::Fill)
             .padding(30),
-            scrollable(button_list(
-                device_list
-                    .state
-                    .persistent()
-                    .devices()
-                    .iter()
-                    .map(|(spki_hash, persistent)| {
-                        button_list::entry(
-                            row![
-                                device_icon(
-                                    &persistent.os(),
-                                    device_list.state.agent_online(spki_hash)
-                                )
-                                .size(30),
-                                text(persistent.name()),
-                                text(
-                                    persistent
-                                        .report()
-                                        .map(|report| {
-                                            format_timestamp(report.system_report.generated_at)
-                                        })
-                                        .unwrap_or_else(|| t!("generic.unknown").to_string())
-                                )
-                            ]
-                            .spacing(20)
-                            .align_y(Center)
-                            .width(Length::Fill),
-                        )
-                        .on_press_maybe(
+            scrollable(match &device_list.group_filter {
+                super::GroupFilter::NoFilter =>
+                    button_list(device_list.state.persistent().devices().iter().map(
+                        |(spki_hash, persistent)| list_entry(
                             device_list.on_select.as_ref().map(|f| f(spki_hash.clone())),
+                            &persistent,
+                            device_list.state.agent_online(spki_hash),
                         )
-                    })
-            ))
+                    )),
+                super::GroupFilter::Group(group) => button_list(
+                    device_list
+                        .state
+                        .group(group)
+                        .map(|(spki_hash, persistent)| list_entry(
+                            device_list.on_select.as_ref().map(|f| f(spki_hash.clone())),
+                            &persistent,
+                            device_list.state.agent_online(spki_hash),
+                        ))
+                ),
+            })
         ]
         .into()
     }
+}
+
+fn list_entry<'a, Message: 'a>(
+    on_press_maybe: Option<Message>,
+    persistent: &'a persistent::DeviceState,
+    is_online: bool,
+) -> button_list::Entry<'a, Message> {
+    button_list::entry(
+        row![
+            device_icon(&persistent.os(), is_online).size(30),
+            text(persistent.name()),
+            text(
+                persistent
+                    .report()
+                    .map(|report| { format_timestamp(report.system_report.generated_at) })
+                    .unwrap_or_else(|| t!("generic.unknown").to_string())
+            )
+        ]
+        .spacing(20)
+        .align_y(Center)
+        .width(Length::Fill),
+    )
+    .on_press_maybe(on_press_maybe)
 }

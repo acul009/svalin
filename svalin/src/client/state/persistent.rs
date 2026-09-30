@@ -218,6 +218,18 @@ impl DeviceState {
             .map(|report| report.system_report.os_family)
             .unwrap_or(OSFamily::Unknown)
     }
+
+    pub(crate) fn group_name(&self) -> Option<&String> {
+        self.meta_info()
+            .map(|meta| {
+                if meta.group.is_empty() {
+                    None
+                } else {
+                    Some(&meta.group)
+                }
+            })
+            .flatten()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

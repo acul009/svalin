@@ -2,7 +2,7 @@ use std::{process, sync::Arc, time::Duration};
 
 use iced::{
     Subscription, Task,
-    widget::{column, stack, text},
+    widget::{button, column, rule, stack, text},
 };
 use svalin::client::{
     Client,
@@ -44,6 +44,7 @@ pub enum Message {
     ),
     CloseError,
     Context(Context),
+    GroupFilter(GroupFilter),
 }
 
 pub enum Action {
@@ -77,6 +78,18 @@ impl From<Context> for Message {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum GroupFilter {
+    Group(Option<String>),
+    NoFilter,
+}
+
+impl From<&Option<String>> for GroupFilter {
+    fn from(value: &Option<String>) -> Self {
+        GroupFilter::Group(value.clone())
+    }
+}
+
 pub struct MainView {
     screen: Screen,
     state: ClientState,
@@ -84,6 +97,7 @@ pub struct MainView {
     client: Arc<Client>,
     error: Option<Arc<anyhow::Error>>,
     update_abort_handle: Option<iced::task::Handle>,
+    group_filter: GroupFilter,
 }
 
 impl MainView {
@@ -97,6 +111,7 @@ impl MainView {
                 client,
                 error: None,
                 update_abort_handle: None,
+                group_filter: GroupFilter::NoFilter,
             },
             Task::future(async move {
                 match client2.subscribe_state().await {
@@ -201,6 +216,10 @@ impl MainView {
                 };
                 Action::None
             }
+            Message::GroupFilter(filter) => {
+                self.group_filter = filter;
+                Action::None
+            }
         }
     }
 
@@ -210,6 +229,7 @@ impl MainView {
             Screen::DeviceList => device_list::DeviceList::new(&self.state)
                 .on_new(Message::OpenAddDevice)
                 .on_select(Message::SelectDevice)
+                .group_filter(&self.group_filter)
                 .into(),
             Screen::AddDevice(add_device) => stack![
                 device_list::DeviceList::new(&self.state),
@@ -282,6 +302,28 @@ impl MainView {
                 ]
                 .into(),
             ),
+        }
+    }
+
+    pub(crate) fn sidebar(&self) -> Option<crate::Element<'_, Message>> {
+        match &self.screen {
+            Screen::DeviceList => Some(
+                column![
+                    button("All devices").on_press(Message::GroupFilter(GroupFilter::NoFilter)),
+                    rule::horizontal(2),
+                    column(self.state.groups().map(|group| {
+                        let name: std::borrow::Cow<'_, str> = group
+                            .as_ref()
+                            .map(|s| s.as_str().into())
+                            .unwrap_or_else(|| t!("device-list.nogroup"));
+                        button(text(name))
+                            .on_press(Message::GroupFilter(group.into()))
+                            .into()
+                    }))
+                ]
+                .into(),
+            ),
+            _ => None,
         }
     }
 

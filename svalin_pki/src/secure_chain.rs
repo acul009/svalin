@@ -58,8 +58,8 @@ enum TimeRatchetMode {
     RealTime,
 }
 
-const MAX_REALTIME_OFFSET_SECONDS: u64 = 10;
-const MAX_FUTURE_CLOCK_SKEW_SECONDS: u64 = 10;
+const MAX_REALTIME_OFFSET_SECONDS: u64 = 30;
+const MAX_FUTURE_CLOCK_SKEW_SECONDS: u64 = 30;
 
 impl TimeRatchetMode {
     fn is_allowed(&self, time: u64) -> bool {
