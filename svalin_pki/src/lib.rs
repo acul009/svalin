@@ -17,6 +17,8 @@ mod verifier;
 // Re-Exports
 pub use curve25519_dalek;
 pub use sha2::Sha512;
+// needed for error matching
+pub use openmls;
 
 // Exports
 pub use argon::{ArgonCost, ArgonParams, DeriveKeyError, ParamsStringParseError, PasswordHash};

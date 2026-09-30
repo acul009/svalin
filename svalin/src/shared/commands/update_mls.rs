@@ -15,6 +15,7 @@ use svalin_pki::{
         provider::{ExportedMlsStore, SvalinStorage},
         transport_types::{MessageToMemberTransport, MessageToServerTransport},
     },
+    openmls::framing::errors::SecretTreeError::TooDistantInThePast,
 };
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
@@ -151,11 +152,26 @@ impl CommandDispatcher for UpdateMls {
                     aknowledged.push(uuid);
                 }
                 Err(err) => {
+                    match &err {
+                        svalin_pki::mls::client::HandleMessageError::ProcessMessage {
+                            source,
+                            ..
+                        } => match source {
+                            svalin_pki::mls::processor::ProcessMessageError::ProcessError(
+                                svalin_pki::openmls::group::ProcessMessageError::ValidationError(
+                                    svalin_pki::openmls::group::ValidationError::UnableToDecrypt(
+                                        svalin_pki::openmls::framing::errors::MessageDecryptionError::SecretTreeError(TooDistantInThePast)))) => {
+                                            // TODO: make sure this can't happen anymore, this is technically not fully secure
+                                            // This usually just means the message has been processed already
+                                            aknowledged.push(uuid);
+                                            continue;
+                                        }
+                            _ => {}
+                        },
+                        _ => {}
+                    }
                     if let Some(group_id) = err.group_id() {
-                        tracing::trace!(
-                            "Error handling message in update_mls: {}",
-                            err.to_string()
-                        );
+                        tracing::error!("Error handling message in update_mls: {}", err);
                         self.client_state
                             .update(state::Update::GroupBroken(group_id, err.to_string()))
                             .await?;

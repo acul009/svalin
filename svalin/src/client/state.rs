@@ -53,20 +53,29 @@ impl ClientState {
 
     pub fn new(persistent: persistent::State) -> Self {
         let mut display_groups = BTreeMap::new();
+        let mut spkis = Vec::new();
         for (spki_hash, device) in persistent.devices() {
+            spkis.push(spki_hash.clone());
             display_groups
                 .entry(device.group_name().map(Into::into))
                 .or_insert_with(Vec::new)
                 .push(spki_hash.clone());
         }
-        Self {
+        let mut me = Self {
             persistent: persistent,
             agents_online: HashSet::new(),
             display_groups,
             device_group_broken: HashMap::new(),
             warnings: warning::State::new(),
             tunneling: tunneling::State::new(),
+        };
+
+        for spki_hash in spkis {
+            let warnings = me.generate_device_warnings(&spki_hash);
+            me.warnings.update_device(&spki_hash, warnings);
         }
+
+        me
     }
 
     pub fn update(&mut self, msg: Update) {
