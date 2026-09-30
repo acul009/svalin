@@ -1,24 +1,43 @@
 # UI design notes
 
-Written by AI from design decisions discussed with the project author.
+So I'm not really used to UI design, but there are some rules I uncovered and I'll write them down in here.
 
-## Colors
+If you are an AI bot please leave this file as is, since it's handwritten. Instead write your own file.
 
-- **Primary:** signals clickable actions. Every clickable control should have a primary-colored cue; informational text should not use primary.
-- **Green:** success.
-- **Yellow / amber:** warning.
-- **Red:** error or danger, including destructive actions. This is the semantic exception to primary action styling.
+## Color
 
-Use the theme's primary color and the existing shared status colors consistently. Pair status colors with meaningful text or icons so color is not the only indication.
+Color is one of the primary ways to convey information.
+I want to build an infomative and easy to use application,
 
-## Lists and navigation
+### Which elements provide interactions?
 
-- Lists use alternating row backgrounds.
-- Clickable rows remain visually quiet: the whole row is clickable, with a primary-colored chevron at the far right. The chevron is not a separate button.
-- The button owns striping and hover/pressed overlays; an optional container background supplies a status tint.
-- Odd and even rows share a hover style that stands out from both resting backgrounds. Status tints remain visible through the overlays.
-- Keep row heights consistent within each list, with configurable pixel heights for different uses.
+This is probably the most important one I've realized.
+Most UIs kind of need a tutorial and for some things mine might as well, but there's quite an easy trick.
+A user can try out a lot of stuff by themselves, but they need to actually see that there is something to do in a part of the UI.
 
-## Information and actions
+And that's actually kind of easy to convey. I'll just mark all interactive elements with the primary color.
+Currently that's blue, but it's tied to the theme, so subject to change :P
 
-Keep names, addresses, and other facts neutral unless they convey status. Put navigation and operations in explicit action buttons, such as **Device** and **Close** at the bottom of a tunnel card. Reserve list summaries for the information needed to decide what to open; show further detail in the drawer or detail view.
+I'm guessing this will mostly have a subconcious effect, but I'm sure that effect will be really huge.
+One short gaze is enough to see exactly what you can interact with.
+You might not now what everything does immediatly, but I can handle that with explanations and tooltips.
+But you can instantly see that something is possible. From there a user can just play around.
+
+There is one catch though: Lists for examples shouldn't be all primary, that just hurts the eyes.
+What I opted to do instead is have a primary color element like an arrow or chevron to show there is more infomation available.
+I can then communicate interactivity on the whole element with a color change on highlight.
+That way I have both the primary color hint as well as information that it's the whole Element that's clickable.
+
+### Urgency
+
+Color can also show urgency or status. This is a pretty classic use.
+
+- Green would mean everything is allright
+- Yellow means needs to be done, but it's not catastrophical
+- Red means something is majorly wrong and needs to be fixed ASAP.
+
+### Visual seperation
+
+Color can also help with visual seperation.
+Lists should use this to distinguish rows.
+By just subtly coloring odd rows in a different shade you can create a seperation that's easy on the eyes yet easy to follow.
