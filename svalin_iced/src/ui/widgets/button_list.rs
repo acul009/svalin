@@ -111,6 +111,7 @@ impl<'a, Message: Clone + 'static> ButtonList<'a, Message> {
                     .center()
                     .style(|theme: &Theme| text::Style {
                         color: Some(theme.palette().primary.base.color),
+                        ..Default::default()
                     }),
             ]
             .spacing(16)

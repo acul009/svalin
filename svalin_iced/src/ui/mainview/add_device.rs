@@ -105,13 +105,11 @@ impl AddDevice {
         match &self.screen {
             Screen::Error(err) => error_display(err)
                 .on_close(Message::Cancel)
-                .overlay()
-                .into_widget()
+                .into_overlay()
                 .boxed(),
             Screen::Loading(message) => dialog(loading(message).into_widget())
                 .title("Adding Device...")
-                .overlay()
-                .into_widget()
+                .into_overlay()
                 .boxed(),
             Screen::Input => dialog(
                 column![
@@ -131,8 +129,7 @@ impl AddDevice {
                 button(iced::widget::text(t!("generic.continue")))
                     .on_press(Message::ConnectToDevice),
             )
-            .overlay()
-            .into_widget()
+            .into_overlay()
             .boxed(),
         }
     }

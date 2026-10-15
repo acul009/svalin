@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use iced::{
     Element, Length, Widget,
-    widget::{self, Column, Row, column, text},
+    widget::{self, Row, column, text},
 };
 
 pub struct Form<'a, Message> {
@@ -47,36 +47,24 @@ impl<'a, Message> Form<'a, Message> {
 impl<'a, Message: Clone + 'static> Form<'a, Message> {
     pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
         let form = self;
-        let mut content_col = Column::with_capacity(3 + form.control.len() * 2).width(Length::Fill);
+        // let mut content_col = Column::with_capacity(3 + form.control.len() * 2).width(Length::Fill);
 
-        let mut should_space = false;
-
-        if let Some(title) = form.title {
-            content_col = content_col.push(text(title));
-            should_space = true;
-        }
-
-        for control in form.control {
-            if should_space {
-                content_col = content_col.push(widget::space::vertical().height(16));
-            }
-            content_col = content_col.push(control);
-            should_space = true;
-        }
+        let content = form
+            .title
+            .map(|title| text(title).boxed())
+            .into_iter()
+            .chain(form.control);
 
         let mut content_row = Row::with_capacity(2)
             .spacing(8)
             .height(Length::Fill)
             .width(Length::Fill);
-        content_row = content_row.push(content_col);
+        content_row = content_row.push(column(content).width(Length::Fill).spacing(16));
 
-        let mut button_row = Row::with_capacity(1 + form.buttons.len())
-            .spacing(4)
-            .push(widget::space::horizontal().width(Length::Fill));
-
-        for button in form.buttons {
-            button_row = button_row.push(button);
-        }
+        let buttons = [widget::space::horizontal().boxed()]
+            .into_iter()
+            .chain(form.buttons);
+        let button_row = widget::row(buttons).spacing(4);
 
         widget::container(column![content_row, button_row].spacing(32))
             .padding(16)

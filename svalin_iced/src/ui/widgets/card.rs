@@ -69,12 +69,14 @@ where
     pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
         let card = self;
         container(column![
-            container(header(card.title).with_actions(card.actions).into_widget()).style(|theme| {
-                container::Style {
-                    background: Some(theme.palette().background.strong.color.into()),
-                    ..Default::default()
+            container(header(card.title).with_actions(card.actions).into_widget()).style(
+                |theme: &iced::Theme| {
+                    container::Style {
+                        background: Some(theme.palette().background.strong.color.into()),
+                        ..Default::default()
+                    }
                 }
-            }),
+            ),
             container(card.content).padding(card.padding)
         ])
         .style(container::bordered_box)

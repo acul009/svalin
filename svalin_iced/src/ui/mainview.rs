@@ -246,10 +246,7 @@ impl MainView {
         if let Some(error) = &self.error {
             stack![
                 screen,
-                error_display(error)
-                    .on_close(Message::CloseError)
-                    .overlay()
-                    .into_widget()
+                error_display(error).on_close(Message::CloseError).into_overlay()
             ]
             .boxed()
         } else {

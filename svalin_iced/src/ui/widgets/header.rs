@@ -1,7 +1,7 @@
 use iced::{
     Length, Widget,
     alignment::Vertical,
-    widget::{center, container, row, space, stack},
+    widget::{self, center, container, space, stack},
 };
 
 use crate::{Element, bootstrap, ui::widgets::icon_button};
@@ -89,22 +89,24 @@ where
         let height = HEADER_HEIGHT;
         let padding = HEADER_PADDING;
         let icon_size = height - 2.0 * padding;
-        let mut row = row![];
-        if let Some(on_back) = header.on_back {
-            let icon = match header.style {
-                HeaderStyle::Default => bootstrap::arrow_left(),
-                HeaderStyle::Drawer => bootstrap::x(),
-            };
-            row = row.push(
+        let row = header
+            .on_back
+            .map(|on_back| {
+                let icon = match header.style {
+                    HeaderStyle::Default => bootstrap::arrow_left(),
+                    HeaderStyle::Drawer => bootstrap::x(),
+                };
                 icon_button(icon)
                     .size(icon_size)
                     .on_press(on_back)
-                    .into_widget(),
-            );
-        }
-        row = row
-            .push(space::horizontal())
-            .extend(header.actions)
+                    .into_widget()
+                    .boxed()
+            })
+            .into_iter()
+            .chain([space::horizontal().boxed()])
+            .chain(header.actions);
+
+        let row = widget::row(row)
             .align_y(Vertical::Center)
             .spacing(HEADER_PADDING)
             .width(Length::Fill)

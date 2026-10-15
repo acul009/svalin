@@ -201,13 +201,11 @@ impl State {
                 Overlay::Update => dialog(self.update.view().map(Message::Update))
                     .title(text(t!("device.update.title")))
                     .on_close(Message::CloseOverlay)
-                    .overlay()
-                    .into_widget()
+                    .into_overlay()
                     .boxed(),
                 Overlay::TunnelOpenError => dialog(text(t!("device.tunnel.open-error")))
                     .on_close(Message::CloseOverlay)
-                    .overlay()
-                    .into_widget()
+                    .into_overlay()
                     .boxed(),
             });
 
@@ -489,8 +487,7 @@ fn proxmox_ve_backup(report: Option<&persistent::Report>) -> Element<'_, Message
         .height(600)
         .title(text(t!("device.report.backup")))
         .on_close(Message::CloseOverlay)
-        .overlay()
-        .into_widget()
+        .into_overlay()
         .boxed()
 }
 
@@ -517,8 +514,7 @@ fn installed_programs(report: Option<&persistent::Report>) -> Element<'_, Messag
             t!("device.report.installed-programs-summary", "count" => programs.len()),
         ))
         .on_close(Message::CloseOverlay)
-        .overlay()
-        .into_widget()
+        .into_overlay()
         .boxed()
 }
 

@@ -38,7 +38,7 @@ impl<'a> RealtimeDisplay<'a> {
                         percent_display(0.0..=100.0, usage.load)
                             .label(t!("realtime.core", "id" => core))
                             .padding(Padding::new(5.0).left(10.0).right(10.0))
-                            .into_widget()
+                            .into_circle()
                     }))
                     .wrap(),
                 )
@@ -57,8 +57,7 @@ impl<'a> RealtimeDisplay<'a> {
                             realtime.memory.used / 1024 / 1024,
                             realtime.memory.total / 1024 / 1024
                         ))
-                        .bar()
-                        .into_widget(),
+                        .into_bar(),
                         if realtime.swap.total > 0 {
                             Some(
                                 percent_display(
@@ -71,8 +70,7 @@ impl<'a> RealtimeDisplay<'a> {
                                     realtime.swap.used / 1024 / 1024,
                                     realtime.swap.total / 1024 / 1024
                                 ))
-                                .bar()
-                                .into_widget(),
+                                .into_bar(),
                             )
                         } else {
                             None

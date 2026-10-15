@@ -16,13 +16,6 @@ pub struct Dialog<'a, Message, Body, Title = iced::widget::Void> {
     width: Length,
     height: Length,
     padding: Padding,
-    display: Display,
-}
-
-pub enum Display {
-    Normal,
-    Overlay,
-    Float,
 }
 
 impl<'a, Message, Body> Dialog<'a, Message, Body> {
@@ -35,7 +28,6 @@ impl<'a, Message, Body> Dialog<'a, Message, Body> {
             width: 500.into(),
             height: 300.into(),
             padding: 16.into(),
-            display: Display::Normal,
         }
     }
 }
@@ -50,7 +42,6 @@ impl<'a, Message, Body, Title> Dialog<'a, Message, Body, Title> {
             width: self.width,
             height: self.height,
             padding: self.padding,
-            display: self.display,
         }
     }
 
@@ -89,21 +80,6 @@ impl<'a, Message, Body, Title> Dialog<'a, Message, Body, Title> {
         self.height = Length::Fill;
         self
     }
-
-    pub fn float(mut self) -> Self {
-        self.display = Display::Float;
-        self
-    }
-
-    pub(crate) fn overlay(mut self) -> Self {
-        self.display = Display::Overlay;
-        self
-    }
-
-    pub fn display(mut self, display: Display) -> Self {
-        self.display = display;
-        self
-    }
 }
 
 impl<'a, Message: Clone + 'static, Body, Title> Dialog<'a, Message, Body, Title>
@@ -111,9 +87,10 @@ where
     Body: Widget<Message> + 'a,
     Title: Widget<Message> + 'a,
 {
-    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+    /// Finishes the dialog without an overlay wrapper.
+    pub fn into_normal(self) -> impl iced::Widget<Message> + 'a {
         let value = self;
-        let dialog = card(
+        card(
             column![
                 value.body,
                 if !value.buttons.is_empty() {
@@ -133,18 +110,22 @@ where
         .width(value.width)
         .padding(value.padding)
         .height(value.height)
-        .into_widget();
+        .into_widget()
+    }
 
-        match value.display {
-            Display::Normal => dialog.into(),
-            Display::Float => float(overlay(dialog)).into(),
-            Display::Overlay => overlay(dialog),
-        }
+    /// Finishes the dialog as a centered overlay with a dimmed background.
+    pub fn into_overlay(self) -> impl Widget<Message> + 'a {
+        overlay(self.into_normal())
+    }
+
+    /// Finishes the dialog as a floating overlay.
+    pub fn into_float(self) -> impl Widget<Message> + 'a {
+        float(self.into_overlay())
     }
 }
 
 fn overlay<'a, Message: 'static>(dialog: impl Widget<Message> + 'a) -> impl Widget<Message> + 'a {
-    opaque(center(dialog).style(|theme| {
+    opaque(center(dialog).style(|theme: &iced::Theme| {
         container::Style {
             background: Some(
                 theme

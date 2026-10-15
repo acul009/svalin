@@ -1,6 +1,6 @@
 use std::ops::RangeInclusive;
 
-use iced::{Element, Length, window};
+use iced::{Length, window};
 
 impl StyleSheet for iced::Theme {
     type Style = ();
@@ -25,6 +25,7 @@ use iced::advanced::{self, Layout, Shell, Widget};
 use iced::mouse;
 use iced::widget::canvas;
 use iced::{Background, Color, Event, Radians, Rectangle, Renderer, Size, Vector};
+use iced_core::widget;
 
 use std::f32::consts::PI;
 
@@ -86,6 +87,8 @@ struct State {
     value: f32,
 }
 
+impl<Theme> widget::Meta for ProgressCircle<Theme> where Theme: StyleSheet {}
+
 impl<'a, Message, Theme> Widget<Message, Theme, Renderer> for ProgressCircle<Theme>
 where
     Message: 'a + Clone,
@@ -112,20 +115,13 @@ where
         }
     }
 
-    fn layout(
-        &mut self,
-        _tree: &mut Tree,
-        _renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        layout::atomic(limits, self.size, self.size)
-    }
+    fn layout(&mut self, _tree: &mut Tree, _renderer: &Renderer, _limits: &layout::Limits) {}
 
     fn update(
         &mut self,
         tree: &mut Tree,
         event: &Event,
-        _layout: Layout<'_>,
+        _layout: Layout,
         _cursor: advanced::mouse::Cursor,
         _renderer: &Renderer,
         shell: &mut Shell<'_, Message>,
@@ -157,7 +153,7 @@ where
         renderer: &mut Renderer,
         theme: &Theme,
         _style: &renderer::Style,
-        layout: Layout<'_>,
+        layout: Layout,
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
@@ -205,16 +201,6 @@ where
         renderer.with_translation(Vector::new(bounds.x, bounds.y), |renderer| {
             renderer.draw_geometry(geometry);
         });
-    }
-}
-
-impl<'a, Message, Theme> From<ProgressCircle<Theme>> for Element<'a, Message, Theme, Renderer>
-where
-    Message: Clone + 'a,
-    Theme: StyleSheet + 'a,
-{
-    fn from(progress_circle: ProgressCircle<Theme>) -> Self {
-        Self::new(progress_circle)
     }
 }
 

@@ -14,7 +14,6 @@ pub struct PercentDisplay<'a, Subinfo = iced::widget::Void> {
     value: f32,
     size: f32,
     label: Cow<'a, str>,
-    display_type: DisplayType,
     padding: Padding,
     subinfo: Option<Subinfo>,
 }
@@ -27,7 +26,6 @@ impl<'a> PercentDisplay<'a> {
             range,
             size: 60.0,
             label: "".into(),
-            display_type: DisplayType::Circle,
             padding: Padding::new(0.0),
             subinfo: None,
         }
@@ -55,16 +53,6 @@ impl<'a, Subinfo> PercentDisplay<'a, Subinfo> {
         self
     }
 
-    pub fn circle(mut self) -> Self {
-        self.display_type = DisplayType::Circle;
-        self
-    }
-
-    pub fn bar(mut self) -> Self {
-        self.display_type = DisplayType::Bar;
-        self
-    }
-
     pub fn padding(mut self, padding: impl Into<Padding>) -> Self {
         self.padding = padding.into();
         self
@@ -84,7 +72,6 @@ impl<'a, Subinfo> PercentDisplay<'a, Subinfo> {
             value: self.value,
             size: self.size,
             label: self.label,
-            display_type: self.display_type,
             padding: self.padding,
             subinfo,
         }
@@ -92,7 +79,8 @@ impl<'a, Subinfo> PercentDisplay<'a, Subinfo> {
 }
 
 impl<'a, Subinfo> PercentDisplay<'a, Subinfo> {
-    pub fn into_widget<Message: Clone + 'static>(self) -> impl iced::Widget<Message> + 'a
+    /// Finishes the percentage display as a circular indicator.
+    pub fn into_circle<Message: Clone + 'static>(self) -> impl iced::Widget<Message> + 'a
     where
         Subinfo: iced::Widget<Message> + 'a,
     {
@@ -100,45 +88,46 @@ impl<'a, Subinfo> PercentDisplay<'a, Subinfo> {
         let range = percent_display.range;
         let percent =
             (percent_display.value - *range.start()) / (*range.end() - *range.start()) * 100.0;
-        match percent_display.display_type {
-            DisplayType::Circle => column![
-                stack![
-                    progress_circle(range, percent_display.value).size(percent_display.size),
-                    text!("{:.0}%", percent)
-                        .center()
-                        .width(Length::Fill)
-                        .height(Length::Fill)
-                ],
-                if percent_display.label.len() > 0 {
-                    Some(text(percent_display.label))
-                } else {
-                    None
-                },
-                percent_display.subinfo
-            ]
-            .padding(percent_display.padding)
-            .align_x(alignment::Horizontal::Center)
-            .into(),
-
-            DisplayType::Bar => column![
-                container(text(percent_display.label)),
-                stack![
-                    progress_bar(range, percent_display.value),
-                    container(text!("{:.0}%", percent))
-                        .padding(padding::left(20))
-                        .align_y(Vertical::Center)
-                        .height(Length::Fill)
-                ],
-                percent_display.subinfo
-            ]
-            .spacing(10)
-            .padding(percent_display.padding)
-            .into(),
-        }
+        column![
+            stack![
+                progress_circle(range, percent_display.value).size(percent_display.size),
+                text!("{:.0}%", percent)
+                    .center()
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+            ],
+            if percent_display.label.len() > 0 {
+                Some(text(percent_display.label))
+            } else {
+                None
+            },
+            percent_display.subinfo
+        ]
+        .padding(percent_display.padding)
+        .align_x(alignment::Horizontal::Center)
     }
-}
 
-pub enum DisplayType {
-    Circle,
-    Bar,
+    /// Finishes the percentage display as a horizontal bar.
+    pub fn into_bar<Message: Clone + 'static>(self) -> impl iced::Widget<Message> + 'a
+    where
+        Subinfo: iced::Widget<Message> + 'a,
+    {
+        let percent_display = self;
+        let range = percent_display.range;
+        let percent =
+            (percent_display.value - *range.start()) / (*range.end() - *range.start()) * 100.0;
+        column![
+            container(text(percent_display.label)),
+            stack![
+                progress_bar(range, percent_display.value),
+                container(text!("{:.0}%", percent))
+                    .padding(padding::left(20))
+                    .align_y(Vertical::Center)
+                    .height(Length::Fill)
+            ],
+            percent_display.subinfo
+        ]
+        .spacing(10)
+        .padding(percent_display.padding)
+    }
 }

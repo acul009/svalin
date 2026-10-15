@@ -288,8 +288,7 @@ impl ProfilePicker {
                 display_info
                     .view()
                     .on_close(Message::Reset)
-                    .overlay()
-                    .into_widget()
+                    .into_overlay()
                     .boxed(),
             ),
             Screen::Loading(message) => Some(loading(message).expand().into_widget().boxed()),
@@ -315,8 +314,7 @@ impl ProfilePicker {
                 )
                 .title(text(t!("profile-picker.title.unlock")))
                 .on_close(Message::Reset)
-                .overlay()
-                .into_widget()
+                .into_overlay()
                 .boxed(),
             ),
             Screen::AddProfile { host } => Some(
@@ -334,8 +332,7 @@ impl ProfilePicker {
                 )
                 .title(text(t!("profile-picker.title.add")))
                 .on_close(Message::Reset)
-                .overlay()
-                .into_widget()
+                .into_overlay()
                 .boxed(),
             ),
             Screen::ConfirmDelete(profile) => Some(
@@ -351,8 +348,7 @@ impl ProfilePicker {
                 )
                 .title(text(t!("profile-picker.title.delete")))
                 .on_close(Message::SelectProfile(profile.clone()))
-                .overlay()
-                .into_widget()
+                .into_overlay()
                 .boxed(),
             ),
         };

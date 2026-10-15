@@ -215,7 +215,7 @@ impl InitServer {
             State::Error(display_info) => display_info
                 .view()
                 .on_close(Message::Back)
-                .into_widget()
+                .into_normal()
                 .boxed(),
             State::Loading(message) => loading(message).expand().into_widget().boxed(),
             State::User => form()

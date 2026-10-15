@@ -8,7 +8,6 @@ pub struct ErrorDisplay<'a, Error, Message> {
     title: Cow<'a, str>,
     error: &'a Error,
     on_close: Option<Message>,
-    display: dialog::Display,
 }
 
 impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
@@ -17,7 +16,6 @@ impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
             error,
             on_close: None,
             title: t!("generic.error").into(),
-            display: dialog::Display::Normal,
         }
     }
 
@@ -35,28 +33,33 @@ impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
         self.on_close = Some(on_close);
         self
     }
-
-    pub fn float(mut self) -> Self {
-        self.display = dialog::Display::Float;
-        self
-    }
-
-    pub fn overlay(mut self) -> Self {
-        self.display = dialog::Display::Overlay;
-        self
-    }
 }
 
 impl<'a, Error, Message: Clone + 'static> ErrorDisplay<'a, Error, Message>
 where
     Error: std::fmt::Display,
 {
-    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+    /// Finishes the error display without an overlay wrapper.
+    pub fn into_normal(self) -> impl iced::Widget<Message> + 'a {
+        self.into_dialog().into_normal()
+    }
+
+    /// Finishes the error display as a centered overlay with a dimmed background.
+    pub fn into_overlay(self) -> impl iced::Widget<Message> + 'a {
+        self.into_dialog().into_overlay()
+    }
+
+    /// Finishes the error display as a floating overlay.
+    pub fn into_float(self) -> impl iced::Widget<Message> + 'a {
+        self.into_dialog().into_float()
+    }
+
+    fn into_dialog(
+        self,
+    ) -> dialog::Dialog<'a, Message, iced::widget::Text<'a>, iced::widget::Text<'a>> {
         let display = self;
         dialog(text!("{:#}", display.error))
             .title(text(display.title))
             .on_close_maybe(display.on_close)
-            .display(display.display)
-            .into_widget()
     }
 }
