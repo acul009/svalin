@@ -1,5 +1,5 @@
 use iced::{
-    Color, Length, Padding,
+    Color, Length, Padding, Widget,
     widget::{center, column, container, float, opaque, row},
 };
 
@@ -8,10 +8,10 @@ use crate::{
     ui::widgets::{card, icon_button},
 };
 
-pub struct Dialog<'a, Message> {
-    body: Element<'a, Message>,
+pub struct Dialog<'a, Message, Body, Title = iced::widget::Void> {
+    body: Body,
     buttons: Vec<Element<'a, Message>>,
-    title: Element<'a, Message>,
+    title: Title,
     on_close: Option<Message>,
     width: Length,
     height: Length,
@@ -25,12 +25,12 @@ pub enum Display {
     Float,
 }
 
-impl<'a, Message> Dialog<'a, Message> {
-    pub(super) fn new(body: impl Into<Element<'a, Message>>) -> Self {
+impl<'a, Message, Body> Dialog<'a, Message, Body> {
+    pub(super) fn new(body: Body) -> Self {
         Self {
-            body: body.into(),
+            body,
             buttons: vec![],
-            title: iced::widget::void().into(),
+            title: iced::widget::void(),
             on_close: None,
             width: 500.into(),
             height: 300.into(),
@@ -38,10 +38,20 @@ impl<'a, Message> Dialog<'a, Message> {
             display: Display::Normal,
         }
     }
+}
 
-    pub fn title(mut self, title: impl Into<Element<'a, Message>>) -> Self {
-        self.title = title.into();
-        self
+impl<'a, Message, Body, Title> Dialog<'a, Message, Body, Title> {
+    pub fn title<NewTitle>(self, title: NewTitle) -> Dialog<'a, Message, Body, NewTitle> {
+        Dialog {
+            body: self.body,
+            buttons: self.buttons,
+            title,
+            on_close: self.on_close,
+            width: self.width,
+            height: self.height,
+            padding: self.padding,
+            display: self.display,
+        }
     }
 
     pub fn padding(mut self, padding: impl Into<Padding>) -> Self {
@@ -49,8 +59,8 @@ impl<'a, Message> Dialog<'a, Message> {
         self
     }
 
-    pub fn button(mut self, button: impl Into<Element<'a, Message>>) -> Self {
-        self.buttons.push(button.into());
+    pub fn button(mut self, button: impl Widget<Message> + 'a) -> Self {
+        self.buttons.push(button.boxed());
         self
     }
 
@@ -96,8 +106,13 @@ impl<'a, Message> Dialog<'a, Message> {
     }
 }
 
-impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Message> {
-    fn from(value: Dialog<'a, Message>) -> Self {
+impl<'a, Message: Clone + 'static, Body, Title> Dialog<'a, Message, Body, Title>
+where
+    Body: Widget<Message> + 'a,
+    Title: Widget<Message> + 'a,
+{
+    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+        let value = self;
         let dialog = card(
             column![
                 value.body,
@@ -110,14 +125,15 @@ impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Mes
             .spacing(20),
         )
         .title(value.title)
-        .action(
-            value
-                .on_close
-                .map(|message| icon_button(bootstrap::x_lg()).on_press(message)),
-        )
+        .action(value.on_close.map(|message| {
+            icon_button(bootstrap::x_lg())
+                .on_press(message)
+                .into_widget()
+        }))
         .width(value.width)
         .padding(value.padding)
-        .height(value.height);
+        .height(value.height)
+        .into_widget();
 
         match value.display {
             Display::Normal => dialog.into(),
@@ -127,7 +143,7 @@ impl<'a, Message: Clone + 'static> From<Dialog<'a, Message>> for Element<'a, Mes
     }
 }
 
-fn overlay<'a, Message: 'static>(dialog: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
+fn overlay<'a, Message: 'static>(dialog: impl Widget<Message> + 'a) -> impl Widget<Message> + 'a {
     opaque(center(dialog).style(|theme| {
         container::Style {
             background: Some(
@@ -143,5 +159,4 @@ fn overlay<'a, Message: 'static>(dialog: impl Into<Element<'a, Message>>) -> Ele
             ..Default::default()
         }
     }))
-    .into()
 }

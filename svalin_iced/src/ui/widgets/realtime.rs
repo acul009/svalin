@@ -19,14 +19,15 @@ impl<'a> RealtimeDisplay<'a> {
     }
 }
 
-impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Message> {
-    fn from(value: RealtimeDisplay) -> Self {
+impl<'a> RealtimeDisplay<'a> {
+    pub fn into_widget<Message: Clone + 'static>(self) -> impl iced::Widget<Message> + 'a {
+        let value = self;
         let content: Element<Message> = match value.realtime {
             RemoteData::Unavailable => container(text(t!("realtime.live-unavailable")).center())
                 .padding(20)
                 .width(Length::Fill)
                 .into(),
-            RemoteData::Pending => container(loading(t!("realtime.connecting")))
+            RemoteData::Pending => container(loading(t!("realtime.connecting")).into_widget())
                 .height(200)
                 .into(),
             RemoteData::Ready(realtime) => column![
@@ -37,11 +38,12 @@ impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Mes
                         percent_display(0.0..=100.0, usage.load)
                             .label(t!("realtime.core", "id" => core))
                             .padding(Padding::new(5.0).left(10.0).right(10.0))
-                            .into()
+                            .into_widget()
                     }))
                     .wrap(),
                 )
-                .padding(10.into()),
+                .padding(10.into())
+                .into_widget(),
                 card(
                     text(t!("realtime.memory")),
                     column![
@@ -55,7 +57,8 @@ impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Mes
                             realtime.memory.used / 1024 / 1024,
                             realtime.memory.total / 1024 / 1024
                         ))
-                        .bar(),
+                        .bar()
+                        .into_widget(),
                         if realtime.swap.total > 0 {
                             Some(
                                 percent_display(
@@ -68,7 +71,8 @@ impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Mes
                                     realtime.swap.used / 1024 / 1024,
                                     realtime.swap.total / 1024 / 1024
                                 ))
-                                .bar(),
+                                .bar()
+                                .into_widget(),
                             )
                         } else {
                             None
@@ -77,12 +81,13 @@ impl<'a, Message: Clone + 'static> From<RealtimeDisplay<'a>> for Element<'a, Mes
                     .padding(20)
                     .spacing(20)
                 )
+                .into_widget()
             ]
             .padding(30)
             .spacing(30)
             .into(),
         };
 
-        container(content).into()
+        container(content)
     }
 }

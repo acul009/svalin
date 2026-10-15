@@ -1,7 +1,7 @@
 use std::{process, sync::Arc, time::Duration};
 
 use iced::{
-    Subscription, Task,
+    Subscription, Task, Widget,
     widget::{button, column, rule, stack, text},
 };
 use svalin::client::{
@@ -225,34 +225,39 @@ impl MainView {
 
     pub fn view(&self) -> crate::Element<'_, Message> {
         let screen = match &self.screen {
-            Screen::Loading(text) => loading(text).into(),
+            Screen::Loading(text) => loading(text).into_widget().boxed(),
             Screen::DeviceList => device_list::DeviceList::new(&self.state)
                 .on_new(Message::OpenAddDevice)
                 .on_select(Message::SelectDevice)
                 .group_filter(&self.group_filter)
-                .into(),
+                .into_widget()
+                .boxed(),
             Screen::AddDevice(add_device) => stack![
-                device_list::DeviceList::new(&self.state),
+                device_list::DeviceList::new(&self.state).into_widget(),
                 add_device.view().map(Message::AddDevice)
             ]
-            .into(),
-            Screen::DeviceView(device_view) => {
-                device_view.view(&self.state).map(Message::DeviceView)
-            }
+            .boxed(),
+            Screen::DeviceView(device_view) => device_view
+                .view(&self.state)
+                .map(Message::DeviceView)
+                .boxed(),
         };
 
         if let Some(error) = &self.error {
             stack![
                 screen,
-                error_display(error).on_close(Message::CloseError).overlay()
+                error_display(error)
+                    .on_close(Message::CloseError)
+                    .overlay()
+                    .into_widget()
             ]
-            .into()
+            .boxed()
         } else {
             screen
         }
     }
 
-    pub fn header(&self) -> header::Header<'_, Message> {
+    pub fn header(&self) -> header::Header<'_, Message, impl Widget<Message> + '_> {
         let header = match &self.screen {
             Screen::DeviceView(device_view) => {
                 device_view.header(&self.state).map(Message::DeviceView)
@@ -267,7 +272,8 @@ impl MainView {
                 icon_button(bootstrap::ethernet())
                     .selected(self.context == Context::Tunnels)
                     .tooltip(text(t!("tunnel.menu.show")))
-                    .on_press(Context::Tunnels.into()),
+                    .on_press(Context::Tunnels.into())
+                    .into_widget(),
             )
             .action(
                 icon_button(
@@ -281,7 +287,8 @@ impl MainView {
                 )
                 .selected(self.context == Context::Warnings)
                 .tooltip(text(t!("warnings.show")))
-                .on_press(Context::Warnings.into()),
+                .on_press(Context::Warnings.into())
+                .into_widget(),
             )
     }
 
@@ -290,17 +297,21 @@ impl MainView {
             Context::None => None,
             Context::Tunnels => Some(
                 column![
-                    tunnel_menu::header().on_back(Context::None.into()),
+                    tunnel_menu::header()
+                        .on_back(Context::None.into())
+                        .into_widget(),
                     tunnel_menu::view(&self.state).map(Message::TunnelMenu),
                 ]
-                .into(),
+                .boxed(),
             ),
             Context::Warnings => Some(
                 column![
-                    warning_menu::header().on_back(Context::None.into()),
+                    warning_menu::header()
+                        .on_back(Context::None.into())
+                        .into_widget(),
                     warning_menu::view(&self.state)
                 ]
-                .into(),
+                .boxed(),
             ),
         }
     }
@@ -318,10 +329,10 @@ impl MainView {
                             .unwrap_or_else(|| t!("device-list.nogroup"));
                         button(text(name))
                             .on_press(Message::GroupFilter(group.into()))
-                            .into()
+                            .boxed()
                     }))
                 ]
-                .into(),
+                .boxed(),
             ),
             _ => None,
         }

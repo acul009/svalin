@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use iced::{
-    Element, Length,
+    Element, Length, Widget,
     widget::{self, Column, Row, column, text},
 };
 
@@ -26,26 +26,27 @@ impl<'a, Message> Form<'a, Message> {
         self
     }
 
-    pub fn control(mut self, control: impl Into<Element<'a, Message>>) -> Self {
-        self.control.push(control.into());
+    pub fn control(mut self, control: impl Widget<Message> + 'a) -> Self {
+        self.control.push(control.boxed());
         self
     }
 
-    pub fn control_maybe(mut self, control: Option<impl Into<Element<'a, Message>>>) -> Self {
+    pub fn control_maybe(mut self, control: Option<impl Widget<Message> + 'a>) -> Self {
         if let Some(control) = control {
-            self.control.push(control.into());
+            self.control.push(control.boxed());
         }
         self
     }
 
-    pub fn button(mut self, button: impl Into<Element<'a, Message>>) -> Self {
-        self.buttons.push(button.into());
+    pub fn button(mut self, button: impl Widget<Message> + 'a) -> Self {
+        self.buttons.push(button.boxed());
         self
     }
 }
 
-impl<'a, Message: Clone + 'static> From<Form<'a, Message>> for Element<'a, Message> {
-    fn from(form: Form<'a, Message>) -> Self {
+impl<'a, Message: Clone + 'static> Form<'a, Message> {
+    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+        let form = self;
         let mut content_col = Column::with_capacity(3 + form.control.len() * 2).width(Length::Fill);
 
         let mut should_space = false;
@@ -77,10 +78,8 @@ impl<'a, Message: Clone + 'static> From<Form<'a, Message>> for Element<'a, Messa
             button_row = button_row.push(button);
         }
 
-        Element::from(
-            widget::container(column![content_row, button_row].spacing(32))
-                .padding(16)
-                .width(Length::Fill),
-        )
+        widget::container(column![content_row, button_row].spacing(32))
+            .padding(16)
+            .width(Length::Fill)
     }
 }

@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use iced::{
-    Task,
+    Task, Widget,
     widget::{button, column, progress_bar, row, stack, text},
 };
 use svalin::client::Client;
@@ -149,28 +149,28 @@ impl State {
             ),
             match &self.status {
                 Status::None => {
-                    Element::from(iced::widget::void())
+                    iced::widget::void().boxed()
                 }
                 Status::Updating(progress, _) => {
-                    progress_bar(0.0..=1.0, *progress).into()
+                    progress_bar(0.0..=1.0, *progress).boxed()
                 }
                 Status::Success => {
                     stack![
                         progress_bar(0.0..=1.0, 1.0),
                         text(t!("device.update.success"))
                     ]
-                    .into()
+                    .boxed()
                 }
                 Status::Error(err) => {
                     stack![
                         progress_bar(0.0..=1.0, 1.0),
                         text(t!("device.update.failed", "error" => err))
                     ]
-                    .into()
+                    .boxed()
                 }
             },
         ]
         .spacing(20)
-        .into()
+        .boxed()
     }
 }

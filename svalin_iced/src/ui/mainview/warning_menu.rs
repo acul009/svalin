@@ -2,7 +2,7 @@ use std::{borrow::Cow, sync::Arc};
 
 use anyhow::anyhow;
 use iced::{
-    Length,
+    Length, Widget,
     widget::{button, column, container, row, scrollable, text},
 };
 use svalin::client::state::{ClientState, warning};
@@ -15,19 +15,20 @@ use crate::{
 
 use super::Message;
 
-pub fn header<'a>() -> crate::ui::widgets::header::Header<'a, Message> {
+pub fn header<'a>()
+-> crate::ui::widgets::header::Header<'a, Message, impl iced::Widget<Message> + 'a> {
     crate::ui::widgets::header(text(t!("warnings.title")).size(20)).drawer()
 }
 
 pub fn view(state: &ClientState) -> Element<'_, Message> {
     let mut warnings = state.warnings().warnings().peekable();
     if warnings.peek().is_none() {
-        return container(text(t!("warnings.empty"))).padding(20).into();
+        return container(text(t!("warnings.empty"))).padding(20).boxed();
     }
 
     scrollable(
         column(warnings.map(|warning| {
-            Element::from(toast(
+            toast(
                 match warning.severity() {
                     warning::Severity::High => toast::Kind::Error,
                     warning::Severity::Medium => toast::Kind::Warning,
@@ -100,18 +101,16 @@ pub fn view(state: &ClientState) -> Element<'_, Message> {
                                 }
                             }
                         };
-                        Element::from(
-                            column![text(name).size(24), message, actions]
-                                .height(Length::Fit)
-                                .spacing(10),
-                        )
+                        column![text(name).size(24), message, actions]
+                            .height(Length::Fit)
+                            .spacing(10)
                     }
                 },
-            ))
-            .into()
+            )
+            .into_widget()
         }))
         .padding(20)
         .spacing(20),
     )
-    .into()
+    .boxed()
 }

@@ -1,3 +1,4 @@
+use iced::Widget;
 use iced::widget::{column, row, space, text, text_editor, text_input};
 use svalin::client::state::persistent::MetaInfo;
 use svalin_pki::get_current_timestamp;
@@ -85,9 +86,18 @@ impl State {
                 .spacing(10),
             )
             .title(text(t!("device.info.title")))
-            .action(icon_button(bootstrap::floppy()).on_press(Message::Save))
-            .action(icon_button(bootstrap::x_square()).on_press(Message::CancelEdit))
-            .into()
+            .action(
+                icon_button(bootstrap::floppy())
+                    .on_press(Message::Save)
+                    .into_widget(),
+            )
+            .action(
+                icon_button(bootstrap::x_square())
+                    .on_press(Message::CancelEdit)
+                    .into_widget(),
+            )
+            .into_widget()
+            .boxed()
         } else {
             card(
                 column![
@@ -110,8 +120,13 @@ impl State {
                 .spacing(10),
             )
             .title(text(t!("device.info.title")))
-            .action(icon_button(bootstrap::pencil()).on_press(Message::Edit))
-            .into()
+            .action(
+                icon_button(bootstrap::pencil())
+                    .on_press(Message::Edit)
+                    .into_widget(),
+            )
+            .into_widget()
+            .boxed()
         }
     }
 }

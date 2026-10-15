@@ -3,21 +3,28 @@ use iced::{
     widget::{column, container, row, rule, space, stack},
 };
 
-use crate::Element;
+use iced::widget::Void;
 
-pub struct Scaffold<'a, Message> {
-    body: Element<'a, Message>,
-    header: Option<Element<'a, Message>>,
-    footer: Option<Element<'a, Message>>,
-    dialog: Option<Element<'a, Message>>,
-    sidebar: Option<Element<'a, Message>>,
-    context: Option<Element<'a, Message>>,
+pub struct Scaffold<
+    Body,
+    Header = Void,
+    Footer = Void,
+    Dialog = Void,
+    Sidebar = Void,
+    Context = Void,
+> {
+    body: Body,
+    header: Option<Header>,
+    footer: Option<Footer>,
+    dialog: Option<Dialog>,
+    sidebar: Option<Sidebar>,
+    context: Option<Context>,
 }
 
-impl<'a, Message> Scaffold<'a, Message> {
-    pub fn new(body: impl Into<Element<'a, Message>>) -> Self {
+impl<Body> Scaffold<Body> {
+    pub fn new(body: Body) -> Self {
         Self {
-            body: body.into(),
+            body,
             header: None,
             footer: None,
             dialog: None,
@@ -25,70 +32,131 @@ impl<'a, Message> Scaffold<'a, Message> {
             context: None,
         }
     }
-
-    pub fn header(mut self, header: impl Into<Element<'a, Message>>) -> Self {
-        self.header = Some(header.into());
-        self
-    }
-
-    pub fn header_maybe(mut self, header: Option<impl Into<Element<'a, Message>>>) -> Self {
-        if let Some(header) = header {
-            self.header = Some(header.into());
-        }
-        self
-    }
-
-    pub fn footer(mut self, footer: impl Into<Element<'a, Message>>) -> Self {
-        self.footer = Some(footer.into());
-        self
-    }
-
-    pub fn footer_maybe(mut self, footer: Option<impl Into<Element<'a, Message>>>) -> Self {
-        if let Some(footer) = footer {
-            self.footer = Some(footer.into());
-        }
-        self
-    }
-
-    pub fn dialog(mut self, dialog: impl Into<Element<'a, Message>>) -> Self {
-        self.dialog = Some(dialog.into());
-        self
-    }
-
-    pub fn dialog_maybe(mut self, dialog: Option<impl Into<Element<'a, Message>>>) -> Self {
-        if let Some(dialog) = dialog {
-            self.dialog = Some(dialog.into());
-        }
-        self
-    }
-
-    pub fn sidebar(mut self, sidebar: impl Into<Element<'a, Message>>) -> Self {
-        self.sidebar = Some(sidebar.into());
-        self
-    }
-
-    pub fn sidebar_maybe(mut self, sidebar: Option<impl Into<Element<'a, Message>>>) -> Self {
-        if let Some(sidebar) = sidebar {
-            self.sidebar = Some(sidebar.into());
-        }
-        self
-    }
-
-    pub fn context(mut self, context: impl Into<Element<'a, Message>>) -> Self {
-        self.context = Some(context.into());
-        self
-    }
-
-    pub fn context_maybe(mut self, context: Option<impl Into<Element<'a, Message>>>) -> Self {
-        if let Some(context) = context {
-            self.context = Some(context.into());
-        }
-        self
-    }
 }
 
-impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, Message> {
-    fn from(scaffold: Scaffold<'a, Message>) -> Self {
+impl<Body, Header, Footer, Dialog, Sidebar, Context>
+    Scaffold<Body, Header, Footer, Dialog, Sidebar, Context>
+{
+    pub fn header<NewHeader>(
+        self,
+        header: NewHeader,
+    ) -> Scaffold<Body, NewHeader, Footer, Dialog, Sidebar, Context> {
+        self.header_maybe(Some(header))
+    }
+
+    /// Replaces the header; passing `None` clears it.
+    pub fn header_maybe<NewHeader>(
+        self,
+        header: Option<NewHeader>,
+    ) -> Scaffold<Body, NewHeader, Footer, Dialog, Sidebar, Context> {
+        Scaffold {
+            body: self.body,
+            header,
+            footer: self.footer,
+            dialog: self.dialog,
+            sidebar: self.sidebar,
+            context: self.context,
+        }
+    }
+
+    pub fn footer<NewFooter>(
+        self,
+        footer: NewFooter,
+    ) -> Scaffold<Body, Header, NewFooter, Dialog, Sidebar, Context> {
+        self.footer_maybe(Some(footer))
+    }
+
+    /// Replaces the footer; passing `None` clears it.
+    pub fn footer_maybe<NewFooter>(
+        self,
+        footer: Option<NewFooter>,
+    ) -> Scaffold<Body, Header, NewFooter, Dialog, Sidebar, Context> {
+        Scaffold {
+            body: self.body,
+            header: self.header,
+            footer,
+            dialog: self.dialog,
+            sidebar: self.sidebar,
+            context: self.context,
+        }
+    }
+
+    pub fn dialog<NewDialog>(
+        self,
+        dialog: NewDialog,
+    ) -> Scaffold<Body, Header, Footer, NewDialog, Sidebar, Context> {
+        self.dialog_maybe(Some(dialog))
+    }
+
+    /// Replaces the dialog; passing `None` clears it.
+    pub fn dialog_maybe<NewDialog>(
+        self,
+        dialog: Option<NewDialog>,
+    ) -> Scaffold<Body, Header, Footer, NewDialog, Sidebar, Context> {
+        Scaffold {
+            body: self.body,
+            header: self.header,
+            footer: self.footer,
+            dialog,
+            sidebar: self.sidebar,
+            context: self.context,
+        }
+    }
+
+    pub fn sidebar<NewSidebar>(
+        self,
+        sidebar: NewSidebar,
+    ) -> Scaffold<Body, Header, Footer, Dialog, NewSidebar, Context> {
+        self.sidebar_maybe(Some(sidebar))
+    }
+
+    /// Replaces the sidebar; passing `None` clears it.
+    pub fn sidebar_maybe<NewSidebar>(
+        self,
+        sidebar: Option<NewSidebar>,
+    ) -> Scaffold<Body, Header, Footer, Dialog, NewSidebar, Context> {
+        Scaffold {
+            body: self.body,
+            header: self.header,
+            footer: self.footer,
+            dialog: self.dialog,
+            sidebar,
+            context: self.context,
+        }
+    }
+
+    pub fn context<NewContext>(
+        self,
+        context: NewContext,
+    ) -> Scaffold<Body, Header, Footer, Dialog, Sidebar, NewContext> {
+        self.context_maybe(Some(context))
+    }
+
+    /// Replaces the context; passing `None` clears it.
+    pub fn context_maybe<NewContext>(
+        self,
+        context: Option<NewContext>,
+    ) -> Scaffold<Body, Header, Footer, Dialog, Sidebar, NewContext> {
+        Scaffold {
+            body: self.body,
+            header: self.header,
+            footer: self.footer,
+            dialog: self.dialog,
+            sidebar: self.sidebar,
+            context,
+        }
+    }
+
+    pub fn into_widget<'a, Message: Clone + 'static>(self) -> impl iced::Widget<Message> + 'a
+    where
+        Body: iced::Widget<Message> + 'a,
+        Header: iced::Widget<Message> + 'a,
+        Footer: iced::Widget<Message> + 'a,
+        Dialog: iced::Widget<Message> + 'a,
+        Sidebar: iced::Widget<Message> + 'a,
+        Context: iced::Widget<Message> + 'a,
+    {
+        let scaffold = self;
         let has_header = scaffold.header.is_some();
         let has_context = scaffold.context.is_some();
         let has_sidebar = scaffold.sidebar.is_some();
@@ -143,6 +211,5 @@ impl<'a, Message: Clone + 'static> From<Scaffold<'a, Message>> for Element<'a, M
             ],
             scaffold.dialog
         ]
-        .into()
     }
 }

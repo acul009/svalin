@@ -5,7 +5,7 @@ use iced::{
 };
 
 use crate::{
-    Element, bootstrap,
+    bootstrap,
     ui::{ERROR_COLOR, INFO_COLOR, SUCCESS_COLOR, WARNING_COLOR},
 };
 
@@ -37,25 +37,23 @@ impl Kind {
     }
 }
 
-pub struct Toast<'a, Message> {
+pub struct Toast<Content> {
     kind: Kind,
-    content: Element<'a, Message>,
+    content: Content,
 }
 
-impl<'a, Message> Toast<'a, Message> {
-    pub fn new(kind: Kind, content: impl Into<Element<'a, Message>>) -> Self {
-        Self {
-            kind,
-            content: content.into(),
-        }
+impl<Content> Toast<Content> {
+    pub fn new(kind: Kind, content: Content) -> Self {
+        Self { kind, content }
     }
 }
 
-impl<'a, Message> From<Toast<'a, Message>> for Element<'a, Message>
-where
-    Message: 'a + 'static,
-{
-    fn from(toast: Toast<'a, Message>) -> Self {
+impl<Content> Toast<Content> {
+    pub fn into_widget<'a, Message: 'static>(self) -> impl iced::Widget<Message> + 'a
+    where
+        Content: iced::Widget<Message> + 'a,
+    {
+        let toast = self;
         let kind = toast.kind;
         let accent = kind.color();
         let icon = container(kind.icon().size(30).color(accent))
@@ -75,6 +73,5 @@ where
                 },
                 ..Default::default()
             })
-            .into()
     }
 }

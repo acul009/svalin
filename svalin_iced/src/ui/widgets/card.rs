@@ -1,31 +1,33 @@
 use iced::{
-    Length, Padding,
+    Length, Padding, Widget,
     widget::{column, container},
 };
 
 use crate::{Element, ui::widgets::header};
 
-pub struct Card<'a, Message> {
-    title: Option<Element<'a, Message>>,
-    content: Element<'a, Message>,
+pub struct Card<'a, Message, Content, Title = iced::widget::Void> {
+    title: Option<Title>,
+    content: Content,
     padding: Padding,
     width: Length,
     height: Length,
     actions: Vec<Element<'a, Message>>,
 }
 
-impl<'a, Message> Card<'a, Message> {
-    pub fn new(content: impl Into<Element<'a, Message>>) -> Self {
+impl<'a, Message, Content> Card<'a, Message, Content> {
+    pub fn new(content: Content) -> Self {
         Self {
             title: None,
-            content: content.into(),
+            content,
             padding: 16.into(),
             width: Length::Fill,
             height: Length::Fit,
             actions: Vec::new(),
         }
     }
+}
 
+impl<'a, Message, Content, Title> Card<'a, Message, Content, Title> {
     pub fn width(mut self, width: impl Into<Length>) -> Self {
         self.width = width.into();
         self
@@ -36,13 +38,19 @@ impl<'a, Message> Card<'a, Message> {
         self
     }
 
-    pub fn title(mut self, title: impl Into<Element<'a, Message>>) -> Self {
-        self.title = Some(title.into());
-        self
+    pub fn title<NewTitle>(self, title: NewTitle) -> Card<'a, Message, Content, NewTitle> {
+        Card {
+            title: Some(title),
+            content: self.content,
+            padding: self.padding,
+            width: self.width,
+            height: self.height,
+            actions: self.actions,
+        }
     }
 
-    pub fn action(mut self, action: impl Into<Element<'a, Message>>) -> Self {
-        self.actions.push(action.into());
+    pub fn action(mut self, action: impl Widget<Message> + 'a) -> Self {
+        self.actions.push(action.boxed());
         self
     }
 
@@ -52,13 +60,16 @@ impl<'a, Message> Card<'a, Message> {
     }
 }
 
-impl<'a, Message> From<Card<'a, Message>> for Element<'a, Message>
+impl<'a, Message, Content, Title> Card<'a, Message, Content, Title>
 where
     Message: 'static + Clone,
+    Content: Widget<Message> + 'a,
+    Title: Widget<Message> + 'a,
 {
-    fn from(card: Card<'a, Message>) -> Self {
+    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+        let card = self;
         container(column![
-            container(header(card.title).with_actions(card.actions)).style(|theme| {
+            container(header(card.title).with_actions(card.actions).into_widget()).style(|theme| {
                 container::Style {
                     background: Some(theme.palette().background.strong.color.into()),
                     ..Default::default()
@@ -70,6 +81,5 @@ where
         .clip(true)
         .width(card.width)
         .height(card.height)
-        .into()
     }
 }

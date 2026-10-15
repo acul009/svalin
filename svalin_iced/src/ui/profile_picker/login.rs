@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use iced::{
-    Task,
+    Task, Widget,
     widget::{button, text, text_input},
 };
 use svalin::client::{Client, Login, LoginError};
@@ -156,8 +156,12 @@ impl LoginDialog {
 
     pub fn view(&self) -> Element<'_, Message> {
         match &self.state {
-            State::Loading(message) => loading(message).into(),
-            State::Error(display_info) => display_info.view().on_close(Message::Back).into(),
+            State::Loading(message) => loading(message).into_widget().boxed(),
+            State::Error(display_info) => display_info
+                .view()
+                .on_close(Message::Back)
+                .into_widget()
+                .boxed(),
             State::LoginForm => form()
                 .title(t!("profile-picker.login"))
                 .control(
@@ -178,15 +182,18 @@ impl LoginDialog {
                 )
                 .button(button(text(t!("generic.back"))).on_press(Message::Back))
                 .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
-                .into(),
+                .into_widget()
+                .boxed(),
             State::WrongPassword => form()
                 .title(t!("profile-picker.wrong-password"))
                 .button(button(text(t!("generic.back"))).on_press(Message::Back))
-                .into(),
+                .into_widget()
+                .boxed(),
             State::InvalidTotp => form()
                 .title(t!("profile-picker.invalid-totp"))
                 .button(button(text(t!("generic.back"))).on_press(Message::Back))
-                .into(),
+                .into_widget()
+                .boxed(),
         }
     }
 }

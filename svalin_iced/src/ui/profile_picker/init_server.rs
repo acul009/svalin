@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
 use iced::{
-    Task,
+    Task, Widget,
     widget::{button, image, text, text_input},
 };
 use svalin::client::{Client, Init};
@@ -212,8 +212,12 @@ impl InitServer {
 
     pub fn view(&self) -> crate::Element<'_, Message> {
         match &self.state {
-            State::Error(display_info) => display_info.view().on_close(Message::Back).into(),
-            State::Loading(message) => loading(message).expand().into(),
+            State::Error(display_info) => display_info
+                .view()
+                .on_close(Message::Back)
+                .into_widget()
+                .boxed(),
+            State::Loading(message) => loading(message).expand().into_widget().boxed(),
             State::User => form()
                 .title(t!("profile-picker.add"))
                 .control(
@@ -243,7 +247,8 @@ impl InitServer {
                 )
                 .button(button(text(t!("generic.back"))).on_press(Message::Back))
                 .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
-                .into(),
+                .into_widget()
+                .boxed(),
             State::Totp { qr, .. } => form()
                 .title(t!("profile-picker.add"))
                 .control(image(qr))
@@ -256,7 +261,8 @@ impl InitServer {
                 )
                 .button(button(text(t!("generic.back"))).on_press(Message::Back))
                 .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
-                .into(),
+                .into_widget()
+                .boxed(),
         }
     }
 }

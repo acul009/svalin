@@ -8,7 +8,7 @@ use svalin::client::{Client, state::ClientState, tunnel_manager::TunnelConfig};
 use svalin_pki::SpkiHash;
 use uuid::Uuid;
 
-use crate::{Element, ui::widgets::card};
+use crate::ui::widgets::card;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -31,11 +31,12 @@ pub fn update(message: Message, client: &Arc<Client>) -> Action {
     }
 }
 
-pub fn header<'a, Message: 'static>() -> crate::ui::widgets::header::Header<'a, Message> {
+pub fn header<'a, Message: 'static>()
+-> crate::ui::widgets::header::Header<'a, Message, impl iced::Widget<Message> + 'a> {
     crate::ui::widgets::header(text(t!("tunnel.menu.title")).size(20)).drawer()
 }
 
-pub fn view(state: &ClientState) -> Element<'_, Message> {
+pub fn view(state: &ClientState) -> impl iced::Widget<Message> + '_ {
     let mut tunnels: Vec<_> = state
         .tunneling()
         .iter()
@@ -76,10 +77,9 @@ pub fn view(state: &ClientState) -> Element<'_, Message> {
                 .spacing(12),
             )
             .title(text(&tunnel.name))
-            .width(Length::Fill),
+            .width(Length::Fill)
+            .into_widget(),
         );
     }
-    scrollable(content.width(Length::Fill))
-        .height(Length::Fill)
-        .into()
+    scrollable(content.width(Length::Fill)).height(Length::Fill)
 }

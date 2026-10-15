@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use iced::{
-    Length, Task,
+    Length, Task, Widget,
     alignment::Vertical,
     widget::{
         self, center, column, container, progress_bar, row, rule, scrollable, space, stack, text,
@@ -177,7 +177,7 @@ impl State {
 
     pub fn view<'a>(&'a self, client_state: &'a ClientState) -> Element<'a, Message> {
         let Some(persistent) = client_state.persistent().devices().get(&self.spki_hash) else {
-            return center(text(t!("device.unavailable"))).into();
+            return center(text(t!("device.unavailable"))).boxed();
         };
 
         let meta = persistent.meta_info().unwrap_or(&PLACEHOLDER_META);
@@ -202,17 +202,24 @@ impl State {
                     .title(text(t!("device.update.title")))
                     .on_close(Message::CloseOverlay)
                     .overlay()
-                    .into(),
+                    .into_widget()
+                    .boxed(),
                 Overlay::TunnelOpenError => dialog(text(t!("device.tunnel.open-error")))
                     .on_close(Message::CloseOverlay)
                     .overlay()
-                    .into(),
+                    .into_widget()
+                    .boxed(),
             });
 
-        stack![scrollable(col), overlay].height(Length::Fill).into()
+        stack![scrollable(col), overlay]
+            .height(Length::Fill)
+            .boxed()
     }
 
-    pub fn header<'a>(&'a self, client_state: &'a ClientState) -> header::Header<'a, Message> {
+    pub fn header<'a>(
+        &'a self,
+        client_state: &'a ClientState,
+    ) -> header::Header<'a, Message, impl Widget<Message> + 'a> {
         let Some(persistent) = client_state.persistent().devices().get(&self.spki_hash) else {
             return header(widget::space()).on_back(Message::Back).into();
         };
@@ -245,11 +252,13 @@ fn agent_actions<'a>(device_state: &persistent::DeviceState) -> Element<'a, Mess
             icon_button(bootstrap::terminal())
                 .size(50)
                 .tooltip(text(t!("device.actions.open-terminal")))
-                .on_press(Message::OpenTerminal),
+                .on_press(Message::OpenTerminal)
+                .into_widget(),
             icon_button(bootstrap::download())
                 .size(50)
                 .tooltip(text(t!("device.actions.update")))
-                .on_press(Overlay::Update.into()),
+                .on_press(Overlay::Update.into())
+                .into_widget(),
             is_proxmox_ve.then(|| {
                 icon_button(bootstrap::window_fullscreen())
                     .size(50)
@@ -259,6 +268,7 @@ fn agent_actions<'a>(device_state: &persistent::DeviceState) -> Element<'a, Mess
                             .parse()
                             .expect("hand coded urls have to parse"),
                     ))
+                    .into_widget()
             }),
             is_proxmox_bs.then(|| {
                 icon_button(bootstrap::window_fullscreen())
@@ -269,6 +279,7 @@ fn agent_actions<'a>(device_state: &persistent::DeviceState) -> Element<'a, Mess
                             .parse()
                             .expect("hand coded urls have to parse"),
                     ))
+                    .into_widget()
             }),
             is_proxmox_mg.then(|| {
                 icon_button(bootstrap::window_fullscreen())
@@ -279,6 +290,7 @@ fn agent_actions<'a>(device_state: &persistent::DeviceState) -> Element<'a, Mess
                             .parse()
                             .expect("hand coded urls have to parse"),
                     ))
+                    .into_widget()
             }),
         ]
         .padding(20)
@@ -286,7 +298,8 @@ fn agent_actions<'a>(device_state: &persistent::DeviceState) -> Element<'a, Mess
     )
     .padding(0)
     .title(text(t!("device.actions.title")))
-    .into()
+    .into_widget()
+    .boxed()
 }
 
 fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
@@ -350,6 +363,7 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
                             human_i_bytes(report.total_swap)
                         )
                     )
+                    .into_widget()
             )
             .padding(30),
             rule::horizontal(2),
@@ -375,10 +389,14 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
                     .map(|programs| button_list::entry(text(t!(
                         "device.report.installed-programs-summary", "count" => programs.len()
                     ))).on_press(Overlay::InstalledPrograms.into())),
-            ),
+            ).into_widget(),
             rule::horizontal(2),
-            container(crate::ui::widgets::list(report.disks.iter().map(disk)).entry_height(90))
-                .padding(30),
+            container(
+                crate::ui::widgets::list(report.disks.iter().map(|entry| disk(entry).boxed()))
+                    .entry_height(90)
+                    .into_widget(),
+            )
+            .padding(30),
         ]
         .spacing(15),
     )
@@ -386,10 +404,12 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
     .action(
         icon_button(bootstrap::arrow_clockwise())
             .tooltip("Generate New Report")
-            .on_press(Message::RefreshReport),
+            .on_press(Message::RefreshReport)
+            .into_widget(),
     )
     .padding(0)
-    .into()
+    .into_widget()
+    .boxed()
 }
 
 fn proxmox_ve_backup(report: Option<&persistent::Report>) -> Element<'_, Message> {
@@ -460,7 +480,7 @@ fn proxmox_ve_backup(report: Option<&persistent::Report>) -> Element<'_, Message
                 container(volumes).padding(iced::Padding::new(0.0).left(16.0)),
             ].spacing(8));
         }
-        card(details).title(text(&job.id)).into()
+        card(details).title(text(&job.id)).into_widget()
     }))
     .spacing(16);
     dialog(scrollable(content.padding(16)).height(Length::Fill))
@@ -470,7 +490,8 @@ fn proxmox_ve_backup(report: Option<&persistent::Report>) -> Element<'_, Message
         .title(text(t!("device.report.backup")))
         .on_close(Message::CloseOverlay)
         .overlay()
-        .into()
+        .into_widget()
+        .boxed()
 }
 
 fn installed_programs(report: Option<&persistent::Report>) -> Element<'_, Message> {
@@ -489,7 +510,6 @@ fn installed_programs(report: Option<&persistent::Report>) -> Element<'_, Messag
             text(program.publisher.as_deref().unwrap_or_default()),
         ]
         .spacing(4)
-        .into()
     }))
     .spacing(16);
     dialog(scrollable(content).height(400))
@@ -498,10 +518,11 @@ fn installed_programs(report: Option<&persistent::Report>) -> Element<'_, Messag
         ))
         .on_close(Message::CloseOverlay)
         .overlay()
-        .into()
+        .into_widget()
+        .boxed()
 }
 
-fn disk<'a>(disk: &'a Disk) -> Element<'a, Message> {
+fn disk(disk: &Disk) -> impl Widget<Message> + '_ {
     row![
         bootstrap::hdd().size(50).center(),
         column![
@@ -540,5 +561,4 @@ fn disk<'a>(disk: &'a Disk) -> Element<'a, Message> {
     .height(Length::Fill)
     .spacing(20)
     .padding([0, 20])
-    .into()
 }

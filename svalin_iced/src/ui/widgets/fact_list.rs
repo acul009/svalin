@@ -1,5 +1,5 @@
 use iced::{
-    Length, Padding,
+    Length, Padding, Widget,
     alignment::Vertical,
     widget::{container, row, space},
 };
@@ -31,27 +31,27 @@ impl<'a, Message> FactList<'a, Message> {
 
     pub fn entry(
         mut self,
-        title: impl Into<Element<'a, Message>>,
-        value: impl Into<Element<'a, Message>>,
+        title: impl Widget<Message> + 'a,
+        value: impl Widget<Message> + 'a,
     ) -> Self {
         self.entries.push(Entry {
-            icon: iced::widget::void().into(),
-            title: title.into(),
-            value: value.into(),
+            icon: iced::widget::void().boxed(),
+            title: title.boxed(),
+            value: value.boxed(),
         });
         self
     }
 
     pub fn with_icon(
         mut self,
-        icon: impl Into<Element<'a, Message>>,
-        title: impl Into<Element<'a, Message>>,
-        value: impl Into<Element<'a, Message>>,
+        icon: impl Widget<Message> + 'a,
+        title: impl Widget<Message> + 'a,
+        value: impl Widget<Message> + 'a,
     ) -> Self {
         self.entries.push(Entry {
-            icon: icon.into(),
-            title: title.into(),
-            value: value.into(),
+            icon: icon.boxed(),
+            title: title.boxed(),
+            value: value.boxed(),
         });
         self
     }
@@ -72,8 +72,9 @@ impl<'a, Message> FactList<'a, Message> {
     }
 }
 
-impl<'a, Message: Clone + 'static> From<FactList<'a, Message>> for Element<'a, Message> {
-    fn from(value: FactList<'a, Message>) -> Self {
+impl<'a, Message: Clone + 'static> FactList<'a, Message> {
+    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+        let value = self;
         let mut list = List::new();
         for entry in value.entries {
             list = list.push(
@@ -94,6 +95,6 @@ impl<'a, Message: Clone + 'static> From<FactList<'a, Message>> for Element<'a, M
         list.entry_height(value.entry_height)
             .entry_padding(value.entry_padding)
             .width(value.width)
-            .into()
+            .into_widget()
     }
 }

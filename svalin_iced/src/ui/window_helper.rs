@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use async_pty::TerminalInput;
 use iced::{
-    Task,
+    Task, Widget,
     widget::{center, text},
     window,
 };
@@ -67,8 +67,9 @@ impl WindowHelper {
             window
                 .view()
                 .map(move |message| Message::Forwarded { id, message })
+                .boxed()
         } else {
-            center(text(t!("window.error"))).into()
+            center(text(t!("window.error"))).boxed()
         }
     }
 
@@ -116,7 +117,7 @@ pub enum WindowContent {
 impl WindowContent {
     fn view(&self) -> Element<'_, WindowMessage> {
         match self {
-            Self::Terminal(terminal) => terminal.view().map(WindowMessage::Terminal),
+            Self::Terminal(terminal) => terminal.view().map(WindowMessage::Terminal).boxed(),
         }
     }
 

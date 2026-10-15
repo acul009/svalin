@@ -45,8 +45,9 @@ impl<'a, Message> DeviceList<'a, Message> {
     }
 }
 
-impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a, Message> {
-    fn from(device_list: DeviceList<'a, Message>) -> Self {
+impl<'a, Message: Clone + 'static> DeviceList<'a, Message> {
+    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+        let device_list = self;
         stack![
             container(
                 button(
@@ -68,7 +69,8 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                             &persistent,
                             device_list.state.agent_online(spki_hash),
                         )
-                    )),
+                    ))
+                    .into_widget(),
                 super::GroupFilter::Group(group) => button_list(
                     device_list
                         .state
@@ -78,10 +80,10 @@ impl<'a, Message: Clone + 'static> From<DeviceList<'a, Message>> for Element<'a,
                             &persistent,
                             device_list.state.agent_online(spki_hash),
                         ))
-                ),
+                )
+                .into_widget(),
             })
         ]
-        .into()
     }
 }
 

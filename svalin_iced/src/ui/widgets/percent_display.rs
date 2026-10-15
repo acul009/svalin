@@ -7,21 +7,19 @@ use iced::{
     widget::{column, container, progress_bar, stack, text},
 };
 
-use crate::Element;
-
 use super::progress_circle;
 
-pub struct PercentDisplay<'a, Message> {
+pub struct PercentDisplay<'a, Subinfo = iced::widget::Void> {
     range: RangeInclusive<f32>,
     value: f32,
     size: f32,
     label: Cow<'a, str>,
     display_type: DisplayType,
     padding: Padding,
-    subinfo: Option<Element<'a, Message>>,
+    subinfo: Option<Subinfo>,
 }
 
-impl<'a, Message> PercentDisplay<'a, Message> {
+impl<'a> PercentDisplay<'a> {
     pub fn new(range: impl Into<RangeInclusive<f32>>, value: impl Into<f32>) -> Self {
         let range: RangeInclusive<f32> = range.into();
         Self {
@@ -34,7 +32,9 @@ impl<'a, Message> PercentDisplay<'a, Message> {
             subinfo: None,
         }
     }
+}
 
+impl<'a, Subinfo> PercentDisplay<'a, Subinfo> {
     pub fn label(mut self, label: impl Into<Cow<'a, str>>) -> Self {
         self.label = label.into();
         self
@@ -70,21 +70,33 @@ impl<'a, Message> PercentDisplay<'a, Message> {
         self
     }
 
-    pub fn subinfo(mut self, subinfo: impl Into<Element<'a, Message>>) -> Self {
-        self.subinfo = Some(subinfo.into());
-        self
+    pub fn subinfo<NewSubinfo>(self, subinfo: NewSubinfo) -> PercentDisplay<'a, NewSubinfo> {
+        self.maybe_subinfo(Some(subinfo))
     }
 
-    pub fn maybe_subinfo(self, subinfo: Option<impl Into<Element<'a, Message>>>) -> Self {
-        if let Some(subinfo) = subinfo {
-            return self.subinfo(subinfo);
-        };
-        self
+    /// Replaces the subinfo; passing `None` clears it.
+    pub fn maybe_subinfo<NewSubinfo>(
+        self,
+        subinfo: Option<NewSubinfo>,
+    ) -> PercentDisplay<'a, NewSubinfo> {
+        PercentDisplay {
+            range: self.range,
+            value: self.value,
+            size: self.size,
+            label: self.label,
+            display_type: self.display_type,
+            padding: self.padding,
+            subinfo,
+        }
     }
 }
 
-impl<'a, Message: Clone + 'static> From<PercentDisplay<'a, Message>> for Element<'a, Message> {
-    fn from(percent_display: PercentDisplay<'a, Message>) -> Self {
+impl<'a, Subinfo> PercentDisplay<'a, Subinfo> {
+    pub fn into_widget<Message: Clone + 'static>(self) -> impl iced::Widget<Message> + 'a
+    where
+        Subinfo: iced::Widget<Message> + 'a,
+    {
+        let percent_display = self;
         let range = percent_display.range;
         let percent =
             (percent_display.value - *range.start()) / (*range.end() - *range.start()) * 100.0;

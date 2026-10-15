@@ -4,13 +4,13 @@ use iced::{
 };
 
 use crate::{
-    Element, bootstrap,
+    bootstrap,
     ui::widgets::header::{HEADER_HEIGHT, HEADER_PADDING},
 };
 
-pub struct IconButton<'a, Message> {
+pub struct IconButton<'a, Message, Tip = iced::widget::Void> {
     icon: iced::widget::Text<'a>,
-    tooltip: Option<Element<'a, Message>>,
+    tooltip: Option<Tip>,
     on_press: Option<Message>,
     size: iced::Pixels,
     selected: bool,
@@ -30,15 +30,22 @@ impl<'a, Message> IconButton<'a, Message> {
             selected: false,
         }
     }
+}
 
+impl<'a, Message, Tip> IconButton<'a, Message, Tip> {
     pub fn on_press(mut self, on_press: Message) -> Self {
         self.on_press = Some(on_press);
         self
     }
 
-    pub fn tooltip(mut self, tooltip: impl Into<Element<'a, Message>>) -> Self {
-        self.tooltip = Some(tooltip.into());
-        self
+    pub fn tooltip<NewTip>(self, tooltip: NewTip) -> IconButton<'a, Message, NewTip> {
+        IconButton {
+            icon: self.icon,
+            tooltip: Some(tooltip),
+            on_press: self.on_press,
+            size: self.size,
+            selected: self.selected,
+        }
     }
 
     pub fn size(mut self, size: impl Into<iced::Pixels>) -> Self {
@@ -52,8 +59,12 @@ impl<'a, Message> IconButton<'a, Message> {
     }
 }
 
-impl<'a, Message: Clone + 'static> From<IconButton<'a, Message>> for Element<'a, Message> {
-    fn from(value: IconButton<'a, Message>) -> Self {
+impl<'a, Message: Clone + 'static, Tip> IconButton<'a, Message, Tip>
+where
+    Tip: iced::Widget<Message> + 'a,
+{
+    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+        let value = self;
         let button = button(
             value
                 .icon

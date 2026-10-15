@@ -1,6 +1,6 @@
 use std::{mem, sync::Arc};
 
-use iced::{Subscription, Task, keyboard, window};
+use iced::{Subscription, Task, Widget, keyboard, window};
 use mainview::MainView;
 use profile_picker::ProfilePicker;
 use widgets::scaffold;
@@ -140,16 +140,18 @@ impl UI {
         if window_id == self.main_window_id {
             let screen: Element<Message> = match &self.screen {
                 Screen::ProfilePicker(profile_picker) => {
-                    profile_picker.view().map(Message::ProfilePicker)
+                    profile_picker.view().map(Message::ProfilePicker).boxed()
                 }
-                Screen::MainView(mainview) => mainview.view().map(Message::MainView),
-                Screen::Closing => loading(t!("generic.shutting-down")).into(),
+                Screen::MainView(mainview) => mainview.view().map(Message::MainView).boxed(),
+                Screen::Closing => loading(t!("generic.shutting-down")).into_widget().boxed(),
             };
 
             let header = match &self.screen {
-                Screen::ProfilePicker(_) => header(iced::widget::void()),
-                Screen::Closing => header(iced::widget::void()),
-                Screen::MainView(mainview) => mainview.header().map(Message::MainView),
+                Screen::ProfilePicker(_) => header(iced::widget::void()).into_widget(),
+                Screen::Closing => header(iced::widget::void()).into_widget(),
+                Screen::MainView(mainview) => {
+                    mainview.header().map(Message::MainView).into_widget()
+                }
             };
 
             let context = match &self.screen {
@@ -180,11 +182,13 @@ impl UI {
                 .header(header)
                 .context_maybe(context)
                 .sidebar_maybe(sidebar)
-                .into()
+                .into_widget()
+                .boxed()
         } else {
             self.window_helper
                 .view(window_id)
                 .map(Message::WindowHelper)
+                .boxed()
         }
     }
 

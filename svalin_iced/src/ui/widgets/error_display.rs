@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use iced::{Element, widget::text};
+use iced::widget::text;
 
 use crate::ui::widgets::dialog;
 
@@ -47,16 +47,16 @@ impl<'a, Error, Message> ErrorDisplay<'a, Error, Message> {
     }
 }
 
-impl<'a, Error, Message: Clone + 'static> From<ErrorDisplay<'a, Error, Message>>
-    for Element<'a, Message>
+impl<'a, Error, Message: Clone + 'static> ErrorDisplay<'a, Error, Message>
 where
     Error: std::fmt::Display,
 {
-    fn from(display: ErrorDisplay<'a, Error, Message>) -> Self {
+    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+        let display = self;
         dialog(text!("{:#}", display.error))
             .title(text(display.title))
             .on_close_maybe(display.on_close)
             .display(display.display)
-            .into()
+            .into_widget()
     }
 }

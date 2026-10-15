@@ -36,8 +36,9 @@ impl<'a> Loading<'a> {
     }
 }
 
-impl<'a, Message: Clone + 'static> From<Loading<'a>> for Element<'a, Message> {
-    fn from(loading: Loading<'a>) -> Self {
+impl<'a> Loading<'a> {
+    pub fn into_widget<Message: Clone + 'static>(self) -> impl iced::Widget<Message> + 'a {
+        let loading = self;
         let mut prepared = container(opaque(column![
             container(
                 Circular::new()
@@ -71,7 +72,7 @@ impl<'a, Message: Clone + 'static> From<Loading<'a>> for Element<'a, Message> {
             prepared = prepared.width(width);
         }
 
-        prepared.into()
+        prepared
     }
 }
 

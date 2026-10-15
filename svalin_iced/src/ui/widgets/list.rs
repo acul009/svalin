@@ -1,5 +1,5 @@
 use iced::{
-    Length, Padding,
+    Length, Padding, Widget,
     alignment::Vertical,
     widget::{column, container},
 };
@@ -24,16 +24,16 @@ impl<'a, Message> List<'a, Message> {
     }
 
     pub(crate) fn with_children(
-        children: impl IntoIterator<Item = Element<'a, Message>>,
+        children: impl IntoIterator<Item = impl Widget<Message> + 'a>,
     ) -> List<'a, Message> {
         Self {
-            entries: children.into_iter().collect(),
+            entries: children.into_iter().map(Widget::boxed).collect(),
             ..Self::new()
         }
     }
 
-    pub fn push(mut self, entry: impl Into<Element<'a, Message>>) -> Self {
-        self.entries.push(entry.into());
+    pub fn push(mut self, entry: impl Widget<Message> + 'a) -> Self {
+        self.entries.push(entry.boxed());
         self
     }
 
@@ -53,8 +53,9 @@ impl<'a, Message> List<'a, Message> {
     }
 }
 
-impl<'a, Message: Clone + 'static> From<List<'a, Message>> for Element<'a, Message> {
-    fn from(value: List<'a, Message>) -> Self {
+impl<'a, Message: Clone + 'static> List<'a, Message> {
+    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+        let value = self;
         let mut col = column!();
         let mut odd = true;
         for entry in value.entries {
@@ -67,7 +68,7 @@ impl<'a, Message: Clone + 'static> From<List<'a, Message>> for Element<'a, Messa
             );
             odd = !odd;
         }
-        col.width(value.width).into()
+        col.width(value.width)
     }
 }
 

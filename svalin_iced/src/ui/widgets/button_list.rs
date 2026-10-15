@@ -1,5 +1,5 @@
 use iced::{
-    Color, Length, Padding, Pixels,
+    Color, Length, Padding, Pixels, Widget,
     alignment::Vertical,
     widget::{button, column, container, row, text},
 };
@@ -19,9 +19,9 @@ pub struct Entry<'a, Message> {
     color: Option<Color>,
 }
 
-pub fn entry<'a, Message>(content: impl Into<Element<'a, Message>>) -> Entry<'a, Message> {
+pub fn entry<'a, Message>(content: impl Widget<Message> + 'a) -> Entry<'a, Message> {
     Entry {
-        content: content.into(),
+        content: content.boxed(),
         on_press: None,
         color: None,
     }
@@ -97,8 +97,9 @@ impl<'a, Message> ButtonList<'a, Message> {
     }
 }
 
-impl<'a, Message: Clone + 'static> From<ButtonList<'a, Message>> for Element<'a, Message> {
-    fn from(list: ButtonList<'a, Message>) -> Self {
+impl<'a, Message: Clone + 'static> ButtonList<'a, Message> {
+    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+        let list = self;
         let mut rows = column![];
         for (index, entry) in list.entries.into_iter().enumerate() {
             let odd = index % 2 == 0;
@@ -131,7 +132,7 @@ impl<'a, Message: Clone + 'static> From<ButtonList<'a, Message>> for Element<'a,
                 }),
             );
         }
-        rows.width(list.width).into()
+        rows.width(list.width)
     }
 }
 

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use iced::{
-    Task,
+    Task, Widget,
     widget::{button, column, operation, text_input},
 };
 use svalin::client::Client;
@@ -106,11 +106,13 @@ impl AddDevice {
             Screen::Error(err) => error_display(err)
                 .on_close(Message::Cancel)
                 .overlay()
-                .into(),
-            Screen::Loading(message) => dialog(loading(message))
+                .into_widget()
+                .boxed(),
+            Screen::Loading(message) => dialog(loading(message).into_widget())
                 .title("Adding Device...")
                 .overlay()
-                .into(),
+                .into_widget()
+                .boxed(),
             Screen::Input => dialog(
                 column![
                     text_input(t!("add-device.input.join-code"), &self.join_code)
@@ -130,7 +132,8 @@ impl AddDevice {
                     .on_press(Message::ConnectToDevice),
             )
             .overlay()
-            .into(),
+            .into_widget()
+            .boxed(),
         }
     }
 }

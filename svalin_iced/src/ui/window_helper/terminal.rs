@@ -1,6 +1,6 @@
 use async_pty::TerminalInput;
 use iced::{
-    Task,
+    Task, Widget,
     widget::{center, stack, text},
 };
 
@@ -94,14 +94,14 @@ impl TerminalWindow {
 
     pub fn view(&self) -> Element<'_, Message> {
         match &self.state {
-            State::Pending => loading(t!("terminal.connecting")).into(),
-            State::Unavailable => center(text(t!("terminal.unavailable"))).into(),
-            State::Ready => self.term_display.view().map(Message::Terminal),
+            State::Pending => loading(t!("terminal.connecting")).into_widget().boxed(),
+            State::Unavailable => center(text(t!("terminal.unavailable"))).boxed(),
+            State::Ready => self.term_display.view().map(Message::Terminal).boxed(),
             State::Closed => stack![
                 self.term_display.view().map(Message::Terminal),
                 center(text(t!("terminal.closed")))
             ]
-            .into(),
+            .boxed(),
         }
     }
 

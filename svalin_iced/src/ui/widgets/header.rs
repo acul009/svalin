@@ -1,5 +1,5 @@
 use iced::{
-    Length,
+    Length, Widget,
     alignment::Vertical,
     widget::{center, container, row, space, stack},
 };
@@ -13,18 +13,18 @@ pub enum HeaderStyle {
     Drawer,
 }
 
-pub struct Header<'a, Message> {
+pub struct Header<'a, Message, Content> {
     style: HeaderStyle,
-    content: Element<'a, Message>,
+    content: Content,
     on_back: Option<Message>,
     actions: Vec<Element<'a, Message>>,
 }
 
-impl<'a, Message: 'static> Header<'a, Message> {
-    pub fn new(content: impl Into<Element<'a, Message>>) -> Self {
+impl<'a, Message: 'static, Content> Header<'a, Message, Content> {
+    pub fn new(content: Content) -> Self {
         Self {
             style: HeaderStyle::Default,
-            content: content.into(),
+            content,
             on_back: None,
             actions: Vec::new(),
         }
@@ -47,8 +47,8 @@ impl<'a, Message: 'static> Header<'a, Message> {
         self
     }
 
-    pub fn action(mut self, action: impl Into<Element<'a, Message>>) -> Self {
-        self.actions.push(action.into());
+    pub fn action(mut self, action: impl Widget<Message> + 'a) -> Self {
+        self.actions.push(action.boxed());
         self
     }
 
@@ -60,13 +60,14 @@ impl<'a, Message: 'static> Header<'a, Message> {
     pub fn map<NewMessage>(
         self,
         f: impl 'a + Copy + Fn(Message) -> NewMessage,
-    ) -> Header<'a, NewMessage>
+    ) -> Header<'a, NewMessage, impl Widget<NewMessage> + 'a>
     where
         NewMessage: Clone + 'static,
+        Content: Widget<Message> + 'a,
     {
         let content = self.content.map(f);
         let on_back = self.on_back.map(f);
-        let actions = self.actions.into_iter().map(|a| a.map(f)).collect();
+        let actions = self.actions.into_iter().map(|a| a.map(f).boxed()).collect();
         Header {
             style: self.style,
             content,
@@ -79,8 +80,12 @@ impl<'a, Message: 'static> Header<'a, Message> {
 pub const HEADER_HEIGHT: f32 = 60.0;
 pub const HEADER_PADDING: f32 = 10.0;
 
-impl<'a, Message: Clone + 'static> From<Header<'a, Message>> for Element<'a, Message> {
-    fn from(header: Header<'a, Message>) -> Self {
+impl<'a, Message: Clone + 'static, Content> Header<'a, Message, Content>
+where
+    Content: Widget<Message> + 'a,
+{
+    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+        let header = self;
         let height = HEADER_HEIGHT;
         let padding = HEADER_PADDING;
         let icon_size = height - 2.0 * padding;
@@ -90,7 +95,12 @@ impl<'a, Message: Clone + 'static> From<Header<'a, Message>> for Element<'a, Mes
                 HeaderStyle::Default => bootstrap::arrow_left(),
                 HeaderStyle::Drawer => bootstrap::x(),
             };
-            row = row.push(icon_button(icon).size(icon_size).on_press(on_back));
+            row = row.push(
+                icon_button(icon)
+                    .size(icon_size)
+                    .on_press(on_back)
+                    .into_widget(),
+            );
         }
         row = row
             .push(space::horizontal())
@@ -104,6 +114,5 @@ impl<'a, Message: Clone + 'static> From<Header<'a, Message>> for Element<'a, Mes
             .padding(padding)
             .height(height)
             .width(Length::Fill)
-            .into()
     }
 }

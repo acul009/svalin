@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{Element, bootstrap, ui::widgets::dialog};
 use iced::{
-    Length, Task,
+    Length, Task, Widget,
     alignment::{Horizontal, Vertical},
     widget::{button, column, container, opaque, row, scrollable, space, stack, text, text_input},
 };
@@ -259,7 +259,8 @@ impl ProfilePicker {
                 button_list::entry(text(profile).size(20))
                     .on_press(Message::SelectProfile(profile.clone()))
             }))
-            .entry_height(70),
+            .entry_height(70)
+            .into_widget(),
         )
         .height(Length::Fill);
 
@@ -277,18 +278,21 @@ impl ProfilePicker {
         .padding(30);
 
         let overlay = match &self.screen {
-            Screen::InitServer(init_server) => Some(init_server.view().map(Message::InitServer)),
+            Screen::InitServer(init_server) => {
+                Some(init_server.view().map(Message::InitServer).boxed())
+            }
             Screen::LoginDialog(login_dialog) => {
-                Some(login_dialog.view().map(Message::LoginDialog))
+                Some(login_dialog.view().map(Message::LoginDialog).boxed())
             }
             Screen::Error(display_info) => Some(
                 display_info
                     .view()
                     .on_close(Message::Reset)
                     .overlay()
-                    .into(),
+                    .into_widget()
+                    .boxed(),
             ),
-            Screen::Loading(message) => Some(loading(message).expand().into()),
+            Screen::Loading(message) => Some(loading(message).expand().into_widget().boxed()),
             Screen::SelectProfile => None,
             Screen::UnlockProfile { profile, password } => Some(
                 dialog(
@@ -312,7 +316,8 @@ impl ProfilePicker {
                 .title(text(t!("profile-picker.title.unlock")))
                 .on_close(Message::Reset)
                 .overlay()
-                .into(),
+                .into_widget()
+                .boxed(),
             ),
             Screen::AddProfile { host } => Some(
                 dialog(
@@ -330,7 +335,8 @@ impl ProfilePicker {
                 .title(text(t!("profile-picker.title.add")))
                 .on_close(Message::Reset)
                 .overlay()
-                .into(),
+                .into_widget()
+                .boxed(),
             ),
             Screen::ConfirmDelete(profile) => Some(
                 dialog(
@@ -346,7 +352,8 @@ impl ProfilePicker {
                 .title(text(t!("profile-picker.title.delete")))
                 .on_close(Message::SelectProfile(profile.clone()))
                 .overlay()
-                .into(),
+                .into_widget()
+                .boxed(),
             ),
         };
         stack![
@@ -356,6 +363,6 @@ impl ProfilePicker {
         ]
         .height(Length::Fill)
         .width(Length::Fill)
-        .into()
+        .boxed()
     }
 }

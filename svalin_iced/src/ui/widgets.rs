@@ -4,13 +4,14 @@ use std::{borrow::Cow, ops::RangeInclusive};
 // use svalin_sysctl::realtime::RealtimeStatus;
 
 use iced::{
+    Widget,
     alignment::Vertical,
     color,
-    widget::{Button, Text, button, row, text},
+    widget::{Text, button, row, text},
 };
 use svalin_sysctl::system_report::OSFamily;
 
-use crate::{Element, bootstrap};
+use crate::bootstrap;
 
 pub mod button_list;
 pub mod card;
@@ -45,7 +46,9 @@ pub fn os_icon(family: &OSFamily) -> iced::widget::Text<'static> {
     .center()
 }
 
-pub fn card<'a, Message>(content: impl Into<Element<'a, Message>>) -> card::Card<'a, Message> {
+pub fn card<'a, Message, Content: Widget<Message> + 'a>(
+    content: Content,
+) -> card::Card<'a, Message, Content> {
     card::Card::new(content)
 }
 
@@ -63,18 +66,20 @@ pub fn loading<'a>(message: impl Into<Cow<'a, str>>) -> loading::Loading<'a> {
     loading::Loading::new(message)
 }
 
-pub fn dialog<'a, Message>(body: impl Into<Element<'a, Message>>) -> dialog::Dialog<'a, Message> {
+pub fn dialog<'a, Message, Body: Widget<Message> + 'a>(
+    body: Body,
+) -> dialog::Dialog<'a, Message, Body> {
     dialog::Dialog::new(body)
 }
 
-pub fn header<'a, Message: 'static>(
-    content: impl Into<Element<'a, Message>>,
-) -> header::Header<'a, Message> {
+pub fn header<'a, Message: 'static, Content: Widget<Message> + 'a>(
+    content: Content,
+) -> header::Header<'a, Message, Content> {
     header::Header::new(content)
 }
 
 pub fn list<'a, Message>(
-    children: impl IntoIterator<Item = Element<'a, Message>>,
+    children: impl IntoIterator<Item = impl Widget<Message> + 'a>,
 ) -> list::List<'a, Message> {
     list::List::with_children(children)
 }
@@ -104,7 +109,7 @@ pub fn icon_button<'a, Message>(icon: Text<'a>) -> icon_button::IconButton<'a, M
     icon_button::IconButton::new(icon)
 }
 
-pub fn back_button<'a, Message: 'static>() -> Button<'a, Message> {
+pub fn back_button<'a, Message: Clone + 'static>() -> impl iced::Widget<Message> + 'a {
     button(
         row![bootstrap::arrow_left(), text(t!("generic.back"))]
             .align_y(Vertical::Center)
@@ -112,7 +117,7 @@ pub fn back_button<'a, Message: 'static>() -> Button<'a, Message> {
     )
 }
 
-pub fn forward_button<'a, Message: 'static>() -> Button<'a, Message> {
+pub fn forward_button<'a, Message: Clone + 'static>() -> impl iced::Widget<Message> + 'a {
     button(
         row![text(t!("generic.continue")), bootstrap::arrow_right()]
             .align_y(Vertical::Center)
@@ -134,22 +139,17 @@ where
     progress_circle::ProgressCircle::new(range, value)
 }
 
-pub fn percent_display<'a, Message>(
+pub fn percent_display<'a>(
     range: RangeInclusive<f32>,
     value: f32,
-) -> percent_display::PercentDisplay<'a, Message> {
+) -> percent_display::PercentDisplay<'a> {
     percent_display::PercentDisplay::new(range, value)
 }
 
-pub fn scaffold<'a, Message>(
-    content: impl Into<Element<'a, Message>>,
-) -> scaffold::Scaffold<'a, Message> {
+pub fn scaffold<Body>(content: Body) -> scaffold::Scaffold<Body> {
     scaffold::Scaffold::new(content)
 }
 
-pub fn toast<'a, Message>(
-    kind: toast::Kind,
-    content: impl Into<Element<'a, Message>>,
-) -> toast::Toast<'a, Message> {
+pub fn toast<Content>(kind: toast::Kind, content: Content) -> toast::Toast<Content> {
     toast::Toast::new(kind, content)
 }

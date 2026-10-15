@@ -34,14 +34,14 @@ thiserror.workspace = true
 tokio-stream = { version = "0.1.19", features = ["full"] }
 tokio-util.workspace = true
 futures = "0.3.34"
-uuid = "1.26.0"
-rust-i18n = "4.2.1"
+uuid = "1.28.0"
+rust-i18n = "4.2.4"
 tracing.workspace = true
 iced_fonts = { git = "https://git.redhawkcodes.dev/redhawk18/iced_fonts.git", branch = "master" }
 chrono = "0.4.45"
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 rfd = "0.17.2"
-open = "5.4.3"
+open = "5.4.4"
 url = "2.5.8"
 
 [build-dependencies]
