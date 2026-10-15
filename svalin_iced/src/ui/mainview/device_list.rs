@@ -7,7 +7,7 @@ use svalin::client::state::{ClientState, persistent};
 use svalin_pki::SpkiHash;
 
 use crate::{
-    Element, bootstrap,
+    bootstrap,
     ui::widgets::{button_list, device_icon},
     util::format_timestamp,
 };

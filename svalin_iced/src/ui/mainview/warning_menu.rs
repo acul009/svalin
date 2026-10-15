@@ -42,18 +42,24 @@ pub fn view(state: &ClientState) -> Element<'_, Message> {
                             .map(|d| d.name())
                             .unwrap_or_else(|| Cow::Owned(spki_hash.to_string()));
 
-                        let mut actions = row![
-                            button(text(t!("warnings.device.action")))
-                                .on_press(Message::SelectDevice(spki_hash.clone()))
-                        ]
+                        let details = if let warning::Device::DeviceGroupBroken(reason) = warning {
+                            Some(
+                                button(text(t!("generic.details")))
+                                    .on_press(Message::Error(Arc::new(anyhow!(reason.to_owned()))))
+                                    .boxed(),
+                            )
+                        } else {
+                            None
+                        };
+                        let actions = row([button(text(t!("warnings.device.action")))
+                            .on_press(Message::SelectDevice(spki_hash.clone()))
+                            .boxed()]
+                        .into_iter()
+                        .chain(details))
                         .spacing(10);
 
                         let message = match warning {
-                            warning::Device::DeviceGroupBroken(reason) => {
-                                actions =
-                                    actions.push(button(text(t!("generic.details"))).on_press(
-                                        Message::Error(Arc::new(anyhow!(reason.to_owned()))),
-                                    ));
+                            warning::Device::DeviceGroupBroken(_) => {
                                 text(t!("warnings.device.group-broken"))
                             }
                             warning::Device::DiskSpaceLow { disk, free, total } => text(t!(

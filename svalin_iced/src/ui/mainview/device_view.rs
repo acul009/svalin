@@ -423,58 +423,64 @@ fn proxmox_ve_backup(report: Option<&persistent::Report>) -> Element<'_, Message
         };
         let unknown = t!("device.report.backup-unknown").to_string();
         let due = job.due_at.map(format_timestamp).unwrap_or_else(|| unknown.clone());
-        let mut details = column![
-            text(t!("device.report.backup-storage", "value" => job.storage.as_deref()
-                .map(str::to_owned).unwrap_or_else(|| t!("device.report.backup-default-storage").to_string()))),
-            text(t!("device.report.backup-schedule", "value" => &job.schedule)),
-            text(t!("device.report.backup-due", "value" => due)),
-            text(status),
-        ].spacing(8);
         // Evaluate the snapshot against its collection time, not a stale job's current due time.
-        if report.is_some_and(|report| job.is_overdue(report.system_report.generated_at)) {
-            details = details.push(text(t!("device.report.backup-overdue")).color(crate::ui::ERROR_COLOR));
-        }
-        match &job.status {
+        let overdue = report
+            .is_some_and(|report| job.is_overdue(report.system_report.generated_at))
+            .then(|| text(t!("device.report.backup-overdue")).color(crate::ui::ERROR_COLOR).boxed());
+        let timestamp = match &job.status {
             BackupStatus::Running { started_at } => {
-                details = details.push(text(t!("device.report.backup-started", "value" => format_timestamp(*started_at))));
+                Some(text(t!("device.report.backup-started", "value" => format_timestamp(*started_at))).boxed())
             }
             BackupStatus::Succeeded { finished_at } | BackupStatus::Failed { finished_at, .. } => {
-                details = details.push(text(t!("device.report.backup-finished", "value" => finished_at.map(format_timestamp).unwrap_or(unknown))));
+                Some(text(t!("device.report.backup-finished", "value" => finished_at.map(format_timestamp).unwrap_or(unknown))).boxed())
             }
-            BackupStatus::Unknown => {},
-        }
-        details = details
-            .push(rule::horizontal(1))
-            .push(text(t!("device.report.backup-coverage")).size(18));
-        if job.coverage.guests.is_empty() {
-            details = details.push(text(t!("device.report.backup-no-guests")));
-        }
-        for guest in &job.coverage.guests {
+            BackupStatus::Unknown => None,
+        };
+        let empty_guests = job.coverage.guests.is_empty()
+            .then(|| text(t!("device.report.backup-no-guests")).boxed());
+        let guests = job.coverage.guests.iter().map(|guest| {
             let kind = match guest.guest_type.as_str() {
                 "qemu" => t!("device.report.backup-vm").to_string(),
                 "lxc" => t!("device.report.backup-container").to_string(),
                 _ => t!("device.report.backup-unknown").to_string(),
             };
-            let mut volumes = column![].spacing(8);
-            for volume in &guest.volumes {
-                volumes = volumes.push(column![
+            let empty_volumes = guest.volumes.is_empty()
+                .then(|| text(t!("device.report.backup-no-volumes")).boxed());
+            let volumes = guest.volumes.iter().map(|volume| {
+                column![
                     text(format!("{} — {}", volume.id, volume.name)),
                     text(format!("{} — {}", if volume.included {
                         t!("device.report.backup-included")
                     } else {
                         t!("device.report.backup-excluded")
                     }, volume.reason)).size(14),
-                ].spacing(4));
-            }
-            if guest.volumes.is_empty() {
-                volumes = volumes.push(text(t!("device.report.backup-no-volumes")));
-            }
-            details = details.push(column![
+                ].spacing(4).boxed()
+            });
+            let volumes = column(volumes.chain(empty_volumes)).spacing(8);
+            column![
                 text(format!("{} · {} · {}", guest.id,
                     guest.name.as_deref().unwrap_or_default(), kind)).size(16),
                 container(volumes).padding(iced::Padding::new(0.0).left(16.0)),
-            ].spacing(8));
-        }
+            ].spacing(8).boxed()
+        });
+        let details = column(
+            [
+                text(t!("device.report.backup-storage", "value" => job.storage.as_deref()
+                    .map(str::to_owned).unwrap_or_else(|| t!("device.report.backup-default-storage").to_string()))).boxed(),
+                text(t!("device.report.backup-schedule", "value" => &job.schedule)).boxed(),
+                text(t!("device.report.backup-due", "value" => due)).boxed(),
+                text(status).boxed(),
+            ]
+            .into_iter()
+            .chain(overdue)
+            .chain(timestamp)
+            .chain([
+                rule::horizontal(1).boxed(),
+                text(t!("device.report.backup-coverage")).size(18).boxed(),
+            ])
+            .chain(empty_guests)
+            .chain(guests),
+        ).spacing(8);
         card(details).title(text(&job.id)).into_widget()
     }))
     .spacing(16);

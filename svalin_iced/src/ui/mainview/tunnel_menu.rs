@@ -1,7 +1,7 @@
 use std::{borrow::Cow, sync::Arc};
 
 use iced::{
-    Length,
+    Length, Widget,
     widget::{button, column, row, scrollable, text},
 };
 use svalin::client::{Client, state::ClientState, tunnel_manager::TunnelConfig};
@@ -43,11 +43,10 @@ pub fn view(state: &ClientState) -> impl iced::Widget<Message> + '_ {
         .collect();
     tunnels.sort_by(|(_, id_a, a), (_, id_b, b)| a.name.cmp(&b.name).then_with(|| id_a.cmp(id_b)));
 
-    let mut content = column![].spacing(20).padding(20);
-    if tunnels.is_empty() {
-        content = content.push(text(t!("tunnel.no_tunnels")));
-    }
-    for (device, id, tunnel) in tunnels {
+    let empty = tunnels
+        .is_empty()
+        .then(|| text(t!("tunnel.no_tunnels")).boxed());
+    let tunnels = tunnels.into_iter().map(|(device, id, tunnel)| {
         let name = state
             .persistent()
             .devices()
@@ -55,30 +54,31 @@ pub fn view(state: &ClientState) -> impl iced::Widget<Message> + '_ {
             .map(|device| device.name())
             .unwrap_or_else(|| Cow::Owned(device.to_string()));
         let TunnelConfig::Tcp { remote_host, .. } = &tunnel.config;
-        content = content.push(
-            card(
+        card(
+            column![
+                text(name),
                 column![
-                    text(name),
-                    column![
-                        text(t!("tunnel.menu.local")).size(14),
-                        text(format!("127.0.0.1:{}", tunnel.local_port())),
-                    ]
-                    .spacing(4),
-                    column![text(t!("tunnel.menu.remote")).size(14), text(remote_host),].spacing(4),
-                    row![
-                        button(text(t!("tunnel.close")))
-                            .on_press(Message::Close(device.clone(), *id)),
-                        button(text(t!("warnings.device.action")))
-                            .on_press(Message::SelectDevice(device.clone())),
-                    ]
-                    .spacing(10),
+                    text(t!("tunnel.menu.local")).size(14),
+                    text(format!("127.0.0.1:{}", tunnel.local_port())),
                 ]
-                .spacing(12),
-            )
-            .title(text(&tunnel.name))
-            .width(Length::Fill)
-            .into_widget(),
-        );
-    }
+                .spacing(4),
+                column![text(t!("tunnel.menu.remote")).size(14), text(remote_host),].spacing(4),
+                row![
+                    button(text(t!("tunnel.close"))).on_press(Message::Close(device.clone(), *id)),
+                    button(text(t!("warnings.device.action")))
+                        .on_press(Message::SelectDevice(device.clone())),
+                ]
+                .spacing(10),
+            ]
+            .spacing(12),
+        )
+        .title(text(&tunnel.name))
+        .width(Length::Fill)
+        .into_widget()
+        .boxed()
+    });
+    let content = column(empty.into_iter().chain(tunnels))
+        .spacing(20)
+        .padding(20);
     scrollable(content.width(Length::Fill)).height(Length::Fill)
 }
