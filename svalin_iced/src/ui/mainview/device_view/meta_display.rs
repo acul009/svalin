@@ -63,7 +63,7 @@ impl State {
         None
     }
 
-    pub fn view<'a>(&'a self, current_info: &'a MetaInfo) -> crate::Element<'a, Message> {
+    pub fn view<'a>(&'a self, current_info: &'a MetaInfo) -> impl Widget<Message> + 'a {
         if self.edit {
             card(
                 column![
@@ -97,7 +97,6 @@ impl State {
                     .into_widget(),
             )
             .into_widget()
-            .boxed()
         } else {
             card(
                 column![
@@ -126,7 +125,6 @@ impl State {
                     .into_widget(),
             )
             .into_widget()
-            .boxed()
         }
     }
 }

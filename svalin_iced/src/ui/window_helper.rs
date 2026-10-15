@@ -115,9 +115,9 @@ pub enum WindowContent {
 }
 
 impl WindowContent {
-    fn view(&self) -> Element<'_, WindowMessage> {
+    fn view(&self) -> impl Widget<WindowMessage> + '_ {
         match self {
-            Self::Terminal(terminal) => terminal.view().map(WindowMessage::Terminal).boxed(),
+            Self::Terminal(terminal) => terminal.view().map(WindowMessage::Terminal),
         }
     }
 

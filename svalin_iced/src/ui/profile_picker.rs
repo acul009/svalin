@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{Element, bootstrap, ui::widgets::dialog};
+use crate::{bootstrap, ui::widgets::dialog};
 use iced::{
     Length, Task, Widget,
     alignment::{Horizontal, Vertical},
@@ -253,7 +253,7 @@ impl ProfilePicker {
         self.screen = Screen::AddProfile { host };
     }
 
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view(&self) -> impl Widget<Message> + '_ {
         let profiles = scrollable(
             button_list(self.profiles.iter().map(|profile| {
                 button_list::entry(text(profile).size(20))
@@ -359,6 +359,5 @@ impl ProfilePicker {
         ]
         .height(Length::Fill)
         .width(Length::Fill)
-        .boxed()
     }
 }

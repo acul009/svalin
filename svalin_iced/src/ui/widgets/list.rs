@@ -56,19 +56,18 @@ impl<'a, Message> List<'a, Message> {
 impl<'a, Message: Clone + 'static> List<'a, Message> {
     pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
         let value = self;
-        let mut col = column!();
-        let mut odd = true;
-        for entry in value.entries {
-            col = col.push(
-                container(entry)
-                    .align_y(Vertical::Center)
-                    .style(if odd { odd_style } else { even_style })
-                    .height(value.entry_height)
-                    .padding(value.entry_padding),
-            );
-            odd = !odd;
-        }
-        col.width(value.width)
+        let entries = value.entries.into_iter().enumerate().map(|(index, entry)| {
+            container(entry)
+                .align_y(Vertical::Center)
+                .style(if index % 2 == 0 {
+                    odd_style
+                } else {
+                    even_style
+                })
+                .height(value.entry_height)
+                .padding(value.entry_padding)
+        });
+        column(entries).width(value.width)
     }
 }
 

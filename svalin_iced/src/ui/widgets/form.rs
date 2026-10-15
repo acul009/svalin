@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use iced::{
     Element, Length, Widget,
-    widget::{self, Row, column, text},
+    widget::{self, column, text},
 };
 
 pub struct Form<'a, Message> {
@@ -55,12 +55,10 @@ impl<'a, Message: Clone + 'static> Form<'a, Message> {
             .into_iter()
             .chain(form.control);
 
-        let mut content_row = Row::with_capacity(2)
+        let content_row = widget::row([column(content).width(Length::Fill).spacing(16)])
             .spacing(8)
             .height(Length::Fill)
             .width(Length::Fill);
-        content_row = content_row.push(column(content).width(Length::Fill).spacing(16));
-
         let buttons = [widget::space::horizontal().boxed()]
             .into_iter()
             .chain(form.buttons);

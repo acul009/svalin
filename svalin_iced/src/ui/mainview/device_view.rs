@@ -231,7 +231,7 @@ impl State {
     }
 }
 
-fn agent_actions<'a>(device_state: &persistent::DeviceState) -> Element<'a, Message> {
+fn agent_actions(device_state: &persistent::DeviceState) -> impl Widget<Message> + '_ {
     let extensions = device_state.report().map(|r| &r.system_report.extensions);
     let is_proxmox_ve = extensions
         .map(|e| e.proxmox_ve().is_some())
@@ -294,10 +294,9 @@ fn agent_actions<'a>(device_state: &persistent::DeviceState) -> Element<'a, Mess
     .padding(0)
     .title(text(t!("device.actions.title")))
     .into_widget()
-    .boxed()
 }
 
-fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
+fn device_report(svalin_report: &persistent::Report) -> impl Widget<Message> + '_ {
     let report = &svalin_report.system_report;
     card(
         column![
@@ -404,7 +403,6 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
     )
     .padding(0)
     .into_widget()
-    .boxed()
 }
 
 fn proxmox_ve_backup(report: Option<&persistent::Report>) -> Element<'_, Message> {

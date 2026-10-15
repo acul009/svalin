@@ -10,8 +10,6 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
 
-use crate::Element;
-
 #[derive(Debug, Clone)]
 pub enum Message {
     SelectFile,
@@ -131,7 +129,7 @@ impl State {
         }
     }
 
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view(&self) -> impl Widget<Message> + '_ {
         column![
             row![
                 button(text(t!("device.update.select-file"))).on_press(Message::SelectFile),
@@ -171,6 +169,5 @@ impl State {
             },
         ]
         .spacing(20)
-        .boxed()
     }
 }

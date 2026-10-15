@@ -100,8 +100,7 @@ impl<'a, Message> ButtonList<'a, Message> {
 impl<'a, Message: Clone + 'static> ButtonList<'a, Message> {
     pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
         let list = self;
-        let mut rows = column![];
-        for (index, entry) in list.entries.into_iter().enumerate() {
+        let rows = list.entries.into_iter().enumerate().map(|(index, entry)| {
             let odd = index % 2 == 0;
             let content = row![
                 container(entry.content).width(Length::Fill),
@@ -117,23 +116,21 @@ impl<'a, Message: Clone + 'static> ButtonList<'a, Message> {
             .spacing(16)
             .align_y(Vertical::Center);
 
-            rows = rows.push(
-                container(
-                    button(content)
-                        .on_press_maybe(entry.on_press)
-                        .width(Length::Fill)
-                        .height(list.entry_height)
-                        .padding(list.entry_padding)
-                        .style(if odd { row_style_odd } else { row_style_even }),
-                )
-                .width(Length::Fill)
-                .style(move |_theme| container::Style {
-                    background: entry.color.map(Into::into),
-                    ..Default::default()
-                }),
-            );
-        }
-        rows.width(list.width)
+            container(
+                button(content)
+                    .on_press_maybe(entry.on_press)
+                    .width(Length::Fill)
+                    .height(list.entry_height)
+                    .padding(list.entry_padding)
+                    .style(if odd { row_style_odd } else { row_style_even }),
+            )
+            .width(Length::Fill)
+            .style(move |_theme| container::Style {
+                background: entry.color.map(Into::into),
+                ..Default::default()
+            })
+        });
+        column(rows).width(list.width)
     }
 }
 

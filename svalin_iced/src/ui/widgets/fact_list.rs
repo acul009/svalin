@@ -75,24 +75,22 @@ impl<'a, Message> FactList<'a, Message> {
 impl<'a, Message: Clone + 'static> FactList<'a, Message> {
     pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
         let value = self;
-        let mut list = List::new();
-        for entry in value.entries {
-            list = list.push(
-                row![
-                    container(entry.icon)
-                        .center(value.entry_height)
-                        .height(Length::Fill),
-                    entry.title,
-                    space::horizontal(),
-                    entry.value,
-                    space().width(value.entry_height)
-                ]
-                .align_y(Vertical::Center)
-                .height(Length::Fill),
-            );
-        }
+        let entries = value.entries.into_iter().map(|entry| {
+            row![
+                container(entry.icon)
+                    .center(value.entry_height)
+                    .height(Length::Fill),
+                entry.title,
+                space::horizontal(),
+                entry.value,
+                space().width(value.entry_height)
+            ]
+            .align_y(Vertical::Center)
+            .height(Length::Fill)
+        });
 
-        list.entry_height(value.entry_height)
+        List::with_children(entries)
+            .entry_height(value.entry_height)
             .entry_padding(value.entry_padding)
             .width(value.width)
             .into_widget()
