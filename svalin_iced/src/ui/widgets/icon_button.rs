@@ -1,6 +1,6 @@
 use iced::{
     Length,
-    widget::{button, tooltip},
+    widget::{Button, Text, Void, button, container, tooltip},
 };
 
 use crate::{
@@ -8,9 +8,9 @@ use crate::{
     ui::widgets::header::{HEADER_HEIGHT, HEADER_PADDING},
 };
 
-pub struct IconButton<'a, Message, Tip = iced::widget::Void> {
+pub struct IconButton<'a, Message, Tip = Void> {
     icon: iced::widget::Text<'a>,
-    tooltip: Option<Tip>,
+    tooltip: Tip,
     on_press: Option<Message>,
     size: iced::Pixels,
     selected: bool,
@@ -25,7 +25,7 @@ impl<'a, Message> IconButton<'a, Message> {
         Self {
             icon,
             on_press: None,
-            tooltip: None,
+            tooltip: iced::widget::void(),
             size: (HEADER_HEIGHT - 2.0 * HEADER_PADDING).into(),
             selected: false,
         }
@@ -38,10 +38,10 @@ impl<'a, Message, Tip> IconButton<'a, Message, Tip> {
         self
     }
 
-    pub fn tooltip<NewTip>(self, tooltip: NewTip) -> IconButton<'a, Message, NewTip> {
+    pub fn tooltip(self, tooltip: Text<'a>) -> IconButton<'a, Message, Text<'a>> {
         IconButton {
             icon: self.icon,
-            tooltip: Some(tooltip),
+            tooltip,
             on_press: self.on_press,
             size: self.size,
             selected: self.selected,
@@ -59,11 +59,8 @@ impl<'a, Message, Tip> IconButton<'a, Message, Tip> {
     }
 }
 
-impl<'a, Message: Clone + 'static, Tip> IconButton<'a, Message, Tip>
-where
-    Tip: iced::Widget<Message> + 'a,
-{
-    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+impl<'a, Message: Clone + 'static, Tip> IconButton<'a, Message, Tip> {
+    fn into_parts(self) -> (Button<'a, Message, Text<'a>>, Tip) {
         let value = self;
         let button = button(
             value
@@ -101,18 +98,30 @@ where
         } else {
             button
         };
-        if let Some(tip) = value.tooltip {
-            tooltip(button, tip, tooltip::Position::Top)
+        (button, value.tooltip)
+    }
+}
+
+impl<'a, Message: Clone + 'static> IconButton<'a, Message, Void> {
+    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+        self.into_parts().0
+    }
+}
+
+impl<'a, Message: Clone + 'static> IconButton<'a, Message, Text<'a>> {
+    pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
+        let (button, tip) = self.into_parts();
+        tooltip(
+            button,
+            container(tip)
                 .padding(8)
                 .style(|_| iced::widget::container::Style {
                     background: Some(iced::Color::BLACK.scale_alpha(0.70).into()),
                     text_color: Some(iced::Color::WHITE),
                     border: iced::border::rounded(4),
                     ..Default::default()
-                })
-                .into()
-        } else {
-            button.into()
-        }
+                }),
+            tooltip::Position::Top,
+        )
     }
 }

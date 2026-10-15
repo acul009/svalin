@@ -1,5 +1,5 @@
 use iced::{
-    Color, Length, Shadow,
+    Color, Length, Shadow, Widget,
     widget::{column, container, row, rule, space, stack},
 };
 
@@ -173,39 +173,42 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
                     })
                 }),
                 has_header.then(|| rule::horizontal(2)),
-                stack![row![
-                    scaffold.sidebar.map(|sidebar| {
-                        container(sidebar)
-                            .style(|_| container::Style {
-                                shadow: Shadow {
-                                    blur_radius: 14.0,
-                                    color: Color::BLACK.scale_alpha(0.45),
-                                    offset: iced::Vector { x: -3.0, y: 0.0 },
-                                },
-                                ..Default::default()
-                            })
-                            .width(300)
-                            .height(Length::Fill)
-                    }),
-                    has_sidebar.then(|| rule::vertical(2)),
-                    scaffold.body,
-                    has_context.then(|| rule::vertical(2)),
-                    scaffold.context.map(|context| {
-                        container(context)
-                            .style(|_| container::Style {
-                                shadow: Shadow {
-                                    blur_radius: 14.0,
-                                    color: Color::BLACK.scale_alpha(0.45),
-                                    offset: iced::Vector { x: -3.0, y: 0.0 },
-                                },
-                                ..Default::default()
-                            })
-                            .width(400)
-                            .height(Length::Fill)
-                    })
-                ]]
+                stack![
+                    row![
+                        scaffold.sidebar.map(|sidebar| {
+                            container(sidebar)
+                                .style(|_| container::Style {
+                                    shadow: Shadow {
+                                        blur_radius: 14.0,
+                                        color: Color::BLACK.scale_alpha(0.45),
+                                        offset: iced::Vector { x: -3.0, y: 0.0 },
+                                    },
+                                    ..Default::default()
+                                })
+                                .width(300)
+                                .height(Length::Fill)
+                        }),
+                        has_sidebar.then(|| rule::vertical(2)),
+                        scaffold.body,
+                        has_context.then(|| rule::vertical(2)),
+                        scaffold.context.map(|context| {
+                            container(context)
+                                .style(|_| container::Style {
+                                    shadow: Shadow {
+                                        blur_radius: 14.0,
+                                        color: Color::BLACK.scale_alpha(0.45),
+                                        offset: iced::Vector { x: -3.0, y: 0.0 },
+                                    },
+                                    ..Default::default()
+                                })
+                                .width(400)
+                                .height(Length::Fill)
+                        })
+                    ]
+                    .boxed()
+                ]
                 // Stack clips upper drawing layers; keep the row as its layout base.
-                .push_under(space())
+                .push_under(space().boxed())
                 .clip(true),
                 scaffold.footer
             ],

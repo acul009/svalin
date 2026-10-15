@@ -401,7 +401,7 @@ fn device_report(svalin_report: &persistent::Report) -> Element<'_, Message> {
     .title(text(t!("device.report.title")))
     .action(
         icon_button(bootstrap::arrow_clockwise())
-            .tooltip("Generate New Report")
+            .tooltip(text("Generate New Report"))
             .on_press(Message::RefreshReport)
             .into_widget(),
     )

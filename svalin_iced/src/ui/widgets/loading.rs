@@ -1,7 +1,7 @@
 use std::{borrow::Cow, sync::LazyLock};
 
 use iced::{
-    Element, Length,
+    Length,
     alignment::{Horizontal, Vertical},
     widget::{column, container, opaque, text},
 };
@@ -102,6 +102,7 @@ use iced::time::Instant;
 use iced::widget::canvas;
 use iced::window;
 use iced::{Background, Color, Event, Radians, Rectangle, Renderer, Size, Vector};
+use iced_core::widget::Meta;
 
 use std::f32::consts::PI;
 use std::time::Duration;
@@ -306,6 +307,8 @@ struct State {
     cache: canvas::Cache,
 }
 
+impl<'a, Theme> Meta for Circular<'a, Theme> where Theme: StyleSheet {}
+
 impl<'a, Message, Theme> Widget<Message, Theme, Renderer> for Circular<'a, Theme>
 where
     Message: 'a + Clone,
@@ -326,20 +329,13 @@ where
         }
     }
 
-    fn layout(
-        &mut self,
-        _tree: &mut Tree,
-        _renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        layout::atomic(limits, self.size, self.size)
-    }
+    fn layout(&mut self, _tree: &mut Tree, _renderer: &Renderer, _limits: &layout::Limits) {}
 
     fn update(
         &mut self,
         tree: &mut Tree,
         event: &Event,
-        _layout: Layout<'_>,
+        _layout: Layout,
         _cursor: advanced::mouse::Cursor,
         _renderer: &Renderer,
         shell: &mut Shell<'_, Message>,
@@ -365,7 +361,7 @@ where
         renderer: &mut Renderer,
         theme: &Theme,
         _style: &renderer::Style,
-        layout: Layout<'_>,
+        layout: Layout,
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
@@ -422,16 +418,6 @@ where
         renderer.with_translation(Vector::new(bounds.x, bounds.y), |renderer| {
             renderer.draw_geometry(geometry);
         });
-    }
-}
-
-impl<'a, Message, Theme> From<Circular<'a, Theme>> for Element<'a, Message, Theme, Renderer>
-where
-    Message: Clone + 'a,
-    Theme: StyleSheet + 'a,
-{
-    fn from(circular: Circular<'a, Theme>) -> Self {
-        Self::new(circular)
     }
 }
 
