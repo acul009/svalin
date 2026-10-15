@@ -72,9 +72,9 @@ pub fn dialog<'a, Message, Body: Widget<Message> + 'a>(
     dialog::Dialog::new(body)
 }
 
-pub fn header<'a, Message: 'static, Content: Widget<Message> + 'a>(
-    content: Content,
-) -> header::Header<'a, Message, Content> {
+pub fn header<'a, Message: 'static>(
+    content: impl Widget<Message> + 'a,
+) -> header::Header<'a, Message> {
     header::Header::new(content)
 }
 

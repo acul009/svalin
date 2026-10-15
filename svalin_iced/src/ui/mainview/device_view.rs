@@ -214,10 +214,7 @@ impl State {
             .boxed()
     }
 
-    pub fn header<'a>(
-        &'a self,
-        client_state: &'a ClientState,
-    ) -> header::Header<'a, Message, impl Widget<Message> + 'a> {
+    pub fn header<'a>(&'a self, client_state: &'a ClientState) -> header::Header<'a, Message> {
         let Some(persistent) = client_state.persistent().devices().get(&self.spki_hash) else {
             return header(widget::space()).on_back(Message::Back).into();
         };

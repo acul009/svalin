@@ -15,8 +15,7 @@ use crate::{
 
 use super::Message;
 
-pub fn header<'a>()
--> crate::ui::widgets::header::Header<'a, Message, impl iced::Widget<Message> + 'a> {
+pub fn header<'a>() -> crate::ui::widgets::header::Header<'a, Message> {
     crate::ui::widgets::header(text(t!("warnings.title")).size(20)).drawer()
 }
 

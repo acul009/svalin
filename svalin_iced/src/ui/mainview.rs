@@ -246,7 +246,9 @@ impl MainView {
         if let Some(error) = &self.error {
             stack![
                 screen,
-                error_display(error).on_close(Message::CloseError).into_overlay()
+                error_display(error)
+                    .on_close(Message::CloseError)
+                    .into_overlay()
             ]
             .boxed()
         } else {
@@ -254,7 +256,7 @@ impl MainView {
         }
     }
 
-    pub fn header(&self) -> header::Header<'_, Message, impl Widget<Message> + '_> {
+    pub fn header(&self) -> header::Header<'_, Message> {
         let header = match &self.screen {
             Screen::DeviceView(device_view) => {
                 device_view.header(&self.state).map(Message::DeviceView)

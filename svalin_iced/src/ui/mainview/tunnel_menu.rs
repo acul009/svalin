@@ -31,8 +31,7 @@ pub fn update(message: Message, client: &Arc<Client>) -> Action {
     }
 }
 
-pub fn header<'a, Message: 'static>()
--> crate::ui::widgets::header::Header<'a, Message, impl iced::Widget<Message> + 'a> {
+pub fn header<'a, Message: 'static>() -> crate::ui::widgets::header::Header<'a, Message> {
     crate::ui::widgets::header(text(t!("tunnel.menu.title")).size(20)).drawer()
 }
 

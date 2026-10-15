@@ -13,18 +13,18 @@ pub enum HeaderStyle {
     Drawer,
 }
 
-pub struct Header<'a, Message, Content> {
+pub struct Header<'a, Message> {
     style: HeaderStyle,
-    content: Content,
+    content: Element<'a, Message>,
     on_back: Option<Message>,
     actions: Vec<Element<'a, Message>>,
 }
 
-impl<'a, Message: 'static, Content> Header<'a, Message, Content> {
-    pub fn new(content: Content) -> Self {
+impl<'a, Message: 'static> Header<'a, Message> {
+    pub fn new(content: impl Widget<Message> + 'a) -> Self {
         Self {
             style: HeaderStyle::Default,
-            content,
+            content: content.boxed(),
             on_back: None,
             actions: Vec::new(),
         }
@@ -60,12 +60,11 @@ impl<'a, Message: 'static, Content> Header<'a, Message, Content> {
     pub fn map<NewMessage>(
         self,
         f: impl 'a + Copy + Fn(Message) -> NewMessage,
-    ) -> Header<'a, NewMessage, impl Widget<NewMessage> + 'a>
+    ) -> Header<'a, NewMessage>
     where
         NewMessage: Clone + 'static,
-        Content: Widget<Message> + 'a,
     {
-        let content = self.content.map(f);
+        let content = self.content.map(f).boxed();
         let on_back = self.on_back.map(f);
         let actions = self.actions.into_iter().map(|a| a.map(f).boxed()).collect();
         Header {
@@ -80,10 +79,7 @@ impl<'a, Message: 'static, Content> Header<'a, Message, Content> {
 pub const HEADER_HEIGHT: f32 = 60.0;
 pub const HEADER_PADDING: f32 = 10.0;
 
-impl<'a, Message: Clone + 'static, Content> Header<'a, Message, Content>
-where
-    Content: Widget<Message> + 'a,
-{
+impl<'a, Message: Clone + 'static> Header<'a, Message> {
     pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
         let header = self;
         let height = HEADER_HEIGHT;
