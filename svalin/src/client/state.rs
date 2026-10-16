@@ -83,6 +83,9 @@ impl ClientState {
         match msg {
             Update::Persistent(msg) => {
                 let affected = msg.affected_device();
+                let was_present = affected
+                    .as_ref()
+                    .is_some_and(|device| self.persistent.devices().contains_key(device));
                 let previous_group = affected
                     .as_ref()
                     .map(|spki_hash| self.persistent.devices().get(&spki_hash))
@@ -102,9 +105,12 @@ impl ClientState {
                         .flatten()
                         .cloned();
 
-                    if new_group != previous_group {
+                    if !was_present || new_group != previous_group {
                         if let Some(old_group) = self.display_groups.get_mut(&previous_group) {
                             old_group.retain(|entry| entry != &affected);
+                            if old_group.is_empty() {
+                                self.display_groups.remove(&previous_group);
+                            }
                         }
                         self.display_groups
                             .entry(new_group)
@@ -144,9 +150,11 @@ impl ClientState {
         &self,
         group: &Option<String>,
     ) -> impl Iterator<Item = (&SpkiHash, &persistent::DeviceState)> {
-        let Some(group) = self.display_groups.get(group) else {
-            todo!("figure out nicer types here");
-        };
+        let group = self
+            .display_groups
+            .get(group)
+            .map(Vec::as_slice)
+            .unwrap_or_default();
         group.iter().map(|spki_hash| {
             (
                 spki_hash,
