@@ -329,7 +329,9 @@ where
         }
     }
 
-    fn layout(&mut self, _tree: &mut Tree, _renderer: &Renderer, _limits: &layout::Limits) {}
+    fn layout(&mut self, tree: &mut Tree, _renderer: &Renderer, limits: &layout::Limits) {
+        tree.size = layout::atomic(limits, self.size, self.size);
+    }
 
     fn update(
         &mut self,
