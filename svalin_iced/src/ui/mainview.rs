@@ -2,6 +2,7 @@ use std::{process, sync::Arc, time::Duration};
 
 use iced::{
     Subscription, Task, Widget,
+    keyboard,
     widget::{column, row, rule, scrollable, stack, text, text_input},
 };
 use svalin::client::{
@@ -46,6 +47,7 @@ pub enum Message {
     Context(Context),
     GroupFilter(GroupFilter),
     Search(String),
+    FocusSearch,
 }
 
 pub enum Action {
@@ -227,6 +229,10 @@ impl MainView {
                 self.search = search;
                 Action::None
             }
+            Message::FocusSearch => Action::Run(
+                iced::widget::operation::focus("device-search")
+                    .chain(iced::widget::operation::text_input::select_all("device-search")),
+            ),
         }
     }
 
@@ -237,6 +243,7 @@ impl MainView {
                 row![
                     bootstrap::search().size(20),
                     text_input(t!("device-list.search"), &self.search)
+                        .id("device-search")
                         .on_input(Message::Search),
                     icon_button(bootstrap::x_lg())
                         .size(32)
@@ -362,7 +369,19 @@ impl MainView {
     }
 
     pub fn subscription(&self) -> iced::Subscription<Message> {
-        Subscription::none()
+        match &self.screen {
+            Screen::DeviceList if self.error.is_none() => {
+                keyboard::listen().filter_map(|event| match event {
+                    keyboard::Event::KeyPressed {
+                        key: keyboard::Key::Character(key),
+                        modifiers,
+                        ..
+                    } if modifiers.control() && key.eq_ignore_ascii_case("f") => Some(Message::FocusSearch),
+                    _ => None,
+                })
+            }
+            _ => Subscription::none(),
+        }
     }
 
     pub(crate) fn shutdown(self) -> Task<()> {

@@ -181,7 +181,7 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
                                     shadow: Shadow {
                                         blur_radius: 14.0,
                                         color: Color::BLACK.scale_alpha(0.45),
-                                        offset: iced::Vector { x: -3.0, y: 0.0 },
+                                        offset: iced::Vector { x: 3.0, y: 0.0 },
                                     },
                                     ..Default::default()
                                 })
