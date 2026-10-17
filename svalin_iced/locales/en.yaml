@@ -91,6 +91,8 @@ tunnel:
 device_list:
   add: Add Device
 device-list:
+  clear-search: Clear search
+  search: Search devices
   loading: Loading devices...
 device:
   unavailable: Device not yet available

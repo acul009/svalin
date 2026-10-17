@@ -2,7 +2,7 @@ use std::{process, sync::Arc, time::Duration};
 
 use iced::{
     Subscription, Task, Widget,
-    widget::{column, rule, scrollable, stack, text},
+    widget::{column, row, rule, scrollable, stack, text, text_input},
 };
 use svalin::client::{
     Client,
@@ -45,6 +45,7 @@ pub enum Message {
     CloseError,
     Context(Context),
     GroupFilter(GroupFilter),
+    Search(String),
 }
 
 pub enum Action {
@@ -98,6 +99,7 @@ pub struct MainView {
     error: Option<Arc<anyhow::Error>>,
     update_abort_handle: Option<iced::task::Handle>,
     group_filter: GroupFilter,
+    search: String,
 }
 
 impl MainView {
@@ -112,6 +114,7 @@ impl MainView {
                 error: None,
                 update_abort_handle: None,
                 group_filter: GroupFilter::NoFilter,
+                search: String::new(),
             },
             Task::future(async move {
                 match client2.subscribe_state().await {
@@ -220,18 +223,37 @@ impl MainView {
                 self.group_filter = filter;
                 Action::None
             }
+            Message::Search(search) => {
+                self.search = search;
+                Action::None
+            }
         }
     }
 
     pub fn view(&self) -> crate::Element<'_, Message> {
         let screen = match &self.screen {
             Screen::Loading(text) => loading(text).into_widget().boxed(),
-            Screen::DeviceList => device_list::DeviceList::new(&self.state)
-                .on_new(Message::OpenAddDevice)
-                .on_select(Message::SelectDevice)
-                .group_filter(&self.group_filter)
-                .into_widget()
-                .boxed(),
+            Screen::DeviceList => column![
+                row![
+                    bootstrap::search().size(20),
+                    text_input(t!("device-list.search"), &self.search)
+                        .on_input(Message::Search),
+                    icon_button(bootstrap::x_lg())
+                        .size(32)
+                        .tooltip(text(t!("device-list.clear-search")))
+                        .on_press(Message::Search(String::new()))
+                        .into_widget(),
+                ]
+                .align_y(iced::alignment::Vertical::Center)
+                .spacing(10)
+                .padding([8, 10]),
+                device_list::DeviceList::new(&self.state)
+                    .on_new(Message::OpenAddDevice)
+                    .on_select(Message::SelectDevice)
+                    .group_filter(&self.group_filter)
+                    .into_widget(),
+            ]
+            .boxed(),
             Screen::AddDevice(add_device) => stack![
                 device_list::DeviceList::new(&self.state).into_widget(),
                 add_device.view().map(Message::AddDevice)

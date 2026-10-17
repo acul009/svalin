@@ -68,6 +68,8 @@ profile-picker:
   wrong-password: Benutzername oder Passwort ist falsch!
   invalid-totp: Der TOTP-Code war ungültig
 device-list:
+  clear-search: Suche leeren
+  search: Geräte suchen
   loading: Geräte werden geladen...
 device:
   unavailable: Gerät ist noch nicht verfügbar
