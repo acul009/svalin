@@ -355,23 +355,23 @@ impl ProfilePicker {
             Screen::UnlockProfile { profile, password } => Some(
                 dialog(
                     column![
-                        row![
-                            text(self.profile_name(profile))
-                                .align_x(Horizontal::Center)
-                                .width(Length::Fill),
-                            button(text(t!("profile-picker.rename")))
-                                .on_press(Message::RenameProfile(profile.clone()))
-                                .style(button::primary),
-                        ].align_y(Vertical::Center).spacing(10),
+                        text(self.profile_name(profile))
+                            .align_x(Horizontal::Center)
+                            .width(Length::Fill),
                         text_input(t!("generic.password"), password)
                             .id("password")
                             .secure(true)
                             .on_input(|input| Message::Input(Input::Password(input)))
                             .on_submit(Message::UnlockProfile),
                         space::vertical(),
-                        button(text(t!("generic.delete")))
-                            .on_press(Message::DeleteProfile(profile.clone()))
-                            .style(button::danger),
+                        row![
+                            button(text(t!("generic.delete")))
+                                .on_press(Message::DeleteProfile(profile.clone()))
+                                .style(button::danger),
+                            button(text(t!("profile-picker.rename")))
+                                .on_press(Message::RenameProfile(profile.clone()))
+                                .style(button::primary),
+                        ].spacing(10),
                         button(text(t!("generic.unlock"))).on_press(Message::UnlockProfile)
                     ]
                     .spacing(20),
