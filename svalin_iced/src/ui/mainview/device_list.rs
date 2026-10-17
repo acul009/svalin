@@ -60,6 +60,23 @@ impl<'a, Message: Clone + 'static> DeviceList<'a, Message> {
             .split_whitespace()
             .map(str::to_lowercase)
             .collect();
+        let mut devices: Vec<_> = match device_list.group_filter {
+            super::GroupFilter::NoFilter => device_list
+                .state
+                .persistent()
+                .devices()
+                .iter()
+                .filter(|(_, device)| matches_search(device, &words))
+                .collect(),
+            super::GroupFilter::Group(group) => device_list
+                .state
+                .group(group)
+                .filter(|(_, device)| matches_search(device, &words))
+                .collect(),
+        };
+        devices.sort_by_cached_key(|(spki_hash, device)| {
+            (device.name().to_lowercase(), (*spki_hash).clone())
+        });
         stack![
             container(
                 button(
@@ -73,34 +90,16 @@ impl<'a, Message: Clone + 'static> DeviceList<'a, Message> {
             .align_bottom(Length::Fill)
             .align_right(Length::Fill)
             .padding(30),
-            scrollable(match &device_list.group_filter {
-                super::GroupFilter::NoFilter => button_list(
-                    device_list
-                        .state
-                        .persistent()
-                        .devices()
-                        .iter()
-                        .filter(|(_, device)| matches_search(device, &words))
-                        .map(|(spki_hash, persistent)| list_entry(
-                            device_list.on_select.as_ref().map(|f| f(spki_hash.clone())),
-                            &persistent,
-                            device_list.state.agent_online(spki_hash),
-                        ))
-                )
-                .into_widget(),
-                super::GroupFilter::Group(group) => button_list(
-                    device_list
-                        .state
-                        .group(group)
-                        .filter(|(_, device)| matches_search(device, &words))
-                        .map(|(spki_hash, persistent)| list_entry(
-                            device_list.on_select.as_ref().map(|f| f(spki_hash.clone())),
-                            &persistent,
-                            device_list.state.agent_online(spki_hash),
-                        ))
-                )
-                .into_widget(),
-            })
+            scrollable(
+                button_list(devices.into_iter().map(|(spki_hash, persistent)| {
+                    list_entry(
+                        device_list.on_select.as_ref().map(|f| f(spki_hash.clone())),
+                        persistent,
+                        device_list.state.agent_online(spki_hash),
+                    )
+                }))
+                .into_widget()
+            )
         ]
     }
 }
