@@ -2,7 +2,7 @@ use std::{process, sync::Arc, time::Duration};
 
 use iced::{
     Subscription, Task, Widget,
-    widget::{button, column, rule, stack, text},
+    widget::{column, rule, scrollable, stack, text},
 };
 use svalin::client::{
     Client,
@@ -16,7 +16,7 @@ use crate::{
     bootstrap,
     ui::{
         ERROR_COLOR, INFO_COLOR, WARNING_COLOR,
-        widgets::{error_display, header, icon_button, loading},
+        widgets::{button_list, error_display, header, icon_button, loading},
     },
 };
 
@@ -319,17 +319,19 @@ impl MainView {
         match &self.screen {
             Screen::DeviceList => Some(
                 column![
-                    button("All devices").on_press(Message::GroupFilter(GroupFilter::NoFilter)),
+                    button_list::entry(text("All devices"))
+                        .on_press(Message::GroupFilter(GroupFilter::NoFilter))
+                        .into_widget(40, [8, 16], true),
                     rule::horizontal(2),
-                    column(self.state.groups().map(|group| {
+                    scrollable(button_list(self.state.groups().map(|group| {
                         let name: std::borrow::Cow<'_, str> = group
                             .as_ref()
                             .map(|s| s.as_str().into())
                             .unwrap_or_else(|| t!("device-list.nogroup"));
-                        button(text(name))
+                        button_list::entry(text(name))
                             .on_press(Message::GroupFilter(group.into()))
-                            .boxed()
-                    }))
+                    })).entry_height(40).into_widget())
+                        .height(iced::Length::Fill)
                 ]
                 .boxed(),
             ),

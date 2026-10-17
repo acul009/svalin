@@ -101,36 +101,47 @@ impl<'a, Message: Clone + 'static> ButtonList<'a, Message> {
     pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
         let list = self;
         let rows = list.entries.into_iter().enumerate().map(|(index, entry)| {
-            let odd = index % 2 == 0;
-            let content = row![
-                container(entry.content).width(Length::Fill),
-                bootstrap::chevron_right()
-                    .size(list.entry_height.0 * 0.48)
-                    .width(list.entry_height.0 * 0.56)
-                    .center()
-                    .style(|theme: &Theme| text::Style {
-                        color: Some(theme.palette().primary.base.color),
-                        ..Default::default()
-                    }),
-            ]
-            .spacing(16)
-            .align_y(Vertical::Center);
-
-            container(
-                button(content)
-                    .on_press_maybe(entry.on_press)
-                    .width(Length::Fill)
-                    .height(list.entry_height)
-                    .padding(list.entry_padding)
-                    .style(if odd { row_style_odd } else { row_style_even }),
-            )
-            .width(Length::Fill)
-            .style(move |_theme| container::Style {
-                background: entry.color.map(Into::into),
-                ..Default::default()
-            })
+            entry.into_widget(list.entry_height, list.entry_padding, index % 2 == 0)
         });
         column(rows).width(list.width)
+    }
+}
+
+impl<'a, Message: Clone + 'static> Entry<'a, Message> {
+    pub fn into_widget(
+        self,
+        height: impl Into<Pixels>,
+        padding: impl Into<Padding>,
+        shaded: bool,
+    ) -> impl iced::Widget<Message> + 'a {
+        let height = height.into();
+        let content = row![
+            container(self.content).width(Length::Fill),
+            bootstrap::chevron_right()
+                .size(height.0 * 0.48)
+                .width(height.0 * 0.56)
+                .center()
+                .style(|theme: &Theme| text::Style {
+                    color: Some(theme.palette().primary.base.color),
+                    ..Default::default()
+                }),
+        ]
+        .spacing(16)
+        .align_y(Vertical::Center);
+
+        container(
+            button(content)
+                .on_press_maybe(self.on_press)
+                .width(Length::Fill)
+                .height(height)
+                .padding(padding)
+                .style(if shaded { row_style_odd } else { row_style_even }),
+        )
+        .width(Length::Fill)
+        .style(move |_theme| container::Style {
+            background: self.color.map(Into::into),
+            ..Default::default()
+        })
     }
 }
 
