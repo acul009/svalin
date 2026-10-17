@@ -52,6 +52,7 @@ profile-picker:
     login: Fehler bei der Anmeldung
   init-loading: Server wird initialisiert...
   input:
+    name: Profilname
     confirm-password: Passwort bestätigen
     totp: 2FA-Code
   title:

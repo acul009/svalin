@@ -39,6 +39,7 @@ profile-picker:
     delete: Delete Profile
   confirm-delete: Are you sure you want to delete %{profile}
   input:
+    name: Profile name
     confirm-password: Confirm Password
     totp: 2FA Code
   copy-totp: Copy TOTP-Secret

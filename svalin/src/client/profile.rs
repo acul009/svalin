@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use crate::{client::tunnel_manager::TunnelManager, store::client_store::ClientStore};
 use anyhow::{Context, Result, anyhow};
@@ -27,6 +27,8 @@ use super::Client;
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Profile {
+    #[serde(default)]
+    name: String,
     pub(crate) username: String,
     pub(crate) upstream_address: String,
     pub(crate) upstream_certificate: UnverifiedCertificate,
@@ -37,6 +39,7 @@ pub(crate) struct Profile {
 
 impl Profile {
     pub(crate) fn new(
+        name: String,
         username: String,
         upstream_address: String,
         upstream_certificate: Certificate,
@@ -45,6 +48,7 @@ impl Profile {
         device_credential: EncryptedCredential,
     ) -> Self {
         Self {
+            name,
             username,
             upstream_address,
             upstream_certificate: upstream_certificate.to_unverified(),
@@ -55,15 +59,11 @@ impl Profile {
     }
 
     pub fn name(&self) -> String {
-        format!("{}@{}", self.username, self.upstream_address)
-    }
-
-    pub async fn profile_dir(&self) -> Result<Location> {
-        Client::profile_dir(&self.name()).await
-    }
-
-    pub async fn trust_store_path(&self) -> Result<Location> {
-        Ok(self.profile_dir().await?.push("trust_store.json"))
+        if self.name.is_empty() {
+            format!("{}@{}", self.username, self.upstream_address)
+        } else {
+            self.name.clone()
+        }
     }
 }
 
@@ -79,22 +79,26 @@ impl Client {
         Ok(Self::data_dir().await?.push(profile_name.replace(":", "+")))
     }
 
-    pub async fn list_profiles() -> Result<Vec<String>> {
+    /// Returns profile folder keys and display names.
+    pub async fn list_profiles() -> Result<BTreeMap<String, String>> {
         let location = Self::data_dir().await?;
 
         let mut folders = match tokio::fs::read_dir(&location).await {
             Ok(folders) => folders,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(Vec::new());
+                return Ok(BTreeMap::new());
             }
             Err(e) => return Err(e.into()),
         };
 
-        let mut profiles = Vec::new();
+        let mut profiles = BTreeMap::new();
 
         while let Some(entry) = folders.next_entry().await? {
             if entry.file_type().await?.is_dir() {
-                profiles.push(entry.file_name().to_string_lossy().into_owned());
+                let key = entry.file_name().to_string_lossy().into_owned();
+                if let Some(profile) = Self::get_profile(&key).await? {
+                    profiles.insert(key, profile.name());
+                }
             }
         }
 
@@ -102,6 +106,7 @@ impl Client {
     }
 
     pub async fn add_profile(
+        name: String,
         username: String,
         upstream_address: String,
         upstream_certificate: Certificate,
@@ -110,6 +115,7 @@ impl Client {
         password: Vec<u8>,
         trust_store: &TrustStore,
     ) -> Result<String> {
+        anyhow::ensure!(!name.trim().is_empty(), "Profile name is required");
         let local_credential_params = ArgonParams::strong();
         let key = local_credential_params
             .derive_encryption_key(password)
@@ -118,6 +124,7 @@ impl Client {
         let encrypted_device_credential = device_credentials.export(&key)?;
 
         let profile = Profile::new(
+            name,
             username,
             upstream_address,
             upstream_certificate,
@@ -126,28 +133,22 @@ impl Client {
             encrypted_device_credential,
         );
 
-        let profile_name = profile.name();
+        let profile_key = uuid::Uuid::new_v4().to_string();
 
-        if Self::list_profiles()
-            .await
-            .context("failed to list profiles")?
-            .contains(&profile_name)
-        {
-            return Err(anyhow!("profile already exists"));
-        }
-
-        Self::save_profile(&profile)
+        Self::save_profile(&profile_key, &profile)
             .await
             .context("failed to save profile to disk")?;
 
-        let trust_store_path = profile.trust_store_path().await?;
+        let trust_store_path = Self::profile_dir(&profile_key)
+            .await?
+            .push("trust_store.json");
         save_trust_store(&trust_store_path, &trust_store.export()).await?;
 
-        Ok(profile_name)
+        Ok(profile_key)
     }
 
-    async fn save_profile(profile: &Profile) -> Result<()> {
-        let location = Self::profile_dir(&profile.name())
+    async fn save_profile(profile_key: &str, profile: &Profile) -> Result<()> {
+        let location = Self::profile_dir(profile_key)
             .await?
             .push("profile.json")
             .ensure_parent_exists()
@@ -194,9 +195,9 @@ impl Client {
             .derive_encryption_key(password.clone())
             .await?;
 
-        // let mls_db_path = profile.profile_dir().await?.push("mls-store.sqlite");
-        let client_db_path = profile.profile_dir().await?.push("client-store.sqlite");
-        let trust_store_path = profile.trust_store_path().await?.to_pathbuf();
+        let profile_dir = Self::profile_dir(profile_key).await?;
+        let client_db_path = profile_dir.clone().push("client-store.sqlite");
+        let trust_store_path = profile_dir.push("trust_store.json").to_pathbuf();
         // tracing::trace!("unlocking profile");
         let device_credential = profile.device_credential.decrypt(&key)?;
         let root_certificate = profile.root_certificate.use_as_root()?;

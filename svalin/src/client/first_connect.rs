@@ -23,7 +23,7 @@ use super::Client;
 
 impl Client {
     #[instrument]
-    pub async fn first_connect(address: String) -> Result<FirstConnect> {
+    pub async fn first_connect(address: String, profile_name: String) -> Result<FirstConnect> {
         tracing::trace!("try connecting to {address}");
 
         let client = RpcClient::connect(
@@ -44,8 +44,16 @@ impl Client {
         tracing::trace!("public status: {server_status:?}");
 
         let first_connect = match server_status {
-            PublicStatus::WaitingForInit => FirstConnect::Init(Init { client, address }),
-            PublicStatus::Ready => FirstConnect::Login(Login { client, address }),
+            PublicStatus::WaitingForInit => FirstConnect::Init(Init {
+                client,
+                address,
+                profile_name,
+            }),
+            PublicStatus::Ready => FirstConnect::Login(Login {
+                client,
+                address,
+                profile_name,
+            }),
         };
 
         tracing::trace!("returning from first connect");
@@ -62,6 +70,7 @@ pub enum FirstConnect {
 pub struct Init {
     client: RpcClient,
     address: String,
+    profile_name: String,
 }
 
 impl Debug for Init {
@@ -108,6 +117,7 @@ impl Init {
 
         let login = Login {
             address: self.address,
+            profile_name: self.profile_name,
             client,
         };
 
@@ -128,6 +138,7 @@ impl Init {
 pub struct Login {
     client: RpcClient,
     address: String,
+    profile_name: String,
 }
 
 impl Debug for Login {
@@ -177,6 +188,7 @@ impl Login {
             })?;
 
         let profile = Client::add_profile(
+            self.profile_name,
             username,
             self.address,
             login_data.server_cert,

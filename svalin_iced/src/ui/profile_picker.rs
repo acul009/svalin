@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use crate::{bootstrap, ui::widgets::dialog};
 use iced::{
@@ -24,7 +24,7 @@ enum Screen {
     SelectProfile,
     UnlockProfile { profile: String, password: String },
     Loading(String),
-    AddProfile { host: String },
+    AddProfile { host: String, name: String },
     InitServer(InitServer),
     LoginDialog(LoginDialog),
     ConfirmDelete(String),
@@ -32,7 +32,7 @@ enum Screen {
 
 pub struct ProfilePicker {
     screen: Screen,
-    profiles: Vec<String>,
+    profiles: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -51,7 +51,7 @@ pub enum Message {
     LoginDialog(login::Message),
     Login(Arc<Login>),
     Profile(Arc<Client>),
-    Profiles(Vec<String>),
+    Profiles(BTreeMap<String, String>),
     None,
 }
 
@@ -63,6 +63,7 @@ pub enum Action {
 
 #[derive(Debug, Clone)]
 pub enum Input {
+    Name(String),
     Host(String),
     Password(String),
 }
@@ -70,11 +71,11 @@ pub enum Input {
 impl Input {
     fn update(self, state: &mut ProfilePicker) {
         match &mut state.screen {
-            Screen::AddProfile { host } => {
-                if let Input::Host(new_host) = self {
-                    *host = new_host;
-                }
-            }
+            Screen::AddProfile { host, name } => match self {
+                Input::Host(value) => *host = value,
+                Input::Name(value) => *name = value,
+                _ => (),
+            },
             Screen::UnlockProfile { password, .. } => {
                 if let Self::Password(new_password) = self {
                     *password = new_password;
@@ -90,7 +91,7 @@ impl ProfilePicker {
         (
             Self {
                 screen: Screen::SelectProfile,
-                profiles: Vec::new(),
+                profiles: BTreeMap::new(),
             },
             Task::done(Message::Reset),
         )
@@ -213,15 +214,22 @@ impl ProfilePicker {
                 }
             }
             Message::AddProfile(host) => {
-                self.screen = Screen::AddProfile { host };
+                self.add_profile(host);
 
                 Action::Run(iced::widget::operation::focus("host"))
             }
             Message::Connect(host) => {
+                let Screen::AddProfile { name, .. } = &self.screen else {
+                    return Action::None;
+                };
+                let name = name.clone();
+                if name.trim().is_empty() {
+                    return Action::None;
+                }
                 self.screen =
                     Screen::Loading(t!("profile-picker.connecting-to-server").to_string());
                 Action::Run(Task::future(async move {
-                    let connected = Client::first_connect(host).await;
+                    let connected = Client::first_connect(host, name).await;
 
                     match connected {
                         Ok(FirstConnect::Init(init)) => Message::Init(Arc::new(init)),
@@ -250,13 +258,20 @@ impl ProfilePicker {
     }
 
     fn add_profile(&mut self, host: String) {
-        self.screen = Screen::AddProfile { host };
+        self.screen = Screen::AddProfile {
+            host,
+            name: String::new(),
+        };
+    }
+
+    fn profile_name<'a>(&'a self, key: &'a str) -> &'a str {
+        self.profiles.get(key).map(String::as_str).unwrap_or(key)
     }
 
     pub fn view(&self) -> impl Widget<Message> + '_ {
         let profiles = scrollable(
-            button_list(self.profiles.iter().map(|profile| {
-                button_list::entry(text(profile).size(20))
+            button_list(self.profiles.iter().map(|(profile, name)| {
+                button_list::entry(text(name).size(20))
                     .on_press(Message::SelectProfile(profile.clone()))
             }))
             .entry_height(70)
@@ -296,7 +311,7 @@ impl ProfilePicker {
             Screen::UnlockProfile { profile, password } => Some(
                 dialog(
                     column![
-                        text(profile)
+                        text(self.profile_name(profile))
                             .align_x(Horizontal::Center)
                             .width(Length::Fill),
                         text_input(t!("generic.password"), password)
@@ -317,16 +332,19 @@ impl ProfilePicker {
                 .into_overlay()
                 .boxed(),
             ),
-            Screen::AddProfile { host } => Some(
+            Screen::AddProfile { host, name } => Some(
                 dialog(
                     column![
+                        text_input(t!("profile-picker.input.name"), name)
+                            .on_input(|input| Message::Input(Input::Name(input)))
+                            .on_submit(Message::Connect(host.clone())),
                         text_input(t!("generic.host"), host)
                             .id("host")
                             .on_input(|input| Message::Input(Input::Host(input)))
                             .on_submit(Message::Connect(host.clone())),
                         space::vertical(),
                         button(text(t!("generic.continue")))
-                            .on_press(Message::Connect(host.clone()))
+                            .on_press_maybe((!name.trim().is_empty()).then(|| Message::Connect(host.clone())))
                     ]
                     .spacing(20),
                 )
@@ -338,7 +356,7 @@ impl ProfilePicker {
             Screen::ConfirmDelete(profile) => Some(
                 dialog(
                     column![
-                        text(t!("profile-picker.confirm-delete", "profile" => profile),),
+                        text(t!("profile-picker.confirm-delete", "profile" => self.profile_name(profile)),),
                         space::vertical(),
                         button(text(t!("generic.delete")))
                             .on_press(Message::ConfirmDelete(profile.clone()))
