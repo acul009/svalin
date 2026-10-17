@@ -8,7 +8,7 @@ use iced::{
 };
 use init_server::InitServer;
 use login::LoginDialog;
-use svalin::client::{Client, FirstConnect, Init, Login};
+use svalin::client::{Client, FirstConnect, Init, Login, ProfileInfo};
 use tokio_util::sync::CancellationToken;
 
 use super::{
@@ -28,11 +28,12 @@ enum Screen {
     InitServer(InitServer),
     LoginDialog(LoginDialog),
     ConfirmDelete(String),
+    RenameProfile { profile: String, name: String },
 }
 
 pub struct ProfilePicker {
     screen: Screen,
-    profiles: BTreeMap<String, String>,
+    profiles: BTreeMap<String, ProfileInfo>,
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +43,8 @@ pub enum Message {
     Reset,
     SelectProfile(String),
     DeleteProfile(String),
+    RenameProfile(String),
+    SaveName,
     ConfirmDelete(String),
     UnlockProfile,
     AddProfile(String),
@@ -51,7 +54,7 @@ pub enum Message {
     LoginDialog(login::Message),
     Login(Arc<Login>),
     Profile(Arc<Client>),
-    Profiles(BTreeMap<String, String>),
+    Profiles(BTreeMap<String, ProfileInfo>),
     None,
 }
 
@@ -79,6 +82,11 @@ impl Input {
             Screen::UnlockProfile { password, .. } => {
                 if let Self::Password(new_password) = self {
                     *password = new_password;
+                }
+            }
+            Screen::RenameProfile { name, .. } => {
+                if let Self::Name(value) = self {
+                    *name = value;
                 }
             }
             _ => (),
@@ -173,6 +181,31 @@ impl ProfilePicker {
 
                 Action::Run(iced::widget::operation::focus("password"))
             }
+            Message::RenameProfile(profile) => {
+                let name = self.profile_name(&profile).to_owned();
+                self.screen = Screen::RenameProfile { profile, name };
+                Action::Run(iced::widget::operation::focus("profile-name"))
+            }
+            Message::SaveName => {
+                let Screen::RenameProfile { profile, name } = &self.screen else {
+                    return Action::None;
+                };
+                if name.trim().is_empty() {
+                    return Action::None;
+                }
+                let profile = profile.clone();
+                let name = name.clone();
+                self.screen = Screen::Loading(t!("generic.loading").to_string());
+                Action::Run(Task::future(async move {
+                    match Client::rename_profile(&profile, name).await {
+                        Ok(()) => Message::Reset,
+                        Err(err) => Message::Error(ErrorDisplayInfo::new(
+                            Arc::new(err),
+                            t!("profile-picker.error.rename"),
+                        )),
+                    }
+                }))
+            }
             Message::DeleteProfile(profile) => {
                 self.screen = Screen::ConfirmDelete(profile);
                 Action::None
@@ -265,14 +298,25 @@ impl ProfilePicker {
     }
 
     fn profile_name<'a>(&'a self, key: &'a str) -> &'a str {
-        self.profiles.get(key).map(String::as_str).unwrap_or(key)
+        self.profiles
+            .get(key)
+            .map(|profile| profile.name.as_str())
+            .unwrap_or(key)
     }
 
     pub fn view(&self) -> impl Widget<Message> + '_ {
         let profiles = scrollable(
-            button_list(self.profiles.iter().map(|(profile, name)| {
-                button_list::entry(text(name).size(20))
-                    .on_press(Message::SelectProfile(profile.clone()))
+            button_list(self.profiles.iter().map(|(profile, info)| {
+                button_list::entry(
+                    row![
+                        text(&info.name).size(20).width(Length::FillPortion(1)),
+                        text(&info.host).size(16).width(Length::FillPortion(1)),
+                        text(&info.username).size(16).width(Length::FillPortion(1)),
+                    ]
+                    .align_y(Vertical::Center)
+                    .spacing(16),
+                )
+                .on_press(Message::SelectProfile(profile.clone()))
             }))
             .entry_height(70)
             .into_widget(),
@@ -311,9 +355,14 @@ impl ProfilePicker {
             Screen::UnlockProfile { profile, password } => Some(
                 dialog(
                     column![
-                        text(self.profile_name(profile))
-                            .align_x(Horizontal::Center)
-                            .width(Length::Fill),
+                        row![
+                            text(self.profile_name(profile))
+                                .align_x(Horizontal::Center)
+                                .width(Length::Fill),
+                            button(text(t!("profile-picker.rename")))
+                                .on_press(Message::RenameProfile(profile.clone()))
+                                .style(button::primary),
+                        ].align_y(Vertical::Center).spacing(10),
                         text_input(t!("generic.password"), password)
                             .id("password")
                             .secure(true)
@@ -350,6 +399,26 @@ impl ProfilePicker {
                 )
                 .title(text(t!("profile-picker.title.add")))
                 .on_close(Message::Reset)
+                .into_overlay()
+                .boxed(),
+            ),
+            Screen::RenameProfile { profile, name } => Some(
+                dialog(
+                    column![
+                        text_input(t!("profile-picker.input.name"), name)
+                            .id("profile-name")
+                            .on_input(|value| Message::Input(Input::Name(value)))
+                            .on_submit(Message::SaveName),
+                        row![
+                            button(text(t!("generic.cancel")))
+                                .on_press(Message::SelectProfile(profile.clone())),
+                            button(text(t!("profile-picker.save")))
+                                .on_press_maybe((!name.trim().is_empty()).then_some(Message::SaveName)),
+                        ].spacing(10),
+                    ].spacing(20),
+                )
+                .title(text(t!("profile-picker.rename")))
+                .on_close(Message::SelectProfile(profile.clone()))
                 .into_overlay()
                 .boxed(),
             ),

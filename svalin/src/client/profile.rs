@@ -25,6 +25,13 @@ use crate::{
 
 use super::Client;
 
+#[derive(Debug, Clone)]
+pub struct ProfileInfo {
+    pub name: String,
+    pub host: String,
+    pub username: String,
+}
+
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Profile {
     #[serde(default)]
@@ -79,8 +86,8 @@ impl Client {
         Ok(Self::data_dir().await?.push(profile_name.replace(":", "+")))
     }
 
-    /// Returns profile folder keys and display names.
-    pub async fn list_profiles() -> Result<BTreeMap<String, String>> {
+    /// Returns profile folder keys and display information.
+    pub async fn list_profiles() -> Result<BTreeMap<String, ProfileInfo>> {
         let location = Self::data_dir().await?;
 
         let mut folders = match tokio::fs::read_dir(&location).await {
@@ -97,7 +104,14 @@ impl Client {
             if entry.file_type().await?.is_dir() {
                 let key = entry.file_name().to_string_lossy().into_owned();
                 if let Some(profile) = Self::get_profile(&key).await? {
-                    profiles.insert(key, profile.name());
+                    profiles.insert(
+                        key,
+                        ProfileInfo {
+                            name: profile.name(),
+                            host: profile.upstream_address,
+                            username: profile.username,
+                        },
+                    );
                 }
             }
         }
@@ -171,6 +185,15 @@ impl Client {
         } else {
             Ok(None)
         }
+    }
+
+    pub async fn rename_profile(profile_key: &str, name: String) -> Result<()> {
+        anyhow::ensure!(!name.trim().is_empty(), "Profile name is required");
+        let mut profile = Self::get_profile(profile_key)
+            .await?
+            .context("Profile is empty")?;
+        profile.name = name;
+        Self::save_profile(profile_key, &profile).await
     }
 
     pub async fn remove_profile(profile_name: &str) -> Result<()> {

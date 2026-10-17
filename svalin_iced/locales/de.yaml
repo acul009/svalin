@@ -36,12 +36,15 @@ generic:
   unknown: Unbekannt
   shutting-down: Wird heruntergefahren...
 profile-picker:
+  rename: Profil umbenennen
+  save: Speichern
   add: Profil hinzufügen
   confirm-delete: Sind Sie sicher, dass Sie %{profile} löschen möchten?
   connecting-to-server: Verbindung zum Server herstellen...
   copy-totp: TOTP-Geheimnis kopieren
   error:
     list: Fehler beim Laden der Profile
+    rename: Fehler beim Umbenennen des Profils
     connect-to-server: Fehler beim Herstellen einer Verbindung zum Server
     delete: Fehler beim Löschen des Profils
     server-init: Fehler beim Initialisieren des Servers

@@ -19,7 +19,10 @@ generic:
   unknown: Unknown
   shutting-down: Shutting down...
 profile-picker:
+  rename: Rename profile
+  save: Save
   error:
+    rename: Error while renaming profile
     list: Error while loading profiles
     totp:
       register: Error while creating TOTP secret
