@@ -17,6 +17,7 @@ pub struct DeviceList<'a, Message> {
     on_select: Option<Box<dyn Fn(SpkiHash) -> Message + 'a>>,
     on_new: Option<Message>,
     group_filter: &'a super::GroupFilter,
+    search: &'a str,
 }
 
 impl<'a, Message> DeviceList<'a, Message> {
@@ -26,6 +27,7 @@ impl<'a, Message> DeviceList<'a, Message> {
             on_select: None,
             on_new: None,
             group_filter: &super::GroupFilter::NoFilter,
+            search: "",
         }
     }
 
@@ -43,11 +45,21 @@ impl<'a, Message> DeviceList<'a, Message> {
         self.group_filter = group_filter;
         self
     }
+
+    pub(crate) fn search(mut self, search: &'a str) -> Self {
+        self.search = search;
+        self
+    }
 }
 
 impl<'a, Message: Clone + 'static> DeviceList<'a, Message> {
     pub fn into_widget(self) -> impl iced::Widget<Message> + 'a {
         let device_list = self;
+        let words: Vec<_> = device_list
+            .search
+            .split_whitespace()
+            .map(str::to_lowercase)
+            .collect();
         stack![
             container(
                 button(
@@ -62,19 +74,25 @@ impl<'a, Message: Clone + 'static> DeviceList<'a, Message> {
             .align_right(Length::Fill)
             .padding(30),
             scrollable(match &device_list.group_filter {
-                super::GroupFilter::NoFilter =>
-                    button_list(device_list.state.persistent().devices().iter().map(
-                        |(spki_hash, persistent)| list_entry(
+                super::GroupFilter::NoFilter => button_list(
+                    device_list
+                        .state
+                        .persistent()
+                        .devices()
+                        .iter()
+                        .filter(|(_, device)| matches_search(device, &words))
+                        .map(|(spki_hash, persistent)| list_entry(
                             device_list.on_select.as_ref().map(|f| f(spki_hash.clone())),
                             &persistent,
                             device_list.state.agent_online(spki_hash),
-                        )
-                    ))
-                    .into_widget(),
+                        ))
+                )
+                .into_widget(),
                 super::GroupFilter::Group(group) => button_list(
                     device_list
                         .state
                         .group(group)
+                        .filter(|(_, device)| matches_search(device, &words))
                         .map(|(spki_hash, persistent)| list_entry(
                             device_list.on_select.as_ref().map(|f| f(spki_hash.clone())),
                             &persistent,
@@ -85,6 +103,14 @@ impl<'a, Message: Clone + 'static> DeviceList<'a, Message> {
             })
         ]
     }
+}
+
+fn matches_search(device: &persistent::DeviceState, words: &[String]) -> bool {
+    if words.is_empty() {
+        return true;
+    }
+    let name = device.name().to_lowercase();
+    words.iter().all(|word| name.contains(word))
 }
 
 fn list_entry<'a, Message: 'a>(

@@ -258,6 +258,7 @@ impl MainView {
                     .on_new(Message::OpenAddDevice)
                     .on_select(Message::SelectDevice)
                     .group_filter(&self.group_filter)
+                    .search(&self.search)
                     .into_widget(),
             ]
             .boxed(),
