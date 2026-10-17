@@ -1,5 +1,5 @@
-use iced::Widget;
-use iced::widget::{column, row, space, text, text_editor, text_input};
+use iced::{Length, Widget, alignment::Vertical};
+use iced::widget::{column, container, row, space, text, text_editor, text_input};
 use svalin::client::state::persistent::MetaInfo;
 use svalin_pki::get_current_timestamp;
 
@@ -68,20 +68,22 @@ impl State {
             card(
                 column![
                     row![
-                        text(t!("device.info.name")),
-                        space::horizontal(),
-                        text_input("", &self.name).on_input(Message::ChangeName)
-                    ],
+                        text(t!("device.info.name")).width(Length::FillPortion(1)),
+                        text_input("", &self.name)
+                            .on_input(Message::ChangeName)
+                            .width(Length::FillPortion(3))
+                    ].align_y(Vertical::Center).spacing(10),
                     row![
-                        text(t!("device.info.group")),
-                        space::horizontal(),
-                        text_input("", &self.group).on_input(Message::ChangeGroup)
-                    ],
+                        text(t!("device.info.group")).width(Length::FillPortion(1)),
+                        text_input("", &self.group)
+                            .on_input(Message::ChangeGroup)
+                            .width(Length::FillPortion(3))
+                    ].align_y(Vertical::Center).spacing(10),
                     row![
-                        text(t!("device.info.notes")),
-                        space::horizontal(),
-                        text_editor(&self.notes).on_action(Message::ChangeNotes)
-                    ],
+                        text(t!("device.info.notes")).width(Length::FillPortion(1)),
+                        container(text_editor(&self.notes).on_action(Message::ChangeNotes))
+                            .width(Length::FillPortion(3))
+                    ].spacing(10),
                 ]
                 .spacing(10),
             )

@@ -109,7 +109,7 @@ impl AddDevice {
                 .boxed(),
             Screen::Loading(message) => dialog(loading(message).into_widget())
                 .title("Adding Device...")
-                .into_overlay()
+                .into_float()
                 .boxed(),
             Screen::Input => dialog(
                 column![

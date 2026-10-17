@@ -19,7 +19,7 @@ use url::Url;
 use crate::{
     Element, bootstrap,
     ui::widgets::{
-        button_list, card, device_icon, dialog, fact_list, header, icon_button, os_icon,
+        button_list, card, device_icon, dialog, fact_list, header, icon_button, list, os_icon,
     },
     util::{format_timestamp, human_i_bytes},
 };
@@ -497,20 +497,25 @@ fn installed_programs(report: Option<&persistent::Report>) -> Element<'_, Messag
         .and_then(|report| report.system_report.extensions.windows())
         .and_then(|windows| windows.installed_programs.as_deref())
         .unwrap_or_default();
-    let content = column(programs.iter().map(|program| {
+    let content = list(programs.iter().map(|program| {
         column![
             row![
-                text(&program.name),
-                space::horizontal(),
+                text(&program.name).width(Length::FillPortion(3)),
                 text(program.version.as_deref().unwrap_or_default())
+                    .width(Length::FillPortion(1))
+                    .align_x(iced::alignment::Horizontal::Right)
             ]
             .spacing(16),
             text(program.publisher.as_deref().unwrap_or_default()),
         ]
         .spacing(4)
     }))
-    .spacing(16);
-    dialog(scrollable(content).height(400))
+    .entry_height(Length::Shrink)
+    .entry_padding([10, 16])
+    .into_widget();
+    dialog(scrollable(content).height(Length::Fill))
+        .width(900)
+        .height(650)
         .title(text(
             t!("device.report.installed-programs-summary", "count" => programs.len()),
         ))
