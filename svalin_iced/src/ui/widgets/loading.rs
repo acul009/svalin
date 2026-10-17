@@ -3,7 +3,7 @@ use std::{borrow::Cow, sync::LazyLock};
 use iced::{
     Length,
     alignment::{Horizontal, Vertical},
-    widget::{column, container, opaque, text},
+    widget::{column, container, float, opaque, text},
 };
 
 pub struct Loading<'a> {
@@ -37,6 +37,11 @@ impl<'a> Loading<'a> {
 }
 
 impl<'a> Loading<'a> {
+    /// Finishes the loading view as a floating overlay.
+    pub fn into_float<Message: Clone + 'static>(self) -> impl iced::Widget<Message> + 'a {
+        float(self.into_widget())
+    }
+
     pub fn into_widget<Message: Clone + 'static>(self) -> impl iced::Widget<Message> + 'a {
         let loading = self;
         let mut prepared = container(opaque(column![

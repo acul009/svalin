@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use iced::{
     Task, Widget,
-    widget::{button, image, text, text_input},
+    widget::{button, column, image, text, text_input},
 };
 use svalin::client::{Client, Init};
 use tokio_util::sync::CancellationToken;
@@ -11,7 +11,7 @@ use totp_rs::Totp;
 
 use crate::ui::{
     types::error_display_info::ErrorDisplayInfo,
-    widgets::{form, loading},
+    widgets::{dialog, loading},
 };
 
 #[derive(Debug, Clone)]
@@ -215,22 +215,17 @@ impl InitServer {
             State::Error(display_info) => display_info
                 .view()
                 .on_close(Message::Back)
-                .into_normal()
+                .into_overlay()
                 .boxed(),
-            State::Loading(message) => loading(message).expand().into_widget().boxed(),
-            State::User => form()
-                .title(t!("profile-picker.add"))
-                .control(
+            State::Loading(message) => loading(message).into_float().boxed(),
+            State::User => dialog(
+                column![
                     text_input(t!("generic.username"), &self.username)
                         .id("username")
                         .on_input(Message::Username),
-                )
-                .control(
                     text_input(t!("generic.password"), &self.password)
                         .secure(true)
                         .on_input(Message::Password),
-                )
-                .control(
                     text_input(
                         t!("profile-picker.input.confirm-password"),
                         &self.confirm_password,
@@ -244,25 +239,33 @@ impl InitServer {
                             None
                         },
                     ),
-                )
-                .button(button(text(t!("generic.back"))).on_press(Message::Back))
-                .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
-                .into_widget()
-                .boxed(),
-            State::Totp { qr, .. } => form()
-                .title(t!("profile-picker.add"))
-                .control(image(qr))
-                .control(button(text(t!("profile-picker.copy-totp"))).on_press(Message::CopyTOTP))
-                .control(
+                ]
+                .spacing(16),
+            )
+            .title(text(t!("profile-picker.add")))
+            .on_close(Message::Back)
+            .button(button(text(t!("generic.back"))).on_press(Message::Back))
+            .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
+            .into_overlay()
+            .boxed(),
+            State::Totp { qr, .. } => dialog(
+                column![
+                    image(qr).width(220).height(220),
+                    button(text(t!("profile-picker.copy-totp"))).on_press(Message::CopyTOTP),
                     text_input(t!("profile-picker.input.totp"), &self.totp_input)
                         .id("totp")
                         .on_input(Message::Totp)
                         .on_submit(Message::Continue),
-                )
-                .button(button(text(t!("generic.back"))).on_press(Message::Back))
-                .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
-                .into_widget()
-                .boxed(),
+                ]
+                .spacing(16),
+            )
+            .title(text(t!("profile-picker.add")))
+            .height(500)
+            .on_close(Message::Back)
+            .button(button(text(t!("generic.back"))).on_press(Message::Back))
+            .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
+            .into_overlay()
+            .boxed(),
         }
     }
 }

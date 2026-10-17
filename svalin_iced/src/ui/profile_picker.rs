@@ -249,7 +249,7 @@ impl ProfilePicker {
             Message::AddProfile(host) => {
                 self.add_profile(host);
 
-                Action::Run(iced::widget::operation::focus("host"))
+                Action::Run(iced::widget::operation::focus("profile-name"))
             }
             Message::Connect(host) => {
                 let Screen::AddProfile { name, .. } = &self.screen else {
@@ -385,6 +385,7 @@ impl ProfilePicker {
                 dialog(
                     column![
                         text_input(t!("profile-picker.input.name"), name)
+                            .id("profile-name")
                             .on_input(|input| Message::Input(Input::Name(input)))
                             .on_submit(Message::Connect(host.clone())),
                         text_input(t!("generic.host"), host)

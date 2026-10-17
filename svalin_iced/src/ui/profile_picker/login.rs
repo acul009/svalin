@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use iced::{
     Task, Widget,
-    widget::{button, text, text_input},
+    widget::{button, column, text, text_input},
 };
 use svalin::client::{Client, Login, LoginError};
 use tokio_util::sync::CancellationToken;
@@ -12,7 +12,7 @@ use crate::{
     Element,
     ui::{
         types::error_display_info::ErrorDisplayInfo,
-        widgets::{form, loading},
+        widgets::{dialog, loading},
     },
 };
 
@@ -156,43 +156,44 @@ impl LoginDialog {
 
     pub fn view(&self) -> Element<'_, Message> {
         match &self.state {
-            State::Loading(message) => loading(message).into_widget().boxed(),
+            State::Loading(message) => loading(message).into_float().boxed(),
             State::Error(display_info) => display_info
                 .view()
                 .on_close(Message::Back)
-                .into_normal()
+                .into_overlay()
                 .boxed(),
-            State::LoginForm => form()
-                .title(t!("profile-picker.login"))
-                .control(
+            State::LoginForm => dialog(
+                column![
                     text_input(t!("generic.username"), &self.username)
                         .id("username")
                         .on_input(Message::Username),
-                )
-                .control(
                     text_input(t!("generic.password"), &self.password)
                         .secure(true)
                         .on_input(Message::Password),
-                )
-                .control(
                     text_input(t!("profile-picker.input.totp"), &self.current_totp)
                         .id("totp")
                         .on_input(Message::Totp)
                         .on_submit(Message::Continue),
-                )
+                ]
+                .spacing(16),
+            )
+            .title(text(t!("profile-picker.login")))
+            .on_close(Message::Back)
+            .button(button(text(t!("generic.back"))).on_press(Message::Back))
+            .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
+            .into_overlay()
+            .boxed(),
+            State::WrongPassword => dialog(text(t!("profile-picker.wrong-password")))
+                .title(text(t!("profile-picker.login")))
+                .on_close(Message::Back)
                 .button(button(text(t!("generic.back"))).on_press(Message::Back))
-                .button(button(text(t!("generic.continue"))).on_press(Message::Continue))
-                .into_widget()
+                .into_overlay()
                 .boxed(),
-            State::WrongPassword => form()
-                .title(t!("profile-picker.wrong-password"))
+            State::InvalidTotp => dialog(text(t!("profile-picker.invalid-totp")))
+                .title(text(t!("profile-picker.login")))
+                .on_close(Message::Back)
                 .button(button(text(t!("generic.back"))).on_press(Message::Back))
-                .into_widget()
-                .boxed(),
-            State::InvalidTotp => form()
-                .title(t!("profile-picker.invalid-totp"))
-                .button(button(text(t!("generic.back"))).on_press(Message::Back))
-                .into_widget()
+                .into_overlay()
                 .boxed(),
         }
     }
