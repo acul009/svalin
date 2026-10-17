@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     AddCertificateError, Certificate, CertificateChain, CertificateChainBuilder, Credential,
     RootCertificate, SignatureVerificationError, SpkiHash, UnverifiedCertificate,
-    UnverifiedCertificateChain, UseAsRootError, VerifyChainError, get_current_timestamp,
+    UnverifiedCertificateChain, UseAsRootError, ValidityError, VerifyChainError,
+    get_current_timestamp,
     secure_chain::{self, Chain, ChainDigest, ChainState, CheckedBlock, UncheckedBlock},
 };
 pub type CreateBlockError = secure_chain::CreateBlockError<Error>;
@@ -178,6 +179,8 @@ impl secure_chain::Transaction for Transaction {
 pub enum Error {
     #[error("signer not known")]
     SignerNotKnown,
+    #[error("signer certificate invalid: {0}")]
+    SignerInvalid(#[from] ValidityError),
     #[error("issuer is not signer")]
     IssuerIsNotSigner,
     #[error("certificate already exists")]
@@ -205,6 +208,7 @@ impl ChainState for State {
         transaction: &Self::Transaction,
     ) -> Result<(), Self::Error> {
         let signer = self.certificates.get(signer).ok_or(Error::SignerNotKnown)?;
+        signer.check_validity_at(time)?;
         match transaction {
             Transaction::Add(certificate) => {
                 if self.certificates.contains_key(certificate.spki_hash()) {
@@ -363,5 +367,141 @@ impl From<CompleteCertChainError> for LoadCertChainError {
             CompleteCertChainError::NotFound(spki_hash) => Self::NotFound(spki_hash),
             CompleteCertChainError::AddCertificateError(err) => Self::AddCertificateError(err),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{CertificateType, KeyPair};
+    use rcgen::PublicKeyData;
+    use time::{Duration, OffsetDateTime};
+
+    fn credential_at(
+        certificate_type: CertificateType,
+        start: OffsetDateTime,
+        issuer: Option<&Credential>,
+    ) -> Credential {
+        let key = KeyPair::generate();
+        let spki = UnverifiedCertificate::compute_spki_hash(
+            &key.export_public_key().subject_public_key_info(),
+        );
+        let mut params = rcgen::CertificateParams::default();
+        params.not_before = start;
+        params.not_after = start + certificate_type.validity_duration();
+        params.is_ca = if certificate_type == CertificateType::Root {
+            rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained)
+        } else {
+            rcgen::IsCa::NoCa
+        };
+        params.distinguished_name.push(
+            rcgen::DnType::OrganizationalUnitName,
+            certificate_type.to_string(),
+        );
+        params
+            .distinguished_name
+            .push(rcgen::DnType::CommonName, spki.to_string());
+        let certificate = match issuer {
+            Some(issuer) => {
+                let issuer = rcgen::Issuer::from_ca_cert_der(
+                    &issuer.certificate().as_der().into(),
+                    issuer.keypair().rcgen(),
+                )
+                .unwrap();
+                params.signed_by(key.rcgen(), &issuer).unwrap()
+            }
+            None => params.self_signed(key.rcgen()).unwrap(),
+        };
+        key.upgrade(UnverifiedCertificate::from_der(certificate.der().to_vec()).unwrap())
+            .unwrap()
+    }
+
+    #[test]
+    fn expired_signer_cannot_add_certificate() {
+        let root = credential_at(
+            CertificateType::Root,
+            OffsetDateTime::now_utc()
+                - CertificateType::Root.validity_duration()
+                - Duration::days(1),
+            None,
+        );
+        let mut store = TrustStore::initialize(
+            root.certificate()
+                .clone()
+                .to_unverified()
+                .use_as_root()
+                .unwrap(),
+        );
+        let certificate = root
+            .create_agent_certificate_for_key(&KeyPair::generate().export_public_key())
+            .unwrap();
+        let digest = store.digest();
+        assert!(matches!(
+            store.add(certificate, &root),
+            Err(CreateBlockError::InvalidTransaction(Error::SignerInvalid(
+                ValidityError::Expired
+            )))
+        ));
+        assert_eq!(store.digest(), digest);
+    }
+
+    #[test]
+    fn future_signer_cannot_add_certificate() {
+        let root = credential_at(
+            CertificateType::Root,
+            OffsetDateTime::now_utc() + Duration::days(1),
+            None,
+        );
+        let mut store = TrustStore::initialize(
+            root.certificate()
+                .clone()
+                .to_unverified()
+                .use_as_root()
+                .unwrap(),
+        );
+        let certificate = root
+            .create_agent_certificate_for_key(&KeyPair::generate().export_public_key())
+            .unwrap();
+        assert!(matches!(
+            store.add(certificate, &root),
+            Err(CreateBlockError::InvalidTransaction(Error::SignerInvalid(
+                ValidityError::NotYetValid
+            )))
+        ));
+    }
+
+    #[test]
+    fn historical_transaction_uses_signer_validity_at_transaction_time() {
+        let now = OffsetDateTime::now_utc();
+        let root = credential_at(
+            CertificateType::Root,
+            now - CertificateType::Root.validity_duration() - Duration::days(1),
+            None,
+        );
+        let historical_time = now - Duration::days(2);
+        let agent = credential_at(CertificateType::Agent, historical_time, Some(&root));
+        let state = State::initialize(
+            root.certificate()
+                .clone()
+                .to_unverified()
+                .use_as_root()
+                .unwrap(),
+        );
+        let transaction = Transaction::Add(agent.certificate().clone().to_unverified());
+        state
+            .check(
+                root.certificate().spki_hash(),
+                historical_time.unix_timestamp() as u64,
+                &transaction,
+            )
+            .unwrap();
+        assert!(matches!(
+            state.check(
+                root.certificate().spki_hash(),
+                now.unix_timestamp() as u64,
+                &transaction
+            ),
+            Err(Error::SignerInvalid(ValidityError::Expired))
+        ));
     }
 }
