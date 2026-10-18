@@ -98,6 +98,7 @@ device:
   unavailable: Device not yet available
   actions:
     title: Agent Actions
+    recreate-group: Recreate device group
     open-terminal: Open Terminal
     open-pve: Open Proxmox-VE
     open-pbs: Open Proxmox-Backup-Server

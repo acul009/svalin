@@ -146,6 +146,11 @@ impl ClientState {
         self.agents_online.contains(spki_hash)
     }
 
+    pub fn device_group_broken(&self, spki_hash: &SpkiHash) -> bool {
+        self.device_group_broken
+            .contains_key(&SvalinGroupId::DeviceGroup(spki_hash.clone()))
+    }
+
     pub fn groups(&self) -> impl Iterator<Item = &Option<String>> {
         self.display_groups.keys()
     }

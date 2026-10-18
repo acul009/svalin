@@ -189,6 +189,10 @@ impl MainView {
                 let action = device_view.update(message, &self.state, &self.client);
                 match action {
                     device_view::Action::None => Action::None,
+                    device_view::Action::Error(error) => {
+                        self.error = Some(error);
+                        Action::None
+                    }
                     device_view::Action::Back => {
                         self.screen = Screen::DeviceList;
                         Action::None

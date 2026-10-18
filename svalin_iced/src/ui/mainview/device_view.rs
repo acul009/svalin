@@ -38,10 +38,13 @@ pub enum Message {
     OpenRemoteWebinterface(Url),
     RemoteWebinterfaceOpened { scheme: String, local_port: u16 },
     RefreshReport,
+    RecreateGroup,
+    GroupRecreated(Result<(), Arc<anyhow::Error>>),
 }
 
 pub enum Action {
     None,
+    Error(Arc<anyhow::Error>),
     Back,
     OpenTerminal(SpkiHash),
     Run(Task<Message>),
@@ -52,6 +55,7 @@ pub struct State {
     meta_display: meta_display::State,
     update: update::State,
     overlay: Option<Overlay>,
+    recreating_group: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -82,6 +86,7 @@ impl State {
             meta_display: meta_display::State::new(),
             update: update::State::new(),
             overlay: None,
+            recreating_group: false,
         }
     }
 
@@ -172,6 +177,30 @@ impl State {
                     .discard(),
                 )
             }
+            Message::RecreateGroup => {
+                if self.recreating_group || !client_state.agent_online(&self.spki_hash) {
+                    return Action::None;
+                }
+                self.recreating_group = true;
+                let client = client.clone();
+                let spki_hash = self.spki_hash.clone();
+                Action::Run(Task::future(async move {
+                    Message::GroupRecreated(
+                        client
+                            .device(spki_hash)
+                            .recreate_device_group()
+                            .await
+                            .map_err(Arc::new),
+                    )
+                }))
+            }
+            Message::GroupRecreated(result) => {
+                self.recreating_group = false;
+                match result {
+                    Ok(()) => Action::None,
+                    Err(err) => Action::Error(err),
+                }
+            }
         }
     }
 
@@ -183,7 +212,7 @@ impl State {
         let meta = persistent.meta_info().unwrap_or(&PLACEHOLDER_META);
         let online = client_state.agent_online(&self.spki_hash);
         let col = column![
-            online.then(|| agent_actions(persistent)),
+            online.then(|| self.agent_actions(client_state)),
             self.meta_display.view(&meta).map(Message::MetaDisplay),
             if let Some(report) = persistent.report() {
                 Some(device_report(report))
@@ -229,71 +258,87 @@ impl State {
         )
         .on_back(Message::Back)
     }
-}
 
-fn agent_actions(device_state: &persistent::DeviceState) -> impl Widget<Message> + '_ {
-    let extensions = device_state.report().map(|r| &r.system_report.extensions);
-    let is_proxmox_ve = extensions
-        .map(|e| e.proxmox_ve().is_some())
-        .unwrap_or(false);
-    let is_proxmox_bs = extensions
-        .map(|e| e.proxmox_bs().is_some())
-        .unwrap_or(false);
-    let is_proxmox_mg = extensions
-        .map(|e| e.proxmox_mg().is_some())
-        .unwrap_or(false);
-    card(
-        row![
-            icon_button(bootstrap::terminal())
-                .size(50)
-                .tooltip(text(t!("device.actions.open-terminal")))
-                .on_press(Message::OpenTerminal)
-                .into_widget(),
-            icon_button(bootstrap::download())
-                .size(50)
-                .tooltip(text(t!("device.actions.update")))
-                .on_press(Overlay::Update.into())
-                .into_widget(),
-            is_proxmox_ve.then(|| {
-                icon_button(bootstrap::window_fullscreen())
+    fn agent_actions<'a>(&'a self, client_state: &'a ClientState) -> Element<'a, Message> {
+        let Some(device_state) = client_state.persistent().devices().get(&self.spki_hash) else {
+            return text(t!("device.unavailable")).boxed();
+        };
+        let extensions = device_state.report().map(|r| &r.system_report.extensions);
+        let is_proxmox_ve = extensions
+            .map(|e| e.proxmox_ve().is_some())
+            .unwrap_or(false);
+        let is_proxmox_bs = extensions
+            .map(|e| e.proxmox_bs().is_some())
+            .unwrap_or(false);
+        let is_proxmox_mg = extensions
+            .map(|e| e.proxmox_mg().is_some())
+            .unwrap_or(false);
+        card(
+            row![
+                icon_button(bootstrap::terminal())
                     .size(50)
-                    .tooltip(text(t!("device.actions.open-pve")))
-                    .on_press(Message::OpenRemoteWebinterface(
-                        "https://127.0.0.1:8006"
-                            .parse()
-                            .expect("hand coded urls have to parse"),
-                    ))
-                    .into_widget()
-            }),
-            is_proxmox_bs.then(|| {
-                icon_button(bootstrap::window_fullscreen())
+                    .tooltip(text(t!("device.actions.open-terminal")))
+                    .on_press(Message::OpenTerminal)
+                    .into_widget(),
+                icon_button(bootstrap::download())
                     .size(50)
-                    .tooltip(text(t!("device.actions.open-pbs")))
-                    .on_press(Message::OpenRemoteWebinterface(
-                        "https://127.0.0.1:8007"
-                            .parse()
-                            .expect("hand coded urls have to parse"),
-                    ))
-                    .into_widget()
-            }),
-            is_proxmox_mg.then(|| {
-                icon_button(bootstrap::window_fullscreen())
-                    .size(50)
-                    .tooltip(text(t!("device.actions.open-pmg")))
-                    .on_press(Message::OpenRemoteWebinterface(
-                        "https://127.0.0.1:8006"
-                            .parse()
-                            .expect("hand coded urls have to parse"),
-                    ))
-                    .into_widget()
-            }),
-        ]
-        .padding(20)
-        .spacing(20),
-    )
-    .padding(0)
-    .title(text(t!("device.actions.title")))
-    .into_widget()
+                    .tooltip(text(t!("device.actions.update")))
+                    .on_press(Overlay::Update.into())
+                    .into_widget(),
+                client_state.device_group_broken(&self.spki_hash).then(|| {
+                    let button = icon_button(bootstrap::arrow_clockwise())
+                        .size(50)
+                        .danger()
+                        .tooltip(text(t!("device.actions.recreate-group")));
+                    let button = if self.recreating_group {
+                        button
+                    } else {
+                        button.on_press(Message::RecreateGroup)
+                    };
+                    button.into_widget()
+                }),
+                is_proxmox_ve.then(|| {
+                    icon_button(bootstrap::window_fullscreen())
+                        .size(50)
+                        .tooltip(text(t!("device.actions.open-pve")))
+                        .on_press(Message::OpenRemoteWebinterface(
+                            "https://127.0.0.1:8006"
+                                .parse()
+                                .expect("hand coded urls have to parse"),
+                        ))
+                        .into_widget()
+                }),
+                is_proxmox_bs.then(|| {
+                    icon_button(bootstrap::window_fullscreen())
+                        .size(50)
+                        .tooltip(text(t!("device.actions.open-pbs")))
+                        .on_press(Message::OpenRemoteWebinterface(
+                            "https://127.0.0.1:8007"
+                                .parse()
+                                .expect("hand coded urls have to parse"),
+                        ))
+                        .into_widget()
+                }),
+                is_proxmox_mg.then(|| {
+                    icon_button(bootstrap::window_fullscreen())
+                        .size(50)
+                        .tooltip(text(t!("device.actions.open-pmg")))
+                        .on_press(Message::OpenRemoteWebinterface(
+                            "https://127.0.0.1:8006"
+                                .parse()
+                                .expect("hand coded urls have to parse"),
+                        ))
+                        .into_widget()
+                }),
+            ]
+            .padding(20)
+            .spacing(20),
+        )
+        .padding(0)
+        .title(text(t!("device.actions.title")))
+        .into_widget()
+        .boxed()
+    }
 }
 
 fn device_report(svalin_report: &persistent::Report) -> impl Widget<Message> + '_ {

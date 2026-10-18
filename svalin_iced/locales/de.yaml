@@ -75,6 +75,7 @@ device:
   unavailable: Gerät ist noch nicht verfügbar
   actions:
     title: Agentenaktionen
+    recreate-group: Gerätegruppe neu erstellen
     open-terminal: Terminal öffnen
     open-pve: Proxmox-VE öffnen
     open-pbs: Proxmox-Backup-Server öffnen

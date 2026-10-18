@@ -14,6 +14,7 @@ pub struct IconButton<'a, Message, Tip = Void> {
     on_press: Option<Message>,
     size: iced::Pixels,
     selected: bool,
+    danger: bool,
 }
 
 pub fn back<'a, Message>() -> IconButton<'a, Message> {
@@ -28,6 +29,7 @@ impl<'a, Message> IconButton<'a, Message> {
             tooltip: iced::widget::void(),
             size: (HEADER_HEIGHT - 2.0 * HEADER_PADDING).into(),
             selected: false,
+            danger: false,
         }
     }
 }
@@ -45,6 +47,7 @@ impl<'a, Message, Tip> IconButton<'a, Message, Tip> {
             on_press: self.on_press,
             size: self.size,
             selected: self.selected,
+            danger: self.danger,
         }
     }
 
@@ -55,6 +58,11 @@ impl<'a, Message, Tip> IconButton<'a, Message, Tip> {
 
     pub fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
+        self
+    }
+
+    pub fn danger(mut self) -> Self {
+        self.danger = true;
         self
     }
 }
@@ -73,7 +81,9 @@ impl<'a, Message: Clone + 'static, Tip> IconButton<'a, Message, Tip> {
         .width(value.size)
         .height(value.size)
         .on_press_maybe(value.on_press);
-        let button = if value.selected {
+        let button = if value.danger {
+            button.style(button::danger)
+        } else if value.selected {
             button.style(|theme: &iced::Theme, status| {
                 let palette = theme.palette();
                 let mut style = button::primary(theme, status);
