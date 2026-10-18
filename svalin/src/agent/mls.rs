@@ -51,10 +51,15 @@ pub(super) async fn run_mls_worker(
             }
             MlsAction::RecreateGroup(response) => {
                 let result = recreate_group(&mls, &messager_handle).await;
+                let recreated = result.is_ok();
                 if let Err(err) = &result {
                     tracing::error!("Failed to recreate device group: {err}");
                 }
                 let _ = response.send(result.map_err(|err| err.to_string()));
+                if recreated {
+                    action = MlsAction::SendReport;
+                    continue;
+                }
             }
         }
 

@@ -11,8 +11,9 @@ use svalin_pki::{
     CertificateType, Credential, EncryptedObject, EncryptionKey, SpkiHash, TrustStoreVerifier,
     mls::{
         SvalinGroupId,
-        client::MessageDataContent,
+        client::{HandleMessageError, MessageDataContent},
         key_package::UnverifiedKeyPackage,
+        processor::ProcessMessageError,
         provider::{ExportedMlsStore, SvalinStorage},
         transport_types::{MessageToMemberTransport, MessageToServerTransport},
     },
@@ -270,7 +271,27 @@ impl CommandDispatcher for UpdateMls {
                     };
                     match update {
                         LiveUpdate::Message(uuid, message) => {
-                            let message_data = mls.handle_message(&message).await?;
+                            let message_data = match mls.handle_message(&message).await {
+                                Ok(message_data) => message_data,
+                                Err(err) => match &err {
+                                    HandleMessageError::ProcessMessage {
+                                        group_id,
+                                        source: ProcessMessageError::ProcessError(
+                                            svalin_pki::openmls::group::ProcessMessageError::ValidationError(
+                                                svalin_pki::openmls::group::ValidationError::UnableToDecrypt(_),
+                                            ),
+                                        ),
+                                    } => {
+                                        tracing::error!("Error handling live message in update_mls: {err}");
+                                        self.client_state
+                                            .update(state::Update::GroupBroken(group_id.clone(), err.to_string()))
+                                            .await?;
+                                        broken.entry(group_id.clone()).or_default().push(uuid);
+                                        continue;
+                                    }
+                                    _ => return Err(err.into()),
+                                },
+                            };
                             match message_data.content {
                                 MessageDataContent::Report(spki_hash, report) => {
                                     self.client_state
