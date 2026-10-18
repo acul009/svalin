@@ -122,6 +122,7 @@ impl MessageToServerTransport {
 
 #[derive(Debug)]
 pub struct MessageToSend {
+    pub group_id: openmls::group::GroupId,
     pub receivers: Vec<SpkiHash>,
     pub message: MessageToMemberTransport,
 }

@@ -49,7 +49,9 @@ async fn integration_tests() {
     });
 
     tracing::trace!("running first connect");
-    let first_connect = Client::first_connect(host.clone()).await.unwrap();
+    let first_connect = Client::first_connect(host.clone(), "integration-test".into())
+        .await
+        .unwrap();
 
     let totp_secret = Totp::default();
     let username = "admin".to_string();
@@ -109,7 +111,9 @@ async fn integration_tests() {
 
     // ===== TEST LOGIN =====
 
-    let fourth_connect = Client::first_connect(host.clone()).await.unwrap();
+    let fourth_connect = Client::first_connect(host.clone(), profile_name.clone())
+        .await
+        .unwrap();
 
     match fourth_connect {
         crate::client::FirstConnect::Init(_) => unreachable!(),

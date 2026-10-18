@@ -163,6 +163,7 @@ where
                 }
 
                 Ok(vec![MessageToSend {
+                    group_id: group_id.to_group_id(),
                     message: MessageToMemberTransport::GroupMessage(raw),
                     receivers: processed.receivers,
                 }])
@@ -218,6 +219,7 @@ where
         let ProcessedContent::Commit(commit) = processed.content else {
             tracing::error!("Expected a commit message, got {:?}", processed.content);
             return Ok(vec![MessageToSend {
+                group_id: group_id.to_group_id(),
                 message: MessageToMemberTransport::AddToGroup(add_to_group.commit_bytes),
                 receivers: processed.receivers,
             }]);
@@ -226,6 +228,7 @@ where
         if let Err(err) = self.harness.check_commit(&group_id, &commit).await {
             tracing::error!("Failed to check commit: {}", err);
             return Ok(vec![MessageToSend {
+                group_id: group_id.to_group_id(),
                 message: MessageToMemberTransport::AddToGroup(add_to_group.commit_bytes),
                 receivers: processed.receivers,
             }]);
@@ -249,10 +252,12 @@ where
 
         Ok(vec![
             MessageToSend {
+                group_id: group_id.to_group_id(),
                 message: MessageToMemberTransport::AddToGroup(add_to_group.commit_bytes),
                 receivers: processed.receivers,
             },
             MessageToSend {
+                group_id: group_id.to_group_id(),
                 message: MessageToMemberTransport::Welcome(add_to_group.welcome),
                 receivers: new_members,
             },

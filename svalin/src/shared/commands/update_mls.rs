@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use svalin_pki::{
     CertificateType, Credential, EncryptedObject, EncryptionKey, SpkiHash, TrustStoreVerifier,
     mls::{
+        SvalinGroupId,
         client::MessageDataContent,
         key_package::UnverifiedKeyPackage,
         provider::{ExportedMlsStore, SvalinStorage},
@@ -127,6 +128,7 @@ impl CommandDispatcher for UpdateMls {
             }
         }
         let mut aknowledged = Vec::new();
+        let mut broken = HashMap::<SvalinGroupId, Vec<Uuid>>::new();
 
         while let OldUpdate::Message(uuid, message) = session.read_object().await? {
             match mls.handle_message(&message).await {
@@ -145,6 +147,11 @@ impl CommandDispatcher for UpdateMls {
                                     spki_hash, meta_info,
                                 ))
                                 .await?
+                        }
+                        MessageDataContent::GroupAdded(group) => {
+                            if let Some(skipped_messages) = broken.remove(&group) {
+                                aknowledged.extend_from_slice(&skipped_messages);
+                            }
                         }
                         MessageDataContent::Internal => (),
                     }
@@ -173,8 +180,12 @@ impl CommandDispatcher for UpdateMls {
                     if let Some(group_id) = err.group_id() {
                         tracing::error!("Error handling message in update_mls: {}", err);
                         self.client_state
-                            .update(state::Update::GroupBroken(group_id, err.to_string()))
+                            .update(state::Update::GroupBroken(
+                                group_id.clone(),
+                                err.to_string(),
+                            ))
                             .await?;
+                        broken.entry(group_id).or_default().push(uuid);
                     } else {
                         return Err(
                             anyhow::anyhow!(err).context("error handling message in update_mls")
@@ -271,6 +282,11 @@ impl CommandDispatcher for UpdateMls {
                                             spki_hash, meta_info,
                                         ))
                                         .await?
+                                }
+                                MessageDataContent::GroupAdded(group) => {
+                                    if let Some(skipped_messages) = broken.remove(&group) {
+                                        aknowledged.extend_from_slice(&skipped_messages);
+                                    }
                                 }
                                 MessageDataContent::Internal => (),
                             }

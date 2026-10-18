@@ -363,7 +363,11 @@ async fn test_device_group() {
     let server = MlsServer::new(storage, verifier.clone(), retriever.clone());
     let welcome = server.process_message(new_group).await.unwrap();
 
-    client.handle_message(&welcome[0].message).await.unwrap();
+    let joined = client.handle_message(&welcome[0].message).await.unwrap();
+    assert!(matches!(
+        joined.content,
+        MessageDataContent::GroupAdded(group) if group == joined.group
+    ));
 
     let report = "Test Data".to_string();
     let to_server = agent.send_report(report.clone()).await.unwrap();

@@ -31,12 +31,14 @@ impl MessageStore {
         let received_at = get_current_timestamp() as i64;
         let data = rmp_serde::to_vec_named(&message.message)?;
         let data = &data;
+        let group_id = message.group_id.as_slice();
 
         sqlx::query!(
-            "INSERT INTO mls_messages (id, data, received_at) VALUES (?,?,?)",
+            "INSERT INTO mls_messages (id, data, received_at, group_id) VALUES (?,?,?,?)",
             message_id,
             data,
-            received_at
+            received_at,
+            group_id
         )
         .execute(&mut *tx)
         .await?;

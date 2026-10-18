@@ -39,6 +39,8 @@ pub struct MessageData<Types: MessageTypes> {
 pub enum MessageDataContent<Types: MessageTypes> {
     Report(SpkiHash, Types::Report),
     MetaInfo(SpkiHash, Types::MetaInfo),
+    /// A Welcome was accepted and the group was joined successfully.
+    GroupAdded(SvalinGroupId),
     Internal,
 }
 
@@ -87,7 +89,7 @@ where
                 tracing::trace!("welcome handled successfully");
 
                 Ok(MessageData {
-                    content: MessageDataContent::Internal,
+                    content: MessageDataContent::GroupAdded(group.clone()),
                     group,
                 })
             }

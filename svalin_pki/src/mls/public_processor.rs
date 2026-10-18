@@ -330,6 +330,7 @@ impl PublicProcessor {
 
         if let Some(welcome) = new_group.welcome {
             Ok(Some(MessageToSend {
+                group_id: group.group_id().clone(),
                 receivers: members,
                 message: MessageToMemberTransport::Welcome(welcome),
             }))
