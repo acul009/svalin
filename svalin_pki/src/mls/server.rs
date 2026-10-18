@@ -1,14 +1,14 @@
 use std::collections::HashSet;
 
 use anyhow::anyhow;
-use openmls::prelude::tls_codec;
+use openmls::prelude::{OpenMlsSignaturePublicKey, Verifiable, tls_codec};
 use openmls_sqlx_storage::SqliteStorageProvider;
 
 use crate::{
     CertificateType, SpkiHash, VerifyError, get_current_timestamp,
     mls::{
         group_id::{ParseGroupIdError, SvalinGroupId},
-        harness::MlsHarness,
+        harness::{IdentityVerificationError, MlsHarness},
         key_package::{KeyPackage, KeyPackageError, UnverifiedKeyPackage},
         provider::MessagePackCodec,
         public_processor::{AddGroupError, ProcessedContent, PublicProcessorHandle},
@@ -71,6 +71,12 @@ where
             .check_group(new_group.clone())
             .await?;
 
+        for member in temp_group.members() {
+            self.harness
+                .verify_identity(&member.credential, &member.signature_key)
+                .await?;
+        }
+
         let members = temp_group
             .members()
             .map(|member| member.credential.deserialized::<SpkiHash>())
@@ -89,6 +95,18 @@ where
                 if certificate.certificate_type() != CertificateType::Agent {
                     return Err(AddDeviceGroupError::InvalidGroupId);
                 }
+
+                // MLS validates the signature against the tree. Also require it
+                // to verify against the certificate of the device being created.
+                let signature_key = OpenMlsSignaturePublicKey::new(
+                    certificate.public_key().to_vec().into(),
+                    new_group.group_info.ciphersuite().signature_algorithm(),
+                )
+                .map_err(|_| AddDeviceGroupError::UnauthorizedCreator)?;
+                new_group
+                    .group_info
+                    .verify_no_out(self.harness.crypto(), &signature_key)
+                    .map_err(|_| AddDeviceGroupError::UnauthorizedCreator)?;
             }
             SvalinGroupId::DeviceMetaGroup(spki_hash) => {
                 let certificate = self
@@ -277,6 +295,8 @@ where
 
 #[derive(Debug, thiserror::Error)]
 pub enum AddDeviceGroupError<KeyRetrieverError> {
+    #[error("member identity verification failed: {0}")]
+    IdentityVerification(#[from] IdentityVerificationError),
     #[error("tls codec error: {0}")]
     TlsCodecError(#[from] tls_codec::Error),
     #[error("error adding group: {0}")]
@@ -293,6 +313,8 @@ pub enum AddDeviceGroupError<KeyRetrieverError> {
     MissingMember(SpkiHash),
     #[error("invalid group id")]
     InvalidGroupId,
+    #[error("device groups must be signed by their device")]
+    UnauthorizedCreator,
     #[error("wrong members")]
     WrongMembers,
 }

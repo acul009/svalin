@@ -11,7 +11,7 @@ use crate::{
     CertificateType, Credential, SpkiHash, VerifyError, get_current_timestamp,
     mls::{
         group_id::{ParseGroupIdError, SvalinGroupId},
-        harness::MlsHarness,
+        harness::{IdentityVerificationError, MlsHarness},
         key_package::KeyPackage,
         processor::{
             CreateKeyPackageError, JoinGroupError, MlsProcessorHandle, ProcessMessageError,
@@ -199,6 +199,12 @@ where
             .get_required_group_members(&id)
             .await
             .map_err(HandleWelcomeError::RetrieverError)?;
+
+        for member in staged.members() {
+            self.harness
+                .verify_identity(&member.credential, &member.signature_key)
+                .await?;
+        }
 
         let members = staged
             .members()
@@ -397,6 +403,8 @@ impl<RetrieverError> HandleMessageError<RetrieverError> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum HandleWelcomeError<RetrieverError> {
+    #[error("member identity verification failed: {0}")]
+    IdentityVerification(#[from] IdentityVerificationError),
     #[error("join group error: {0}")]
     JoinGroupError(#[from] JoinGroupError),
     #[error("parse group id error: {0}")]

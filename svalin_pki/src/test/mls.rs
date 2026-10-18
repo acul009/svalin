@@ -1,3 +1,6 @@
+mod commit_attacks;
+mod group_attacks;
+
 use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 use openmls::group::GroupId;

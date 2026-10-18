@@ -1,12 +1,12 @@
 use anyhow::anyhow;
 use openmls::{
     group::{GroupId, StagedCommit},
-    prelude::{LeafNodeIndex, ProtocolVersion, Sender},
+    prelude::{Credential, LeafNodeIndex, Proposal, ProtocolVersion, Sender, tls_codec},
 };
 use openmls_rust_crypto::RustCrypto;
 
 use crate::{
-    CertificateType, SpkiHash, get_current_timestamp,
+    Certificate, CertificateType, SpkiHash, VerifyError, get_current_timestamp,
     mls::{
         SvalinGroupId,
         agent::CreateSvalinGroupError,
@@ -65,6 +65,36 @@ impl<KeyRetriever, Verifier, Processor> MlsHarness<KeyRetriever, Verifier, Proce
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum IdentityVerificationError {
+    #[error("invalid MLS credential: {0}")]
+    Credential(#[from] tls_codec::Error),
+    #[error("certificate verification failed: {0}")]
+    Certificate(#[from] VerifyError),
+    #[error("MLS signature key does not match the certificate for {0:?}")]
+    SignatureKeyMismatch(SpkiHash),
+}
+
+impl<KeyRetriever, Verifier: crate::Verifier, Processor>
+    MlsHarness<KeyRetriever, Verifier, Processor>
+{
+    pub async fn verify_identity(
+        &self,
+        credential: &Credential,
+        signature_key: &[u8],
+    ) -> Result<Certificate, IdentityVerificationError> {
+        let identity: SpkiHash = credential.deserialized()?;
+        let certificate = self
+            .verifier
+            .verify_spki_hash(&identity, get_current_timestamp())
+            .await?;
+        if signature_key != certificate.public_key() {
+            return Err(IdentityVerificationError::SignatureKeyMismatch(identity));
+        }
+        Ok(certificate)
+    }
+}
+
 // Shared between client, agent and server
 impl<KeyRetriever, Verifier, Processor> MlsHarness<KeyRetriever, Verifier, Processor>
 where
@@ -77,10 +107,28 @@ where
         group_id: &SvalinGroupId,
         commit: &StagedCommit,
     ) -> anyhow::Result<()> {
-        for to_verify in commit.credentials_to_verify() {
-            let spki_hash: SpkiHash = to_verify.deserialized()?;
-            self.verifier()
-                .verify_spki_hash(&spki_hash, get_current_timestamp())
+        // Add/update leaves are verified with their keys below. Keep the
+        // credential-only check for external senders in context extensions:
+        // OpenMLS doesn't expose their credential/key pairs through public APIs.
+        if commit
+            .queued_proposals()
+            .any(|proposal| matches!(proposal.proposal(), Proposal::GroupContextExtensions(_)))
+        {
+            for credential in commit.credentials_to_verify() {
+                let identity: SpkiHash = credential.deserialized()?;
+                self.verifier()
+                    .verify_spki_hash(&identity, get_current_timestamp())
+                    .await?;
+            }
+        }
+
+        for proposal in commit.update_proposals() {
+            let leaf = proposal.update_proposal().leaf_node();
+            self.verify_identity(leaf.credential(), leaf.signature_key().as_slice())
+                .await?;
+        }
+        if let Some(leaf) = commit.update_path_leaf_node() {
+            self.verify_identity(leaf.credential(), leaf.signature_key().as_slice())
                 .await?;
         }
 
@@ -130,9 +178,7 @@ where
 
             let raw_key_package = proposal.add_proposal().key_package();
             let key_package = UnverifiedKeyPackage::new(raw_key_package.clone().into());
-            let key_package = key_package
-                .verify(&self.crypto, self.protocol_version, &self.verifier)
-                .await?;
+            let key_package = self.verify_key_package(key_package).await?;
             match key_package.certificate().certificate_type() {
                 CertificateType::User => (),
                 CertificateType::UserSession => (),
