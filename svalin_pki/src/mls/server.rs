@@ -163,10 +163,12 @@ where
 
                 match processed.content {
                     ProcessedContent::Unknown => (),
-                    ProcessedContent::Commit(commit) => {
+                    ProcessedContent::Commit { commit, sender } => {
                         // No adds allowed here, so if this commit has adds, it's just ignored with this message type
                         if commit.add_proposals().count() == 0 {
-                            if let Err(err) = self.harness.check_commit(&group_id, &commit).await {
+                            if let Err(err) =
+                                self.harness.check_commit(&group_id, &commit, &sender).await
+                            {
                                 // message still needs to be distributed to all members, so just logging, no bail here
                                 tracing::error!("invalid commit for group {group_id:?}: {err}");
                             } else {
@@ -234,7 +236,7 @@ where
             .map_err(|err| anyhow!(err))?;
         let group_id = processed.group_id()?;
 
-        let ProcessedContent::Commit(commit) = processed.content else {
+        let ProcessedContent::Commit { commit, sender } = processed.content else {
             tracing::error!("Expected a commit message, got {:?}", processed.content);
             return Ok(vec![MessageToSend {
                 group_id: group_id.to_group_id(),
@@ -243,7 +245,7 @@ where
             }]);
         };
 
-        if let Err(err) = self.harness.check_commit(&group_id, &commit).await {
+        if let Err(err) = self.harness.check_commit(&group_id, &commit, &sender).await {
             tracing::error!("Failed to check commit: {}", err);
             return Ok(vec![MessageToSend {
                 group_id: group_id.to_group_id(),

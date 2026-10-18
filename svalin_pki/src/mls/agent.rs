@@ -114,7 +114,9 @@ where
             anyhow::bail!("received message for unexpected group: {:?}", group_id)
         }
 
-        self.harness.check_commit(&group_id, &commit).await?;
+        self.harness
+            .check_commit(&group_id, &commit, &processed.sender)
+            .await?;
 
         self.harness.processor().commit(commit).await?;
 

@@ -251,7 +251,7 @@ where
         };
 
         self.harness
-            .check_commit(&group_id, &commit)
+            .check_commit(&group_id, &commit, &processed.sender)
             .await
             .map_err(|source| HandleMessageError::CheckCommit {
                 group_id: group_id.clone(),

@@ -106,6 +106,7 @@ where
         &self,
         group_id: &SvalinGroupId,
         commit: &StagedCommit,
+        sender: &SpkiHash,
     ) -> anyhow::Result<()> {
         // Add/update leaves are verified with their keys below. Keep the
         // credential-only check for external senders in context extensions:
@@ -124,12 +125,29 @@ where
 
         for proposal in commit.update_proposals() {
             let leaf = proposal.update_proposal().leaf_node();
-            self.verify_identity(leaf.credential(), leaf.signature_key().as_slice())
+            let identity = self
+                .verify_identity(leaf.credential(), leaf.signature_key().as_slice())
                 .await?;
+            let Sender::Member(index) = proposal.sender() else {
+                anyhow::bail!("Only members can update their identity");
+            };
+            let previous = self
+                .processor()
+                .get_member(group_id.to_group_id(), *index)
+                .await?;
+            anyhow::ensure!(
+                identity.spki_hash() == &previous,
+                "Updates cannot change member identity"
+            );
         }
         if let Some(leaf) = commit.update_path_leaf_node() {
-            self.verify_identity(leaf.credential(), leaf.signature_key().as_slice())
+            let identity = self
+                .verify_identity(leaf.credential(), leaf.signature_key().as_slice())
                 .await?;
+            anyhow::ensure!(
+                identity.spki_hash() == sender,
+                "Updates cannot change member identity"
+            );
         }
 
         let required_members = self

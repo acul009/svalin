@@ -1,14 +1,21 @@
 use super::*;
+use crate::mls::{SvalinGroupId, harness::MlsHarness, provider::SvalinProvider};
+use openmls::prelude::{
+    CredentialWithKey, LeafNodeParameters, MlsGroup, MlsMessageBodyOut, MlsMessageOut,
+    PURE_PLAINTEXT_WIRE_FORMAT_POLICY,
+};
 
-#[tokio::test]
-async fn test_commit_identity_binding() {
-    use crate::mls::{SvalinGroupId, harness::MlsHarness, provider::SvalinProvider};
-    use openmls::prelude::{
-        CredentialWithKey, LeafNodeParameters, MlsGroup, MlsMessageBodyOut,
-        PURE_PLAINTEXT_WIRE_FORMAT_POLICY,
-    };
+struct CommitFixture {
+    owner: Credential,
+    victim: Credential,
+    provider: SvalinProvider,
+    group: MlsGroup,
+    id: SvalinGroupId,
+    harness: MlsHarness<TestRetriever, TestVerifier, PublicProcessorHandle>,
+}
 
-    for attack in [None, Some("update"), Some("add")] {
+impl CommitFixture {
+    async fn new() -> Self {
         let owner = Credential::generate_root().unwrap();
         let victim = Credential::generate_root().unwrap();
         let peer = create_processor(Credential::generate_root().unwrap()).await;
@@ -60,41 +67,17 @@ async fn test_commit_identity_binding() {
         };
         harness.processor().add_group(initial).await.unwrap();
 
-        let forged_identity = CredentialWithKey {
-            credential: victim.certificate().spki_hash().into(),
-            signature_key: owner.certificate().public_key().into(),
-        };
-        let commit = if attack == Some("add") {
-            let outsider = Credential::generate_root().unwrap();
-            let package = openmls::prelude::KeyPackage::builder()
-                .build(
-                    provider.ciphersuite(),
-                    &provider,
-                    &outsider,
-                    CredentialWithKey {
-                        credential: victim.certificate().spki_hash().into(),
-                        signature_key: outsider.certificate().public_key().into(),
-                    },
-                )
-                .unwrap();
-            group
-                .add_members(&provider, &owner, &[package.key_package().clone()])
-                .unwrap()
-                .0
-        } else {
-            let parameters = if attack.is_some() {
-                LeafNodeParameters::builder()
-                    .with_credential_with_key(forged_identity)
-                    .build()
-            } else {
-                LeafNodeParameters::default()
-            };
-            group
-                .self_update(&provider, &owner, parameters)
-                .unwrap()
-                .into_contents()
-                .0
-        };
+        Self {
+            owner,
+            victim,
+            provider,
+            group,
+            id,
+            harness,
+        }
+    }
+
+    async fn check_commit(&self, commit: MlsMessageOut) -> anyhow::Result<()> {
         // OpenMLS accepts these signatures and stages the commit. Svalin must
         // reject the credential/key mismatch before merging it.
         let encoded =
@@ -105,31 +88,86 @@ async fn test_commit_identity_binding() {
         else {
             panic!("expected commit")
         };
-        let processed = harness
+        let processed = self
+            .harness
             .processor()
             .process_message(commit.into())
             .await
             .unwrap();
-        let crate::mls::public_processor::ProcessedContent::Commit(commit) = processed.content
+        let crate::mls::public_processor::ProcessedContent::Commit { commit, sender } =
+            processed.content
         else {
             panic!("expected staged commit")
         };
-        let result = harness.check_commit(&id, &commit).await;
-        match attack {
-            None => result.unwrap(),
-            Some("update") => assert!(matches!(
-                result
-                    .unwrap_err()
-                    .downcast_ref::<crate::mls::harness::IdentityVerificationError>(),
-                Some(crate::mls::harness::IdentityVerificationError::SignatureKeyMismatch(_))
-            )),
-            Some("add") => assert!(matches!(
-                result
-                    .unwrap_err()
-                    .downcast_ref::<crate::mls::key_package::KeyPackageError>(),
-                Some(crate::mls::key_package::KeyPackageError::SignatureKeyMismatch)
-            )),
-            _ => unreachable!(),
-        }
+        self.harness.check_commit(&self.id, &commit, &sender).await
     }
+}
+
+#[tokio::test]
+async fn accepts_valid_update() {
+    let mut fixture = CommitFixture::new().await;
+    let commit = fixture
+        .group
+        .self_update(
+            &fixture.provider,
+            &fixture.owner,
+            LeafNodeParameters::default(),
+        )
+        .unwrap()
+        .into_contents()
+        .0;
+    fixture.check_commit(commit).await.unwrap();
+}
+
+#[tokio::test]
+async fn rejects_update_with_forged_identity() {
+    let mut fixture = CommitFixture::new().await;
+    let parameters = LeafNodeParameters::builder()
+        .with_credential_with_key(CredentialWithKey {
+            credential: fixture.victim.certificate().spki_hash().into(),
+            signature_key: fixture.owner.certificate().public_key().into(),
+        })
+        .build();
+    let commit = fixture
+        .group
+        .self_update(&fixture.provider, &fixture.owner, parameters)
+        .unwrap()
+        .into_contents()
+        .0;
+    let error = fixture.check_commit(commit).await.unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<crate::mls::harness::IdentityVerificationError>(),
+        Some(crate::mls::harness::IdentityVerificationError::SignatureKeyMismatch(_))
+    ));
+}
+
+#[tokio::test]
+async fn rejects_add_with_forged_identity() {
+    let mut fixture = CommitFixture::new().await;
+    let outsider = Credential::generate_root().unwrap();
+    let package = openmls::prelude::KeyPackage::builder()
+        .build(
+            fixture.provider.ciphersuite(),
+            &fixture.provider,
+            &outsider,
+            CredentialWithKey {
+                credential: fixture.victim.certificate().spki_hash().into(),
+                signature_key: outsider.certificate().public_key().into(),
+            },
+        )
+        .unwrap();
+    let commit = fixture
+        .group
+        .add_members(
+            &fixture.provider,
+            &fixture.owner,
+            &[package.key_package().clone()],
+        )
+        .unwrap()
+        .0;
+    let error = fixture.check_commit(commit).await.unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<crate::mls::key_package::KeyPackageError>(),
+        Some(crate::mls::key_package::KeyPackageError::SignatureKeyMismatch)
+    ));
 }

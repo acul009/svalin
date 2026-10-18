@@ -292,14 +292,8 @@ impl UnverifiedCertificate {
             .as_str()?;
 
         let mut issuer_data = [0u8; 32];
-        if issuer_str.len() != 64 {
-            return Err(CertificateParseError::InvalidIssuer(issuer_str.to_string()));
-        }
-        for i in 0..32 {
-            let hex_byte = &issuer_str[i * 2..i * 2 + 2];
-            issuer_data[i] = u8::from_str_radix(hex_byte, 16)
-                .map_err(|_| CertificateParseError::InvalidIssuer(issuer_str.to_string()))?;
-        }
+        hex::decode_to_slice(issuer_str, &mut issuer_data)
+            .map_err(|_| CertificateParseError::InvalidIssuer(issuer_str.to_string()))?;
         let issuer = SpkiHash(issuer_data);
 
         if cert.issuer() == cert.subject() {

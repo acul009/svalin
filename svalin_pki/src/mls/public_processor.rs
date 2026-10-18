@@ -208,7 +208,10 @@ impl ProcessedMessage {
 #[derive(Debug)]
 pub(crate) enum ProcessedContent {
     Unknown,
-    Commit(Box<openmls::prelude::StagedCommit>),
+    Commit {
+        commit: Box<openmls::prelude::StagedCommit>,
+        sender: SpkiHash,
+    },
 }
 
 struct PublicProcessor {
@@ -267,6 +270,16 @@ impl PublicProcessor {
 
         let processed = group.process_message(self.provider.crypto(), message)?;
 
+        let openmls::prelude::Sender::Member(index) = processed.sender() else {
+            anyhow::bail!("Only members can send commits");
+        };
+        let sender = group
+            .members()
+            .find(|member| member.index == *index)
+            .ok_or_else(|| anyhow::anyhow!("Unknown commit sender"))?
+            .credential
+            .deserialized()?;
+
         match processed.into_content() {
             openmls::prelude::ProcessedMessageContent::ApplicationMessage(_application_message) => {
                 unreachable!("see the private message shortcut above");
@@ -281,7 +294,7 @@ impl PublicProcessor {
                 return Ok(ProcessedMessage {
                     group_id: group_id,
                     receivers: current_members,
-                    content: ProcessedContent::Commit(commit),
+                    content: ProcessedContent::Commit { commit, sender },
                 });
             }
         }
