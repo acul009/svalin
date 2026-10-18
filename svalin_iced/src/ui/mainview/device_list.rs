@@ -1,7 +1,7 @@
 use iced::{
     Alignment::Center,
     Length,
-    widget::{button, container, row, scrollable, stack, text},
+    widget::{button, container, row, scrollable, space, stack, text},
 };
 use svalin::client::state::{ClientState, persistent};
 use svalin_pki::SpkiHash;
@@ -95,6 +95,7 @@ impl<'a, Message: Clone + 'static> DeviceList<'a, Message> {
                     button_list::entry(
                         row![
                             device_label(device_list.state, spki_hash).into_widget(),
+                            space::horizontal(),
                             text(
                                 persistent
                                     .report()
