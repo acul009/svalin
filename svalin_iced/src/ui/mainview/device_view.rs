@@ -19,7 +19,7 @@ use url::Url;
 use crate::{
     Element, bootstrap,
     ui::widgets::{
-        button_list, card, device_icon, dialog, fact_list, header, icon_button, list, os_icon,
+        button_list, card, device_label, dialog, fact_list, header, icon_button, list, os_icon,
     },
     util::{format_timestamp, human_i_bytes},
 };
@@ -244,17 +244,14 @@ impl State {
     }
 
     pub fn header<'a>(&'a self, client_state: &'a ClientState) -> header::Header<'a, Message> {
-        let Some(persistent) = client_state.persistent().devices().get(&self.spki_hash) else {
+        if !client_state.persistent().devices().contains_key(&self.spki_hash) {
             return header(widget::space()).on_back(Message::Back).into();
-        };
+        }
 
         header(
-            row![
-                device_icon(&persistent.os(), client_state.agent_online(&self.spki_hash)).size(30),
-                text(persistent.name()).size(24)
-            ]
-            .align_y(Vertical::Center)
-            .spacing(20),
+            device_label(client_state, &self.spki_hash)
+                .text_size(24)
+                .into_widget(),
         )
         .on_back(Message::Back)
     }
@@ -286,7 +283,7 @@ impl State {
                     .on_press(Overlay::Update.into())
                     .into_widget(),
                 client_state.device_group_broken(&self.spki_hash).then(|| {
-                    let button = icon_button(bootstrap::arrow_clockwise())
+                    let button = icon_button(bootstrap::wrench())
                         .size(50)
                         .danger()
                         .tooltip(text(t!("device.actions.recreate-group")));

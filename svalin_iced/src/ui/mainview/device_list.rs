@@ -8,7 +8,7 @@ use svalin_pki::SpkiHash;
 
 use crate::{
     bootstrap,
-    ui::widgets::{button_list, device_icon},
+    ui::widgets::{button_list, device_label},
     util::format_timestamp,
 };
 
@@ -92,11 +92,23 @@ impl<'a, Message: Clone + 'static> DeviceList<'a, Message> {
             .padding(30),
             scrollable(
                 button_list(devices.into_iter().map(|(spki_hash, persistent)| {
-                    list_entry(
-                        device_list.on_select.as_ref().map(|f| f(spki_hash.clone())),
-                        persistent,
-                        device_list.state.agent_online(spki_hash),
+                    button_list::entry(
+                        row![
+                            device_label(device_list.state, spki_hash).into_widget(),
+                            text(
+                                persistent
+                                    .report()
+                                    .map(|report| format_timestamp(
+                                        report.system_report.generated_at
+                                    ))
+                                    .unwrap_or_else(|| t!("generic.unknown").to_string())
+                            ),
+                        ]
+                        .spacing(20)
+                        .align_y(Center)
+                        .width(Length::Fill),
                     )
+                    .on_press_maybe(device_list.on_select.as_ref().map(|f| f(spki_hash.clone())))
                 }))
                 .into_widget()
             )
@@ -110,27 +122,4 @@ fn matches_search(device: &persistent::DeviceState, words: &[String]) -> bool {
     }
     let name = device.name().to_lowercase();
     words.iter().all(|word| name.contains(word))
-}
-
-fn list_entry<'a, Message: 'a>(
-    on_press_maybe: Option<Message>,
-    persistent: &'a persistent::DeviceState,
-    is_online: bool,
-) -> button_list::Entry<'a, Message> {
-    button_list::entry(
-        row![
-            device_icon(&persistent.os(), is_online).size(30),
-            text(persistent.name()),
-            text(
-                persistent
-                    .report()
-                    .map(|report| { format_timestamp(report.system_report.generated_at) })
-                    .unwrap_or_else(|| t!("generic.unknown").to_string())
-            )
-        ]
-        .spacing(20)
-        .align_y(Center)
-        .width(Length::Fill),
-    )
-    .on_press_maybe(on_press_maybe)
 }

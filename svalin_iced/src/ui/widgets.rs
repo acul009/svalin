@@ -15,6 +15,7 @@ use crate::bootstrap;
 
 pub mod button_list;
 pub mod card;
+pub mod device_label;
 pub mod dialog;
 pub mod error_display;
 pub mod fact_list;
@@ -27,6 +28,13 @@ pub mod percent_display;
 pub mod progress_circle;
 pub mod scaffold;
 pub mod toast;
+
+pub fn device_label<'a>(
+    state: &'a svalin::client::state::ClientState,
+    spki_hash: &'a svalin_pki::SpkiHash,
+) -> device_label::DeviceLabel<'a> {
+    device_label::DeviceLabel::new(state, spki_hash)
+}
 
 pub fn device_icon(family: &OSFamily, online: bool) -> iced::widget::Text<'static> {
     os_icon(family).color(if online {

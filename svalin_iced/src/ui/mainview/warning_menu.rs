@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::anyhow;
 use iced::{
@@ -6,11 +6,10 @@ use iced::{
     widget::{button, column, container, row, scrollable, text},
 };
 use svalin::client::state::{ClientState, warning};
-use svalin_sysctl::system_report::OSFamily;
 
 use crate::{
     Element,
-    ui::widgets::{device_icon, toast},
+    ui::widgets::{device_label, toast},
     util::{format_timestamp, human_i_bytes},
 };
 
@@ -29,14 +28,12 @@ pub fn view(state: &ClientState) -> Element<'_, Message> {
     scrollable(
         column(warnings.map(|warning| match warning {
             warning::Warning::Device(spki_hash, warnings) => {
-                let device = state.persistent().devices().get(spki_hash);
-                let name = device
-                    .map(|device| device.name())
-                    .unwrap_or_else(|| Cow::Owned(spki_hash.to_string()));
-                let os = device.map(|device| device.os()).unwrap_or(OSFamily::Unknown);
                 let header = row![
-                    device_icon(&os, state.agent_online(spki_hash)).size(30),
-                    text(name).size(24).width(Length::Fill),
+                    device_label(state, spki_hash)
+                        .text_size(24)
+                        .spacing(10.0)
+                        .width(Length::Fill)
+                        .into_widget(),
                     button(text(t!("warnings.device.action")))
                         .on_press(Message::SelectDevice(spki_hash.clone())),
                 ]
