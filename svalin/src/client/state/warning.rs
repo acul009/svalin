@@ -21,33 +21,31 @@ impl State {
         self.warnings.first().map(Warning::severity)
     }
 
-    pub fn update_device(&mut self, device: &SpkiHash, warnings: Vec<Device>) {
-        self.warnings = std::mem::take(&mut self.warnings)
-            .into_iter()
-            .filter(|warning| match warning {
-                Warning::Device(spki, _) => spki != device,
-                #[allow(unreachable_patterns)]
-                _ => true,
-            })
-            .chain(
-                warnings
-                    .into_iter()
-                    .map(|warning| Warning::Device(device.clone(), warning)),
-            )
-            .collect();
-        self.warnings.sort_by_key(|warning| warning.severity());
+    pub fn update_device(&mut self, device: &SpkiHash, mut warnings: Vec<Device>) {
+        self.warnings.retain(|warning| match warning {
+            Warning::Device(spki, _) => spki != device,
+        });
+        if !warnings.is_empty() {
+            warnings.sort_by_key(Device::severity);
+            self.warnings.push(Warning::Device(device.clone(), warnings));
+        }
+        self.warnings.sort_by_key(Warning::severity);
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum Warning {
-    Device(SpkiHash, Device),
+    Device(SpkiHash, Vec<Device>),
 }
 
 impl Warning {
     pub fn severity(&self) -> Severity {
         match self {
-            Self::Device(_, warning) => warning.severity(),
+            Self::Device(_, warnings) => warnings
+                .iter()
+                .map(Device::severity)
+                .min()
+                .unwrap_or(Severity::Low),
         }
     }
 }

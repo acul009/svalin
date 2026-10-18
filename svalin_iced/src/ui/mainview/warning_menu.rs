@@ -6,10 +6,11 @@ use iced::{
     widget::{button, column, container, row, scrollable, text},
 };
 use svalin::client::state::{ClientState, warning};
+use svalin_sysctl::system_report::OSFamily;
 
 use crate::{
     Element,
-    ui::widgets::toast,
+    ui::widgets::{device_icon, toast},
     util::{format_timestamp, human_i_bytes},
 };
 
@@ -26,96 +27,106 @@ pub fn view(state: &ClientState) -> Element<'_, Message> {
     }
 
     scrollable(
-        column(warnings.map(|warning| {
-            toast(
-                match warning.severity() {
-                    warning::Severity::High => toast::Kind::Error,
-                    warning::Severity::Medium => toast::Kind::Warning,
-                    warning::Severity::Low => toast::Kind::Info,
-                },
-                match warning {
-                    warning::Warning::Device(spki_hash, warning) => {
-                        let name = state
-                            .persistent()
-                            .devices()
-                            .get(spki_hash)
-                            .map(|d| d.name())
-                            .unwrap_or_else(|| Cow::Owned(spki_hash.to_string()));
+        column(warnings.map(|warning| match warning {
+            warning::Warning::Device(spki_hash, warnings) => {
+                let device = state.persistent().devices().get(spki_hash);
+                let name = device
+                    .map(|device| device.name())
+                    .unwrap_or_else(|| Cow::Owned(spki_hash.to_string()));
+                let os = device.map(|device| device.os()).unwrap_or(OSFamily::Unknown);
+                let header = row![
+                    device_icon(&os, state.agent_online(spki_hash)).size(30),
+                    text(name).size(24).width(Length::Fill),
+                    button(text(t!("warnings.device.action")))
+                        .on_press(Message::SelectDevice(spki_hash.clone())),
+                ]
+                .align_y(iced::Alignment::Center)
+                .spacing(10);
 
-                        let details = if let warning::Device::DeviceGroupBroken(reason) = warning {
-                            Some(
-                                button(text(t!("generic.details")))
-                                    .on_press(Message::Error(Arc::new(anyhow!(reason.to_owned()))))
-                                    .boxed(),
-                            )
-                        } else {
-                            None
-                        };
-                        let actions = row([button(text(t!("warnings.device.action")))
-                            .on_press(Message::SelectDevice(spki_hash.clone()))
-                            .boxed()]
-                        .into_iter()
-                        .chain(details))
-                        .spacing(10);
-
-                        let message = match warning {
-                            warning::Device::DeviceGroupBroken(_) => {
-                                text(t!("warnings.device.group-broken"))
-                            }
-                            warning::Device::DiskSpaceLow { disk, free, total } => text(t!(
-                                "warnings.device.disk-space-low",
-                                "disk" => disk,
-                                "free" => human_i_bytes(*free),
-                                "total" => human_i_bytes(*total)
-                            )),
-                            warning::Device::MissingName => {
-                                text(t!("warnings.device.missing-name"))
-                            }
-                            warning::Device::BitlockerActive { drive, .. } => {
-                                text!("Drive {drive} has bitlocker active!")
-                            }
-                            warning::Device::PMGAttachmentQuarantine(count) => {
-                                text!("There are {count} mails in the attachment quarantine")
-                            }
-                            warning::Device::PMGVirusQuarantine(count) => {
-                                text!("There are {count} mails in the virus quarantine")
-                            }
-                            warning::Device::BackupOverdue { name, due_at } => text(t!(
-                                "warnings.device.backup-overdue",
-                                "name" => name,
-                                "due_at" => format_timestamp(*due_at)
-                            )),
-                            warning::Device::BackupFailed {
-                                name,
-                                message,
-                                finished_at,
-                            } => {
-                                if let Some(finished_at) = finished_at {
-                                    text(t!(
-                                        "warnings.device.backup-failed-at",
-                                        "name" => name,
-                                        "message" => message,
-                                    "finished_at" => format_timestamp(*finished_at)
-                                    ))
-                                } else {
-                                    text(t!(
-                                        "warnings.device.backup-failed",
-                                        "name" => name,
-                                        "message" => message
-                                    ))
-                                }
-                            }
-                        };
-                        column![text(name).size(24), message, actions]
-                            .height(Length::Fit)
-                            .spacing(10)
-                    }
-                },
-            )
-            .into_widget()
+                toast(
+                    toast::Kind::Neutral,
+                    column![
+                        header,
+                        column(warnings.iter().map(device_warning)).spacing(10)
+                    ]
+                    .width(Length::Fill)
+                    .spacing(10),
+                )
+                .into_widget()
+            }
         }))
         .padding(20)
         .spacing(20),
     )
+    .boxed()
+}
+
+fn device_warning(warning: &warning::Device) -> Element<'_, Message> {
+    let kind = match warning.severity() {
+        warning::Severity::High => toast::Kind::Error,
+        warning::Severity::Medium => toast::Kind::Warning,
+        warning::Severity::Low => toast::Kind::Info,
+    };
+    let details = if let warning::Device::DeviceGroupBroken(reason) = warning {
+        Some(
+            button(text(t!("generic.details")))
+                .on_press(Message::Error(Arc::new(anyhow!(reason.to_owned()))))
+                .boxed(),
+        )
+    } else {
+        None
+    };
+
+    let message = match warning {
+        warning::Device::DeviceGroupBroken(_) => text(t!("warnings.device.group-broken")),
+        warning::Device::DiskSpaceLow { disk, free, total } => text(t!(
+            "warnings.device.disk-space-low",
+            "disk" => disk,
+            "free" => human_i_bytes(*free),
+            "total" => human_i_bytes(*total)
+        )),
+        warning::Device::MissingName => text(t!("warnings.device.missing-name")),
+        warning::Device::BitlockerActive { drive, .. } => {
+            text!("Drive {drive} has bitlocker active!")
+        }
+        warning::Device::PMGAttachmentQuarantine(count) => {
+            text!("There are {count} mails in the attachment quarantine")
+        }
+        warning::Device::PMGVirusQuarantine(count) => {
+            text!("There are {count} mails in the virus quarantine")
+        }
+        warning::Device::BackupOverdue { name, due_at } => text(t!(
+            "warnings.device.backup-overdue",
+            "name" => name,
+            "due_at" => format_timestamp(*due_at)
+        )),
+        warning::Device::BackupFailed {
+            name,
+            message,
+            finished_at,
+        } => {
+            if let Some(finished_at) = finished_at {
+                text(t!(
+                    "warnings.device.backup-failed-at",
+                    "name" => name,
+                    "message" => message,
+                "finished_at" => format_timestamp(*finished_at)
+                ))
+            } else {
+                text(t!(
+                    "warnings.device.backup-failed",
+                    "name" => name,
+                    "message" => message
+                ))
+            }
+        }
+    };
+    toast(
+        kind,
+        column([message.boxed()].into_iter().chain(details))
+            .width(Length::Fill)
+            .spacing(10),
+    )
+    .into_widget()
     .boxed()
 }

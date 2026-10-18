@@ -164,7 +164,7 @@ warnings:
   show: Show Warnings
   empty: No problems detected
   device:
-    action: Device
+    action: Open
     group-broken: Device associated group broken
     disk-space-low: "Disk space low on %{disk}: %{free} of %{total} free"
     missing-name: Device has no name yet

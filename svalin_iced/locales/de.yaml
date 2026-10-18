@@ -164,7 +164,7 @@ warnings:
   show: Warnungen anzeigen
   empty: Keine Probleme erkannt
   device:
-    action: Gerät
+    action: Öffnen
     group-broken: Die zugeordnete Gerätegruppe ist beschädigt
     disk-space-low: "Wenig Speicherplatz auf %{disk}: %{free} von %{total} frei"
     missing-name: Das Gerät hat noch keinen Namen
