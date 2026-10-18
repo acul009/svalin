@@ -14,6 +14,7 @@ use crate::{
         get_key_packages::GetKeyPackagesHandler, get_user_credentials::GetUserCredentialHandler,
         load_certificate_chain::LoadCertificateChainHandler,
         public_server_status::PublicStatusHandler,
+        recreate_device_group::RecreateDeviceGroupHandler,
         request_system_report::RequestSystemReportHandler, update_agent::UpdateAgentHandler,
         update_mls::UpdateMlsHandler, update_trust_store::UpdateTrustStoreHandler,
     },
@@ -124,6 +125,12 @@ impl From<&PermissionPrecursor<RequestSystemReportHandler>> for Permission {
 
 impl From<&PermissionPrecursor<UpdateAgentHandler>> for Permission {
     fn from(_value: &PermissionPrecursor<UpdateAgentHandler>) -> Self {
+        Permission::SessionOnly
+    }
+}
+
+impl From<&PermissionPrecursor<RecreateDeviceGroupHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<RecreateDeviceGroupHandler>) -> Self {
         Permission::SessionOnly
     }
 }

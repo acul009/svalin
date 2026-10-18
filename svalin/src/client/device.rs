@@ -12,6 +12,7 @@ use uuid::Uuid;
 use crate::{
     client::{state::persistent, tunnel_manager::TunnelDefinition},
     shared::commands::{
+        recreate_device_group::RecreateDeviceGroup,
         request_system_report::RequestSystemReport, terminal::RemoteTerminalDispatcher,
         update_agent::UpdateAgent, update_mls::MlsUpdate,
     },
@@ -35,6 +36,16 @@ impl<'a> DeviceHandle<'a> {
             .dispatch(RequestSystemReport)
             .await
             .map_err(|err| anyhow!("{}", err))?)
+    }
+
+    pub async fn recreate_device_group(&self) -> anyhow::Result<()> {
+        self.connection()
+            .await?
+            .dispatch(RecreateDeviceGroup)
+            .await
+            .map_err(|err| anyhow!("{err}"))?;
+
+        Ok(())
     }
 
     pub async fn update_metainfo(&self, metainfo: persistent::MetaInfo) -> anyhow::Result<()> {

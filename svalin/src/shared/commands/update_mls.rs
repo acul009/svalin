@@ -152,6 +152,9 @@ impl CommandDispatcher for UpdateMls {
                             if let Some(skipped_messages) = broken.remove(&group) {
                                 aknowledged.extend_from_slice(&skipped_messages);
                             }
+                            self.client_state
+                                .update(state::Update::GroupRestored(group))
+                                .await?;
                         }
                         MessageDataContent::Internal => (),
                     }
@@ -287,6 +290,9 @@ impl CommandDispatcher for UpdateMls {
                                     if let Some(skipped_messages) = broken.remove(&group) {
                                         aknowledged.extend_from_slice(&skipped_messages);
                                     }
+                                    self.client_state
+                                        .update(state::Update::GroupRestored(group))
+                                        .await?;
                                 }
                                 MessageDataContent::Internal => (),
                             }

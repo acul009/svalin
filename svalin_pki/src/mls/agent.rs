@@ -184,6 +184,16 @@ where
             .create_group_if_not_exists(&group_id, self.me.spki_hash())
             .await
     }
+
+    pub async fn recreate_device_group(
+        &self,
+    ) -> Result<MessageToServerTransport, CreateSvalinGroupError<KeyRetriever::Error>> {
+        let group_id = SvalinGroupId::DeviceGroup(self.me.spki_hash().clone());
+
+        self.harness
+            .recreate_group(&group_id, self.me.spki_hash())
+            .await
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

@@ -240,14 +240,20 @@ where
             return Ok(None);
         }
 
-        let members = self.get_required_key_packages(&group_id, me).await?;
+        Ok(Some(self.recreate_group(group_id, me).await?))
+    }
 
-        let new_group = self
+    pub(crate) async fn recreate_group(
+        &self,
+        group_id: &SvalinGroupId,
+        me: &SpkiHash,
+    ) -> Result<MessageToServerTransport, CreateSvalinGroupError<KeyRetriever::Error>> {
+        let members = self.get_required_key_packages(group_id, me).await?;
+
+        Ok(self
             .processor()
             .create_group(members, group_id.to_group_id())
-            .await?;
-
-        Ok(Some(new_group))
+            .await?)
     }
 
     async fn get_required_key_packages(

@@ -6,6 +6,7 @@ pub mod load_certificate_chain;
 pub mod login;
 pub mod public_server_status;
 pub mod realtime_status;
+pub mod recreate_device_group;
 pub mod request_system_report;
 pub mod terminal;
 pub mod update_agent;

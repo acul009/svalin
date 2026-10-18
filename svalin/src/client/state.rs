@@ -23,6 +23,7 @@ pub enum Update {
     Persistent(persistent::Update),
     AgentOnline(SpkiHash, bool),
     GroupBroken(SvalinGroupId, String),
+    GroupRestored(SvalinGroupId),
     Tunnel(tunneling::Update),
 }
 
@@ -31,7 +32,7 @@ impl Update {
         match self {
             Self::Persistent(update) => update.affected_device(),
             Self::AgentOnline(spki_hash, _) => Some(spki_hash.clone()),
-            Self::GroupBroken(group_id, _) => match group_id {
+            Self::GroupBroken(group_id, _) | Self::GroupRestored(group_id) => match group_id {
                 SvalinGroupId::DeviceGroup(spki_hash) => Some(spki_hash.clone()),
                 SvalinGroupId::DeviceMetaGroup(spki_hash) => Some(spki_hash.clone()),
             },
@@ -128,6 +129,9 @@ impl ClientState {
             }
             Update::GroupBroken(group, reason) => {
                 self.device_group_broken.insert(group, reason);
+            }
+            Update::GroupRestored(group) => {
+                self.device_group_broken.remove(&group);
             }
             Update::Tunnel(update) => self.tunneling.update(update),
         }

@@ -1,9 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::anyhow;
-use futures::{FutureExt, select};
 use svalin_sysctl::system_report::SystemReporter;
-use tokio::sync::Notify;
+use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -11,6 +10,11 @@ use crate::{
     message_streaming::{MessageFromAgent, agent::AgentMessageDispatcherHandle},
     mls::MlsAgent,
 };
+
+pub enum MlsAction {
+    SendReport,
+    RecreateGroup(oneshot::Sender<Result<(), String>>),
+}
 
 // Todo: repeat this periodically if it fails - also needs to account for dropping the welcome message to the server
 // That basically means the server should send a signal to the agent upon connecting if this group is missing, causing a recreation
@@ -29,25 +33,54 @@ pub(super) async fn ensure_group_exists(
     Ok(())
 }
 
-const SYSTEM_REPORT_INTERVAL: Duration = Duration::from_secs(60 * 30); // 24 hours
-pub(super) async fn schedule_system_reports(
+const SYSTEM_REPORT_INTERVAL: Duration = Duration::from_secs(60 * 30);
+pub(super) async fn run_mls_worker(
     mls: Arc<MlsAgent>,
     messager_handle: AgentMessageDispatcherHandle,
     cancel: CancellationToken,
-    notify: Arc<Notify>,
+    mut actions: mpsc::Receiver<MlsAction>,
 ) {
     let mut reporter = SystemReporter::new();
+    let mut action = MlsAction::SendReport;
     loop {
-        if let Err(err) = send_system_report(&mls, &messager_handle, &mut reporter).await {
-            tracing::error!("Failed to send system report: {}", err);
+        match action {
+            MlsAction::SendReport => {
+                if let Err(err) = send_system_report(&mls, &messager_handle, &mut reporter).await {
+                    tracing::error!("Failed to send system report: {err}");
+                }
+            }
+            MlsAction::RecreateGroup(response) => {
+                let result = recreate_group(&mls, &messager_handle).await;
+                if let Err(err) = &result {
+                    tracing::error!("Failed to recreate device group: {err}");
+                }
+                let _ = response.send(result.map_err(|err| err.to_string()));
+            }
         }
 
-        select! {
-            _ = cancel.cancelled().fuse() => return,
-            _ = notify.notified().fuse() => continue,
-            _ = tokio::time::sleep(SYSTEM_REPORT_INTERVAL).fuse() => continue,
-        }
+        action = tokio::select! {
+            _ = cancel.cancelled() => return,
+            action = actions.recv() => match action {
+                Some(action) => action,
+                None => return,
+            },
+            _ = tokio::time::sleep(SYSTEM_REPORT_INTERVAL) => MlsAction::SendReport,
+        };
     }
+}
+
+async fn recreate_group(
+    mls: &MlsAgent,
+    messager_handle: &AgentMessageDispatcherHandle,
+) -> anyhow::Result<()> {
+    let message = mls
+        .recreate_device_group()
+        .await
+        .map_err(|err| anyhow!(err))?;
+    messager_handle
+        .try_send(MessageFromAgent::Mls(message))
+        .await
+        .map_err(|_| anyhow!("Failed to submit recreated device group"))
 }
 
 async fn send_system_report(

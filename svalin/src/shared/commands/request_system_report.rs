@@ -1,15 +1,15 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
     session::Session,
 };
-use tokio::sync::Notify;
+use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
+use crate::agent::MlsAction;
+
 pub struct RequestSystemReportHandler {
-    pub notify: Arc<Notify>,
+    pub actions: mpsc::Sender<MlsAction>,
 }
 
 #[async_trait]
@@ -26,7 +26,7 @@ impl CommandHandler for RequestSystemReportHandler {
         _request: Self::Request,
         _cancel: CancellationToken,
     ) -> anyhow::Result<()> {
-        self.notify.notify_one();
+        self.actions.send(MlsAction::SendReport).await?;
 
         session.write_object(&()).await?;
         Ok(())

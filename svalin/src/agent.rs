@@ -16,7 +16,7 @@ use svalin_rpc::{
         connection::{Connection, ServeableConnectionBase},
     },
 };
-use tokio::sync::Notify;
+use tokio::sync::mpsc;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::instrument;
 
@@ -24,6 +24,7 @@ mod init;
 mod mls;
 
 pub use init::init;
+pub use mls::MlsAction;
 
 use crate::util::location::{Location, LocationError};
 use crate::util::{key_storage::KeySource, trust_store::save_trust_store};
@@ -43,7 +44,10 @@ use crate::{
 };
 use crate::{mls::MlsAgent, remote_key_retriever::RemoteKeyRetriever};
 use crate::{
-    shared::commands::{terminal::RemoteTerminalHandler, update_agent::UpdateAgentHandler},
+    shared::commands::{
+        recreate_device_group::RecreateDeviceGroupHandler, terminal::RemoteTerminalHandler,
+        update_agent::UpdateAgentHandler,
+    },
     util::trust_store::update_trust_store,
 };
 use crate::{shared::join_agent::AgentInitPayload, util::trust_store::load_trust_store};
@@ -137,7 +141,8 @@ pub async fn run(cancel: CancellationToken, profile: &str) -> Result<()> {
 
     let e2e_commands = HandlerCollection::new(permission_handler.clone());
 
-    let system_report_notify = Arc::new(Notify::new());
+    let (mls_actions, mls_action_receiver) = mpsc::channel(16);
+    let (messager_handle, message_dispatcher) = AgentMessageDispatcher::new();
 
     e2e_commands
         .chain()
@@ -147,8 +152,11 @@ pub async fn run(cancel: CancellationToken, profile: &str) -> Result<()> {
         .add(RemoteTerminalHandler)
         .add(TcpForwardHandler)
         .add(UpdateAgentHandler::new())
+        .add(RecreateDeviceGroupHandler {
+            actions: mls_actions.clone(),
+        })
         .add(RequestSystemReportHandler {
-            notify: system_report_notify.clone(),
+            actions: mls_actions,
         });
 
     let public_commands = HandlerCollection::new(permission_handler.clone());
@@ -167,8 +175,6 @@ pub async fn run(cancel: CancellationToken, profile: &str) -> Result<()> {
         .add(DeauthenticateHandler::new(public_commands));
 
     tracing::trace!("Starting agent background tasks");
-
-    let (messager_handle, message_dispatcher) = AgentMessageDispatcher::new();
 
     let connection = rpc.upstream_connection();
     tasks.spawn(async move {
@@ -202,11 +208,11 @@ pub async fn run(cancel: CancellationToken, profile: &str) -> Result<()> {
 
     mls::ensure_group_exists(&mls, &messager_handle).await?;
 
-    tasks.spawn(mls::schedule_system_reports(
+    tasks.spawn(mls::run_mls_worker(
         mls,
         messager_handle,
         cancel.clone(),
-        system_report_notify,
+        mls_action_receiver,
     ));
 
     cancel.cancelled().await;
