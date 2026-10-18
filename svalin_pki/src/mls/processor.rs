@@ -17,8 +17,8 @@ use openmls::{
     group::{
         AddMembersError, CommitBuilderStageError, CreateCommitError, CreateMessageError,
         ExportGroupInfoError, GroupId, MergePendingCommitError, MlsGroup, MlsGroupJoinConfig,
-        NewGroupError, PURE_PLAINTEXT_WIRE_FORMAT_POLICY, ProcessedWelcome, StagedCommit,
-        StagedWelcome, WelcomeError,
+        NewGroupError, PURE_PLAINTEXT_WIRE_FORMAT_POLICY, StagedCommit, StagedWelcome,
+        WelcomeError,
     },
     prelude::{
         CredentialWithKey, KeyPackageNewError, LeafNodeIndex, MlsMessageBodyOut, ProtocolMessage,
@@ -420,6 +420,7 @@ impl MlsProcessor {
         group_id: GroupId,
     ) -> Result<MessageToServerTransport, CreateGroupError> {
         let group = MlsGroup::builder()
+            .replace_old_group()
             .ciphersuite(self.provider.ciphersuite())
             .with_group_id(group_id.clone())
             .use_ratchet_tree_extension(true)
@@ -485,9 +486,9 @@ impl MlsProcessor {
             .sender_ratchet_configuration(SenderRatchetConfiguration::new(0, 0))
             .build();
 
-        let processed = ProcessedWelcome::new_from_welcome(&self.provider, &join_config, welcome)?;
-
-        let welcome = processed.into_staged_welcome(&self.provider, None)?;
+        let welcome = StagedWelcome::build_from_welcome(&self.provider, &join_config, welcome)?
+            .replace_old_group()
+            .build()?;
 
         Ok(welcome)
     }

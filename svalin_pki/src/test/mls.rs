@@ -1,5 +1,6 @@
 mod commit_attacks;
 mod group_attacks;
+mod group_recreation;
 mod identity_change_attacks;
 
 use std::{cell::RefCell, collections::HashMap, sync::Arc};

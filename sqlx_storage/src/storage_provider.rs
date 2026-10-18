@@ -860,7 +860,7 @@ impl<EpochKeyPairs: Entity<CURRENT_VERSION>> StorableEpochKeyPairsRef<'_, EpochK
         let epoch_id = KeyRefWrapper::<_, C>(epoch_id, PhantomData);
         let entity = EntitySliceWrapper::<_, C>(self.0, PhantomData);
         query!(
-            "INSERT INTO openmls_epoch_key_pairs (group_id, epoch_id, leaf_index, key_pairs)
+            "INSERT OR REPLACE INTO openmls_epoch_key_pairs (group_id, epoch_id, leaf_index, key_pairs)
             VALUES (?1, ?2, ?3, ?4)",
             group_id,
             epoch_id,
