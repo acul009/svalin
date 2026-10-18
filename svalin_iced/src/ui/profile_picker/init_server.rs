@@ -141,7 +141,7 @@ impl InitServer {
                     State::Totp { totp, .. } => match totp.check_current(&self.totp_input) {
                         None => {
                             self.error(ErrorDisplayInfo::new(
-                                Arc::new(anyhow!("TOTP mismatch")),
+                                Arc::new(anyhow!("{}", t!("profile-picker.invalid-totp"))),
                                 t!("profile-picker.error.totp.verify"),
                             ));
                             return Action::None;
@@ -150,8 +150,8 @@ impl InitServer {
                         Some(_) => match self.init.take() {
                             None => {
                                 self.error(ErrorDisplayInfo::new(
-                                    Arc::new(anyhow!("init already used")),
-                                    "init already used",
+                                    Arc::new(anyhow!("{}", t!("profile-picker.error.init-used"))),
+                                    t!("profile-picker.error.server-init"),
                                 ));
                                 return Action::None;
                             }

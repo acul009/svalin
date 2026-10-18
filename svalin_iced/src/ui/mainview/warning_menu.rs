@@ -84,13 +84,13 @@ fn device_warning(warning: &warning::Device) -> Element<'_, Message> {
         )),
         warning::Device::MissingName => text(t!("warnings.device.missing-name")),
         warning::Device::BitlockerActive { drive, .. } => {
-            text!("Drive {drive} has bitlocker active!")
+            text(t!("warnings.device.bitlocker-active", "drive" => drive))
         }
         warning::Device::PMGAttachmentQuarantine(count) => {
-            text!("There are {count} mails in the attachment quarantine")
+            text(t!("warnings.device.attachment-quarantine", "count" => count))
         }
         warning::Device::PMGVirusQuarantine(count) => {
-            text!("There are {count} mails in the virus quarantine")
+            text(t!("warnings.device.virus-quarantine", "count" => count))
         }
         warning::Device::BackupOverdue { name, due_at } => text(t!(
             "warnings.device.backup-overdue",

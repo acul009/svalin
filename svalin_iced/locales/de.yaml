@@ -10,6 +10,8 @@ add-device:
     join-code: Beitrittscode
   success: Das neue Gerät wurde erfolgreich registriert!
   title:
+    add: Gerät hinzufügen
+    adding: Gerät wird hinzugefügt...
     confirm-code: Geben Sie den Bestätigungscode ein
     device-name: Legen Sie den Gerätenamen fest
     join-code: Geben Sie den Beitrittscode ein
@@ -53,6 +55,8 @@ profile-picker:
       verify: Fehler beim Überprüfen des TOTP-Codes
     unlock: Fehler beim Entsperren des Profils
     login: Fehler bei der Anmeldung
+    login-used: Dieser Anmeldeversuch wurde bereits verwendet. Bitte beginnen Sie erneut.
+    init-used: Dieser Einrichtungsversuch wurde bereits verwendet. Bitte beginnen Sie erneut.
   init-loading: Server wird initialisiert...
   input:
     name: Profilname
@@ -68,6 +72,8 @@ profile-picker:
   wrong-password: Benutzername oder Passwort ist falsch!
   invalid-totp: Der TOTP-Code war ungültig
 device-list:
+  all: Alle Geräte
+  nogroup: Keine Gruppe
   clear-search: Suche leeren
   search: Geräte suchen
   loading: Geräte werden geladen...
@@ -87,6 +93,7 @@ device:
     group: "Gruppe:"
     notes: "Notizen:"
   report:
+    generate: Neuen Bericht erstellen
     title: Systembericht
     backup: Backup
     backup-coverage: Konfigurierter Backup-Umfang
@@ -142,9 +149,9 @@ realtime:
   core: Kern %{id}
   cpu: CPU
   live-unavailable: Live-Daten nicht verfügbar
-  memory: Erinnerung
+  memory: Arbeitsspeicher
   ram: RAM
-  swap: Tauschen
+  swap: Swap
 tunnel:
   menu:
     title: Offene Tunnel
@@ -167,6 +174,9 @@ warnings:
   device:
     action: Öffnen
     group-broken: Die zugeordnete Gerätegruppe ist beschädigt
+    bitlocker-active: "BitLocker ist auf Laufwerk %{drive} aktiv"
+    attachment-quarantine: "E-Mails in der Anhang-Quarantäne: %{count}"
+    virus-quarantine: "E-Mails in der Virus-Quarantäne: %{count}"
     disk-space-low: "Wenig Speicherplatz auf %{disk}: %{free} von %{total} frei"
     missing-name: Das Gerät hat noch keinen Namen
     backup-overdue: "Backup-Auftrag %{name} ist überfällig (fällig: %{due_at})"

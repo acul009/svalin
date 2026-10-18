@@ -100,8 +100,8 @@ impl LoginDialog {
                 State::LoginForm => match self.login.take() {
                     None => {
                         self.state = State::Error(ErrorDisplayInfo::new(
-                            Arc::new(anyhow!("login already used")),
-                            "login already used",
+                            Arc::new(anyhow!("{}", t!("profile-picker.error.login-used"))),
+                            t!("profile-picker.error.login"),
                         ));
                         return Action::None;
                     }

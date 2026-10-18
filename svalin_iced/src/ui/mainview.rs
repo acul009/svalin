@@ -353,7 +353,7 @@ impl MainView {
         match &self.screen {
             Screen::DeviceList => Some(
                 column![
-                    button_list::entry(text("All devices"))
+                    button_list::entry(text(t!("device-list.all")))
                         .on_press(Message::GroupFilter(GroupFilter::NoFilter))
                         .into_widget(40, [8, 16], true),
                     rule::horizontal(2),

@@ -13,7 +13,7 @@ use svalin::client::{
     tunnel_manager::{TunnelConfig, TunnelDefinition},
 };
 use svalin_pki::SpkiHash;
-use svalin_sysctl::system_report::{Disk, proxmox_ve::backup::BackupStatus};
+use svalin_sysctl::system_report::{Disk, OSFamily, proxmox_ve::backup::BackupStatus};
 use url::Url;
 
 use crate::{
@@ -363,7 +363,10 @@ fn device_report(svalin_report: &persistent::Report) -> impl Widget<Message> + '
                                 .os
                                 .as_ref()
                                 .map(iced::widget::text)
-                                .unwrap_or_else(|| text(report.os_family.to_string())),
+                                .unwrap_or_else(|| text(match report.os_family {
+                                    OSFamily::Unknown => t!("generic.unknown").to_string(),
+                                    family => family.to_string(),
+                                })),
                             os_icon(&report.os_family)
                         ]
                         .spacing(10)
@@ -439,7 +442,7 @@ fn device_report(svalin_report: &persistent::Report) -> impl Widget<Message> + '
     .title(text(t!("device.report.title")))
     .action(
         icon_button(bootstrap::arrow_clockwise())
-            .tooltip(text("Generate New Report"))
+            .tooltip(text(t!("device.report.generate")))
             .on_press(Message::RefreshReport)
             .into_widget(),
     )

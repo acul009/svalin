@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use iced::{
     Task, Widget,
-    widget::{button, column, operation, text_input},
+    widget::{button, column, operation, text, text_input},
 };
 use svalin::client::Client;
 use svalin_pki::{Certificate, SpkiHash};
@@ -108,7 +108,7 @@ impl AddDevice {
                 .into_overlay()
                 .boxed(),
             Screen::Loading(message) => dialog(loading(message).into_widget())
-                .title("Adding Device...")
+                .title(text(t!("add-device.title.adding")))
                 .into_float()
                 .boxed(),
             Screen::Input => dialog(
@@ -123,7 +123,7 @@ impl AddDevice {
                 ]
                 .spacing(10),
             )
-            .title("Add Device")
+            .title(text(t!("add-device.title.add")))
             .on_close(Message::Cancel)
             .button(
                 button(iced::widget::text(t!("generic.continue")))

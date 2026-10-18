@@ -9,7 +9,7 @@ generic:
   unlock: Unlock
   password: Password
   success: Success
-  error: An error has occured!
+  error: An error has occurred!
   required-field: required
   passwords-dont-match: Passwords must match
   username: Username
@@ -32,6 +32,8 @@ profile-picker:
     delete: Error while deleting profile
     connect-to-server: Error while connecting to server
     login: Error during login
+    login-used: This login attempt has already been used. Please start again.
+    init-used: This setup attempt has already been used. Please start again.
   init-loading: initializing Server...
   unlocking: Unlocking Profile...
   connecting-to-server: Connecting to Server...
@@ -56,6 +58,8 @@ add-device:
     join-code: Error while connecting to new agent
   enrolling: Enrolling Device...
   title:
+    add: Add device
+    adding: Adding device...
     join-code: Input Join Code
     device-name: Set Device Name
     confirm-code: Input Confirm Code
@@ -91,6 +95,8 @@ tunnel:
 device_list:
   add: Add Device
 device-list:
+  all: All devices
+  nogroup: No group
   clear-search: Clear search
   search: Search devices
   loading: Loading devices...
@@ -110,6 +116,7 @@ device:
     group: "Group:"
     notes: "Notes:"
   report:
+    generate: Generate new report
     title: System Report
     backup: Backup
     backup-coverage: Configured backup coverage
@@ -167,6 +174,9 @@ warnings:
   device:
     action: Open
     group-broken: Device associated group broken
+    bitlocker-active: "BitLocker is active on drive %{drive}"
+    attachment-quarantine: "Emails in attachment quarantine: %{count}"
+    virus-quarantine: "Emails in virus quarantine: %{count}"
     disk-space-low: "Disk space low on %{disk}: %{free} of %{total} free"
     missing-name: Device has no name yet
     backup-overdue: "Backup job %{name} is overdue (due: %{due_at})"
