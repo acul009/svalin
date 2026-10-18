@@ -100,28 +100,27 @@ where
                     unreachable!()
                 };
                 tracing::trace!("handling group message");
-                let processed = match self.harness.processor().process_message(message).await {
-                    Ok(processed) => processed,
-                    Err(err) => match err {
-                        ProcessMessageError::ProcessError(
-                            openmls::group::ProcessMessageError::ValidationError(
-                                openmls::group::ValidationError::CannotDecryptOwnMessage,
-                            ),
-                        ) => {
-                            return Ok(MessageData {
-                                content: MessageDataContent::Internal,
-                                group: group_id,
-                            });
-                        }
-                        source => {
-                            return Err(HandleMessageError::ProcessMessage { group_id, source });
-                        }
-                    },
-                };
+                let processed = self
+                    .harness
+                    .processor()
+                    .process_message(message)
+                    .await
+                    .map_err(|source| HandleMessageError::ProcessMessage {
+                        group_id: group_id.clone(),
+                        source,
+                    })?;
                 tracing::trace!("message processed successfully");
-                tracing::trace!("group id parsed successfully");
-                let ProcessedContent::Message(decrypted) = processed.content else {
-                    return Err(HandleMessageError::InvalidMessage { group_id });
+                let decrypted = match processed.content {
+                    ProcessedContent::Message(decrypted) => decrypted,
+                    ProcessedContent::Internal => {
+                        return Ok(MessageData {
+                            content: MessageDataContent::Internal,
+                            group: group_id,
+                        });
+                    }
+                    ProcessedContent::Commit(_) => {
+                        return Err(HandleMessageError::InvalidMessage { group_id });
+                    }
                 };
                 let decoded: SvalinMessage<Types> =
                     rmp_serde::from_slice(&decrypted).map_err(|source| {

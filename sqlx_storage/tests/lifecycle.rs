@@ -35,6 +35,21 @@ async fn proposals() {
         .collect();
     assert_eq!(proposals_expected, proposals_read);
 
+    let replacement = TestProposal(b"replacement proposal".to_vec());
+    storage
+        .queue_proposal(&group_id, &TestProposalRef(5), &replacement)
+        .unwrap();
+    let updated: Vec<(TestProposalRef, TestProposal)> =
+        storage.queued_proposals(&group_id).unwrap();
+    assert_eq!(
+        updated
+            .iter()
+            .find(|(reference, _)| *reference == TestProposalRef(5))
+            .unwrap()
+            .1,
+        replacement
+    );
+
     storage
         .remove_proposal(&group_id, &TestProposalRef(5))
         .unwrap();
@@ -211,6 +226,12 @@ async fn key_material_roundtrip() {
     storage.run_migrations().await.unwrap();
 
     storage
+        .write_signature_key_pair(
+            &signature_public_key,
+            &TestSignatureKeyPair(b"stale".to_vec()),
+        )
+        .unwrap();
+    storage
         .write_signature_key_pair(&signature_public_key, &signature_key_pair)
         .unwrap();
     let signature_pair_read: Option<TestSignatureKeyPair> =
@@ -224,6 +245,9 @@ async fn key_material_roundtrip() {
     assert!(signature_pair_after_delete.is_none());
 
     storage
+        .write_encryption_key_pair(&encryption_key, &TestHpkeKeyPair(b"stale".to_vec()))
+        .unwrap();
+    storage
         .write_encryption_key_pair(&encryption_key, &encryption_pair)
         .unwrap();
     let encryption_pair_read: Option<TestHpkeKeyPair> =
@@ -234,6 +258,14 @@ async fn key_material_roundtrip() {
         storage.encryption_key_pair(&encryption_key).unwrap();
     assert!(encryption_pair_after_delete.is_none());
 
+    storage
+        .write_encryption_epoch_key_pairs(
+            &group_id,
+            &epoch,
+            leaf_index,
+            &[TestHpkeKeyPair(b"stale".to_vec())],
+        )
+        .unwrap();
     storage
         .write_encryption_epoch_key_pairs(&group_id, &epoch, leaf_index, &epoch_pairs)
         .unwrap();
@@ -249,6 +281,9 @@ async fn key_material_roundtrip() {
         .unwrap();
     assert!(epoch_pairs_after_delete.is_empty());
 
+    storage
+        .write_key_package(&hash_ref, &TestKeyPackage(b"stale".to_vec()))
+        .unwrap();
     storage.write_key_package(&hash_ref, &key_package).unwrap();
     let key_package_read: Option<TestKeyPackage> = storage.key_package(&hash_ref).unwrap();
     assert_eq!(Some(key_package.clone()), key_package_read);
@@ -256,6 +291,9 @@ async fn key_material_roundtrip() {
     let key_package_after_delete: Option<TestKeyPackage> = storage.key_package(&hash_ref).unwrap();
     assert!(key_package_after_delete.is_none());
 
+    storage
+        .write_psk(&psk_id, &TestPskBundle(b"stale".to_vec()))
+        .unwrap();
     storage.write_psk(&psk_id, &psk_bundle).unwrap();
     let psk_bundle_read: Option<TestPskBundle> = storage.psk(&psk_id).unwrap();
     assert_eq!(Some(psk_bundle.clone()), psk_bundle_read);

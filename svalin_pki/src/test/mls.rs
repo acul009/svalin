@@ -2,6 +2,7 @@ mod commit_attacks;
 mod group_attacks;
 mod group_recreation;
 mod identity_change_attacks;
+mod own_messages;
 
 use std::{cell::RefCell, collections::HashMap, sync::Arc};
 

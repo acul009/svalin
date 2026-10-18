@@ -675,7 +675,7 @@ impl<C: Codec> StorageProvider<CURRENT_VERSION> for SqliteStorageProvider<C> {
         block_async_in_place(task)
     }
 
-    #[cfg(feature = "extensions-draft-08")]
+    #[cfg(feature = "extensions-draft")]
     fn write_application_export_tree<
         GroupId: traits::GroupId<CURRENT_VERSION>,
         ApplicationExportTree: traits::ApplicationExportTree<CURRENT_VERSION>,
@@ -690,7 +690,7 @@ impl<C: Codec> StorageProvider<CURRENT_VERSION> for SqliteStorageProvider<C> {
         block_async_in_place(task)
     }
 
-    #[cfg(feature = "extensions-draft-08")]
+    #[cfg(feature = "extensions-draft")]
     fn application_export_tree<
         GroupId: traits::GroupId<CURRENT_VERSION>,
         ApplicationExportTree: traits::ApplicationExportTree<CURRENT_VERSION>,
@@ -706,7 +706,7 @@ impl<C: Codec> StorageProvider<CURRENT_VERSION> for SqliteStorageProvider<C> {
         block_async_in_place(task)
     }
 
-    #[cfg(feature = "extensions-draft-08")]
+    #[cfg(feature = "extensions-draft")]
     fn delete_application_export_tree<
         GroupId: traits::GroupId<CURRENT_VERSION>,
         ApplicationExportTree: traits::ApplicationExportTree<CURRENT_VERSION>,
@@ -784,7 +784,7 @@ impl<SignatureKeyPairs: Entity<CURRENT_VERSION>>
         let public_key = KeyRefWrapper::<_, C>(public_key, PhantomData);
         let signature_key = EntityRefWrapper::<_, C>(self.0, PhantomData);
         query!(
-            "INSERT INTO openmls_signature_key (public_key, signature_key) VALUES (?1, ?2)",
+            "INSERT OR REPLACE INTO openmls_signature_key (public_key, signature_key) VALUES (?1, ?2)",
             public_key,
             signature_key
         )
@@ -803,7 +803,7 @@ impl<LeafNode: Entity<CURRENT_VERSION>> StorableLeafNodeRef<'_, LeafNode> {
         let group_id = KeyRefWrapper::<_, C>(group_id, PhantomData);
         let entity = EntityRefWrapper::<_, C>(self.0, PhantomData);
         query!(
-            "INSERT INTO openmls_own_leaf_node (group_id, leaf_node) VALUES (?1, ?2)",
+            "INSERT OR REPLACE INTO openmls_own_leaf_node (group_id, leaf_node) VALUES (?1, ?2)",
             group_id,
             entity,
         )
@@ -838,7 +838,7 @@ impl<KeyPackage: Entity<CURRENT_VERSION>> StorableKeyPackageRef<'_, KeyPackage> 
         let key_package_ref = KeyRefWrapper::<_, C>(key_package_ref, PhantomData);
         let key_package = EntityRefWrapper::<_, C>(self.0, PhantomData);
         query!(
-            "INSERT INTO openmls_key_package (key_package_ref, key_package) VALUES (?1, ?2)",
+            "INSERT OR REPLACE INTO openmls_key_package (key_package_ref, key_package) VALUES (?1, ?2)",
             key_package_ref,
             key_package,
         )
@@ -882,7 +882,7 @@ impl<PskBundle: Entity<CURRENT_VERSION>> StorablePskBundleRef<'_, PskBundle> {
         let psk_id = KeyRefWrapper::<_, C>(psk_id, PhantomData);
         let psk_bundle = EntityRefWrapper::<_, C>(self.0, PhantomData);
         query!(
-            "INSERT INTO openmls_psk (psk_id, psk_bundle) VALUES (?1, ?2)",
+            "INSERT OR REPLACE INTO openmls_psk (psk_id, psk_bundle) VALUES (?1, ?2)",
             psk_id,
             psk_bundle,
         )
@@ -924,7 +924,7 @@ impl<Proposal: Entity<CURRENT_VERSION>, ProposalRef: Entity<CURRENT_VERSION>>
         let proposal_ref = EntityRefWrapper::<_, C>::new(self.0);
         let proposal = EntityRefWrapper::<_, C>::new(self.1);
         query!(
-            "INSERT INTO openmls_proposal (group_id, proposal_ref, proposal) VALUES (?1, ?2, ?3)",
+            "INSERT OR REPLACE INTO openmls_proposal (group_id, proposal_ref, proposal) VALUES (?1, ?2, ?3)",
             group_id,
             proposal_ref,
             proposal
@@ -1040,7 +1040,7 @@ impl<EncryptionKeyPair: Entity<CURRENT_VERSION>>
         let public_key = KeyRefWrapper::<_, C>(public_key, PhantomData);
         let key_pair = EntityRefWrapper::<_, C>(self.0, PhantomData);
         query!(
-            "INSERT INTO openmls_encryption_key (public_key, key_pair) VALUES (?1, ?2)",
+            "INSERT OR REPLACE INTO openmls_encryption_key (public_key, key_pair) VALUES (?1, ?2)",
             public_key,
             key_pair
         )

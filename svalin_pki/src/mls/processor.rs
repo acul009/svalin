@@ -374,6 +374,7 @@ impl ProcessedMessage {
 }
 
 pub(crate) enum ProcessedContent {
+    Internal,
     Message(Vec<u8>),
     Commit(Box<openmls::prelude::StagedCommit>),
 }
@@ -381,6 +382,7 @@ pub(crate) enum ProcessedContent {
 impl Debug for ProcessedContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            ProcessedContent::Internal => f.debug_tuple("Internal").finish(),
             ProcessedContent::Message(_) => f.debug_tuple("Message").finish(),
             ProcessedContent::Commit(_) => f.debug_tuple("Commit").finish(),
         }
@@ -569,6 +571,15 @@ impl MlsProcessor {
         tracing::trace!("sender is {sender:?}");
 
         match processed.into_content() {
+            openmls::prelude::ProcessedMessageContent::OwnPrivateMessage => Ok(ProcessedMessage {
+                group_id,
+                sender,
+                content: ProcessedContent::Internal,
+            }),
+            openmls::prelude::ProcessedMessageContent::OwnPendingCommit => {
+                // Our outgoing commits are merged before they are sent.
+                Err(ProcessMessageError::ForbiddenMessageType)
+            }
             openmls::prelude::ProcessedMessageContent::ApplicationMessage(application_message) => {
                 Ok(ProcessedMessage {
                     group_id,

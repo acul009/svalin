@@ -281,6 +281,10 @@ impl PublicProcessor {
             .deserialized()?;
 
         match processed.into_content() {
+            openmls::prelude::ProcessedMessageContent::OwnPendingCommit
+            | openmls::prelude::ProcessedMessageContent::OwnPrivateMessage => {
+                anyhow::bail!("message type not allowed")
+            }
             openmls::prelude::ProcessedMessageContent::ApplicationMessage(_application_message) => {
                 unreachable!("see the private message shortcut above");
             }
