@@ -57,6 +57,7 @@ impl ServerView {
     pub fn sidebar(&self) -> crate::Element<'_, Message> {
         column![
             button_list::entry(text(t!("server.sessions")))
+                .selected(self.screen == Screen::Sessions)
                 .on_press(Message::SelectScreen(Screen::Sessions))
                 .into_widget(40, [8, 16], false)
         ]

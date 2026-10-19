@@ -87,6 +87,8 @@ impl<'a, Message: Clone + 'static, Tip> IconButton<'a, Message, Tip> {
             button.style(|theme: &iced::Theme, status| {
                 let palette = theme.palette();
                 let mut style = button::primary(theme, status);
+                style.border.color = palette.primary.base.color;
+                style.border.width = 1.0;
                 let darken = match status {
                     button::Status::Active => 0.50,
                     button::Status::Hovered => 0.40,

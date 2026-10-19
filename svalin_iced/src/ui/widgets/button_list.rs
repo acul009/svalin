@@ -1,7 +1,7 @@
 use iced::{
     Color, Length, Padding, Pixels, Widget,
     alignment::Vertical,
-    widget::{button, column, container, row, text},
+    widget::{button, column, container, row, space, stack, text},
 };
 
 use crate::{Element, Theme, bootstrap};
@@ -17,6 +17,7 @@ pub struct Entry<'a, Message> {
     content: Element<'a, Message>,
     on_press: Option<Message>,
     color: Option<Color>,
+    selected: bool,
 }
 
 pub fn entry<'a, Message>(content: impl Widget<Message> + 'a) -> Entry<'a, Message> {
@@ -24,10 +25,17 @@ pub fn entry<'a, Message>(content: impl Widget<Message> + 'a) -> Entry<'a, Messa
         content: content.boxed(),
         on_press: None,
         color: None,
+        selected: false,
     }
 }
 
 impl<'a, Message> Entry<'a, Message> {
+    /// Marks the selected entry with a primary-color bar on its left edge.
+    pub fn selected(mut self, selected: bool) -> Self {
+        self.selected = selected;
+        self
+    }
+
     pub fn on_press(mut self, on_press: Message) -> Self {
         self.on_press = Some(on_press);
         self
@@ -115,6 +123,7 @@ impl<'a, Message: Clone + 'static> Entry<'a, Message> {
         shaded: bool,
     ) -> impl iced::Widget<Message> + 'a {
         let height = height.into();
+        let selected = self.selected;
         let content = row![
             container(self.content).width(Length::Fill),
             bootstrap::chevron_right()
@@ -129,7 +138,7 @@ impl<'a, Message: Clone + 'static> Entry<'a, Message> {
         .spacing(16)
         .align_y(Vertical::Center);
 
-        container(
+        container(stack![
             button(content)
                 .on_press_maybe(self.on_press)
                 .width(Length::Fill)
@@ -140,7 +149,13 @@ impl<'a, Message: Clone + 'static> Entry<'a, Message> {
                 } else {
                     row_style_even
                 }),
-        )
+            container(space().width(3).height(height)).style(
+                move |theme: &Theme| container::Style {
+                    background: selected.then(|| theme.palette().primary.base.color.into()),
+                    ..Default::default()
+                }
+            ),
+        ])
         .width(Length::Fill)
         .style(move |_theme| container::Style {
             background: self.color.map(Into::into),

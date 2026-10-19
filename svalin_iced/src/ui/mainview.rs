@@ -274,15 +274,24 @@ impl MainView {
         }
     }
 
-    pub fn view(&self) -> crate::Element<'_, Message> {
-        match self.section {
+    pub fn view(&self) -> impl Widget<Message> + '_ {
+        let screen = match self.section {
             Section::Devices => self.devices_view(),
             Section::Server => self.server_view.view().map(Message::ServerView).boxed(),
-        }
+        };
+
+        stack![
+            screen,
+            self.error.as_ref().map(|error| {
+                error_display(error)
+                    .on_close(Message::CloseError)
+                    .into_overlay()
+            }),
+        ]
     }
 
     fn devices_view(&self) -> crate::Element<'_, Message> {
-        let screen = match &self.screen {
+        match &self.screen {
             Screen::Loading(text) => loading(text).into_widget().boxed(),
             Screen::DeviceList => column![
                 row![
@@ -316,18 +325,6 @@ impl MainView {
                 .view(&self.state)
                 .map(Message::DeviceView)
                 .boxed(),
-        };
-
-        if let Some(error) = &self.error {
-            stack![
-                screen,
-                error_display(error)
-                    .on_close(Message::CloseError)
-                    .into_overlay()
-            ]
-            .boxed()
-        } else {
-            screen
         }
     }
 
@@ -347,14 +344,14 @@ impl MainView {
     }
 
     pub fn header(&self) -> header::Header<'_, Message> {
-        if self.section == Section::Server {
-            return header(text(t!("navigation.server")));
-        }
-        let header = match &self.screen {
-            Screen::DeviceView(device_view) => {
-                device_view.header(&self.state).map(Message::DeviceView)
-            }
-            _ => header(iced::widget::void()),
+        let header = match self.section {
+            Section::Server => header(text(t!("navigation.server"))),
+            Section::Devices => match &self.screen {
+                Screen::DeviceView(device_view) => {
+                    device_view.header(&self.state).map(Message::DeviceView)
+                }
+                _ => header(iced::widget::void()),
+            },
         };
 
         let severity = self.state.warnings().highest_severity();
@@ -420,6 +417,7 @@ impl MainView {
             Screen::DeviceList => Some(
                 column![
                     button_list::entry(text(t!("device-list.all")))
+                        .selected(matches!(self.group_filter, GroupFilter::NoFilter))
                         .on_press(Message::GroupFilter(GroupFilter::NoFilter))
                         .into_widget(40, [8, 16], false),
                     rule::horizontal(2),
@@ -430,6 +428,7 @@ impl MainView {
                                 .map(|s| s.as_str().into())
                                 .unwrap_or_else(|| t!("device-list.nogroup"));
                             button_list::entry(text(name))
+                                .selected(matches!(&self.group_filter, GroupFilter::Group(selected) if selected == group))
                                 .on_press(Message::GroupFilter(group.into()))
                         }))
                         .entry_height(40)
