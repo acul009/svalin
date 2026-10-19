@@ -132,7 +132,7 @@ impl From<&PermissionPrecursor<RequestSystemReportHandler>> for Permission {
 
 impl From<&PermissionPrecursor<UpdateAgentHandler>> for Permission {
     fn from(_value: &PermissionPrecursor<UpdateAgentHandler>) -> Self {
-        Permission::SessionOnly
+        Permission::RootOnlyPlaceholder
     }
 }
 
