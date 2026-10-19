@@ -32,7 +32,7 @@ impl ServerStore {
             trust_store_transactions: TrustStoreTransactionStore::open(pool.clone()).await?,
             key_packages: KeyPackageStore::open(pool.clone()),
             messages: MessageStore::open(pool.clone()),
-            sessions: SessionStore::open(pool.clone()),
+            sessions: SessionStore::open(pool.clone()).await?,
             users: UserStore::open(pool.clone()),
             pool,
         })

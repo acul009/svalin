@@ -408,6 +408,11 @@ impl CertificateData {
         self.certificate_type
     }
 
+    /// Certificate expiration as a Unix timestamp in seconds.
+    pub fn expires_at(&self) -> i64 {
+        self.validity.not_after.timestamp()
+    }
+
     pub fn check_validity_at(&self, time: u64) -> Result<(), ValidityError> {
         // Todo: maybe not try to panic here or at least verify that this conversion
         // always works

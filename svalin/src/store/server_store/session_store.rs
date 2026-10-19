@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use svalin_pki::{Certificate, CertificateType, SpkiHash, UnverifiedCertificate};
+use svalin_pki::{
+    Certificate, CertificateType, SpkiHash, UnverifiedCertificate, get_current_timestamp,
+};
 
 #[derive(Debug)]
 pub struct SessionStore {
@@ -16,8 +18,25 @@ pub enum AddSessionError {
 }
 
 impl SessionStore {
-    pub fn open(pool: sqlx::SqlitePool) -> Arc<Self> {
-        Arc::new(Self { pool })
+    pub async fn open(pool: sqlx::SqlitePool) -> Result<Arc<Self>, sqlx::Error> {
+        // Existing databases need their certificate expiry extracted once.
+        let mut tx = pool.begin().await?;
+        let sessions = sqlx::query_as::<_, (Vec<u8>, Vec<u8>)>(
+            "SELECT spki_hash, certificate FROM sessions WHERE expires_at IS NULL",
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        for (spki_hash, der) in sessions {
+            let certificate = UnverifiedCertificate::from_der(der)
+                .map_err(|err| sqlx::Error::Decode(Box::new(err)))?;
+            sqlx::query("UPDATE sessions SET expires_at = ? WHERE spki_hash = ?")
+                .bind(certificate.expires_at())
+                .bind(spki_hash)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(Arc::new(Self { pool }))
     }
 
     pub async fn add_session(
@@ -34,12 +53,13 @@ impl SessionStore {
         let issuer = certificate.issuer().as_slice();
         let der = certificate.as_der();
 
-        sqlx::query!(
-            "INSERT INTO sessions (spki_hash, issuer, certificate) VALUES (?, ?, ?)",
-            spki_hash,
-            issuer,
-            der
+        sqlx::query(
+            "INSERT INTO sessions (spki_hash, issuer, certificate, expires_at) VALUES (?, ?, ?, ?)",
         )
+        .bind(spki_hash)
+        .bind(issuer)
+        .bind(der)
+        .bind(certificate.expires_at())
         .execute(&self.pool)
         .await?;
 
@@ -64,6 +84,16 @@ impl SessionStore {
         };
 
         Ok(Some(session))
+    }
+
+    /// Deletes expired session certificates and returns the number removed.
+    pub async fn delete_expired_sessions(&self) -> anyhow::Result<u64> {
+        let now = i64::try_from(get_current_timestamp())?;
+        let result = sqlx::query("DELETE FROM sessions WHERE expires_at < ?")
+            .bind(now)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
     }
 
     pub async fn list_user_sessions(
