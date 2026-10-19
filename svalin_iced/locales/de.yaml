@@ -196,3 +196,13 @@ navigation:
 
 server:
   sessions: Sitzungen
+
+sessions:
+  loading: Sitzungen werden geladen...
+  load-failed: Sitzungen konnten nicht geladen werden
+  empty: Keine Sitzungen gefunden
+  refresh: Aktualisieren
+  current: Aktuelle Sitzung
+  session: Sitzung
+  valid-from: Gültig ab
+  expires-at: Gültig bis

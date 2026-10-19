@@ -249,12 +249,23 @@ impl MainView {
             }
             Message::Section(section) => {
                 self.section = section;
-                Action::None
+                match section {
+                    Section::Devices => Action::None,
+                    Section::Server => Action::Run(
+                        self.server_view
+                            .update(
+                                server_view::Message::SelectScreen(server_view::Screen::Sessions),
+                                &self.client,
+                            )
+                            .map(Message::ServerView),
+                    ),
+                }
             }
-            Message::ServerView(message) => {
-                self.server_view.update(message);
-                Action::None
-            }
+            Message::ServerView(message) => Action::Run(
+                self.server_view
+                    .update(message, &self.client)
+                    .map(Message::ServerView),
+            ),
             Message::FocusSearch => {
                 Action::Run(iced::widget::operation::focus("device-search").chain(
                     iced::widget::operation::text_input::select_all("device-search"),

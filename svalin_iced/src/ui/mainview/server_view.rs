@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use iced::{
-    Widget,
+    Task, Widget,
     widget::{column, text},
 };
+use svalin::client::Client;
 
 use crate::ui::widgets::button_list;
 
@@ -31,18 +34,23 @@ impl ServerView {
         }
     }
 
-    pub fn update(&mut self, message: Message) {
+    pub fn update(&mut self, message: Message, client: &Arc<Client>) -> Task<Message> {
         match message {
-            Message::SelectScreen(screen) => self.screen = screen,
-            Message::Sessions(message) => self.sessions.update(message),
+            Message::SelectScreen(screen) => {
+                self.screen = screen;
+                self.sessions
+                    .update(sessions_view::Message::Refresh, client)
+                    .map(Message::Sessions)
+            }
+            Message::Sessions(message) => {
+                self.sessions.update(message, client).map(Message::Sessions)
+            }
         }
     }
 
     pub fn view(&self) -> impl Widget<Message> + '_ {
         match self.screen {
-            Screen::Sessions => sessions_view::view(&self.sessions)
-                .map(Message::Sessions)
-                .boxed(),
+            Screen::Sessions => self.sessions.view().map(Message::Sessions).boxed(),
         }
     }
 

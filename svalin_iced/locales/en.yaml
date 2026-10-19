@@ -196,3 +196,13 @@ navigation:
 
 server:
   sessions: Sessions
+
+sessions:
+  loading: Loading sessions...
+  load-failed: Failed to load sessions
+  empty: No sessions found
+  refresh: Refresh
+  current: Current session
+  session: Session
+  valid-from: Valid from
+  expires-at: Expires at

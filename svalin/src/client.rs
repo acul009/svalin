@@ -98,6 +98,11 @@ impl Client {
             .map_err(|err| anyhow!(err))
     }
 
+    /// Public-key fingerprint of the session used by this client.
+    pub fn session_spki_hash(&self) -> &SpkiHash {
+        self.device_credential.certificate().spki_hash()
+    }
+
     pub fn device(&self, spki_hash: SpkiHash) -> DeviceHandle<'_> {
         DeviceHandle::new(self, spki_hash)
     }
