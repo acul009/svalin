@@ -189,3 +189,10 @@ terminal:
   connecting: Connecting to terminal...
   unavailable: Terminal unavailable
   closed: Terminal closed
+
+navigation:
+  devices: Devices
+  server: Server
+
+server:
+  sessions: Sessions

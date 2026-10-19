@@ -12,6 +12,7 @@ use crate::{
     message_streaming::{with_agent, with_client},
     shared::commands::{
         get_key_packages::GetKeyPackagesHandler, get_user_credentials::GetUserCredentialHandler,
+        list_user_sessions::ListUserSessionsHandler,
         load_certificate_chain::LoadCertificateChainHandler,
         public_server_status::PublicStatusHandler,
         recreate_device_group::RecreateDeviceGroupHandler,
@@ -31,6 +32,12 @@ pub enum Permission {
     AuthenticatedOnly,
     AnonymousOnly,
     SessionOnly,
+}
+
+impl From<&PermissionPrecursor<ListUserSessionsHandler>> for Permission {
+    fn from(_value: &PermissionPrecursor<ListUserSessionsHandler>) -> Self {
+        Permission::SessionOnly
+    }
 }
 
 impl From<&PermissionPrecursor<PingHandler>> for Permission {

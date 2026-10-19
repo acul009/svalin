@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use crate::store::server_store::SessionStore;
 use async_trait::async_trait;
-use svalin_pki::{SpkiHash, UnverifiedCertificate};
+use svalin_pki::{CertificateType, UnverifiedCertificate};
 use svalin_rpc::rpc::{
     command::{dispatcher::CommandDispatcher, handler::CommandHandler},
+    peer::Peer,
     session::Session,
 };
 use tokio_util::sync::CancellationToken;
@@ -15,7 +16,7 @@ pub struct ListUserSessionsHandler {
 
 #[async_trait]
 impl CommandHandler for ListUserSessionsHandler {
-    type Request = SpkiHash;
+    type Request = ();
 
     fn key() -> String {
         "list-user-sessions".into()
@@ -23,10 +24,19 @@ impl CommandHandler for ListUserSessionsHandler {
     async fn handle(
         &self,
         session: &mut Session,
-        request: Self::Request,
+        _request: Self::Request,
         _cancel: CancellationToken,
     ) -> anyhow::Result<()> {
-        let user_sessions = self.session_store.list_user_sessions(&request).await?;
+        let Peer::Certificate(certificate) = session.peer() else {
+            anyhow::bail!("Only user sessions can list their own sessions");
+        };
+        if certificate.certificate_type() != CertificateType::UserSession {
+            anyhow::bail!("Only user sessions can list their own sessions");
+        }
+        let user_sessions = self
+            .session_store
+            .list_user_sessions(certificate.issuer())
+            .await?;
 
         session.write_object(&user_sessions).await?;
 
@@ -36,21 +46,22 @@ impl CommandHandler for ListUserSessionsHandler {
     }
 }
 
-pub struct ListUserSessions<'a>(pub &'a SpkiHash);
+/// Lists sessions belonging to the authenticated session's user.
+pub struct ListUserSessions;
 
-impl<'a> CommandDispatcher for ListUserSessions<'a> {
+impl CommandDispatcher for ListUserSessions {
     type Output = Vec<UnverifiedCertificate>;
 
     type Error = anyhow::Error;
 
-    type Request = SpkiHash;
+    type Request = ();
 
     fn key() -> String {
         ListUserSessionsHandler::key()
     }
 
     fn get_request(&self) -> &Self::Request {
-        self.0
+        &()
     }
 
     async fn dispatch(self, session: &mut Session) -> Result<Self::Output, Self::Error> {

@@ -27,7 +27,8 @@ impl State {
         });
         if !warnings.is_empty() {
             warnings.sort_by_key(Device::severity);
-            self.warnings.push(Warning::Device(device.clone(), warnings));
+            self.warnings
+                .push(Warning::Device(device.clone(), warnings));
         }
         self.warnings.sort_by_key(Warning::severity);
     }

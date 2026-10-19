@@ -12,9 +12,8 @@ use uuid::Uuid;
 use crate::{
     client::{state::persistent, tunnel_manager::TunnelDefinition},
     shared::commands::{
-        recreate_device_group::RecreateDeviceGroup,
-        request_system_report::RequestSystemReport, terminal::RemoteTerminalDispatcher,
-        update_agent::UpdateAgent, update_mls::MlsUpdate,
+        recreate_device_group::RecreateDeviceGroup, request_system_report::RequestSystemReport,
+        terminal::RemoteTerminalDispatcher, update_agent::UpdateAgent, update_mls::MlsUpdate,
     },
 };
 

@@ -178,10 +178,16 @@ impl UI {
                 }
             };
 
+            let rail = match &self.screen {
+                Screen::MainView(mainview) => Some(mainview.rail().map(Message::MainView)),
+                _ => None,
+            };
+
             scaffold(screen)
                 .header(header)
                 .context_maybe(context)
                 .sidebar_maybe(sidebar)
+                .rail_maybe(rail)
                 .into_widget()
                 .boxed()
         } else {

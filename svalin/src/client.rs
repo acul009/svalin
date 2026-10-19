@@ -16,7 +16,9 @@ use crate::store::client_store::ClientStore;
 pub use first_connect::*;
 pub use profile::ProfileInfo;
 use svalin_pki::trust_store::TrustStore;
-use svalin_pki::{Certificate, Credential, RootCertificate, SpkiHash, TrustStoreVerifier};
+use svalin_pki::{
+    Certificate, Credential, RootCertificate, SpkiHash, TrustStoreVerifier, UnverifiedCertificate,
+};
 use svalin_rpc::commands::ping::Ping;
 use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
@@ -30,6 +32,7 @@ use crate::client::device::DeviceHandle;
 use crate::client::state::{ClientState, Update};
 use crate::message_streaming::MessageFromClient;
 use crate::message_streaming::client::{ClientMessageDispatcherHandle, ClientStateHandle};
+use crate::shared::commands::list_user_sessions::ListUserSessions;
 use crate::shared::commands::update_mls::MlsUpdate;
 
 pub struct Client {
@@ -83,6 +86,14 @@ impl Client {
         self.rpc
             .upstream_connection()
             .dispatch(Ping)
+            .await
+            .map_err(|err| anyhow!(err))
+    }
+
+    pub async fn list_user_sessions(&self) -> anyhow::Result<Vec<UnverifiedCertificate>> {
+        self.rpc
+            .upstream_connection()
+            .dispatch(ListUserSessions)
             .await
             .map_err(|err| anyhow!(err))
     }

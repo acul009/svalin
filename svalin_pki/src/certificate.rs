@@ -271,6 +271,10 @@ impl UnverifiedCertificate {
 
         let validity = cert.validity().clone();
 
+        if validity.not_before.timestamp() < 0 || validity.not_after.timestamp() < 0 {
+            return Err(CertificateParseError::BrokenValidity);
+        }
+
         let validity_time = (validity.not_after - validity.not_before)
             .ok_or_else(|| CertificateParseError::BrokenValidity)?;
 
@@ -409,8 +413,21 @@ impl CertificateData {
     }
 
     /// Certificate expiration as a Unix timestamp in seconds.
-    pub fn expires_at(&self) -> i64 {
-        self.validity.not_after.timestamp()
+    pub fn expires_at(&self) -> u64 {
+        self.validity
+            .not_after
+            .timestamp()
+            .try_into()
+            .expect("certificate parsing rejects timestamps before the Unix epoch")
+    }
+
+    /// Start of certificate validity as a Unix timestamp in seconds.
+    pub fn valid_from(&self) -> u64 {
+        self.validity
+            .not_before
+            .timestamp()
+            .try_into()
+            .expect("certificate parsing rejects timestamps before the Unix epoch")
     }
 
     pub fn check_validity_at(&self, time: u64) -> Result<(), ValidityError> {

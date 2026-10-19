@@ -12,6 +12,7 @@ pub struct Scaffold<
     Dialog = Void,
     Sidebar = Void,
     Context = Void,
+    Rail = Void,
 > {
     body: Body,
     header: Option<Header>,
@@ -19,6 +20,7 @@ pub struct Scaffold<
     dialog: Option<Dialog>,
     sidebar: Option<Sidebar>,
     context: Option<Context>,
+    rail: Option<Rail>,
 }
 
 impl<Body> Scaffold<Body> {
@@ -30,17 +32,18 @@ impl<Body> Scaffold<Body> {
             dialog: None,
             sidebar: None,
             context: None,
+            rail: None,
         }
     }
 }
 
-impl<Body, Header, Footer, Dialog, Sidebar, Context>
-    Scaffold<Body, Header, Footer, Dialog, Sidebar, Context>
+impl<Body, Header, Footer, Dialog, Sidebar, Context, Rail>
+    Scaffold<Body, Header, Footer, Dialog, Sidebar, Context, Rail>
 {
     pub fn header<NewHeader>(
         self,
         header: NewHeader,
-    ) -> Scaffold<Body, NewHeader, Footer, Dialog, Sidebar, Context> {
+    ) -> Scaffold<Body, NewHeader, Footer, Dialog, Sidebar, Context, Rail> {
         self.header_maybe(Some(header))
     }
 
@@ -48,7 +51,7 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
     pub fn header_maybe<NewHeader>(
         self,
         header: Option<NewHeader>,
-    ) -> Scaffold<Body, NewHeader, Footer, Dialog, Sidebar, Context> {
+    ) -> Scaffold<Body, NewHeader, Footer, Dialog, Sidebar, Context, Rail> {
         Scaffold {
             body: self.body,
             header,
@@ -56,13 +59,14 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
             dialog: self.dialog,
             sidebar: self.sidebar,
             context: self.context,
+            rail: self.rail,
         }
     }
 
     pub fn footer<NewFooter>(
         self,
         footer: NewFooter,
-    ) -> Scaffold<Body, Header, NewFooter, Dialog, Sidebar, Context> {
+    ) -> Scaffold<Body, Header, NewFooter, Dialog, Sidebar, Context, Rail> {
         self.footer_maybe(Some(footer))
     }
 
@@ -70,7 +74,7 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
     pub fn footer_maybe<NewFooter>(
         self,
         footer: Option<NewFooter>,
-    ) -> Scaffold<Body, Header, NewFooter, Dialog, Sidebar, Context> {
+    ) -> Scaffold<Body, Header, NewFooter, Dialog, Sidebar, Context, Rail> {
         Scaffold {
             body: self.body,
             header: self.header,
@@ -78,13 +82,14 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
             dialog: self.dialog,
             sidebar: self.sidebar,
             context: self.context,
+            rail: self.rail,
         }
     }
 
     pub fn dialog<NewDialog>(
         self,
         dialog: NewDialog,
-    ) -> Scaffold<Body, Header, Footer, NewDialog, Sidebar, Context> {
+    ) -> Scaffold<Body, Header, Footer, NewDialog, Sidebar, Context, Rail> {
         self.dialog_maybe(Some(dialog))
     }
 
@@ -92,7 +97,7 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
     pub fn dialog_maybe<NewDialog>(
         self,
         dialog: Option<NewDialog>,
-    ) -> Scaffold<Body, Header, Footer, NewDialog, Sidebar, Context> {
+    ) -> Scaffold<Body, Header, Footer, NewDialog, Sidebar, Context, Rail> {
         Scaffold {
             body: self.body,
             header: self.header,
@@ -100,13 +105,14 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
             dialog,
             sidebar: self.sidebar,
             context: self.context,
+            rail: self.rail,
         }
     }
 
     pub fn sidebar<NewSidebar>(
         self,
         sidebar: NewSidebar,
-    ) -> Scaffold<Body, Header, Footer, Dialog, NewSidebar, Context> {
+    ) -> Scaffold<Body, Header, Footer, Dialog, NewSidebar, Context, Rail> {
         self.sidebar_maybe(Some(sidebar))
     }
 
@@ -114,7 +120,7 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
     pub fn sidebar_maybe<NewSidebar>(
         self,
         sidebar: Option<NewSidebar>,
-    ) -> Scaffold<Body, Header, Footer, Dialog, NewSidebar, Context> {
+    ) -> Scaffold<Body, Header, Footer, Dialog, NewSidebar, Context, Rail> {
         Scaffold {
             body: self.body,
             header: self.header,
@@ -122,13 +128,14 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
             dialog: self.dialog,
             sidebar,
             context: self.context,
+            rail: self.rail,
         }
     }
 
     pub fn context<NewContext>(
         self,
         context: NewContext,
-    ) -> Scaffold<Body, Header, Footer, Dialog, Sidebar, NewContext> {
+    ) -> Scaffold<Body, Header, Footer, Dialog, Sidebar, NewContext, Rail> {
         self.context_maybe(Some(context))
     }
 
@@ -136,7 +143,7 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
     pub fn context_maybe<NewContext>(
         self,
         context: Option<NewContext>,
-    ) -> Scaffold<Body, Header, Footer, Dialog, Sidebar, NewContext> {
+    ) -> Scaffold<Body, Header, Footer, Dialog, Sidebar, NewContext, Rail> {
         Scaffold {
             body: self.body,
             header: self.header,
@@ -144,6 +151,31 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
             dialog: self.dialog,
             sidebar: self.sidebar,
             context,
+            rail: self.rail,
+        }
+    }
+
+    /// Adds a navigation rail to the left of the sidebar.
+    pub fn rail<NewRail>(
+        self,
+        rail: NewRail,
+    ) -> Scaffold<Body, Header, Footer, Dialog, Sidebar, Context, NewRail> {
+        self.rail_maybe(Some(rail))
+    }
+
+    /// Replaces the rail; passing `None` clears it.
+    pub fn rail_maybe<NewRail>(
+        self,
+        rail: Option<NewRail>,
+    ) -> Scaffold<Body, Header, Footer, Dialog, Sidebar, Context, NewRail> {
+        Scaffold {
+            body: self.body,
+            header: self.header,
+            footer: self.footer,
+            dialog: self.dialog,
+            sidebar: self.sidebar,
+            context: self.context,
+            rail,
         }
     }
 
@@ -155,10 +187,12 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
         Dialog: iced::Widget<Message> + 'a,
         Sidebar: iced::Widget<Message> + 'a,
         Context: iced::Widget<Message> + 'a,
+        Rail: iced::Widget<Message> + 'a,
     {
         let scaffold = self;
         let has_header = scaffold.header.is_some();
         let has_context = scaffold.context.is_some();
+        let has_rail = scaffold.rail.is_some();
         let has_sidebar = scaffold.sidebar.is_some();
         stack![
             column![
@@ -175,6 +209,10 @@ impl<Body, Header, Footer, Dialog, Sidebar, Context>
                 has_header.then(|| rule::horizontal(2)),
                 stack![
                     row![
+                        scaffold
+                            .rail
+                            .map(|rail| container(rail).height(Length::Fill)),
+                        has_rail.then(|| rule::vertical(2)),
                         scaffold.sidebar.map(|sidebar| {
                             container(sidebar)
                                 .style(|_| container::Style {

@@ -135,7 +135,11 @@ impl<'a, Message: Clone + 'static> Entry<'a, Message> {
                 .width(Length::Fill)
                 .height(height)
                 .padding(padding)
-                .style(if shaded { row_style_odd } else { row_style_even }),
+                .style(if shaded {
+                    row_style_odd
+                } else {
+                    row_style_even
+                }),
         )
         .width(Length::Fill)
         .style(move |_theme| container::Style {

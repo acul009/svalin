@@ -244,7 +244,11 @@ impl State {
     }
 
     pub fn header<'a>(&'a self, client_state: &'a ClientState) -> header::Header<'a, Message> {
-        if !client_state.persistent().devices().contains_key(&self.spki_hash) {
+        if !client_state
+            .persistent()
+            .devices()
+            .contains_key(&self.spki_hash)
+        {
             return header(widget::space()).on_back(Message::Back).into();
         }
 

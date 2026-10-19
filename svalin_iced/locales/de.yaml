@@ -189,3 +189,10 @@ terminal:
   connecting: Verbindung zum Terminal wird hergestellt...
   unavailable: Terminal nicht verfügbar
   closed: Terminal geschlossen
+
+navigation:
+  devices: Geräte
+  server: Server
+
+server:
+  sessions: Sitzungen

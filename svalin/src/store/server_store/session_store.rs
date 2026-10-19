@@ -30,7 +30,7 @@ impl SessionStore {
             let certificate = UnverifiedCertificate::from_der(der)
                 .map_err(|err| sqlx::Error::Decode(Box::new(err)))?;
             sqlx::query("UPDATE sessions SET expires_at = ? WHERE spki_hash = ?")
-                .bind(certificate.expires_at())
+                .bind(certificate.expires_at() as i64)
                 .bind(spki_hash)
                 .execute(&mut *tx)
                 .await?;
@@ -59,7 +59,7 @@ impl SessionStore {
         .bind(spki_hash)
         .bind(issuer)
         .bind(der)
-        .bind(certificate.expires_at())
+        .bind(certificate.expires_at() as i64)
         .execute(&self.pool)
         .await?;
 

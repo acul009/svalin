@@ -26,6 +26,7 @@ pub mod list;
 pub mod loading;
 pub mod percent_display;
 pub mod progress_circle;
+pub mod rail;
 pub mod scaffold;
 pub mod toast;
 

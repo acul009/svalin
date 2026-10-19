@@ -1,8 +1,7 @@
 use std::{process, sync::Arc, time::Duration};
 
 use iced::{
-    Subscription, Task, Widget,
-    keyboard,
+    Subscription, Task, Widget, keyboard,
     widget::{column, row, rule, scrollable, stack, text, text_input},
 };
 use svalin::client::{
@@ -24,6 +23,7 @@ use crate::{
 mod add_device;
 mod device_list;
 mod device_view;
+mod server_view;
 mod tunnel_menu;
 mod warning_menu;
 
@@ -48,6 +48,8 @@ pub enum Message {
     GroupFilter(GroupFilter),
     Search(String),
     FocusSearch,
+    Section(Section),
+    ServerView(server_view::Message),
 }
 
 pub enum Action {
@@ -59,6 +61,12 @@ pub enum Action {
             tokio::sync::mpsc::Receiver<Vec<u8>>,
         )>,
     ),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Section {
+    Devices,
+    Server,
 }
 
 enum Screen {
@@ -95,6 +103,8 @@ impl From<&Option<String>> for GroupFilter {
 
 pub struct MainView {
     screen: Screen,
+    section: Section,
+    server_view: server_view::ServerView,
     state: ClientState,
     context: Context,
     client: Arc<Client>,
@@ -109,6 +119,8 @@ impl MainView {
         let client2 = client.clone();
         (
             Self {
+                section: Section::Devices,
+                server_view: server_view::ServerView::new(),
                 screen: Screen::Loading(t!("device-list.loading").to_string()),
                 state: ClientState::empty(),
                 context: Context::None,
@@ -156,6 +168,7 @@ impl MainView {
                 Action::None
             }
             Message::SelectDevice(spki_hash) => {
+                self.section = Section::Devices;
                 self.screen = Screen::DeviceView(device_view::State::new(spki_hash));
                 Action::None
             }
@@ -213,6 +226,7 @@ impl MainView {
             Message::TunnelMenu(message) => match tunnel_menu::update(message, &self.client) {
                 tunnel_menu::Action::None => Action::None,
                 tunnel_menu::Action::SelectDevice(device) => {
+                    self.section = Section::Devices;
                     self.screen = Screen::DeviceView(device_view::State::new(device));
                     Action::None
                 }
@@ -233,14 +247,30 @@ impl MainView {
                 self.search = search;
                 Action::None
             }
-            Message::FocusSearch => Action::Run(
-                iced::widget::operation::focus("device-search")
-                    .chain(iced::widget::operation::text_input::select_all("device-search")),
-            ),
+            Message::Section(section) => {
+                self.section = section;
+                Action::None
+            }
+            Message::ServerView(message) => {
+                self.server_view.update(message);
+                Action::None
+            }
+            Message::FocusSearch => {
+                Action::Run(iced::widget::operation::focus("device-search").chain(
+                    iced::widget::operation::text_input::select_all("device-search"),
+                ))
+            }
         }
     }
 
     pub fn view(&self) -> crate::Element<'_, Message> {
+        match self.section {
+            Section::Devices => self.devices_view(),
+            Section::Server => self.server_view.view().map(Message::ServerView).boxed(),
+        }
+    }
+
+    fn devices_view(&self) -> crate::Element<'_, Message> {
         let screen = match &self.screen {
             Screen::Loading(text) => loading(text).into_widget().boxed(),
             Screen::DeviceList => column![
@@ -290,7 +320,25 @@ impl MainView {
         }
     }
 
+    pub fn rail(&self) -> impl Widget<Message> + '_ {
+        use crate::ui::widgets::rail::{Item, Rail};
+
+        Rail::new()
+            .items([Item::new(bootstrap::pc_display())
+                .tooltip(text(t!("navigation.devices")))
+                .selected(self.section == Section::Devices)
+                .on_press(Message::Section(Section::Devices))])
+            .bottom_items([Item::new(bootstrap::server())
+                .tooltip(text(t!("navigation.server")))
+                .selected(self.section == Section::Server)
+                .on_press(Message::Section(Section::Server))])
+            .into_widget()
+    }
+
     pub fn header(&self) -> header::Header<'_, Message> {
+        if self.section == Section::Server {
+            return header(text(t!("navigation.server")));
+        }
         let header = match &self.screen {
             Screen::DeviceView(device_view) => {
                 device_view.header(&self.state).map(Message::DeviceView)
@@ -350,22 +398,33 @@ impl MainView {
     }
 
     pub(crate) fn sidebar(&self) -> Option<crate::Element<'_, Message>> {
+        match self.section {
+            Section::Server => Some(self.server_view.sidebar().map(Message::ServerView).boxed()),
+            Section::Devices => self.devices_sidebar(),
+        }
+    }
+
+    fn devices_sidebar(&self) -> Option<crate::Element<'_, Message>> {
         match &self.screen {
             Screen::DeviceList => Some(
                 column![
                     button_list::entry(text(t!("device-list.all")))
                         .on_press(Message::GroupFilter(GroupFilter::NoFilter))
-                        .into_widget(40, [8, 16], true),
+                        .into_widget(40, [8, 16], false),
                     rule::horizontal(2),
-                    scrollable(button_list(self.state.groups().map(|group| {
-                        let name: std::borrow::Cow<'_, str> = group
-                            .as_ref()
-                            .map(|s| s.as_str().into())
-                            .unwrap_or_else(|| t!("device-list.nogroup"));
-                        button_list::entry(text(name))
-                            .on_press(Message::GroupFilter(group.into()))
-                    })).entry_height(40).into_widget())
-                        .height(iced::Length::Fill)
+                    scrollable(
+                        button_list(self.state.groups().map(|group| {
+                            let name: std::borrow::Cow<'_, str> = group
+                                .as_ref()
+                                .map(|s| s.as_str().into())
+                                .unwrap_or_else(|| t!("device-list.nogroup"));
+                            button_list::entry(text(name))
+                                .on_press(Message::GroupFilter(group.into()))
+                        }))
+                        .entry_height(40)
+                        .into_widget()
+                    )
+                    .height(iced::Length::Fill)
                 ]
                 .boxed(),
             ),
@@ -375,13 +434,15 @@ impl MainView {
 
     pub fn subscription(&self) -> iced::Subscription<Message> {
         match &self.screen {
-            Screen::DeviceList if self.error.is_none() => {
+            Screen::DeviceList if self.error.is_none() && self.section == Section::Devices => {
                 keyboard::listen().filter_map(|event| match event {
                     keyboard::Event::KeyPressed {
                         key: keyboard::Key::Character(key),
                         modifiers,
                         ..
-                    } if modifiers.control() && key.eq_ignore_ascii_case("f") => Some(Message::FocusSearch),
+                    } if modifiers.control() && key.eq_ignore_ascii_case("f") => {
+                        Some(Message::FocusSearch)
+                    }
                     _ => None,
                 })
             }
