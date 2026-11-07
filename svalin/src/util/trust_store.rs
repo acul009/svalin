@@ -40,13 +40,13 @@ impl Store for crate::store::server_store::TrustStoreTransactionStore {
     }
 }
 
-pub async fn load_trust_store(
-    file_location: PathBuf,
+/// Loads the local snapshot and checks and applies newer stored transactions.
+/// Does not write files or start background tasks.
+pub async fn read_trust_store(
+    file_location: &Path,
     store: &impl Store,
-    cancel: CancellationToken,
-    task_tracker: &TaskTracker,
-) -> anyhow::Result<Arc<RwLock<TrustStore>>> {
-    let exported = tokio::fs::read(&file_location)
+) -> anyhow::Result<TrustStore> {
+    let exported = tokio::fs::read(file_location)
         .await
         .context("failed to read trust store file")?;
     let exported: trust_store::Exported =
@@ -63,9 +63,17 @@ pub async fn load_trust_store(
         trust_store.apply(block);
     }
 
-    let exported = trust_store.export();
-    let exported = serde_json::to_vec_pretty(&exported)?;
-    tokio::fs::write(&file_location, exported).await?;
+    Ok(trust_store)
+}
+
+pub async fn load_trust_store(
+    file_location: PathBuf,
+    store: &impl Store,
+    cancel: CancellationToken,
+    task_tracker: &TaskTracker,
+) -> anyhow::Result<Arc<RwLock<TrustStore>>> {
+    let trust_store = read_trust_store(&file_location, store).await?;
+    save_trust_store(&file_location, &trust_store.export()).await?;
 
     let trust_store = Arc::new(RwLock::new(trust_store));
     let trust_store_2 = trust_store.clone();
@@ -77,16 +85,18 @@ pub async fn load_trust_store(
         loop {
             tokio::select! {
                 _ = tokio::time::sleep(Duration::from_secs(300)) => {
-                    let exported = {
+                    let (digest, exported) = {
                         let guard = trust_store.read().unwrap();
-                        if guard.digest() == last_digest {
+                        let digest = guard.digest();
+                        if digest == last_digest {
                             continue;
                         }
-                        last_digest = guard.digest();
-                        guard.export()
+                        (digest, guard.export())
                     };
                     if let Err(err)  = save_trust_store(&file_location, &exported).await {
                         tracing::error!("error during scheduled trust store save: {err}")
+                    } else {
+                        last_digest = digest;
                     }
                 }
                 _ = cancel.cancelled() => {

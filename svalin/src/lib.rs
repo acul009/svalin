@@ -8,6 +8,7 @@ pub mod installer;
 pub mod message_streaming;
 pub mod mls;
 pub mod permissions;
+pub mod profile;
 pub mod remote_key_retriever;
 pub mod server;
 pub mod shared;

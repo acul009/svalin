@@ -228,7 +228,7 @@ impl ProfilePicker {
                     self.screen = Screen::Loading(t!("profile-picker.unlocking").to_string());
 
                     Action::Run(Task::future(async move {
-                        match Client::open_profile(
+                        match Client::connect_profile(
                             &profile,
                             password.into_bytes(),
                             CancellationToken::new(),

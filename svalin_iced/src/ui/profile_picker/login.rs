@@ -125,7 +125,7 @@ impl LoginDialog {
                                     t!("profile-picker.error.login"),
                                 )),
                                 Ok(new_profile) => {
-                                    match Client::open_profile(
+                                    match Client::connect_profile(
                                         &new_profile,
                                         password,
                                         CancellationToken::new(),

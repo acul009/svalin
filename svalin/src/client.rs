@@ -15,6 +15,7 @@ use crate::client::tunnel_manager::TunnelManager;
 use crate::store::client_store::ClientStore;
 pub use first_connect::*;
 pub use profile::ProfileInfo;
+pub(crate) use profile::Profile;
 use svalin_pki::trust_store::TrustStore;
 use svalin_pki::{
     Certificate, Credential, RootCertificate, SpkiHash, TrustStoreVerifier, UnverifiedCertificate,

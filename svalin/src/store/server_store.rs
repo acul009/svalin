@@ -1,11 +1,13 @@
 mod key_package_store;
 mod message_store;
+mod record_store;
 mod session_store;
 mod trust_store_transaction_store;
 mod user_store;
 
 pub use key_package_store::KeyPackageStore;
 pub use message_store::{MessageStore, MessageStoreError};
+pub use record_store::{ParseRecordIdError, RecordId, RecordStore};
 pub use session_store::{AddSessionError, SessionStore};
 pub use trust_store_transaction_store::{TransactionStoreError, TrustStoreTransactionStore};
 pub use user_store::{GetBySpkiHashError, UserStore};
@@ -19,6 +21,7 @@ pub struct ServerStore {
     pub trust_store_transactions: Arc<TrustStoreTransactionStore>,
     pub key_packages: Arc<KeyPackageStore>,
     pub messages: Arc<MessageStore>,
+    pub records: Arc<RecordStore>,
     pub sessions: Arc<SessionStore>,
     pub users: Arc<UserStore>,
     pool: SqlitePool,
@@ -32,6 +35,7 @@ impl ServerStore {
             trust_store_transactions: TrustStoreTransactionStore::open(pool.clone()).await?,
             key_packages: KeyPackageStore::open(pool.clone()),
             messages: MessageStore::open(pool.clone()),
+            records: RecordStore::open(pool.clone()),
             sessions: SessionStore::open(pool.clone()).await?,
             users: UserStore::open(pool.clone()),
             pool,

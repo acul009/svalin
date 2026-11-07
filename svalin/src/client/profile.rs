@@ -204,7 +204,7 @@ impl Client {
         Ok(())
     }
 
-    pub async fn open_profile(
+    pub async fn connect_profile(
         profile_key: &str,
         password: Vec<u8>,
         cancel: CancellationToken,

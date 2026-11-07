@@ -1,13 +1,13 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::{self, Debug},
 };
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AddCertificateError, Certificate, CertificateChain, CertificateChainBuilder, Credential,
-    RootCertificate, SignatureVerificationError, SpkiHash, UnverifiedCertificate,
+    AddCertificateError, Certificate, CertificateChain, CertificateChainBuilder, CertificateType,
+    Credential, RootCertificate, SignatureVerificationError, SpkiHash, UnverifiedCertificate,
     UnverifiedCertificateChain, UseAsRootError, ValidityError, VerifyChainError,
     get_current_timestamp,
     secure_chain::{self, Chain, ChainDigest, ChainState, CheckedBlock, UncheckedBlock},
@@ -84,6 +84,35 @@ impl TrustStore {
 
     pub fn root(&self) -> &RootCertificate {
         &self.chain.state().root
+    }
+
+    /// Returns all agent certificates descended from `parent`, including through users.
+    pub fn child_devices<'a>(&'a self, parent: &SpkiHash) -> impl Iterator<Item = &'a Certificate> {
+        let mut children: HashMap<&SpkiHash, Vec<&Certificate>> = HashMap::new();
+        for cert in self.chain.state().certificates.values() {
+            children.entry(cert.issuer()).or_default().push(cert);
+        }
+
+        let mut pending = vec![parent.clone()];
+        let mut visited = HashSet::new();
+        let mut devices = Vec::new();
+
+        while let Some(issuer) = pending.pop() {
+            if !visited.insert(issuer.clone()) {
+                continue;
+            }
+
+            if let Some(certs) = children.get(&issuer) {
+                for &cert in certs {
+                    pending.push(cert.spki_hash().clone());
+                    if cert.certificate_type() == CertificateType::Agent {
+                        devices.push(cert);
+                    }
+                }
+            }
+        }
+
+        devices.into_iter()
     }
 
     pub fn complete_certificate_chain(
@@ -377,6 +406,64 @@ mod tests {
     use rcgen::PublicKeyData;
     use time::{Duration, OffsetDateTime};
 
+    #[test]
+    fn child_devices_includes_indirect_agents_and_excludes_unrelated_certificates() {
+        let start = OffsetDateTime::now_utc() - Duration::minutes(1);
+        let root = credential_at(CertificateType::Root, start, None);
+        let user = credential_at(CertificateType::User, start, Some(&root));
+        let nested_user = credential_at(CertificateType::User, start, Some(&user));
+        let direct = credential_at(CertificateType::Agent, start, Some(&user));
+        let indirect = credential_at(CertificateType::Agent, start, Some(&nested_user));
+        let unrelated = credential_at(CertificateType::Agent, start, Some(&root));
+        let session = credential_at(CertificateType::UserSession, start, Some(&user));
+        let mut store = TrustStore::initialize(
+            root.certificate()
+                .clone()
+                .to_unverified()
+                .use_as_root()
+                .unwrap(),
+        );
+        for (child, parent) in [
+            (&user, &root),
+            (&nested_user, &user),
+            (&direct, &user),
+            (&indirect, &nested_user),
+            (&unrelated, &root),
+            (&session, &user),
+        ] {
+            let block = store.add(child.certificate().clone(), parent).unwrap();
+            store.apply(block);
+        }
+
+        let devices: HashSet<_> = store
+            .child_devices(user.certificate().spki_hash())
+            .map(|cert| cert.spki_hash().clone())
+            .collect();
+        assert_eq!(
+            devices,
+            HashSet::from([
+                direct.certificate().spki_hash().clone(),
+                indirect.certificate().spki_hash().clone(),
+            ])
+        );
+        assert_eq!(
+            store.child_devices(root.certificate().spki_hash()).count(),
+            3
+        );
+        assert_eq!(
+            store
+                .child_devices(direct.certificate().spki_hash())
+                .count(),
+            0
+        );
+        assert_eq!(
+            store
+                .child_devices(&SpkiHash::from_slice(&[0; 32]).unwrap())
+                .count(),
+            0
+        );
+    }
+
     fn credential_at(
         certificate_type: CertificateType,
         start: OffsetDateTime,
@@ -389,7 +476,10 @@ mod tests {
         let mut params = rcgen::CertificateParams::default();
         params.not_before = start;
         params.not_after = start + certificate_type.validity_duration();
-        params.is_ca = if certificate_type == CertificateType::Root {
+        params.is_ca = if matches!(
+            certificate_type,
+            CertificateType::Root | CertificateType::User
+        ) {
             rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained)
         } else {
             rcgen::IsCa::NoCa

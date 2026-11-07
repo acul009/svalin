@@ -133,7 +133,7 @@ async fn integration_tests() {
 
     let client_cancel = CancellationToken::new();
 
-    let client = Client::open_profile(
+    let client = Client::connect_profile(
         &profile_name,
         password.clone().into_bytes(),
         client_cancel.clone(),

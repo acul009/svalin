@@ -177,7 +177,7 @@ impl InitServer {
                                             t!("profile-picker.error.server-init"),
                                         )),
                                         Ok(profile) => {
-                                            let client = match Client::open_profile(
+                                            let client = match Client::connect_profile(
                                                 &profile,
                                                 password.into(),
                                                 CancellationToken::new(),

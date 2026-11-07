@@ -45,7 +45,7 @@ async fn test_init() {
 
     init_complete.notified().await;
 
-    let client = Client::open_profile(
+    let client = Client::connect_profile(
         "admin@localhost:55411".into(),
         "admin".as_bytes().to_owned(),
     )
