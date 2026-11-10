@@ -1,4 +1,3 @@
-
 use std::sync::{Arc, RwLock};
 
 pub mod persistent;
@@ -10,11 +9,10 @@ pub enum Update {
 }
 
 use anyhow::{Context, Result};
-use svalin_pki::trust_store::TrustStore;
 use svalin_pki::Credential;
+use svalin_pki::trust_store::TrustStore;
 
 use crate::client::Profile;
-use svalin_pki::SpkiHash;
 use crate::store::client_store::ClientStore;
 use crate::util::location::{Location, LocationError};
 use crate::util::trust_store::read_trust_store;
@@ -24,16 +22,37 @@ pub struct ProfileState {
     client_store: ClientStore,
     trust_store: Arc<RwLock<TrustStore>>,
     persistent: persistent::State,
+    warnings: warnings::State,
 }
 
 impl ProfileState {
-    pub fn update_warnings(&mut self, devices: impl Iterator<Item = SpkiHash>) {
-        todo!()
+    pub fn update(&mut self, update: Update) -> Result<()> {
+        match update {
+            Update::TrustStore(block) => {
+                let mut trust_store = self.trust_store.write().unwrap();
+                let block = trust_store.check(block)?;
+                trust_store.apply(block);
+                let devices = self.persistent.update_from_trust_store(
+                    &trust_store,
+                    self.connection_info.device_credential.certificate().issuer(),
+                );
+                for device in devices {
+                    self.warnings.update_device_warnings(&self.persistent, &device);
+                }
+            }
+            Update::Persistent(update) => {
+                let device = self.persistent.update(update);
+                self.warnings.update_device_warnings(&self.persistent, &device);
+            }
+        }
+        Ok(())
     }
+}
 
-    pub fn update(&mut self, update: Update) {
-        todo!()
-    }
+pub enum ConnectionState {
+    Connecting,
+    Connected,
+    Disconnected,
 }
 
 pub struct ConnectionInfo {
@@ -42,7 +61,9 @@ pub struct ConnectionInfo {
 }
 
 pub async fn unlock(profile_name: &str, password: Vec<u8>) -> Result<ProfileState> {
-    let profile = get_profile(profile_name).await?.context("Profile not found")?;
+    let profile = get_profile(profile_name)
+        .await?
+        .context("Profile not found")?;
 
     let key = profile
         .local_credential_params
@@ -60,23 +81,26 @@ pub async fn unlock(profile_name: &str, password: Vec<u8>) -> Result<ProfileStat
     let client_store = ClientStore::open(client_db_path).await?;
 
     let trust_store_path = profile_dir.push("trust_store.json").to_pathbuf();
-    let trust_store = read_trust_store(
-        &trust_store_path,
-        client_store.transaction_store().as_ref(),
-    )
-    .await?;
+    let trust_store =
+        read_trust_store(&trust_store_path, client_store.transaction_store().as_ref()).await?;
 
     let mut persistent = persistent::State::default();
-    persistent.update_from_trust_store(
+    let devices = persistent.update_from_trust_store(
         &trust_store,
         connection_info.device_credential.certificate().issuer(),
     );
+
+    let mut warnings = warnings::State::new();
+    for device in devices {
+        warnings.update_device_warnings(&persistent, &device);
+    }
 
     Ok(ProfileState {
         connection_info,
         client_store,
         trust_store: Arc::new(RwLock::new(trust_store)),
         persistent,
+        warnings,
     })
 }
 
