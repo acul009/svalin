@@ -121,3 +121,17 @@ A certificate can remain accepted after an ancestor expires. Revocation must als
 Replace temporary apply-and-rollback validation in the secure chain with validation against a cloned state. Apply the transaction to the clone and verify its resulting state hash; discard it on failure. This removes the need for transaction-specific rollback information.
 
 When revoking a certificate, also remove all of its descendants from the trust store. Ancestor expiry must likewise invalidate descendants during verification; revocation-driven removal alone does not address expiry.
+
+## SEC-010: Possible trust-store writer starvation under sustained reads
+
+**Status:** Open; theoretical risk reported by the project owner; starvation has not been reproduced.
+
+**Affected code:** [`TrustStoreVerifier`](../svalin_pki/src/verifier/trust_store.rs) acquires read access to the shared `std::sync::RwLock<TrustStore>`, while [`apply_block`](../svalin/src/shared/commands/update_trust_store.rs) requires write access to validate and apply trust-store updates.
+
+Rust's [`std::sync::RwLock` documentation](https://doc.rust-lang.org/std/sync/struct.RwLock.html) does not guarantee a reader/writer priority policy; the policy depends on the underlying platform implementation. With a reader-preferring implementation, such as a reader-preferring POSIX lock, continuous overlapping read acquisitions could starve a waiting writer. This is platform-dependent, not a confirmed property of every Rust or POSIX implementation.
+
+If this occurs, trust-store updates could be delayed indefinitely while readers continue using the existing trust state. This could delay future revocation enforcement once SEC-003 is implemented. Practical exploitability and the required reader load have not been established.
+
+### Intended fix
+
+Use a synchronization strategy with documented protection against writer starvation, or restructure trust-store access so readers cannot indefinitely prevent updates. Select the implementation and verify writer progress under sustained concurrent reads on supported platforms.
