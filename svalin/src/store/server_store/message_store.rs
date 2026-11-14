@@ -63,6 +63,26 @@ impl MessageStore {
         Ok(())
     }
 
+    pub async fn clear_group_messages(&self, group_id: &[u8]) -> Result<(), sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
+        sqlx::query(
+            "DELETE FROM mls_message_receivers WHERE message_id IN (
+                SELECT id FROM mls_messages WHERE group_id = ?
+            )",
+        )
+        .bind(group_id)
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query("DELETE FROM mls_messages WHERE group_id = ?")
+            .bind(group_id)
+            .execute(&mut *tx)
+            .await?;
+
+        tx.commit().await
+    }
+
     pub async fn load_all_for(
         &self,
         receiver: &SpkiHash,
@@ -148,6 +168,7 @@ pub enum MessageStoreError {
     #[error("MessagePack decode error: {0}")]
     MessagePackDecode(#[from] rmp_serde::decode::Error),
 }
+
 
 #[derive(Debug)]
 enum SubscriptionRequest {

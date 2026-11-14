@@ -208,6 +208,11 @@ impl Debug for NewGroupTransport {
 }
 
 impl NewGroupTransport {
+    pub fn group_id(&self) -> Result<openmls::group::GroupId, tls_codec::Error> {
+        let info = VerifiableGroupInfo::tls_deserialize_exact_bytes(&self.group_info)?;
+        Ok(info.group_id().clone())
+    }
+
     pub(crate) fn unpack(self) -> Result<NewGroup, tls_codec::Error> {
         Ok(NewGroup {
             group_info: VerifiableGroupInfo::tls_deserialize_exact_bytes(&self.group_info)?,

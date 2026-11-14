@@ -20,11 +20,23 @@ impl MlsMessageHandler {
         sender: &Certificate,
         message: MessageToServerTransport,
     ) -> Result<(), anyhow::Error> {
+        let group_to_clear = match &message {
+            MessageToServerTransport::NewDeviceGroup(group) => Some(group.group_id()?),
+            _ => None,
+        };
+
         let messages_to_send = self
             .mls_server
             .process_message(message)
             .await
             .map_err(|err| anyhow!(err))?;
+
+        if let Some(group_id) = group_to_clear {
+            self.message_store
+                .clear_group_messages(group_id.as_slice())
+                .await?;
+        }
+
         for mut to_send in messages_to_send {
             match sender.certificate_type() {
                 CertificateType::UserSession => {
