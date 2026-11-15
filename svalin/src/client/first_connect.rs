@@ -3,6 +3,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use secrecy::SecretSlice;
 use svalin_pki::{DecodeCredentialsError, Limit, TrustStoreVerifier, Verifier};
 use svalin_rpc::rpc::command::dispatcher::DispatcherError;
 use svalin_rpc::rpc::connection::ConnectionDispatchError;
@@ -84,7 +85,7 @@ impl Init {
     pub async fn init(
         self,
         username: String,
-        password: Vec<u8>,
+        password: SecretSlice<u8>,
         totp_secret: totp_rs::Totp,
     ) -> Result<String> {
         tracing::trace!("starting init");
@@ -165,7 +166,7 @@ impl Login {
     pub async fn login(
         self,
         username: String,
-        password: Vec<u8>,
+        password: SecretSlice<u8>,
         totp: String,
     ) -> Result<String, LoginError> {
         let login_data = self

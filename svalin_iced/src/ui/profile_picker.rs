@@ -8,6 +8,7 @@ use iced::{
 };
 use init_server::InitServer;
 use login::LoginDialog;
+use secrecy::SecretSlice;
 use svalin::client::{Client, FirstConnect, Init, Login, ProfileInfo};
 use tokio_util::sync::CancellationToken;
 
@@ -223,17 +224,13 @@ impl ProfilePicker {
             Message::UnlockProfile => {
                 if let Screen::UnlockProfile { profile, password } = &self.screen {
                     let profile = profile.clone();
-                    let password = password.clone();
+                    let password = SecretSlice::new(password.as_bytes().into());
 
                     self.screen = Screen::Loading(t!("profile-picker.unlocking").to_string());
 
                     Action::Run(Task::future(async move {
-                        match Client::connect_profile(
-                            &profile,
-                            password.into_bytes(),
-                            CancellationToken::new(),
-                        )
-                        .await
+                        match Client::connect_profile(&profile, password, CancellationToken::new())
+                            .await
                         {
                             Ok(client) => Message::Profile(client),
                             Err(err) => Message::Error(ErrorDisplayInfo::new(

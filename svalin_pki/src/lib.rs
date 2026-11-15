@@ -16,6 +16,7 @@ mod verifier;
 
 // Re-Exports
 pub use curve25519_dalek;
+use secrecy::SecretBox;
 pub use sha2::Sha512;
 // needed for error matching
 pub use openmls;
@@ -60,11 +61,11 @@ pub enum GenerateKeyError {
 pub fn generate_key() -> Result<EncryptionKey, GenerateKeyError> {
     let rand = SystemRandom::new();
 
-    let mut key = [0u8; 32];
-    rand.fill(&mut key)
+    let mut key = Box::new([0u8; 32]);
+    rand.fill(key.as_mut_slice())
         .map_err(GenerateKeyError::UnspecifiedError)?;
 
-    Ok(EncryptionKey::dangerous_from_bytes(key))
+    Ok(EncryptionKey::dangerous_from_bytes(SecretBox::new(key)))
 }
 
 pub fn generate_short_code() -> String {

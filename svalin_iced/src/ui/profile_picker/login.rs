@@ -5,6 +5,7 @@ use iced::{
     Task, Widget,
     widget::{button, column, text, text_input},
 };
+use secrecy::SecretSlice;
 use svalin::client::{Client, Login, LoginError};
 use tokio_util::sync::CancellationToken;
 
@@ -113,7 +114,7 @@ impl LoginDialog {
 
                         self.state = State::Loading(t!("profile-picker.login-loading").to_string());
                         let username = self.username.clone();
-                        let password = self.password.clone().into_bytes();
+                        let password = SecretSlice::new(self.password.as_bytes().into());
                         let totp = self.current_totp.clone();
                         Action::Run(Task::future(async move {
                             let login_result = login.login(username, password.clone(), totp).await;

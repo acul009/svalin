@@ -5,6 +5,7 @@ use crate::store::server_store::{SessionStore, UserStore};
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage};
+use secrecy::{ExposeSecret, SecretSlice};
 use serde::{Deserialize, Serialize};
 use svalin_pki::argon2::password_hash::rand_core::OsRng;
 use svalin_pki::secure_chain::ChainDigest;
@@ -362,7 +363,7 @@ impl TakeableCommandHandler for LoginHandler {
 
 pub struct Login {
     pub username: Vec<u8>,
-    pub password: Vec<u8>,
+    pub password: SecretSlice<u8>,
     pub totp: String,
 }
 
@@ -533,8 +534,11 @@ impl TakeableCommandDispatcher for Login {
             let username_clone = self.username.clone();
             let password_clone = self.password.clone();
             let blocking_handle = tokio::task::spawn_blocking(move || {
-                let (client, strong_username) =
-                    client.start_augmentation_strong(&username_clone, &password_clone, &mut OsRng);
+                let (client, strong_username) = client.start_augmentation_strong(
+                    &username_clone,
+                    password_clone.expose_secret(),
+                    &mut OsRng,
+                );
 
                 username_send
                     .send(

@@ -42,6 +42,7 @@ windows-registry = "0.6.1"
 windows-service = "0.8.1"
 tracing-appender = "0.2.5"
 sqlx.workspace = true
+secrecy = "0.10.3"
 
 [package.metadata.deb]
 depends = "libc6 (>= 2.31)"

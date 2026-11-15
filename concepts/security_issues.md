@@ -135,3 +135,13 @@ If this occurs, trust-store updates could be delayed indefinitely while readers 
 ### Intended fix
 
 Use a synchronization strategy with documented protection against writer starvation, or restructure trust-store access so readers cannot indefinitely prevent updates. Select the implementation and verify writer progress under sustained concurrent reads on supported platforms.
+
+## SEC-011: Secrets are distributed too widely in memory
+
+**Status:** Open; known issue reported by the project owner.
+
+Secret values are copied and passed around too widely in memory, increasing the number of places that hold sensitive material and making its lifetime harder to control.
+
+### Intended fix
+
+Use `BoxedSecret` and `BoxedSlice` for secret storage and handling to reduce unnecessary copies and keep secret ownership and lifetimes explicit.

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
 use aucpace::{AuCPaceClient, ClientMessage};
+use secrecy::{ExposeSecret, SecretSlice};
 use serde::{Deserialize, Serialize};
 use svalin_pki::argon2::password_hash::rand_core::OsRng;
 use svalin_pki::mls::provider::{ExportedMlsStore, SvalinStorage};
@@ -177,7 +178,7 @@ pub struct ClientInitSuccess {
 pub struct Init {
     root: Credential,
     username: Vec<u8>,
-    password: Vec<u8>,
+    password: SecretSlice<u8>,
     totp: totp_rs::Totp,
 }
 
@@ -185,7 +186,7 @@ impl Init {
     pub fn new(
         totp: totp_rs::Totp,
         username: Vec<u8>,
-        password: Vec<u8>,
+        password: SecretSlice<u8>,
     ) -> Result<Self, CreateCredentialsError> {
         let root = Credential::generate_root()?;
 
@@ -243,7 +244,7 @@ impl CommandDispatcher for Init {
         let (_username, secret_exponent, params, verifier) = match pace_client
             .register_alloc_strong(
                 &self.username,
-                &self.password,
+                self.password.expose_secret(),
                 hasher.params().clone(),
                 hasher,
             )

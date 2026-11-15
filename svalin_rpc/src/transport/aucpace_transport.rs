@@ -1,4 +1,5 @@
 use aucpace::{AuCPaceClient, AuCPaceServer, ClientMessage, ServerMessage};
+use secrecy::SecretBox;
 use serde::{Deserialize, Serialize, de};
 use sha2::digest::generic_array::GenericArray;
 use std::pin::Pin;
@@ -482,13 +483,13 @@ impl<'de> de::Visitor<'de> for AuthenticatorVisitor {
     }
 }
 
-pub fn key_to_array(key: GenericArray<u8, typenum::U64>) -> [u8; 32] {
-    [
+pub fn key_to_array(key: GenericArray<u8, typenum::U64>) -> SecretBox<[u8; 32]> {
+    SecretBox::new(Box::new([
         key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7], key[8], key[9], key[10],
         key[11], key[12], key[13], key[14], key[15], key[16], key[17], key[18], key[19], key[20],
         key[21], key[22], key[23], key[24], key[25], key[26], key[27], key[28], key[29], key[30],
         key[31],
-    ]
+    ]))
 }
 
 impl<T: SessionTransport> AsyncRead for AucPaceTransport<T> {

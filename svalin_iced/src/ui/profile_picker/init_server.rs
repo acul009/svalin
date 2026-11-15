@@ -5,6 +5,7 @@ use iced::{
     Task, Widget,
     widget::{button, column, image, text, text_input},
 };
+use secrecy::SecretSlice;
 use svalin::client::{Client, Init};
 use tokio_util::sync::CancellationToken;
 use totp_rs::Totp;
@@ -161,17 +162,15 @@ impl InitServer {
                                     Some(init) => init,
                                 };
                                 let username = self.username.clone();
-                                let password = self.password.clone();
+                                let password: SecretSlice<u8> =
+                                    SecretSlice::new(self.password.as_bytes().into());
                                 let totp = totp.clone();
 
                                 self.state =
                                     State::Loading(t!("profile-picker.init-loading").to_string());
 
                                 Action::Run(Task::future(async move {
-                                    match init
-                                        .init(username, password.clone().into_bytes(), totp)
-                                        .await
-                                    {
+                                    match init.init(username, password.clone(), totp).await {
                                         Err(err) => Message::Error(ErrorDisplayInfo::new(
                                             Arc::new(err),
                                             t!("profile-picker.error.server-init"),
@@ -179,7 +178,7 @@ impl InitServer {
                                         Ok(profile) => {
                                             let client = match Client::connect_profile(
                                                 &profile,
-                                                password.into(),
+                                                password,
                                                 CancellationToken::new(),
                                             )
                                             .await

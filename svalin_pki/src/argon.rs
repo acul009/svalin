@@ -1,6 +1,7 @@
 use anyhow::Result;
 use argon2::{Argon2, Params, password_hash::ParamsString};
 use rand::RngExt;
+use secrecy::{ExposeSecret, SecretBox, SecretSlice};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zeroize::Zeroize;
@@ -156,17 +157,20 @@ impl ArgonParams {
         }
     }
 
-    async fn derive_key(&self, mut secret: Vec<u8>) -> Result<[u8; 32], DeriveKeyError> {
+    async fn derive_key(
+        &self,
+        mut secret: SecretSlice<u8>,
+    ) -> Result<SecretBox<[u8; 32]>, DeriveKeyError> {
         let argon = self.cost.get_argon_hasher();
 
         let salt_bytes = self.salt.as_slice().to_owned();
 
         let result = tokio::task::spawn_blocking(move || {
             // tracing::trace!("running blocking task");
-            let mut hash = [0u8; 32];
+            let mut hash = Box::new([0u8; 32]);
             let result = argon
-                .hash_password_into(&secret, &salt_bytes, &mut hash)
-                .map(move |_| hash)
+                .hash_password_into(secret.expose_secret(), &salt_bytes, hash.as_mut_slice())
+                .map(move |_| SecretBox::new(hash))
                 .map_err(DeriveKeyError::HashError);
 
             secret.zeroize();
@@ -179,14 +183,20 @@ impl ArgonParams {
         result
     }
 
-    pub async fn derive_encryption_key(&self, secret: Vec<u8>) -> anyhow::Result<EncryptionKey> {
+    pub async fn derive_encryption_key(
+        &self,
+        secret: SecretSlice<u8>,
+    ) -> anyhow::Result<EncryptionKey> {
         let hash = self.derive_key(secret).await?;
         Ok(EncryptionKey::dangerous_from_bytes(hash))
     }
 
-    pub async fn derive_password_hash(self, secret: Vec<u8>) -> Result<PasswordHash> {
+    pub async fn derive_password_hash(self, secret: SecretSlice<u8>) -> Result<PasswordHash> {
         let hash = self.derive_key(secret).await?;
-        Ok(PasswordHash { params: self, hash })
+        Ok(PasswordHash {
+            params: self,
+            hash: hash.expose_secret().clone(),
+        })
     }
 
     pub fn get_argon_hasher<'a>(&self) -> Argon2<'a> {
@@ -201,18 +211,19 @@ pub struct PasswordHash {
 }
 
 impl PasswordHash {
-    pub async fn verify(&self, secret: Vec<u8>) -> Result<bool> {
+    pub async fn verify(&self, secret: SecretSlice<u8>) -> Result<bool> {
         let hash = self.params.derive_key(secret).await?;
-        Ok(self.hash == hash)
+        Ok(&self.hash == hash.expose_secret())
     }
 }
 
 #[cfg(test)]
 mod test {
+    use secrecy::SecretSlice;
 
     #[tokio::test]
     async fn test_hash() {
-        let password = "testpass".as_bytes().to_owned();
+        let password: SecretSlice<u8> = b"testpass".to_vec().into();
 
         let params = super::ArgonParams::basic();
         let hashed = params.derive_password_hash(password.clone()).await.unwrap();

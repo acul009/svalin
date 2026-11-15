@@ -7,6 +7,7 @@ use ring::aead::{
     AES_256_GCM, Aad, BoundKey, CHACHA20_POLY1305, NONCE_LEN, Nonce, NonceSequence, OpeningKey,
     SealingKey, UnboundKey,
 };
+use secrecy::{ExposeSecret, SecretBox};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use zeroize::ZeroizeOnDrop;
 
@@ -26,17 +27,15 @@ impl From<EncryptionAlgorithm> for &'static ring::aead::Algorithm {
 }
 
 #[derive(ZeroizeOnDrop)]
-pub struct EncryptionKey([u8; 32]);
+pub struct EncryptionKey(SecretBox<[u8; 32]>);
 
 impl EncryptionKey {
-    pub fn dangerous_from_bytes(key: [u8; 32]) -> Self {
+    pub fn dangerous_from_bytes(key: SecretBox<[u8; 32]>) -> Self {
         Self(key)
     }
-}
 
-impl AsRef<[u8; 32]> for EncryptionKey {
-    fn as_ref(&self) -> &[u8; 32] {
-        &self.0
+    pub fn expose_secret(&self) -> &[u8; 32] {
+        self.0.expose_secret()
     }
 }
 
@@ -167,7 +166,7 @@ impl EncryptedData {
         let mut nonce_mask = [0u8; NONCE_LEN];
         rng().fill_bytes(&mut nonce_mask);
 
-        let unbound = UnboundKey::new(ring_alg, encryption_key.0.as_ref())
+        let unbound = UnboundKey::new(ring_alg, encryption_key.expose_secret())
             .map_err(EncryptError::CreateUnboundError)?;
         let mut sealing = SealingKey::new(unbound, NonceCounter::new(nonce_mask.clone()));
 
@@ -187,7 +186,7 @@ impl EncryptedData {
     pub fn decrypt(mut self, encryption_key: &EncryptionKey) -> Result<Vec<u8>, DecryptError> {
         let ring_alg = self.alg.into();
 
-        let unbound = UnboundKey::new(ring_alg, encryption_key.0.as_ref())
+        let unbound = UnboundKey::new(ring_alg, encryption_key.expose_secret())
             .map_err(DecryptError::CreateUnboundError)?;
         let mut opening = OpeningKey::new(unbound, NonceCounter::new(self.nonce_mask));
 

@@ -1,5 +1,6 @@
 use std::{panic, process, time::Duration};
 
+use secrecy::SecretSlice;
 use std::net::ToSocketAddrs;
 use svalin_pki::get_current_timestamp;
 use test_log::test;
@@ -55,17 +56,13 @@ async fn integration_tests() {
 
     let totp_secret = Totp::default();
     let username = "admin".to_string();
-    let password = "admin".to_string();
+    let password: SecretSlice<u8> = b"admin".to_vec().into();
 
     tracing::trace!("running init on first connect");
     let profile_name = match first_connect {
         crate::client::FirstConnect::Login(_) => unreachable!(),
         crate::client::FirstConnect::Init(init) => init
-            .init(
-                username.clone(),
-                password.clone().into_bytes(),
-                totp_secret.clone(),
-            )
+            .init(username.clone(), password.clone(), totp_secret.clone())
             .await
             .unwrap(),
     };
@@ -121,7 +118,7 @@ async fn integration_tests() {
             login
                 .login(
                     username.clone(),
-                    password.clone().into_bytes(),
+                    password.clone(),
                     totp_secret.generate_current().to_string(),
                 )
                 .await
@@ -133,13 +130,9 @@ async fn integration_tests() {
 
     let client_cancel = CancellationToken::new();
 
-    let client = Client::connect_profile(
-        &profile_name,
-        password.clone().into_bytes(),
-        client_cancel.clone(),
-    )
-    .await
-    .unwrap();
+    let client = Client::connect_profile(&profile_name, password.clone(), client_cancel.clone())
+        .await
+        .unwrap();
 
     let (mut client_state, mut client_state_updates) = client.subscribe_state().await.unwrap();
 

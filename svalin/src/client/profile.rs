@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use crate::{client::tunnel_manager::TunnelManager, store::client_store::ClientStore};
 use anyhow::{Context, Result, anyhow};
+use secrecy::SecretSlice;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{
     ArgonParams, Certificate, Credential, EncryptedCredential, ExactVerififier, RootCertificate,
@@ -126,7 +127,7 @@ impl Client {
         upstream_certificate: Certificate,
         root_certificate: RootCertificate,
         device_credentials: Credential,
-        password: Vec<u8>,
+        password: SecretSlice<u8>,
         trust_store: &TrustStore,
     ) -> Result<String> {
         anyhow::ensure!(!name.trim().is_empty(), "Profile name is required");
@@ -206,7 +207,7 @@ impl Client {
 
     pub async fn connect_profile(
         profile_key: &str,
-        password: Vec<u8>,
+        password: SecretSlice<u8>,
         cancel: CancellationToken,
     ) -> Result<Arc<Self>> {
         let Some(profile) = Self::get_profile(&profile_key).await? else {

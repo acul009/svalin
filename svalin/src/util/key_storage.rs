@@ -1,4 +1,5 @@
 use anyhow::Result;
+use secrecy::SecretBox;
 use serde::{Deserialize, Serialize};
 use svalin_pki::{Credential, EncryptedCredential, EncryptionKey};
 
@@ -7,19 +8,21 @@ use svalin_pki::{Credential, EncryptedCredential, EncryptionKey};
 /// external key management systems should that be necessary one day
 #[derive(Serialize, Deserialize)]
 pub enum KeySource {
-    BuiltIn([u8; 32]),
+    BuiltIn(Box<[u8; 32]>),
 }
 
 impl KeySource {
     async fn to_key(&self) -> Result<EncryptionKey> {
         match self {
-            KeySource::BuiltIn(k) => Ok(EncryptionKey::dangerous_from_bytes(k.clone())),
+            KeySource::BuiltIn(k) => Ok(EncryptionKey::dangerous_from_bytes(SecretBox::new(
+                k.clone(),
+            ))),
         }
     }
 
     pub fn generate_builtin() -> Result<Self> {
         let key = svalin_pki::generate_key()?;
-        Ok(Self::BuiltIn(key.as_ref().clone()))
+        Ok(Self::BuiltIn(Box::new(key.expose_secret().clone())))
     }
 
     pub async fn encrypt_credential(

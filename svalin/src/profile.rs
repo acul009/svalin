@@ -6,19 +6,28 @@ pub mod warnings;
 pub enum Update {
     TrustStore(svalin_pki::secure_chain::UncheckedBlock<svalin_pki::trust_store::Transaction>),
     Persistent(persistent::Update),
+    ConnectionState(ConnectionState),
 }
 
 use anyhow::{Context, Result};
-use svalin_pki::Credential;
+use secrecy::SecretSlice;
 use svalin_pki::trust_store::TrustStore;
+use svalin_pki::{Credential, TrustStoreVerifier, Verifier};
+use svalin_rpc::rpc::client::RpcClient;
+use svalin_rpc::rpc::connection::Connection;
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 use crate::client::Profile;
+use crate::shared::commands::get_user_credentials::GetUserCredential;
 use crate::store::client_store::ClientStore;
 use crate::util::location::{Location, LocationError};
 use crate::util::trust_store::read_trust_store;
+use crate::verifier;
 
 pub struct ProfileState {
     connection_info: ConnectionInfo,
+    connection_state: ConnectionState,
     client_store: ClientStore,
     trust_store: Arc<RwLock<TrustStore>>,
     persistent: persistent::State,
@@ -26,6 +35,28 @@ pub struct ProfileState {
 }
 
 impl ProfileState {
+    pub fn connect(&mut self, send: mpsc::Sender<Update>) -> Result<()> {
+        if !matches!(self.connection_state, ConnectionState::Disconnected) {
+            anyhow::bail!("already connecting");
+        }
+        let cancel = CancellationToken::new();
+        self.connection_state = ConnectionState::Connecting(cancel.clone());
+
+        let verifier = TrustStoreVerifier::new(self.trust_store.clone());
+        let connection_info = self.connection_info.clone();
+        tokio::spawn(async move {
+            let result = connect_internal(send.clone(), connection_info, cancel, verifier).await;
+            if let Err(err) = result {
+                tracing::error!("connection failed: {err:?}");
+                let _ = send
+                    .send(Update::ConnectionState(ConnectionState::Disconnected))
+                    .await;
+            }
+        });
+
+        todo!()
+    }
+
     pub fn update(&mut self, update: Update) -> Result<()> {
         match update {
             Update::TrustStore(block) => {
@@ -34,46 +65,86 @@ impl ProfileState {
                 trust_store.apply(block);
                 let devices = self.persistent.update_from_trust_store(
                     &trust_store,
-                    self.connection_info.device_credential.certificate().issuer(),
+                    self.connection_info
+                        .device_credential
+                        .certificate()
+                        .issuer(),
                 );
                 for device in devices {
-                    self.warnings.update_device_warnings(&self.persistent, &device);
+                    self.warnings
+                        .update_device_warnings(&self.persistent, &device);
                 }
             }
             Update::Persistent(update) => {
                 let device = self.persistent.update(update);
-                self.warnings.update_device_warnings(&self.persistent, &device);
+                self.warnings
+                    .update_device_warnings(&self.persistent, &device);
+            }
+            Update::ConnectionState(state) => {
+                self.connection_state = state;
             }
         }
         Ok(())
     }
 }
 
+async fn connect_internal(
+    send: mpsc::Sender<Update>,
+    connection_info: ConnectionInfo,
+    cancel: CancellationToken,
+    verifier: TrustStoreVerifier,
+) -> Result<()> {
+    let connection_info = connection_info;
+    let rpc = RpcClient::connect(
+        &connection_info.upstream_address,
+        Some(&connection_info.device_credential),
+        verifier.to_tls_verifier(),
+        cancel,
+    )
+    .await?;
+
+    let user_credential = rpc
+        .upstream_connection()
+        .dispatch(GetUserCredential)
+        .await?;
+    let key = user_credential
+        .params
+        .derive_encryption_key(connection_info.password)
+        .await?;
+    let user_credential = user_credential.credential.decrypt(&key)?;
+
+    todo!();
+    Ok(())
+}
+
 pub enum ConnectionState {
-    Connecting,
+    Connecting(CancellationToken),
     Connected,
     Disconnected,
 }
 
+#[derive(Clone)]
 pub struct ConnectionInfo {
     device_credential: Credential,
     upstream_address: String,
+    password: SecretSlice<u8>,
 }
 
-pub async fn unlock(profile_name: &str, password: Vec<u8>) -> Result<ProfileState> {
+pub async fn unlock(profile_name: &str, password: SecretSlice<u8>) -> Result<ProfileState> {
     let profile = get_profile(profile_name)
         .await?
         .context("Profile not found")?;
 
     let key = profile
         .local_credential_params
-        .derive_encryption_key(password)
+        .derive_encryption_key(password.clone())
         .await?;
     let device_credential = profile.device_credential.decrypt(&key)?;
 
     let connection_info = ConnectionInfo {
         device_credential,
         upstream_address: profile.upstream_address,
+        password,
     };
 
     let profile_dir = profile_dir(profile_name).await?;
@@ -97,6 +168,7 @@ pub async fn unlock(profile_name: &str, password: Vec<u8>) -> Result<ProfileStat
 
     Ok(ProfileState {
         connection_info,
+        connection_state: ConnectionState::Disconnected,
         client_store,
         trust_store: Arc::new(RwLock::new(trust_store)),
         persistent,

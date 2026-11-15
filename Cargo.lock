@@ -6194,6 +6194,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "secrecy"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
+dependencies = [
+ "zeroize",
+]
+
+[[package]]
 name = "security-framework"
 version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6957,6 +6966,7 @@ dependencies = [
  "rand 0.10.3",
  "reqwest",
  "rmp-serde",
+ "secrecy",
  "serde",
  "serde_json",
  "sqlx",
@@ -6996,6 +7006,7 @@ dependencies = [
  "open",
  "rfd",
  "rust-i18n",
+ "secrecy",
  "svalin",
  "svalin_pki",
  "svalin_rpc",
@@ -7030,6 +7041,7 @@ dependencies = [
  "ring",
  "rmp-serde",
  "rustls",
+ "secrecy",
  "serde",
  "sha2 0.10.9",
  "sqlx",
@@ -7050,6 +7062,7 @@ dependencies = [
  "aucpace",
  "quinn",
  "rmp-serde",
+ "secrecy",
  "serde",
  "sha2 0.10.9",
  "svalin_pki",
