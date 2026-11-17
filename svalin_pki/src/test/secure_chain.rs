@@ -46,7 +46,7 @@ impl secure_chain::ChainState for State {
 
     fn check(
         &self,
-        _signer: &crate::SpkiHash,
+        _signer: &crate::Certificate,
         _time: u64,
         transaction: &Self::Transaction,
     ) -> Result<(), Self::Error> {
@@ -62,7 +62,7 @@ impl secure_chain::ChainState for State {
         }
     }
 
-    fn apply(&mut self, _signer: &crate::SpkiHash, _time: u64, transaction: &Self::Transaction) {
+    fn apply(&mut self, _signer: &crate::Certificate, _time: u64, transaction: &Self::Transaction) {
         self.number += transaction.add;
     }
 
@@ -100,7 +100,9 @@ fn test_simple_chain() {
         let transaction = Transaction {
             add: rand::random_range(1..=10),
         };
+        let previous_number = chain.state().number;
         let packaged = chain.package(transaction, &credential).unwrap();
+        assert_eq!(chain.state().number, previous_number);
         chain.apply(packaged);
     }
 
@@ -111,24 +113,32 @@ fn test_simple_chain() {
         let transaction = Transaction {
             add: rand::random_range(1..=10),
         };
+        let previous_number = chain.state().number;
         let packaged = chain.package(transaction, &credential).unwrap();
-        saved.push(packaged.as_unchecked().clone());
+        assert_eq!(chain.state().number, previous_number);
+        saved.push(packaged.pack().clone());
         chain.apply(packaged);
     }
 
     let mut chain2: secure_chain::Chain<State> = Chain::import(exported).unwrap();
 
     for packaged in saved.into_iter() {
-        let checked = chain2.check(packaged, credential.certificate()).unwrap();
+        let previous_number = chain2.state().number;
+        let checked = chain2
+            .check(packaged, credential.certificate().clone())
+            .unwrap();
+        assert_eq!(chain2.state().number, previous_number);
         chain2.apply(checked);
     }
     assert_eq!(chain.state().number, chain2.state().number);
-    assert_eq!(chain.digest(), chain2.digest());
+    assert_eq!(chain.sequence(), chain2.sequence());
 
     let broken = chain
         .package(Transaction { add: 100 }, &credential)
         .unwrap()
-        .as_unchecked()
+        .pack()
         .clone();
-    chain2.check(broken, credential.certificate()).unwrap_err();
+    chain2
+        .check(broken, credential.certificate().clone())
+        .unwrap_err();
 }

@@ -7,6 +7,7 @@ use crate::client::state::persistent;
 
 use super::{close_handle::CloseHandle, trust_store_transaction_store::TrustStoreTransactionStore};
 
+#[derive(Clone)]
 pub struct ClientStore {
     pool: SqlitePool,
     transaction_store: Arc<TrustStoreTransactionStore>,

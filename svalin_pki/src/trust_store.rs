@@ -46,11 +46,11 @@ impl TrustStore {
             .chain
             .state()
             .certificates
-            .get(block.signer())
+            .get(block.signed_by())
             .ok_or(CheckBlockError::InvalidTransaction(Error::SignerNotKnown))?
             .clone();
 
-        self.chain.check(block, &certificate)
+        self.chain.check(block, certificate)
     }
 
     pub fn apply(&mut self, block: CheckedBlock<Transaction>) {
@@ -222,6 +222,8 @@ pub enum Error {
     CertificateNotFound,
     #[error("certificate does not match")]
     CertificateDoesNotMatch,
+    #[error("signer does not match")]
+    SignerDoesNotMatch,
 }
 
 impl ChainState for State {
@@ -232,11 +234,17 @@ impl ChainState for State {
 
     fn check(
         &self,
-        signer: &SpkiHash,
+        signer: &Certificate,
         time: u64,
         transaction: &Self::Transaction,
     ) -> Result<(), Self::Error> {
-        let signer = self.certificates.get(signer).ok_or(Error::SignerNotKnown)?;
+        let found_signer = self
+            .certificates
+            .get(signer.spki_hash())
+            .ok_or(Error::SignerNotKnown)?;
+        if found_signer != signer {
+            return Err(Error::SignerDoesNotMatch);
+        }
         signer.check_validity_at(time)?;
         match transaction {
             Transaction::Add(certificate) => {
@@ -264,7 +272,7 @@ impl ChainState for State {
         Ok(())
     }
 
-    fn apply(&mut self, _signer: &SpkiHash, time: u64, transaction: &Self::Transaction) {
+    fn apply(&mut self, _signer: &Certificate, time: u64, transaction: &Self::Transaction) {
         match transaction {
             Transaction::Add(unverified_certificate) => {
                 let signer = self
@@ -580,14 +588,14 @@ mod tests {
         let transaction = Transaction::Add(agent.certificate().clone().to_unverified());
         state
             .check(
-                root.certificate().spki_hash(),
+                root.certificate(),
                 historical_time.unix_timestamp() as u64,
                 &transaction,
             )
             .unwrap();
         assert!(matches!(
             state.check(
-                root.certificate().spki_hash(),
+                root.certificate(),
                 now.unix_timestamp() as u64,
                 &transaction
             ),

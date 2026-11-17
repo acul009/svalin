@@ -9,6 +9,7 @@ pub mod realtime_status;
 pub mod recreate_device_group;
 pub mod request_system_report;
 pub mod terminal;
+pub mod trust_store_update;
 pub mod update_agent;
 pub mod update_mls;
 pub mod update_trust_store;

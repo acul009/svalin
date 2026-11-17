@@ -145,3 +145,17 @@ Secret values are copied and passed around too widely in memory, increasing the 
 ### Intended fix
 
 Use `BoxedSecret` and `BoxedSlice` for secret storage and handling to reduce unnecessary copies and keep secret ownership and lifetimes explicit.
+
+## SEC-012: Trust-store state digest lacks an explicit multihash construction
+
+**Status:** Open; construction gap confirmed by source inspection; exploit not demonstrated.
+
+**Affected code:** [`State::digest`](../svalin_pki/src/trust_store.rs), consumed by [`Chain::digest`](../svalin_pki/src/secure_chain.rs).
+
+The trust-store state digest feeds the root certificate's DER bytes followed by the stored certificates' DER bytes, sorted by SPKI hash, directly into one hash context. It does not use a structured multi-input hashing construction with explicit domain separation, field roles, and sequence framing. Separate hash-update calls do not encode boundaries between inputs.
+
+The current certificates are DER-encoded, which supplies internal length information, so missing explicit framing alone does not establish that two valid trust-store states can produce the same hash input. Nevertheless, the construction relies on those encoding constraints rather than an explicit multi-input hashing contract, making future changes harder to assess safely. This concerns hashing multiple values, not algorithm-identifying multihash formats.
+
+### Intended fix
+
+Use a reviewed multi-input hashing construction, such as SequenceHash with SHA-2, and explicitly distinguish the trust-store state domain, root certificate, and ordered certificate sequence. Preserve deterministic ordering and add tests for field and sequence boundaries. Changing this construction changes trust-store digests and requires a compatibility strategy for existing peers.

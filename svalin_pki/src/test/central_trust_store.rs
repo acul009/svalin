@@ -35,7 +35,7 @@ fn test_trust_store() {
         .unwrap_err();
 
     let block = root_store.add(cert.clone(), &root_credential).unwrap();
-    let unchecked = block.as_unchecked().clone();
+    let unchecked = block.pack().clone();
     root_store.apply(block);
     let exported = root_store.export();
 

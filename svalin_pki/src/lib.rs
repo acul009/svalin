@@ -9,6 +9,7 @@ pub mod mls;
 pub mod secure_chain;
 pub mod serde_paramsstring;
 pub mod serde_saltstring;
+pub mod signed_object;
 #[cfg(test)]
 mod test;
 pub mod trust_store;

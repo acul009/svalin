@@ -4,7 +4,8 @@ pub mod persistent;
 pub mod warnings;
 
 pub enum Update {
-    TrustStore(svalin_pki::secure_chain::UncheckedBlock<svalin_pki::trust_store::Transaction>),
+    TrustStore(svalin_pki::secure_chain::CheckedBlock<svalin_pki::trust_store::Transaction>),
+    TrustStoreReady,
     Persistent(persistent::Update),
     ConnectionState(ConnectionState),
 }
@@ -17,12 +18,14 @@ use svalin_rpc::rpc::client::RpcClient;
 use svalin_rpc::rpc::connection::Connection;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 
 use crate::client::Profile;
 use crate::shared::commands::get_user_credentials::GetUserCredential;
-use crate::store::client_store::ClientStore;
+use crate::store::client_store::{self, ClientStore};
+use crate::store::trust_store_transaction_store::TrustStoreTransactionStore;
 use crate::util::location::{Location, LocationError};
-use crate::util::trust_store::read_trust_store;
+use crate::util::trust_store::{read_trust_store, update_trust_store};
 use crate::verifier;
 
 pub struct ProfileState {
@@ -42,10 +45,18 @@ impl ProfileState {
         let cancel = CancellationToken::new();
         self.connection_state = ConnectionState::Connecting(cancel.clone());
 
-        let verifier = TrustStoreVerifier::new(self.trust_store.clone());
         let connection_info = self.connection_info.clone();
+        let trust_store = self.trust_store.clone();
+        let client_store = self.client_store.clone();
         tokio::spawn(async move {
-            let result = connect_internal(send.clone(), connection_info, cancel, verifier).await;
+            let result = connect_internal_1(
+                send.clone(),
+                connection_info,
+                cancel,
+                trust_store,
+                client_store,
+            )
+            .await;
             if let Err(err) = result {
                 tracing::error!("connection failed: {err:?}");
                 let _ = send
@@ -61,7 +72,6 @@ impl ProfileState {
         match update {
             Update::TrustStore(block) => {
                 let mut trust_store = self.trust_store.write().unwrap();
-                let block = trust_store.check(block)?;
                 trust_store.apply(block);
                 let devices = self.persistent.update_from_trust_store(
                     &trust_store,
@@ -88,18 +98,19 @@ impl ProfileState {
     }
 }
 
-async fn connect_internal(
+async fn connect_internal_1(
     send: mpsc::Sender<Update>,
     connection_info: ConnectionInfo,
     cancel: CancellationToken,
-    verifier: TrustStoreVerifier,
+    trust_store: Arc<RwLock<TrustStore>>,
+    client_store: ClientStore,
 ) -> Result<()> {
     let connection_info = connection_info;
     let rpc = RpcClient::connect(
         &connection_info.upstream_address,
         Some(&connection_info.device_credential),
-        verifier.to_tls_verifier(),
-        cancel,
+        TrustStoreVerifier::new(trust_store.clone()).to_tls_verifier(),
+        cancel.clone(),
     )
     .await?;
 
@@ -119,7 +130,7 @@ async fn connect_internal(
 
 pub enum ConnectionState {
     Connecting(CancellationToken),
-    Connected,
+    UpdatingTrustStore(CancellationToken),
     Disconnected,
 }
 
