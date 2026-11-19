@@ -1,0 +1,3 @@
+[submodule "crypto/structured_digest"]
+	path = crypto/structured_digest
+	url = https://github.com/acul009/structured_digest.git
