@@ -1,6 +1,7 @@
 use std::{marker::PhantomData, ops::Deref};
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use structured_digest::prelude::*;
 
 use crate::{Certificate, Credential, SpkiHash, verifier::Verifier};
 
@@ -51,6 +52,17 @@ where
 
     pub fn signed_by(&self) -> &SpkiHash {
         &self.signer_spki_hash
+    }
+}
+
+impl<T> Digestable for SignedObject<T> {
+    fn digest(&self, hasher: &mut impl structured_digest::Hasher) -> structured_digest::Finished {
+        hasher
+            .digest_struct()
+            .field("payload", &self.payload.as_slice())
+            .field("signature", self.signature.as_slice())
+            .field("signer", self.signer_spki_hash.as_slice())
+            .finish()
     }
 }
 

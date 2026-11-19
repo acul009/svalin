@@ -1,6 +1,7 @@
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha512_256};
+use sha2::Sha512_256;
+use structured_digest::prelude::*;
 
 use crate::signed_object::{SignedObject, SignedObjectError, VerifiedObject};
 use crate::{Certificate, Credential, UnverifiedCertificate, get_current_timestamp};
@@ -24,7 +25,7 @@ impl BlockDigest {
     }
 }
 
-pub trait ChainState: Sized {
+pub trait State: Sized + Digestable {
     type Transaction: Transaction + Serialize + DeserializeOwned + Clone;
     type Error: std::error::Error;
     type Exported: Serialize + DeserializeOwned;
@@ -37,8 +38,6 @@ pub trait ChainState: Sized {
         transaction: &Self::Transaction,
     ) -> Result<(), Self::Error>;
     fn apply(&mut self, signer: &Certificate, time: u64, transaction: &Self::Transaction);
-    fn revert(&mut self, transaction: &Self::Transaction);
-    fn digest(&self, digest: &mut impl sha2::Digest);
     fn export(&self) -> Self::Exported;
     fn import(exported: Self::Exported) -> Result<Self, Self::ImportError>;
 }
@@ -77,14 +76,14 @@ impl TimeRatchetMode {
     }
 }
 
-pub struct Chain<State: ChainState> {
-    last_block: Option<CheckedBlock<State::Transaction>>,
+pub struct Chain<S: State> {
+    last_block: Option<CheckedBlock<S::Transaction>>,
     time_ratchet: TimeRatchetMode,
-    state: State,
+    state: S,
 }
 
-impl<State: ChainState> Chain<State> {
-    pub fn initialize(state: State) -> Self {
+impl<S: State> Chain<S> {
+    pub fn initialize(state: S) -> Self {
         Self {
             last_block: None,
             time_ratchet: TimeRatchetMode::now(),
@@ -92,15 +91,15 @@ impl<State: ChainState> Chain<State> {
         }
     }
 
-    pub fn state(&self) -> &State {
+    pub fn state(&self) -> &S {
         &self.state
     }
 
     pub fn package(
         &self,
-        transaction: State::Transaction,
+        transaction: S::Transaction,
         credential: &Credential,
-    ) -> Result<CheckedBlock<State::Transaction>, CreateBlockError<State::Error>> {
+    ) -> Result<CheckedBlock<S::Transaction>, CreateBlockError<S::Error>> {
         let timestamp = get_current_timestamp();
         if let Err(reason) = self
             .state
@@ -133,9 +132,9 @@ impl<State: ChainState> Chain<State> {
 
     pub fn check(
         &self,
-        block: UncheckedBlock<State::Transaction>,
+        block: UncheckedBlock<S::Transaction>,
         certificate: Certificate,
-    ) -> Result<CheckedBlock<State::Transaction>, CheckBlockError<State::Error>> {
+    ) -> Result<CheckedBlock<S::Transaction>, CheckBlockError<S::Error>> {
         let block = block.verify_signature(certificate)?;
 
         if let Some(last) = &self.last_block {
@@ -176,30 +175,14 @@ impl<State: ChainState> Chain<State> {
         Ok(block)
     }
 
-    pub fn apply(&mut self, block: CheckedBlock<State::Transaction>) {
+    pub fn apply(&mut self, block: CheckedBlock<S::Transaction>) {
         self.state
             .apply(&block.signed_by(), block.time, &block.transaction);
 
         self.last_block = Some(block);
     }
 
-    pub(crate) fn digest(&self) -> ChainDigest {
-        let mut ctx = Sha512_256::new();
-        let block_digest = self
-            .last_block
-            .as_ref()
-            .map_or(BlockDigest::empty(), |b| b.digest());
-        ctx.update(block_digest.as_ref());
-        self.state.digest(&mut ctx);
-        let digest = ctx.finalize().into();
-
-        ChainDigest {
-            digest,
-            sequence: self.sequence(),
-        }
-    }
-
-    pub fn export(&self) -> ExportedChain<State> {
+    pub fn export(&self) -> ExportedChain<S> {
         let Some(last_block) = &self.last_block else {
             panic!("cannot export empty chain")
         };
@@ -211,8 +194,8 @@ impl<State: ChainState> Chain<State> {
         }
     }
 
-    pub fn import(exported: ExportedChain<State>) -> Result<Self, ImportError<State::ImportError>> {
-        let state = State::import(exported.state).map_err(ImportError::ImportError)?;
+    pub fn import(exported: ExportedChain<S>) -> Result<Self, ImportError<S::ImportError>> {
+        let state = S::import(exported.state).map_err(ImportError::ImportError)?;
         let signer = exported.last_block_signer.mark_as_trusted();
         let last_block = exported.last_block.verify_signature(signer)?;
         Ok(Self {
@@ -231,19 +214,45 @@ impl<State: ChainState> Chain<State> {
     pub fn enable_real_time_ratchet(&mut self) {
         self.time_ratchet = TimeRatchetMode::RealTime;
     }
+
+    pub fn digest(&self) -> ChainDigest {
+        let mut hasher = StructuredHasher::<Sha512_256>::new();
+        hasher.add_item(&self);
+        let digest = hasher.finalize();
+        ChainDigest {
+            digest: digest.try_into().expect("digest should be 32 bytes"),
+            sequence: self.sequence(),
+        }
+    }
+}
+
+impl<S: State> Digestable for Chain<S> {
+    fn digest(&self, hasher: &mut impl structured_digest::Hasher) -> structured_digest::Finished {
+        hasher
+            .digest_struct()
+            .field("last_block", self.last_block.as_ref().map(|b| b.digest()))
+            .field("state", &self.state)
+            .finish()
+    }
+}
+
+impl Digestable for BlockDigest {
+    fn digest(&self, hasher: &mut impl structured_digest::Hasher) -> structured_digest::Finished {
+        hasher.digest_scalar(self.0.as_slice())
+    }
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ExportedChain<State: ChainState> {
-    state: State::Exported,
-    last_block: UncheckedBlock<State::Transaction>,
+pub struct ExportedChain<S: State> {
+    state: S::Exported,
+    last_block: UncheckedBlock<S::Transaction>,
     last_block_signer: UnverifiedCertificate,
     time_ratchet: u64,
 }
-impl<State> Clone for ExportedChain<State>
+impl<S> Clone for ExportedChain<S>
 where
-    State: ChainState,
-    State::Exported: Clone,
+    S: State,
+    S::Exported: Clone,
 {
     fn clone(&self) -> Self {
         Self {

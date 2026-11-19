@@ -6917,6 +6917,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
+name = "structured_digest"
+version = "0.1.0"
+dependencies = [
+ "digest 0.11.3",
+]
+
+[[package]]
 name = "subsecond"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7031,6 +7038,7 @@ dependencies = [
  "anyhow",
  "argon2",
  "curve25519-dalek 4.1.3",
+ "digest 0.10.7",
  "hex",
  "openmls",
  "openmls_rust_crypto",
@@ -7043,8 +7051,9 @@ dependencies = [
  "rustls",
  "secrecy",
  "serde",
- "sha2 0.10.9",
+ "sha2 0.11.1",
  "sqlx",
+ "structured_digest",
  "thiserror 2.0.21",
  "time",
  "tokio",
@@ -7064,7 +7073,7 @@ dependencies = [
  "rmp-serde",
  "secrecy",
  "serde",
- "sha2 0.10.9",
+ "sha2 0.11.1",
  "svalin_pki",
  "test-log",
  "thiserror 2.0.21",

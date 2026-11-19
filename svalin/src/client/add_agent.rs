@@ -36,7 +36,7 @@ impl Client {
             .unwrap()
             .add(cert, &self.user_credential)?;
         self.message_sender
-            .send_with_feedback(MessageFromClient::TrustStore(block.as_unchecked().clone()))
+            .send_with_feedback(MessageFromClient::TrustStore(block.pack().clone()))
             .await
             .map_err(|_| AddToTrustStoreError::UploadToServerError)?;
         self.store.transaction_store().add(&block).await?;

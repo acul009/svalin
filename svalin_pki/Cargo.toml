@@ -21,11 +21,13 @@ zeroize = { workspace = true, features = ["aarch64", "derive", "std"] }
 openmls = { workspace = true, features = ["openmls_rust_crypto"] }
 openmls_traits.workspace = true
 sha2.workspace = true
+digest.workspace = true
 openmls_rust_crypto.workspace = true
 openmls_sqlx_storage.workspace = true
 curve25519-dalek = { workspace = true, features = ["serde", "digest", "rand_core"] }
 hex = "0.4.3"
 secrecy = "0.10.3"
+structured_digest.workspace = true
 
 [dev-dependencies]
 sqlx = { workspace = true, features = ["sqlite", "migrate", "runtime-tokio"] }

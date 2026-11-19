@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 
 use serde::{Deserialize, Serialize};
+use structured_digest::prelude::*;
 
 use crate::{
     Credential,
@@ -37,7 +38,7 @@ pub enum Error {
     TooSmall,
 }
 
-impl secure_chain::ChainState for State {
+impl secure_chain::State for State {
     type Transaction = Transaction;
 
     type Error = Error;
@@ -66,14 +67,6 @@ impl secure_chain::ChainState for State {
         self.number += transaction.add;
     }
 
-    fn revert(&mut self, transaction: &Self::Transaction) {
-        self.number -= transaction.add;
-    }
-
-    fn digest(&self, digest: &mut impl sha2::Digest) {
-        digest.update(self.number.to_le_bytes());
-    }
-
     fn export(&self) -> Self::Exported {
         Self::Exported {
             number: self.number,
@@ -85,6 +78,12 @@ impl secure_chain::ChainState for State {
             number: exported.number,
             allow_wrong_transaction: false,
         })
+    }
+}
+
+impl Digestable for State {
+    fn digest(&self, hasher: &mut impl structured_digest::Hasher) -> structured_digest::Finished {
+        hasher.digest_struct().field("number", self.number).finish()
     }
 }
 
