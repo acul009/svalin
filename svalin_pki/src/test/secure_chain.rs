@@ -81,7 +81,7 @@ impl secure_chain::State for State {
     }
 }
 
-impl Digestable for State {
+impl Digestible for State {
     fn digest(&self, hasher: &mut impl structured_digest::Hasher) -> structured_digest::Finished {
         hasher.digest_struct().field("number", self.number).finish()
     }

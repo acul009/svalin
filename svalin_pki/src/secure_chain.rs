@@ -25,7 +25,7 @@ impl BlockDigest {
     }
 }
 
-pub trait State: Sized + Digestable {
+pub trait State: Sized + Digestible {
     type Transaction: Transaction + Serialize + DeserializeOwned + Clone;
     type Error: std::error::Error;
     type Exported: Serialize + DeserializeOwned;
@@ -226,7 +226,7 @@ impl<S: State> Chain<S> {
     }
 }
 
-impl<S: State> Digestable for Chain<S> {
+impl<S: State> Digestible for Chain<S> {
     fn digest(&self, hasher: &mut impl structured_digest::Hasher) -> structured_digest::Finished {
         hasher
             .digest_struct()
@@ -236,7 +236,7 @@ impl<S: State> Digestable for Chain<S> {
     }
 }
 
-impl Digestable for BlockDigest {
+impl Digestible for BlockDigest {
     fn digest(&self, hasher: &mut impl structured_digest::Hasher) -> structured_digest::Finished {
         hasher.digest_scalar(self.0.as_slice())
     }

@@ -21,7 +21,6 @@ zeroize = { workspace = true, features = ["aarch64", "derive", "std"] }
 openmls = { workspace = true, features = ["openmls_rust_crypto"] }
 openmls_traits.workspace = true
 sha2.workspace = true
-digest.workspace = true
 openmls_rust_crypto.workspace = true
 openmls_sqlx_storage.workspace = true
 curve25519-dalek = { workspace = true, features = ["serde", "digest", "rand_core"] }

@@ -55,7 +55,7 @@ where
     }
 }
 
-impl<T> Digestable for SignedObject<T> {
+impl<T> Digestible for SignedObject<T> {
     fn digest(&self, hasher: &mut impl structured_digest::Hasher) -> structured_digest::Finished {
         hasher
             .digest_struct()
